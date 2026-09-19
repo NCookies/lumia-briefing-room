@@ -609,7 +609,7 @@ def test_구멍을_사이에_둔_카운터_변화는_태그가_아니다():
 > **진행 방식**: §8의 "확인 필요" 항목은 별도 확인 단계로 멈추지 않는다. 구현하면서 실제 동작으로 검증한다. 완료한 항목은 아래 체크박스에 표시한다.
 
 - [x] **1. 골격** — `profiles/`, `video/session.py`, `video/segments.py`, `video/frames.py`. 세션 폴더 + 매치 시각 → ROI 프레임 스트림. probe 스크립트 로직을 옮기는 것에 가깝다
-- [ ] **2. 배지 검출기** — `detect/color.py`, `detect/badge.py`, `detect/intervals.py`. ★ 여기까지만 해도 교전 구간이 나온다
+- [x] **2. 배지 검출기** — `detect/color.py`, `detect/badge.py`, `detect/intervals.py`. ★ 여기까지만 해도 교전 구간이 나온다
 - [ ] **3. 사망 검출기** — `detect/death.py`. death 태그 + 사망 구간 제외
 - [ ] **4. 카운터 판독** — `detect/glyph.py`, `detect/counter.py`, `tools/build_templates.py`. kill / assist 태그
 - [ ] **5. 낮/밤·일차** — `detect/daynight.py`
