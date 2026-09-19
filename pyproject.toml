@@ -1,0 +1,18 @@
+[project]
+name = "lumia-briefing-room"
+version = "0.1.0"
+description = "이터널 리턴 교전 클립 자동 추출기"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "opencv-python-headless>=4.8",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

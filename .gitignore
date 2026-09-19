@@ -1,0 +1,45 @@
+# 미디어 / 스크린샷 — 저장소에 넣지 않는다
+*.mp4
+*.mkv
+*.m4s
+*.mpd
+*.mov
+*.avi
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.webp
+!docs/**/*.png
+!docs/**/*.jpg
+
+# 단, 라벨링용 소형 프레임 크롭은 예외로 저장소에 둔다
+!tests/data/frames/*.png
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+
+# 스크래치패드 / 임시
+scratchpad/
+*.tmp
+*.raw
+
+# 설정 / 로컬 상태 (실행 시 생성)
+config.local.json
+*.log
+
+# 에디터
+.vscode/
+.idea/
+*.swp
