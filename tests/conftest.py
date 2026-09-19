@@ -5,6 +5,8 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+import cv2
+import numpy as np
 import pytest
 
 from lumia_briefing_room.config import discover_ffmpeg
@@ -23,6 +25,40 @@ def ffmpeg_path() -> Path | None:
 def make_synthetic_session():
     """테스트가 tmp_path 와 함께 호출할 세션 빌더 함수를 넘긴다."""
     return build_synthetic_session
+
+
+def render_digit_alpha(
+    digit: int, *, height: int = 17, width: int = 12
+) -> np.ndarray:
+    """숫자 하나를 실제 폰트 안티에일리어싱으로 렌더링해 알파(0~1) 맵으로 낸다.
+
+    real 게임 폰트는 아니지만, 안티에일리어싱된 글자 모양·매칭 알고리즘을
+    실제 폰트 없이도 진짜와 가깝게 검증할 수 있다.
+    """
+    canvas = np.zeros((height, width), dtype=np.uint8)
+    cv2.putText(
+        canvas, str(digit), (1, height - 2), cv2.FONT_HERSHEY_SIMPLEX,
+        0.5, 255, 1, cv2.LINE_AA,
+    )
+    return canvas.astype(np.float32) / 255.0
+
+
+def compose_alpha(alpha: np.ndarray, background: tuple[int, int, int]) -> np.ndarray:
+    """알파 맵을 배경색 위에 합성해 RGB 크롭(uint8)을 만든다."""
+    bg = np.array(background, dtype=np.float32)
+    a = alpha[..., None]
+    composed = a * 255.0 + (1 - a) * bg
+    return np.clip(composed, 0, 255).astype(np.uint8)
+
+
+@pytest.fixture
+def render_digit():
+    return render_digit_alpha
+
+
+@pytest.fixture
+def compose():
+    return compose_alpha
 
 
 def _read_top_level_boxes(data: bytes) -> list[tuple[bytes, int, int]]:
