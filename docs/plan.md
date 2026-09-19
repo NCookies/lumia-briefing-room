@@ -614,7 +614,7 @@ def test_구멍을_사이에_둔_카운터_변화는_태그가_아니다():
 - [x] **4. 카운터 판독** — `detect/glyph.py`, `detect/counter.py`, `tools/build_templates.py`. kill / assist 태그
 - [x] **5. 낮/밤** — `detect/daynight.py`. 일차 숫자 판독은 §8-5(타이머 글꼴 확인) 전까지 보류
 - [x] **6. 통합** — `detect/types.py`, `detect/match.py`, `cli/detect_match.py`. 매치 하나를 통째로 돌려 결과를 JSON 으로 출력
-- [ ] **7. 라벨링 도구** — `tools/collect_frames.py`, `tools/label_combat.py`, `tools/eval_detect.py`
+- [x] **7. 라벨링 도구** — `tools/collect_frames.py`, `tools/label_combat.py`, `tools/eval_detect.py`
 - [ ] **8. 실측 라벨셋으로 튜닝** — 실제 녹화본 5판 이상 라벨링 후 §8-8 파라미터 확정 (도구는 갖춰짐, 라벨셋 축적은 실사용과 함께 진행)
 
 **2번까지가 이 계획의 최소 목표였다.** 거기서 이미 "내가 참여한 모든 교전 구간"이 나오고, 3번 이후는 태그와 품질을 더하는 작업이다.
