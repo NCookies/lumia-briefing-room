@@ -16,6 +16,7 @@
 
 # 단, 라벨링용 소형 프레임 크롭은 예외로 저장소에 둔다
 !tests/data/frames/*.png
+!data/templates/**/*.png
 
 # Python
 __pycache__/
