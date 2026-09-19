@@ -103,22 +103,17 @@ class CounterEvent:
     delta: int
 
 
-def to_events(
-    readings: list[tuple[float, int | None]],
-    field: str,
-    *,
-    confirm_samples: int = CONFIRM_SAMPLES,
-) -> list[CounterEvent]:
-    """확정된 값이 바뀔 때만 이벤트를 만든다. (plan.md §5.5)
+def _confirmed_transitions(
+    readings: list[tuple[float, int | None]], confirm_samples: int
+):
+    """확정값이 바뀔 때마다 (시각, 이전값, 새값) 을 낸다. 이전값이 None 이면 첫 확정(기준값)이다.
 
     규칙:
       1) None(신뢰도 낮음/판독 실패)은 스트릭을 끊는다. 보간하지 않는다
       2) 같은 값이 confirm_samples 연속이어야 확정값이 된다
-      3) 첫 확정값은 매치 시작 시점의 기존 상태로 보고 이벤트를 만들지 않는다
-      4) 이후 확정값은 매치 내에서 줄지 않는다(단조) — 감소는 오판으로 버린다
-      5) 이벤트 시각은 그 값이 처음 보인 프레임이다(확정된 프레임이 아니라)
+      3) 확정값은 매치 내에서 줄지 않는다(단조) — 감소는 오판으로 버린다
+      4) 시각은 그 값이 처음 보인 프레임이다(확정된 프레임이 아니라)
     """
-    events: list[CounterEvent] = []
     confirmed: int | None = None
     pending_value: int | None = None
     pending_count = 0
@@ -142,14 +137,40 @@ def to_events(
 
         if confirmed is None:
             confirmed = v
+            yield (pending_first_t, None, v)
             continue
 
         if v == confirmed or v < confirmed:
             continue
 
-        events.append(
-            CounterEvent(t=pending_first_t, field=field, frm=confirmed, to=v, delta=v - confirmed)
-        )
+        yield (pending_first_t, confirmed, v)
         confirmed = v
 
-    return events
+
+def to_events(
+    readings: list[tuple[float, int | None]],
+    field: str,
+    *,
+    confirm_samples: int = CONFIRM_SAMPLES,
+) -> list[CounterEvent]:
+    """확정된 값이 바뀔 때만 이벤트를 만든다. (plan.md §5.5)
+
+    첫 확정값은 매치 시작 시점의 기존 상태로 보고 이벤트를 만들지 않는다.
+    """
+    return [
+        CounterEvent(t=t, field=field, frm=frm, to=to, delta=to - frm)
+        for t, frm, to in _confirmed_transitions(readings, confirm_samples)
+        if frm is not None
+    ]
+
+
+def final_confirmed_value(
+    readings: list[tuple[float, int | None]],
+    *,
+    confirm_samples: int = CONFIRM_SAMPLES,
+) -> int | None:
+    """스트림 전체에서 마지막으로 확정된 값. 변화가 없어도(예: 킬 0회) 값을 낸다."""
+    result: int | None = None
+    for _, _frm, to in _confirmed_transitions(readings, confirm_samples):
+        result = to
+    return result

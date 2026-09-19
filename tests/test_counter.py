@@ -1,7 +1,13 @@
 import numpy as np
 import pytest
 
-from lumia_briefing_room.detect.counter import CounterEvent, ReadResult, read_field, to_events
+from lumia_briefing_room.detect.counter import (
+    CounterEvent,
+    ReadResult,
+    final_confirmed_value,
+    read_field,
+    to_events,
+)
 from lumia_briefing_room.detect.glyph import build_template, text_score
 
 
@@ -116,6 +122,25 @@ def test_field_이름이_이벤트에_기록된다():
 
 def test_빈_readings는_빈_이벤트_목록():
     assert to_events([], "K") == []
+
+
+def test_final_confirmed_value_without_any_change():
+    readings = [r(0.0, 0), r(0.5, 0), r(1.0, 0)]
+    assert final_confirmed_value(readings) == 0
+
+
+def test_final_confirmed_value_reflects_last_confirmed():
+    readings = [r(0.0, 0), r(0.5, 0), r(1.0, 3), r(1.5, 3), r(2.0, 9), r(2.5, 9)]
+    assert final_confirmed_value(readings) == 9
+
+
+def test_final_confirmed_value_ignores_unconfirmed_trailing_noise():
+    readings = [r(0.0, 0), r(0.5, 0), r(1.0, 3), r(1.5, 3), r(2.0, 99)]
+    assert final_confirmed_value(readings) == 3
+
+
+def test_final_confirmed_value_none_when_never_confirmed():
+    assert final_confirmed_value([r(0.0, 1)]) is None
 
 
 def test_counter_event_is_frozen():
