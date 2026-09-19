@@ -473,6 +473,8 @@ class ResolutionProfile:
 - 구멍 옆에서 시작하거나 끝나는 교전 구간은 **경계가 잘렸을 수 있다**고 표시한다.
 - 구멍이 있으면 자체 검증(증가 횟수 == 최종값)이 당연히 안 맞는다. **검출기 실패로 집계하지 말 것.**
 
+> **구현 확인**: `video/frames.py` 는 요청받은 세그먼트 번호 중 존재하는 것만 골라 **번호가 연속인 구간별로 나눠 각각 별도 ffmpeg 호출로 디코딩한다.** 구멍을 사이에 두고 통째로 이어붙이면 fMP4 프래그먼트의 바이트 오프셋 참조가 깨져 디코딩이 중단된다(실측: NAL 유닛 크기가 쓰레기값으로 깨짐). 연속 구간별 분리 디코딩이 이 문제를 원천적으로 피한다.
+
 ```python
 @dataclass(frozen=True)
 class MatchDetection:
@@ -606,7 +608,7 @@ def test_구멍을_사이에_둔_카운터_변화는_태그가_아니다():
 
 > **진행 방식**: §8의 "확인 필요" 항목은 별도 확인 단계로 멈추지 않는다. 구현하면서 실제 동작으로 검증한다. 완료한 항목은 아래 체크박스에 표시한다.
 
-- [ ] **1. 골격** — `profiles/`, `video/session.py`, `video/segments.py`, `video/frames.py`. 세션 폴더 + 매치 시각 → ROI 프레임 스트림. probe 스크립트 로직을 옮기는 것에 가깝다
+- [x] **1. 골격** — `profiles/`, `video/session.py`, `video/segments.py`, `video/frames.py`. 세션 폴더 + 매치 시각 → ROI 프레임 스트림. probe 스크립트 로직을 옮기는 것에 가깝다
 - [ ] **2. 배지 검출기** — `detect/color.py`, `detect/badge.py`, `detect/intervals.py`. ★ 여기까지만 해도 교전 구간이 나온다
 - [ ] **3. 사망 검출기** — `detect/death.py`. death 태그 + 사망 구간 제외
 - [ ] **4. 카운터 판독** — `detect/glyph.py`, `detect/counter.py`, `tools/build_templates.py`. kill / assist 태그
