@@ -6,8 +6,10 @@
 
 ## 0. 진행 상태 (세션이 끊겨도 여기부터 이어간다)
 
-- [ ] 계획 수립 (이 문서)
-- [ ] FastAPI 백엔드 — 클립 목록/필터/재생/정리 REST API
+- [x] 계획 수립 (이 문서)
+- [x] `api/clips.py` — 클립 스캔 (scan_clips/find_clip/to_summary_dict)
+- [x] `api/filters.py` — 저장된 메타데이터 위에서 도는 UI 필터
+- [ ] FastAPI 라우트 (REST API 나머지)
 - [ ] React 프론트엔드 스캐폴딩 (Vite + TS + Tailwind)
 - [ ] 클립 목록 뷰 (카드 그리드)
 - [ ] 매치 타임라인 뷰
