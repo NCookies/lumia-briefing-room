@@ -148,6 +148,7 @@ python tools/rescore_clips.py     # 가중치를 고친 뒤 점수를 다시 계
 | `tools/label_combat.py` | 검출기 결과로 라벨 초안 생성 |
 | `tools/build_templates.py` | 라벨셋 → 숫자 본보기(npz) |
 | `tools/build_regions.py` | 라벨셋 → 지역명 본보기(npz) |
+| `tools/migrate_labels.py` | 클립을 새 경계로 다시 만들 때 옛 클립의 교전/사냥 라벨을 시간이 겹치는 새 클립으로 이관 |
 | `tools/backfill_day.py` | 이미 만든 클립의 일차·제목을 재처리 없이 채움 (클립 영상의 HUD 에서 읽음) |
 | `tools/rescore_clips.py` | 저장된 클립 메타데이터의 교전 점수를 재검출 없이 다시 계산 |
 | `tools/eval_pvp.py` | UI 에서 찍은 교전/사냥 라벨로 점수를 평가 (가중치·임계 튜닝) |
