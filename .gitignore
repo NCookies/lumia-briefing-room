@@ -44,3 +44,6 @@ config.local.json
 .vscode/
 .idea/
 *.swp
+
+# 검토용 HTML (커밋하지 않는다)
+review.html
