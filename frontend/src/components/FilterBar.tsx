@@ -1,12 +1,7 @@
+import { TAG_LABELS } from '../labels'
 import type { ClipTag } from '../types'
 
-const ALL_TAGS: ClipTag[] = ['kill', 'assist', 'death', 'no_result']
-const TAG_LABELS: Record<ClipTag, string> = {
-  kill: '킬',
-  assist: '어시스트',
-  death: '사망',
-  no_result: '무성과',
-}
+const ALL_TAGS: ClipTag[] = ['kill', 'assist', 'death', 'teammate_death', 'no_result']
 
 export interface FilterState {
   tags: ClipTag[]
@@ -14,6 +9,9 @@ export interface FilterState {
   gameMode: string
   pinnedOnly: boolean
   trashed: boolean
+  sort: 'pvp' | 'recent'
+  label: '' | 'unlabeled' | 'pvp' | 'pve'
+  minPvpScore: number
 }
 
 export const DEFAULT_FILTER: FilterState = {
@@ -22,12 +20,17 @@ export const DEFAULT_FILTER: FilterState = {
   gameMode: '',
   pinnedOnly: false,
   trashed: false,
+  sort: 'pvp',
+  label: '',
+  minPvpScore: 0,
 }
 
 interface Props {
   value: FilterState
   onChange: (next: FilterState) => void
 }
+
+const SELECT = 'rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm'
 
 export function FilterBar({ value, onChange }: Props) {
   const toggleTag = (tag: ClipTag) => {
@@ -37,6 +40,38 @@ export function FilterBar({ value, onChange }: Props) {
 
   return (
     <div className="flex flex-wrap items-center gap-3 border-b border-zinc-700 bg-zinc-800/40 px-4 py-3">
+      <select
+        className={SELECT}
+        value={value.sort}
+        onChange={(e) => onChange({ ...value, sort: e.target.value as FilterState['sort'] })}
+      >
+        <option value="pvp">교전 가능성순</option>
+        <option value="recent">최신순</option>
+      </select>
+
+      <select
+        className={SELECT}
+        value={value.label}
+        onChange={(e) => onChange({ ...value, label: e.target.value as FilterState['label'] })}
+      >
+        <option value="">라벨 전체</option>
+        <option value="unlabeled">라벨 안 한 것</option>
+        <option value="pvp">교전으로 라벨</option>
+        <option value="pve">사냥으로 라벨</option>
+      </select>
+
+      <label className="flex items-center gap-2 text-sm text-zinc-300">
+        점수 ≥ {Math.round(value.minPvpScore * 100)}%
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={5}
+          value={Math.round(value.minPvpScore * 100)}
+          onChange={(e) => onChange({ ...value, minPvpScore: Number(e.target.value) / 100 })}
+        />
+      </label>
+
       <div className="flex gap-1">
         {ALL_TAGS.map((tag) => (
           <button
@@ -55,7 +90,7 @@ export function FilterBar({ value, onChange }: Props) {
       </div>
 
       <select
-        className="rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm"
+        className={SELECT}
         value={value.dayNight}
         onChange={(e) => onChange({ ...value, dayNight: e.target.value })}
       >
@@ -65,7 +100,7 @@ export function FilterBar({ value, onChange }: Props) {
       </select>
 
       <select
-        className="rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm"
+        className={SELECT}
         value={value.gameMode}
         onChange={(e) => onChange({ ...value, gameMode: e.target.value })}
       >

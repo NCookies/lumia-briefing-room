@@ -39,6 +39,8 @@ def _aggregate_interval(intervals: list[CombatInterval]) -> CombatInterval:
     tags: frozenset[str] = frozenset()
     for iv in intervals:
         tags = tags | iv.tags
+    if len(tags) > 1:
+        tags = tags - {"no_result"}
     return CombatInterval(
         start=intervals[0].start,
         end=intervals[-1].end,

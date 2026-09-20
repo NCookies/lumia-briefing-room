@@ -153,3 +153,17 @@ def test_default_title_includes_region_when_known():
 
     assert default_title("day", "묘지") == "낮 묘지 교전"
     assert default_title("night") == "밤 교전"
+
+
+def test_aggregate_interval_drops_no_result_when_another_tag_exists():
+    from lumia_briefing_room.detect.types import CombatInterval
+    from lumia_briefing_room.pipeline.orchestrator import _aggregate_interval
+
+    def iv(tags):
+        return CombatInterval(
+            start=0, end=5, tags=frozenset(tags), k_delta=0, a_delta=0,
+            died=False, day_night="day", confidence=1.0,
+        )
+
+    assert _aggregate_interval([iv({"no_result"}), iv({"assist"})]).tags == frozenset({"assist"})
+    assert _aggregate_interval([iv({"no_result"}), iv({"no_result"})]).tags == frozenset({"no_result"})

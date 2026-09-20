@@ -3,14 +3,15 @@ import { deleteClipForever, listClips, patchClip, restoreClip, trashClip } from 
 import { ClipCard } from './components/ClipCard'
 import { DEFAULT_FILTER, FilterBar, type FilterState } from './components/FilterBar'
 import { PlayerModal } from './components/PlayerModal'
-import type { Clip } from './types'
+import { applyLabel, progress } from './labeling'
+import type { Clip, UserLabel } from './types'
 
 export default function App() {
   const [filter, setFilter] = useState<FilterState>(DEFAULT_FILTER)
   const [clips, setClips] = useState<Clip[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [playing, setPlaying] = useState<Clip | null>(null)
+  const [playingIndex, setPlayingIndex] = useState<number | null>(null)
 
   const reload = useCallback(() => {
     setLoading(true)
@@ -21,6 +22,9 @@ export default function App() {
       gameMode: filter.gameMode || undefined,
       pinned: filter.pinnedOnly || undefined,
       trashed: filter.trashed,
+      minPvpScore: filter.minPvpScore || undefined,
+      label: filter.label || undefined,
+      sort: filter.sort,
     })
       .then(setClips)
       .catch((e: Error) => setError(e.message))
@@ -57,10 +61,25 @@ export default function App() {
     reload()
   }
 
+  const handleLabel = (clip: Clip, label: UserLabel) => {
+    setClips((prev) => applyLabel(prev, clip.id, label))
+    patchClip(clip.id, { userLabel: label }).catch((e: Error) => {
+      setError(`라벨 저장 실패: ${e.message}`)
+      reload()
+    })
+  }
+
+  const { labeled, total } = progress(clips)
+
   return (
     <div className="flex min-h-screen flex-col bg-zinc-900 text-zinc-100">
-      <header className="border-b border-zinc-700 px-4 py-3">
+      <header className="flex items-baseline justify-between border-b border-zinc-700 px-4 py-3">
         <h1 className="text-xl font-semibold">루미아 브리핑룸</h1>
+        {!filter.trashed && total > 0 && (
+          <span className="text-sm text-zinc-400">
+            라벨 {labeled}/{total}
+          </span>
+        )}
       </header>
 
       <FilterBar value={filter} onChange={setFilter} />
@@ -75,23 +94,32 @@ export default function App() {
         )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {clips.map((clip) => (
+          {clips.map((clip, i) => (
             <ClipCard
               key={clip.id}
               clip={clip}
               trashed={filter.trashed}
-              onPlay={setPlaying}
+              onPlay={() => setPlayingIndex(i)}
               onTogglePin={handleTogglePin}
               onRename={handleRename}
               onTrash={handleTrash}
               onRestore={handleRestore}
               onDeleteForever={handleDeleteForever}
+              onLabel={handleLabel}
             />
           ))}
         </div>
       </main>
 
-      {playing && <PlayerModal clip={playing} onClose={() => setPlaying(null)} />}
+      {playingIndex !== null && clips[playingIndex] && (
+        <PlayerModal
+          clips={clips}
+          index={playingIndex}
+          onIndexChange={setPlayingIndex}
+          onLabel={handleLabel}
+          onClose={() => setPlayingIndex(null)}
+        />
+      )}
     </div>
   )
 }

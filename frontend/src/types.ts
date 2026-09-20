@@ -1,4 +1,12 @@
-export type ClipTag = 'kill' | 'assist' | 'death' | 'no_result'
+export type ClipTag =
+  | 'kill'
+  | 'assist'
+  | 'death'
+  | 'teammate_death'
+  | 'team_wipe'
+  | 'no_result'
+
+export type UserLabel = 'pvp' | 'pve' | null
 
 export interface Clip {
   id: string
@@ -22,6 +30,12 @@ export interface Clip {
   killDelta: number
   assistDelta: number
   died: boolean
+  pvpScore: number | null
+  pvpSignals: string[]
+  teamWipe: string | null
+  enemyRingMean: number | null
+  region: string | null
+  userLabel: UserLabel
   gameDay: number | null
   dayNight: 'day' | 'night' | null
   phaseIndex: number | null

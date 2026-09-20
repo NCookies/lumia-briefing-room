@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { thumbnailUrl } from '../api'
-import type { Clip } from '../types'
+import type { Clip, UserLabel } from '../types'
+import { LabelButtons } from './LabelButtons'
+import { ScoreChip } from './ScoreChip'
 import { TagBadge } from './TagBadge'
 
 interface Props {
@@ -12,12 +14,18 @@ interface Props {
   onTrash: (clip: Clip) => void
   onRestore: (clip: Clip) => void
   onDeleteForever: (clip: Clip) => void
+  onLabel: (clip: Clip, label: UserLabel) => void
 }
 
 function formatDuration(sec: number): string {
   const m = Math.floor(sec / 60)
   const s = Math.floor(sec % 60)
   return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+const BORDER: Record<string, string> = {
+  pvp: 'border-emerald-500/60',
+  pve: 'border-zinc-600 opacity-70',
 }
 
 export function ClipCard({
@@ -29,6 +37,7 @@ export function ClipCard({
   onTrash,
   onRestore,
   onDeleteForever,
+  onLabel,
 }: Props) {
   const [editing, setEditing] = useState(false)
   const [draftTitle, setDraftTitle] = useState(clip.title)
@@ -43,7 +52,11 @@ export function ClipCard({
   }
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-lg border border-zinc-700 bg-zinc-800/60">
+    <div
+      className={`flex flex-col overflow-hidden rounded-lg border bg-zinc-800/60 ${
+        (clip.userLabel && BORDER[clip.userLabel]) || 'border-zinc-700'
+      }`}
+    >
       <button
         type="button"
         className="group relative aspect-video w-full overflow-hidden bg-zinc-900"
@@ -56,17 +69,16 @@ export function ClipCard({
             className="h-full w-full object-cover transition-transform group-hover:scale-105"
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-zinc-500">
-            썸네일 없음
-          </div>
+          <div className="flex h-full items-center justify-center text-zinc-500">썸네일 없음</div>
         )}
         <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-xs">
           {formatDuration(clip.durationSec)}
         </span>
+        <span className="absolute left-1 top-1">
+          <ScoreChip score={clip.pvpScore} signals={clip.pvpSignals ?? []} />
+        </span>
         {clip.sourceIncomplete && (
-          <span className="absolute left-1 top-1 rounded bg-amber-600/90 px-1 text-xs">
-            일부 손실
-          </span>
+          <span className="absolute right-1 top-1 rounded bg-amber-600/90 px-1 text-xs">일부 손실</span>
         )}
       </button>
 
@@ -122,22 +134,25 @@ export function ClipCard({
               </button>
             </div>
           ) : (
-            <div className="flex gap-2 text-xs">
-              <button
-                type="button"
-                className={clip.pinned ? 'text-amber-400' : 'text-zinc-400 hover:text-amber-300'}
-                onClick={() => onTogglePin(clip)}
-              >
-                {clip.pinned ? '고정됨' : '고정'}
-              </button>
-              <button
-                type="button"
-                className="text-zinc-400 hover:text-rose-400"
-                onClick={() => onTrash(clip)}
-              >
-                삭제
-              </button>
-            </div>
+            <>
+              <LabelButtons value={clip.userLabel} onChange={(l) => onLabel(clip, l)} />
+              <div className="flex gap-2 text-xs">
+                <button
+                  type="button"
+                  className={clip.pinned ? 'text-amber-400' : 'text-zinc-400 hover:text-amber-300'}
+                  onClick={() => onTogglePin(clip)}
+                >
+                  {clip.pinned ? '고정됨' : '고정'}
+                </button>
+                <button
+                  type="button"
+                  className="text-zinc-400 hover:text-rose-400"
+                  onClick={() => onTrash(clip)}
+                >
+                  삭제
+                </button>
+              </div>
+            </>
           )}
         </div>
       </div>

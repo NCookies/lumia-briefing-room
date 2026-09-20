@@ -1,4 +1,4 @@
-import type { Clip } from './types'
+import type { Clip, UserLabel } from './types'
 
 const BASE = '/api'
 
@@ -8,6 +8,9 @@ export interface ClipQuery {
   gameMode?: string
   pinned?: boolean
   trashed?: boolean
+  minPvpScore?: number
+  label?: string
+  sort?: string
 }
 
 async function checkOk(res: Response, action: string): Promise<Response> {
@@ -24,14 +27,18 @@ export async function listClips(query: ClipQuery = {}): Promise<Clip[]> {
   if (query.gameMode) params.set('gameMode', query.gameMode)
   if (query.pinned) params.set('pinned', 'true')
   if (query.trashed) params.set('trashed', 'true')
+  if (query.minPvpScore) params.set('minPvpScore', String(query.minPvpScore))
+  if (query.label) params.set('label', query.label)
+  if (query.sort) params.set('sort', query.sort)
 
   const res = await checkOk(await fetch(`${BASE}/clips?${params}`), '클립 목록 조회')
-  return res.json()
+  const clips: Clip[] = await res.json()
+  return clips.map((c) => ({ ...c, userLabel: c.userLabel ?? null }))
 }
 
 export async function patchClip(
   id: string,
-  body: Partial<Pick<Clip, 'title' | 'pinned'>>,
+  body: Partial<Pick<Clip, 'title' | 'pinned'>> & { userLabel?: UserLabel },
 ): Promise<Clip> {
   const res = await checkOk(
     await fetch(`${BASE}/clips/${id}`, {

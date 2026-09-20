@@ -16,18 +16,29 @@ def iv(*, k=0, a=0, died=False, team=0, rings=None, start=0.0, end=20.0):
     )
 
 
-WEIGHTS = {"enemyRings": 0.7}
+WEIGHTS = {"enemyRings": 0.7, "death": 0.9, "teammateDeath": 0.8}
 
 
-def test_each_confirmed_signal_gives_full_score():
-    cases = {
-        "kill_delta": iv(k=1), "assist_delta": iv(a=2),
-        "death": iv(died=True), "teammate_death": iv(team=1),
-    }
-    for signal, interval in cases.items():
+def test_kill_and_assist_are_certain_because_only_players_count():
+    for interval, signal in ((iv(k=1), "kill_delta"), (iv(a=2), "assist_delta")):
         result = score_interval(interval, WEIGHTS)
         assert result.score == 1.0
         assert signal in result.signals
+
+
+def test_deaths_are_strong_but_not_certain_since_monsters_and_the_zone_also_kill():
+    mine = score_interval(iv(died=True), WEIGHTS)
+    mate = score_interval(iv(team=1), WEIGHTS)
+
+    assert mine.score == 0.9 and mine.signals == ["death"]
+    assert mate.score == 0.8 and mate.signals == ["teammate_death"]
+
+
+def test_strongest_evidence_wins_and_every_signal_is_listed():
+    result = score_interval(iv(died=True, team=1, rings=3.0), WEIGHTS)
+
+    assert result.score == 0.9
+    assert result.signals == ["death", "teammate_death", "enemy_rings"]
 
 
 def test_confirmed_evidence_beats_the_minimap_estimate():
@@ -54,6 +65,7 @@ def test_enemy_rings_scale_up_to_the_weight():
 def test_weights_are_configurable():
     assert score_interval(iv(rings=3.0), {"enemyRings": 0.5}).score == 0.5
     assert score_interval(iv(rings=3.0), {}).score == 0.0
+    assert score_interval(iv(died=True), {"death": 0.6}).score == 0.6
 
 
 def test_min_pvp_score_filters_generation_and_defaults_to_pass_all():
