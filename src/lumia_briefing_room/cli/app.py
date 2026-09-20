@@ -67,6 +67,44 @@ def apply_autostart_setting(cfg, *, app_name: str | None = None) -> None:
         autostart.disable(app_name=name)
 
 
+def make_watch_controller(args, *, auto_start: bool = True):
+    """트레이 "감시 중" 토글의 실제 시작/정지 배선. (plan-pipeline.md §3-5 해결)
+
+    `run()` 이 `should_stop` 으로 넘겨받는 `stop_event.is_set` 을 `tail_follow()` 가
+    유휴 폴링마다 확인하므로, 정지 요청은 다음 폴링 주기 안에 반영된다. 재개는
+    새 스레드로 `run()` 을 처음부터 다시 부르는 것과 같다 — 백로그 복구(run_once)는
+    `ProcessedState` 로 이미 처리한 매치를 다시 건드리지 않으니 안전하다.
+    """
+    state = {"thread": None, "stop_event": threading.Event(), "running": False}
+
+    def _start() -> None:
+        state["stop_event"].clear()
+        thread = threading.Thread(
+            target=_run_watch_safely, args=(args, state["stop_event"]), daemon=True
+        )
+        state["thread"] = thread
+        state["running"] = True
+        thread.start()
+
+    def _stop() -> None:
+        state["stop_event"].set()
+        state["running"] = False
+
+    def on_toggle_watch() -> None:
+        if state["running"]:
+            _stop()
+        else:
+            _start()
+
+    def watch_enabled() -> bool:
+        return state["running"]
+
+    if auto_start:
+        _start()
+
+    return on_toggle_watch, watch_enabled
+
+
 def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     args = build_parser().parse_args(argv)
@@ -74,8 +112,7 @@ def main(argv: list[str] | None = None) -> None:
     cfg = load_config(args.config)
     apply_autostart_setting(cfg)
 
-    watch_thread = threading.Thread(target=_run_watch_safely, args=(args,), daemon=True)
-    watch_thread.start()
+    on_toggle_watch, watch_enabled = make_watch_controller(args)
 
     on_open = make_on_open(
         host="127.0.0.1", port=resolve_port(cfg.ui.port), config_path=args.config
@@ -83,8 +120,8 @@ def main(argv: list[str] | None = None) -> None:
 
     icon = build_icon(
         on_open=on_open,
-        on_toggle_watch=_on_toggle_watch,
-        watch_enabled=lambda: True,  # TODO: 실제 정지/재개 배선 - 확인 필요(plan-pipeline.md §3)
+        on_toggle_watch=on_toggle_watch,
+        watch_enabled=watch_enabled,
         on_quit=lambda: _on_quit(),
     )
     _icon_ref["icon"] = icon
@@ -94,19 +131,13 @@ def main(argv: list[str] | None = None) -> None:
 _icon_ref: dict = {}
 
 
-def _run_watch_safely(args) -> None:
+def _run_watch_safely(args, stop_event: threading.Event) -> None:
     try:
-        run(args)
+        run(args, should_stop=stop_event.is_set)
     except SystemExit as exc:
         log.error("감시 스레드 종료: %s", exc)
     except Exception:
         log.exception("감시 스레드에서 처리되지 않은 예외")
-
-
-def _on_toggle_watch() -> None:
-    # TODO: run_forever 루프에 정지 신호를 보내는 배선이 없다. 지금은 표시만
-    # 바뀌지 않는다 - plan-pipeline.md §3 확인 필요.
-    log.warning("감시 정지/재개는 아직 구현되지 않았다")
 
 
 def _on_quit() -> None:

@@ -37,9 +37,9 @@
 - [x] `tray.py` — 메뉴 구조(순수 테스트) + `pystray.Icon` 배선. 실제 이벤트루프
   (`icon.run()`)는 GUI라 테스트 불가 — 수동 확인 필요 (§3 확인 필요 참고)
 - [x] `cli/app.py` — tray(메인 스레드) + watch(백그라운드 데몬 스레드)를 한 프로세스로,
-  부팅 시 `ui.autoStart` 설정을 레지스트리에 반영. **감시 정지/재개 토글은 아직
-  표시만 바뀌고 실제로 멈추지 않는다** (§3 확인 필요에 추가)
-- [ ] 열람 UI (SPEC 3단계) — 아직 손 안 댐. FastAPI + React, SPEC §4 참조
+  부팅 시 `ui.autoStart` 설정을 레지스트리에 반영. 감시 정지/재개 토글도 실제로
+  멈추고 다시 시작한다(`make_watch_controller`) — §3-5 해결, 아래 참고
+- [x] 열람 UI (SPEC 3단계) — FastAPI + React 로 완성. 자세한 내용은 [plan-ui.md](plan-ui.md) 참고
 
 **SPEC §6 2단계(파이프라인 자동화)가 여기서 사실상 완료됐다.** `python -m
 lumia_briefing_room.cli.app --recording-root ...` 하나로 트레이 상주 + 자동 시작 +
@@ -265,18 +265,17 @@ SPEC §2.6 은 버퍼 길이를 `session.mpd` → `localconfig.vdf` → 120분 �
   (또는 전역값)를 읽는 최소 VDF 파서를 만들면 된다. VDF 는 중첩 중괄호 기반의
   단순 텍스트 포맷이라 정규식 기반 파서로도 충분할 것으로 보인다(미검증).
 
-### 3-5. 트레이의 "감시 중" 토글이 실제로 감시를 멈추지 않는다
+### 3-5. 트레이의 "감시 중" 토글이 실제로 감시를 멈추지 않는다 — ✅ 해결됨
 
-`cli/app.py::_on_toggle_watch()` 는 로그만 남기고 아무 것도 안 한다. `run_forever()`
-는 애초에 "멈춰라" 신호를 받을 방법이 없다(무한 `for line in lines` 뿐).
-
-- **영향**: 사용자가 트레이 메뉴에서 "감시 중"을 눌러도 실제로는 계속 감시·처리한다.
-  단순 표시 오류가 아니라 **기능 자체가 없다.**
-- **막는가**: 아니다. 자동 감시가 기본 동작이고 끄고 싶은 경우는 부차적이다.
-- **고치는 방법**: `run_forever()` 가 `stop_event: threading.Event` 를 선택적으로 받아
-  매 반복 `stop_event.is_set()` 을 확인하고 빠져나오게 하면 된다 — `tail_follow()` 는
-  `poll_interval_sec` 마다 깨어나므로 반응 지연은 그 정도다. `cli/app.py` 가 그
-  `Event` 를 만들어 tray 콜백과 watch 스레드가 공유하게 배선하면 끝난다.
+`pipeline/playerlog.py::tail_follow()`/`_follow()` 에 `should_stop: Callable[[],
+bool]` 을 추가했다 — 유휴 폴링(새 줄이 없을 때) 중에 `should_stop()` 이 참이면
+제너레이터가 끝난다(이미 남아있는 줄은 멈추기 전에 마저 낸다). `run_forever()` 는
+`for line in lines:` 가 자연히 끝나는 것으로 빠져나오므로 별도 수정이 필요 없었다.
+`cli/watch.py::run()` 이 `should_stop` 을 받아 `tail_follow()` 에 그대로 넘기고,
+`cli/app.py::make_watch_controller()` 가 `threading.Event` 를 만들어 tray 콜백
+(정지→`event.set()`, 재개→새 감시 스레드 시작 + `event.clear()`)과 감시 스레드가
+공유하게 배선했다. TDD로 확인: `tail_follow` 의 정지 동작(2건) +
+`make_watch_controller` 의 시작/정지/자동시작(2건) 전부 테스트.
 
 ### 3-3. `cut_clip()` 의 오디오 먹싱 경로 — ✅ 실제 녹화본으로 검증됨
 

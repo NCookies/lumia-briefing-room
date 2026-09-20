@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from lumia_briefing_room.pipeline.playerlog import (
     LogEvent,
     LogEventType,
@@ -126,3 +128,34 @@ def test_tail_follow_start_at_end_skips_existing_content(tmp_path):
         f.write("new\n")
 
     assert next(gen) == "new\n"
+
+
+def test_tail_follow_stops_when_should_stop_becomes_true(tmp_path):
+    path = tmp_path / "log.txt"
+    path.write_text("", encoding="utf-8")
+
+    calls = {"n": 0}
+
+    def should_stop():
+        calls["n"] += 1
+        return calls["n"] > 2  # 몇 번의 유휴 폴링 후 멈춘다
+
+    gen = tail_follow(
+        path, start_at_end=False, poll_interval_sec=0.01, should_stop=should_stop
+    )
+
+    with pytest.raises(StopIteration):
+        next(gen)
+
+
+def test_tail_follow_yields_pending_lines_before_stopping(tmp_path):
+    path = tmp_path / "log.txt"
+    path.write_text("a\n", encoding="utf-8")
+
+    gen = tail_follow(
+        path, start_at_end=False, poll_interval_sec=0.01, should_stop=lambda: True
+    )
+
+    assert next(gen) == "a\n"
+    with pytest.raises(StopIteration):
+        next(gen)

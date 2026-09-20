@@ -42,3 +42,51 @@ def test_make_on_open_starts_server_once_and_opens_browser(monkeypatch):
 
     assert started == [("the-app", "127.0.0.1", 8123)]
     assert opened == ["http://127.0.0.1:8123/", "http://127.0.0.1:8123/"]
+
+
+def test_watch_controller_toggle_starts_and_stops(monkeypatch):
+    import threading
+    import time
+
+    started = threading.Event()
+    calls = []
+
+    def fake_run(args, *, should_stop=lambda: False):
+        calls.append(args)
+        started.set()
+        while not should_stop():
+            time.sleep(0.005)
+
+    monkeypatch.setattr("lumia_briefing_room.cli.app.run", fake_run)
+
+    from lumia_briefing_room.cli.app import make_watch_controller
+
+    on_toggle_watch, watch_enabled = make_watch_controller("fake-args", auto_start=False)
+    assert watch_enabled() is False
+
+    on_toggle_watch()  # 시작
+    assert started.wait(timeout=1.0)
+    assert watch_enabled() is True
+    assert calls == ["fake-args"]
+
+    on_toggle_watch()  # 정지
+    assert watch_enabled() is False
+
+
+def test_watch_controller_auto_start_runs_immediately(monkeypatch):
+    import threading
+
+    started = threading.Event()
+
+    def fake_run(args, *, should_stop=lambda: False):
+        started.set()
+        while not should_stop():
+            threading.Event().wait(0.005)
+
+    monkeypatch.setattr("lumia_briefing_room.cli.app.run", fake_run)
+
+    from lumia_briefing_room.cli.app import make_watch_controller
+
+    _on_toggle_watch, watch_enabled = make_watch_controller("fake-args", auto_start=True)
+    assert started.wait(timeout=1.0)
+    assert watch_enabled() is True

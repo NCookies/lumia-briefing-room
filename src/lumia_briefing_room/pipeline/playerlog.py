@@ -1,7 +1,7 @@
 import os
 import re
 import time
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
 from datetime import datetime, timezone, tzinfo
 from enum import Enum
@@ -90,9 +90,17 @@ def extract_matches(lines: Iterable[str], *, local_tz: tzinfo) -> list[MatchBoun
 
 
 def tail_follow(
-    path: Path, *, start_at_end: bool = True, poll_interval_sec: float = 1.0
+    path: Path,
+    *,
+    start_at_end: bool = True,
+    poll_interval_sec: float = 1.0,
+    should_stop: Callable[[], bool] = lambda: False,
 ) -> Iterator[str]:
-    """파일을 계속 지켜보며 새로 추가되는 줄을 낸다(`tail -f`). 끝나지 않는 제너레이터다.
+    """파일을 계속 지켜보며 새로 추가되는 줄을 낸다(`tail -f`).
+
+    `should_stop()` 이 참이 되면 유휴 대기(새 줄이 없을 때) 중에 멈춘다 — 이미
+    파일에 남아있는 줄은 멈추기 전에 마저 낸다. 기본값(`lambda: False`)이면
+    끝나지 않는 제너레이터다 (plan-pipeline.md §3-5: 트레이 감시 정지/재개 배선).
 
     파일을 열고 seek 하는 부분은 즉시(호출 시점에) 실행한다. 제너레이터 함수로
     통째로 만들면 본문이 첫 next() 호출까지 미뤄져, 그 사이 파일에 쓰인 내용을
@@ -101,14 +109,16 @@ def tail_follow(
     f = open(path, encoding="utf-8", errors="replace")
     if start_at_end:
         f.seek(0, os.SEEK_END)
-    return _follow(f, poll_interval_sec)
+    return _follow(f, poll_interval_sec, should_stop)
 
 
-def _follow(f, poll_interval_sec: float) -> Iterator[str]:
+def _follow(f, poll_interval_sec: float, should_stop: Callable[[], bool]) -> Iterator[str]:
     with f:
         while True:
             line = f.readline()
             if not line:
+                if should_stop():
+                    return
                 time.sleep(poll_interval_sec)
                 continue
             yield line

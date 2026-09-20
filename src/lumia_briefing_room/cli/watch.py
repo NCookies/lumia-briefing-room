@@ -89,7 +89,12 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def run(args: argparse.Namespace, *, now: Callable[[], datetime] = lambda: datetime.now(timezone.utc)) -> None:
+def run(
+    args: argparse.Namespace,
+    *,
+    now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+    should_stop: Callable[[], bool] = lambda: False,
+) -> None:
     cfg = load_config(args.config)
     ffmpeg_path = args.ffmpeg or discover_ffmpeg()
     if ffmpeg_path is None:
@@ -134,7 +139,11 @@ def run(args: argparse.Namespace, *, now: Callable[[], datetime] = lambda: datet
 
     log.info("Player.log 감시 시작: %s", player_log)
     run_forever(
-        tail_follow(player_log, poll_interval_sec=cfg.watch.poll_interval_ms / 1000),
+        tail_follow(
+            player_log,
+            poll_interval_sec=cfg.watch.poll_interval_ms / 1000,
+            should_stop=should_stop,
+        ),
         local_tz=local_tz, recording_root=recording_root, now=now,
         delay_sec=cfg.watch.delay_sec,
         rescue_threshold_min=cfg.watch.rescue_threshold_min,
