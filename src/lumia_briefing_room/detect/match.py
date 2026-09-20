@@ -18,7 +18,7 @@ from lumia_briefing_room.detect.daynight import read_day_night
 from lumia_briefing_room.detect.death import FaceStat, detect_death
 from lumia_briefing_room.detect.glyph import text_score
 from lumia_briefing_room.detect.intervals import to_intervals
-from lumia_briefing_room.detect.minimap import count_enemy_rings
+from lumia_briefing_room.detect.minimap import count_rings
 from lumia_briefing_room.detect.region import load_region_templates, read_region, region_score
 from lumia_briefing_room.detect.spectator import read_spectating
 from lumia_briefing_room.detect.teammate import combat_slots, dead_slots, new_deaths
@@ -29,6 +29,7 @@ from lumia_briefing_room.video.segments import SegmentRange, existing_segment_nu
 from lumia_briefing_room.video.session import RecordingSession
 
 TAG_TOLERANCE_SEC = 3.0
+WAITING_ROOM_REGIONS = frozenset({"브리핑 룸"})
 DEATH_LINK_SEC = 8.0
 MIN_SPECTATOR_SAMPLES = 2
 
@@ -99,9 +100,10 @@ def analyze_frame(
     if day_templates and spectating is not None:
         game_day = read_game_day(crop_roi(frame, profile.rois["day_digit"]), day_templates)
 
-    enemy_rings = None
+    enemy_rings = ally_rings = None
     if spectating is False:
-        enemy_rings = count_enemy_rings(crop_roi(frame, profile.rois["minimap"]))
+        counts = count_rings(crop_roi(frame, profile.rois["minimap"]))
+        enemy_rings, ally_rings = counts.enemy, counts.ally
 
     if spectating:
         combat = None
@@ -142,6 +144,7 @@ def analyze_frame(
         dead_teammates=dead_teammates,
         region=region,
         enemy_rings=enemy_rings,
+        ally_rings=ally_rings,
         game_day=game_day,
         team_combat=team_combat,
     )
@@ -212,8 +215,13 @@ def finalize_match(
         return any(a <= t <= b for a, b in spectator_ranges)
 
     def _fighting(s: FrameState) -> bool | None:
-        """내 배지 OR 팀원 전투. 배지는 구도를 잡거나 거리를 벌리는 동안 꺼지지만 팀원 링은 켜져 있다."""
-        if _spectating(s.t):
+        """내 배지 OR 팀원 전투. 배지는 구도를 잡거나 거리를 벌리는 동안 꺼지지만 팀원 링은 켜져 있다.
+
+        팀원 전투는 내 전투를 이어줄 뿐 스스로 구간을 시작하지 못한다(아래 필터) — 스플릿으로
+        팀원이 따로 싸우거나 끝난 교전의 여운으로 깜빡이는 링이 클립이 되면 안 된다. 브리핑 룸은
+        본게임 전 대기방이라 교전이 아니다.
+        """
+        if _spectating(s.t) or s.region in WAITING_ROOM_REGIONS:
             return False
         if s.combat is True or (use_team_combat and s.team_combat is True):
             return True
@@ -222,6 +230,11 @@ def finalize_match(
         return False
 
     combat_ranges = to_intervals([(s.t, _fighting(s)) for s in states])
+    if use_team_combat:
+        combat_ranges = [
+            (start, end) for start, end in combat_ranges
+            if any(s.combat is True and start <= s.t <= end for s in states)
+        ]
 
     face_stats = [
         FaceStat(t=s.t, value=s.face_value, sat=s.face_sat)

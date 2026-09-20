@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import cv2
 import numpy as np
 
@@ -8,6 +10,8 @@ MAX_RADIUS = 16
 RING_MIN_PIXELS = 25
 SAT_MIN = 110
 VAL_MIN = 110
+ALLY_HUE_MIN = 45
+ALLY_HUE_MAX = 260
 
 
 def _ring_hue(hsv: np.ndarray, gray_shape: tuple[int, int], x: int, y: int, r: int) -> int | None:
@@ -20,11 +24,17 @@ def _ring_hue(hsv: np.ndarray, gray_shape: tuple[int, int], x: int, y: int, r: i
     return int(np.median(px[:, 0])) * 2
 
 
-def count_enemy_rings(minimap_rgb: np.ndarray) -> int:
-    """SPEC §2.12: 미니맵의 원형 아이콘 링 중 빨강(적)의 개수.
+@dataclass(frozen=True)
+class RingCounts:
+    enemy: int
+    ally: int
+
+
+def count_rings(minimap_rgb: np.ndarray) -> RingCounts:
+    """SPEC §2.12: 미니맵의 원형 아이콘 링을 색으로 나눠 센다. 빨강 = 적, 노랑/초록/파랑 = 아군.
 
     배경 색 카운팅은 금지구역 빨강과 시야 원에 묻혀 못 쓴다. 원형 링을 먼저 찾고 테두리 색만 본다.
-    노랑/초록/파랑은 아군이며, 내 아이콘 색은 매치마다 달라 아군으로 셀 필요가 없다.
+    아군에는 내 아이콘도 들어간다(내 아이콘 색은 매치마다 달라 따로 특정하지 않는다).
     """
     bgr = cv2.cvtColor(minimap_rgb, cv2.COLOR_RGB2BGR)
     gray = cv2.medianBlur(cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY), 3)
@@ -33,12 +43,20 @@ def count_enemy_rings(minimap_rgb: np.ndarray) -> int:
         param1=100, param2=18, minRadius=MIN_RADIUS, maxRadius=MAX_RADIUS,
     )
     if circles is None:
-        return 0
+        return RingCounts(0, 0)
 
     hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
-    enemies = 0
+    enemy = ally = 0
     for x, y, r in np.uint16(np.around(circles))[0]:
         hue = _ring_hue(hsv, gray.shape, int(x), int(y), int(r))
-        if hue is not None and (hue < 15 or hue >= 345):
-            enemies += 1
-    return enemies
+        if hue is None:
+            continue
+        if hue < 15 or hue >= 345:
+            enemy += 1
+        elif ALLY_HUE_MIN <= hue < ALLY_HUE_MAX:
+            ally += 1
+    return RingCounts(enemy, ally)
+
+
+def count_enemy_rings(minimap_rgb: np.ndarray) -> int:
+    return count_rings(minimap_rgb).enemy

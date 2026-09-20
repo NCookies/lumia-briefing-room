@@ -38,3 +38,21 @@ def test_a_flat_red_zone_without_rings_is_not_an_enemy():
     img[40:200, 30:250] = (200, 40, 40)
 
     assert count_enemy_rings(img) == 0
+
+
+def test_count_rings_separates_enemy_and_ally_rings():
+    from lumia_briefing_room.detect.minimap import count_rings
+
+    rgb = _map([((80, 80), RED), ((200, 90), YELLOW), ((150, 200), GREEN), ((260, 240), BLUE)])
+    counts = count_rings(rgb)
+
+    assert counts.enemy == 1
+    assert counts.ally == 3
+
+
+def test_count_rings_of_an_empty_map_is_zero():
+    from lumia_briefing_room.detect.minimap import count_rings
+
+    counts = count_rings(_map([]))
+
+    assert (counts.enemy, counts.ally) == (0, 0)

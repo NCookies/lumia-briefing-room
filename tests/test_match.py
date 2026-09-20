@@ -592,16 +592,45 @@ def test_finalize_match_bridges_a_badge_gap_while_a_teammate_is_fighting():
     assert len(badge_only) == 2
 
 
-def test_finalize_match_starts_an_interval_from_team_combat_alone():
+def test_finalize_match_never_starts_an_interval_from_team_combat_alone():
     states = [_tc_state(0.0, False, False), _tc_state(3.0, False, True), _tc_state(6.0, False, True),
               _tc_state(9.0, False, False)]
 
-    assert len(finalize_match(states).intervals) == 1
-    assert finalize_match(states, use_team_combat=False).intervals == []
+    assert finalize_match(states).intervals == []
+
+
+def test_finalize_match_team_combat_extends_an_interval_that_has_my_own_badge():
+    states = [_tc_state(0.0, False, False), _tc_state(3.0, True, False), _tc_state(6.0, True, True),
+              _tc_state(9.0, False, True), _tc_state(12.0, False, True), _tc_state(15.0, False, False)]
+
+    interval = finalize_match(states).intervals[0]
+
+    assert (interval.start, interval.end) == (3.0, 12.0)
 
 
 def test_finalize_match_unread_team_state_does_not_hide_a_badge_reading():
     states = [_tc_state(0.0, False, None), _tc_state(3.0, True, None), _tc_state(6.0, True, None),
               _tc_state(9.0, False, None)]
+
+    assert len(finalize_match(states).intervals) == 1
+
+
+def _room_state(t, combat, region):
+    return FrameState(
+        t=t, combat=combat, face_value=111.0, face_sat=26.0, k=0, a=0,
+        day_night="day", spectating=False, region=region,
+    )
+
+
+def test_finalize_match_ignores_the_pre_match_waiting_room():
+    states = [_room_state(0.0, False, "브리핑 룸"), _room_state(3.0, True, "브리핑 룸"),
+              _room_state(6.0, True, "브리핑 룸"), _room_state(9.0, False, "브리핑 룸")]
+
+    assert finalize_match(states).intervals == []
+
+
+def test_finalize_match_still_detects_fights_outside_the_waiting_room():
+    states = [_room_state(0.0, False, "묘지"), _room_state(3.0, True, "묘지"),
+              _room_state(6.0, True, "묘지"), _room_state(9.0, False, "묘지")]
 
     assert len(finalize_match(states).intervals) == 1
