@@ -12,6 +12,13 @@
 - [x] FastAPI 라우트 (`api/app.py`) — 클립 목록/조회/수정/삭제/복구/영구삭제,
   Range 지원 비디오 스트리밍, 썸네일, 설정 조회/저장. TestClient 로 전부 테스트
   (실제 서버 안 띄우고 ASGI 로 직접 호출 — 빠르고 결정적)
+
+**✅ 진짜 uvicorn 서버 + 진짜 클립으로도 확인했다.** `process_match()` 로 만든
+실제 클립(78MB HEVC mp4)을 서빙하는 실제 서버에 curl 로 요청했다:
+`GET /api/clips` 가 실제 메타데이터를 정확히 반환, `Range: bytes=0-1023` 요청에
+`206 Partial Content` + `Content-Range: bytes 0-1023/78557811` 정상 응답,
+썸네일도 28KB 그대로 서빙됐다. TestClient(ASGI 직접호출)와 실제 TCP 서버
+양쪽에서 Range 구현이 큰 파일에도 정확히 동작함을 확인했다.
 - [ ] React 프론트엔드 스캐폴딩 (Vite + TS + Tailwind)
 - [ ] 클립 목록 뷰 (카드 그리드)
 - [ ] 매치 타임라인 뷰
