@@ -22,6 +22,7 @@ class FrameState:
     dead_teammates: tuple[int, ...] | None = None
     region: str | None = None
     enemy_rings: int | None = None
+    game_day: int | None = None
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,7 @@ class CombatInterval:
     teammate_deaths: int = 0
     region: str | None = None
     enemy_ring_mean: float | None = None
+    game_day: int | None = None
 
 
 @dataclass(frozen=True)

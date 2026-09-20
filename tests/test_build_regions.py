@@ -57,3 +57,23 @@ def test_build_region_templates_reads_back_every_name_regardless_of_text_color(t
     for name, seed in (("묘지", 1), ("학교", 2)):
         for tint in ((255, 255, 255), (255, 40, 40), (255, 160, 30)):
             assert read_region(region_score(_crop(seed, tint)), templates).name == name
+
+
+def test_white_score_option_builds_templates_that_ignore_background_color(tmp_path):
+    from build_regions import build_region_templates
+    from lumia_briefing_room.detect.day import white_score
+
+    rng = np.random.default_rng(5)
+    mask = rng.random((26, 15)) > 0.5
+
+    def crop(bg):
+        img = np.full((26, 15, 3), bg, np.uint8)
+        img[mask] = (245, 240, 220)
+        return img
+
+    samples = {"6": [crop((20, 25, 35)), crop((175, 15, 15)), crop((190, 110, 30))]}
+
+    template = build_region_templates(samples, score=white_score)["6"]
+
+    for bg in ((20, 25, 35), (175, 15, 15), (190, 110, 30)):
+        assert float(np.abs(white_score(crop(bg))[:, : template.shape[1]] - template).mean()) < 0.35

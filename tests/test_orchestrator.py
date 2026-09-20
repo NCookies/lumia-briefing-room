@@ -167,3 +167,24 @@ def test_aggregate_interval_drops_no_result_when_another_tag_exists():
 
     assert _aggregate_interval([iv({"no_result"}), iv({"assist"})]).tags == frozenset({"assist"})
     assert _aggregate_interval([iv({"no_result"}), iv({"no_result"})]).tags == frozenset({"no_result"})
+
+
+def test_default_title_puts_the_day_before_day_night():
+    from lumia_briefing_room.pipeline.orchestrator import default_title
+
+    assert default_title("day", "묘지", 4) == "4일차 낮 묘지 교전"
+    assert default_title("night", None, 6) == "6일차 밤 교전"
+    assert default_title("night", "성당") == "밤 성당 교전"
+
+
+def test_aggregate_interval_keeps_the_first_known_game_day():
+    from lumia_briefing_room.detect.types import CombatInterval
+    from lumia_briefing_room.pipeline.orchestrator import _aggregate_interval
+
+    def iv(day):
+        return CombatInterval(
+            start=0, end=5, tags=frozenset({"no_result"}), k_delta=0, a_delta=0,
+            died=False, day_night="day", confidence=1.0, game_day=day,
+        )
+
+    assert _aggregate_interval([iv(None), iv(4), iv(5)]).game_day == 4

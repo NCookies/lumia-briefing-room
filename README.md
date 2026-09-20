@@ -130,6 +130,9 @@ python -m lumia_briefing_room.cli.detect_match \
 `1` 교전 · `2` 사냥 · `0` 해제 · `←`/`→` 이동 · `Esc` 닫기. 라벨하면 다음 "안 한" 클립으로 자동 이동한다.
 필터에서 "라벨 안 한 것"만 보고, 정렬은 "교전 가능성순"(기본)이다.
 
+**기준: 클립에 사람과의 교전이 *포함*되어 있으면 "교전".** 사냥하다 교전하거나, 교전 뒤에 야생동물·오브젝트(알파/오메가/위클라인)를 잡는 클립도 교전이다.
+야생동물·보스만 상대했으면 "사냥", 판단이 안 되면 안 찍고 넘어간다. 자세한 표는 [plan-pvp.md §4-0](docs/plan-pvp.md).
+
 ```bash
 python tools/eval_pvp.py          # 라벨로 점수를 평가: 오탐, 적 링 분포, 임계별 정밀도/재현율
 python tools/rescore_clips.py     # 가중치를 고친 뒤 점수를 다시 계산 (사용자 라벨은 보존)
@@ -145,6 +148,7 @@ python tools/rescore_clips.py     # 가중치를 고친 뒤 점수를 다시 계
 | `tools/label_combat.py` | 검출기 결과로 라벨 초안 생성 |
 | `tools/build_templates.py` | 라벨셋 → 숫자 본보기(npz) |
 | `tools/build_regions.py` | 라벨셋 → 지역명 본보기(npz) |
+| `tools/backfill_day.py` | 이미 만든 클립의 일차·제목을 재처리 없이 채움 (클립 영상의 HUD 에서 읽음) |
 | `tools/rescore_clips.py` | 저장된 클립 메타데이터의 교전 점수를 재검출 없이 다시 계산 |
 | `tools/eval_pvp.py` | UI 에서 찍은 교전/사냥 라벨로 점수를 평가 (가중치·임계 튜닝) |
 | `tools/eval_detect.py` | 라벨셋 대비 검출 정확도 리포트 |

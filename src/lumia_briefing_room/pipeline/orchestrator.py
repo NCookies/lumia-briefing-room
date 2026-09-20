@@ -17,12 +17,15 @@ from lumia_briefing_room.video.session import RecordingSession
 _DAY_NIGHT_KR = {"day": "낮", "night": "밤"}
 
 
-def default_title(day_night: str | None, region: str | None = None) -> str:
+def default_title(day_night: str | None, region: str | None = None, game_day: int | None = None) -> str:
     """SPEC §7.7 titleTemplate 의 축소판.
 
     일차/캐릭터 인식이 아직 없어(plan.md §8-5, v2 후보) 낮/밤과 지역만 반영한다.
     """
-    parts = [_DAY_NIGHT_KR.get(day_night, "알 수 없음")]
+    parts = []
+    if game_day is not None:
+        parts.append(f"{game_day}일차")
+    parts.append(_DAY_NIGHT_KR.get(day_night, "알 수 없음"))
     if region:
         parts.append(region)
     parts.append("교전")
@@ -52,6 +55,7 @@ def _aggregate_interval(intervals: list[CombatInterval]) -> CombatInterval:
         confidence=min(iv.confidence for iv in intervals),
         teammate_deaths=sum(iv.teammate_deaths for iv in intervals),
         region=next((iv.region for iv in intervals if iv.region), None),
+        game_day=next((iv.game_day for iv in intervals if iv.game_day is not None), None),
         enemy_ring_mean=_mean_of_known([iv.enemy_ring_mean for iv in intervals]),
     )
 
@@ -160,7 +164,8 @@ def process_match(
             thumbnail_rel = str(thumb_path)
 
         meta = build_metadata(
-            title=default_title(aggregated.day_night, aggregated.region),
+            title=default_title(aggregated.day_night, aggregated.region, aggregated.game_day),
+            game_day=aggregated.game_day,
             pvp=score_interval(aggregated, cfg.filter.pvp_weights),
             session=session,
             match_start_utc=match_start,

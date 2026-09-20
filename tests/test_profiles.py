@@ -66,3 +66,10 @@ def test_measured_profile_points_at_region_templates():
 
 def test_unmeasured_profile_has_no_region_templates():
     assert ResolutionProfile.for_resolution(1920, 1080).region_templates is None
+
+
+def test_measured_profile_points_at_day_templates_only_when_the_file_exists():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+
+    assert profile.day_templates is None or profile.day_templates.exists()
+    assert ResolutionProfile.for_resolution(1920, 1080).day_templates is None

@@ -8,6 +8,7 @@ _BUILTIN_DIR = Path(__file__).parent / "builtin"
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _TEMPLATES_DIR = _PROJECT_ROOT / "data" / "templates" / "digits"
 _REGION_TEMPLATES_DIR = _PROJECT_ROOT / "data" / "templates" / "regions"
+_DAY_TEMPLATES_DIR = _PROJECT_ROOT / "data" / "templates" / "days"
 
 _MEASURED_RESOLUTIONS: tuple[tuple[int, int], ...] = ((2560, 1440),)
 
@@ -54,6 +55,11 @@ def _region_templates_path(width: int, height: int) -> Path | None:
     return path if path.exists() else None
 
 
+def _day_templates_path(width: int, height: int) -> Path | None:
+    path = _DAY_TEMPLATES_DIR / f"{width}x{height}.npz"
+    return path if path.exists() else None
+
+
 @dataclass(frozen=True)
 class ResolutionProfile:
     width: int
@@ -62,6 +68,7 @@ class ResolutionProfile:
     measured: bool
     templates: Path | None = None
     region_templates: Path | None = None
+    day_templates: Path | None = None
 
     @classmethod
     def builtin(cls, width: int, height: int) -> "ResolutionProfile":
@@ -75,6 +82,7 @@ class ResolutionProfile:
             measured=True,
             templates=_templates_path(width, height),
             region_templates=_region_templates_path(width, height),
+            day_templates=_day_templates_path(width, height),
         )
 
     @classmethod

@@ -13,6 +13,7 @@ from lumia_briefing_room.detect.counter import (
     read_field,
     to_events,
 )
+from lumia_briefing_room.detect.day import read_game_day
 from lumia_briefing_room.detect.daynight import read_day_night
 from lumia_briefing_room.detect.death import FaceStat, detect_death
 from lumia_briefing_room.detect.glyph import text_score
@@ -62,6 +63,7 @@ def analyze_frame(
     k_templates: dict[int, np.ndarray] | None = None,
     a_templates: dict[int, np.ndarray] | None = None,
     region_templates: dict[str, np.ndarray] | None = None,
+    day_templates: dict[str, np.ndarray] | None = None,
 ) -> FrameState:
     """프레임 하나에서 교전/사망/카운터/낮밤 신호를 전부 읽는다. (plan.md §5)"""
     spectating = read_spectating(
@@ -79,6 +81,10 @@ def analyze_frame(
                 ]
             )
         )
+
+    game_day = None
+    if day_templates and spectating is not None:
+        game_day = read_game_day(crop_roi(frame, profile.rois["day_digit"]), day_templates)
 
     enemy_rings = None
     if spectating is False:
@@ -123,6 +129,7 @@ def analyze_frame(
         dead_teammates=dead_teammates,
         region=region,
         enemy_rings=enemy_rings,
+        game_day=game_day,
     )
 
 
@@ -134,6 +141,16 @@ def resolve_region_templates(profile: ResolutionProfile) -> dict[str, np.ndarray
         )
         return None
     return load_region_templates(profile.region_templates)
+
+
+def resolve_day_templates(profile: ResolutionProfile) -> dict[str, np.ndarray] | None:
+    if profile.day_templates is None:
+        log.warning(
+            "일차 템플릿을 찾을 수 없다(%dx%d) - 클립 제목에 일차가 빠진다",
+            profile.width, profile.height,
+        )
+        return None
+    return load_region_templates(profile.day_templates)
 
 
 def _overlaps(start: float, end: float, t: float, tolerance: float) -> bool:
@@ -212,6 +229,7 @@ def finalize_match(
         region = next((s.region for s in in_range if s.region), None)
         rings = [s.enemy_rings for s in in_range if s.enemy_rings is not None]
         enemy_ring_mean = sum(rings) / len(rings) if rings else None
+        game_day = _mode([str(s.game_day) for s in in_range if s.game_day is not None])
         day_night = _mode([s.day_night for s in in_range if s.day_night])
         solid = sum(1 for s in in_range if s.combat is True)
         confidence = solid / len(in_range) if in_range else 0.0
@@ -235,6 +253,7 @@ def finalize_match(
                 day_night=day_night, confidence=confidence,
                 teammate_deaths=team_deaths, region=region,
                 enemy_ring_mean=enemy_ring_mean,
+                game_day=int(game_day) if game_day is not None else None,
             )
         )
 
@@ -260,6 +279,7 @@ def detect_match(
     profile = profile or ResolutionProfile.for_resolution(session.width, session.height)
     k_templates, a_templates = resolve_templates(profile, k_templates, a_templates)
     region_templates = resolve_region_templates(profile)
+    day_templates = resolve_day_templates(profile)
 
     existing = existing_segment_numbers(session, stream, seg_range.first, seg_range.last)
     gap_segments = seg_range.gaps(existing)
@@ -277,7 +297,7 @@ def detect_match(
         states.append(
             analyze_frame(
                 frame, profile, t=t, k_templates=k_templates, a_templates=a_templates,
-                region_templates=region_templates,
+                region_templates=region_templates, day_templates=day_templates,
             )
         )
 

@@ -466,3 +466,71 @@ def test_analyze_frame_skips_minimap_while_spectating():
     profile = ResolutionProfile.for_resolution(2560, 1440)
 
     assert analyze_frame(_frame_with_minimap(profile), profile, t=0.0).enemy_rings is None
+
+
+def _day_templates(profile):
+    from lumia_briefing_room.detect.day import white_score
+    from lumia_briefing_room.detect.region import build_region_template
+
+    roi = profile.rois["day_digit"]
+    rng = np.random.default_rng(11)
+    patch = np.full((roi.height, roi.width, 3), 20, np.uint8)
+    ink = rng.random((14, 11)) > 0.5
+    patch[6:20, 2:13][ink] = 255
+    return {"4": build_region_template([white_score(patch)])}, patch
+
+
+def test_analyze_frame_reads_game_day_from_the_top_hud():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    templates, patch = _day_templates(profile)
+    frame = _frame_with_minimap(profile, alive=True)
+    roi = profile.rois["day_digit"]
+    frame[roi.y0 : roi.y1, roi.x0 : roi.x1] = patch
+
+    state = analyze_frame(frame, profile, t=0.0, day_templates=templates)
+
+    assert state.game_day == 4
+
+
+def test_analyze_frame_reads_game_day_even_while_spectating():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    templates, patch = _day_templates(profile)
+    frame = _frame_with_minimap(profile)
+    roi = profile.rois["day_digit"]
+    frame[roi.y0 : roi.y1, roi.x0 : roi.x1] = patch
+
+    state = analyze_frame(frame, profile, t=0.0, day_templates=templates)
+
+    assert state.spectating is True
+    assert state.game_day == 4
+
+
+def test_analyze_frame_game_day_is_none_without_hud_or_templates():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    templates, patch = _day_templates(profile)
+    blank = np.full((1440, 2560, 3), 5, np.uint8)
+
+    assert analyze_frame(blank, profile, t=0.0, day_templates=templates).game_day is None
+    assert analyze_frame(_frame_with_minimap(profile, alive=True), profile, t=0.0).game_day is None
+
+
+def _day_state(t, combat, day):
+    return FrameState(
+        t=t, combat=combat, face_value=111.0, face_sat=26.0, k=0, a=0,
+        day_night="day", spectating=False, game_day=day,
+    )
+
+
+def test_finalize_match_uses_the_most_common_day_in_the_interval():
+    states = [
+        _day_state(0.0, False, 3), _day_state(3.0, True, 4), _day_state(6.0, True, 4),
+        _day_state(9.0, True, None), _day_state(12.0, True, 5), _day_state(15.0, False, 5),
+    ]
+
+    assert finalize_match(states).intervals[0].game_day == 4
+
+
+def test_finalize_match_game_day_is_none_when_never_read():
+    states = [_day_state(0.0, False, None), _day_state(3.0, True, None), _day_state(6.0, True, None)]
+
+    assert finalize_match(states).intervals[0].game_day is None
