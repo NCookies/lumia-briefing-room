@@ -37,6 +37,8 @@ export interface Clip {
   enemyRingMean: number | null
   region: string | null
   userLabel: UserLabel
+  labelSource?: 'user' | 'migrated' | null
+  labelConflict?: boolean
   gameDay: number | null
   dayNight: 'day' | 'night' | null
   phaseIndex: number | null

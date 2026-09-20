@@ -10,7 +10,7 @@ export interface FilterState {
   pinnedOnly: boolean
   trashed: boolean
   sort: 'pvp' | 'recent'
-  label: '' | 'unlabeled' | 'pvp' | 'pve'
+  label: '' | 'unlabeled' | 'pvp' | 'pve' | 'conflict'
   minPvpScore: number
 }
 
@@ -56,6 +56,7 @@ export function FilterBar({ value, onChange }: Props) {
       >
         <option value="">라벨 전체</option>
         <option value="unlabeled">라벨 안 한 것</option>
+        <option value="conflict">이관됐지만 확인 필요</option>
         <option value="pvp">교전으로 라벨</option>
         <option value="pve">사냥으로 라벨</option>
       </select>

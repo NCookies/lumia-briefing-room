@@ -56,6 +56,11 @@ export function PlayerModal({ clips, index, onIndexChange, onLabel, onClose }: P
                 {clip.audioStatus === 'none' ? '소리 없음 (원본에 오디오가 없다)' : '소리 일부 (원본 오디오 일부 소실)'}
               </span>
             )}
+            {clip.labelConflict && (
+              <span className="rounded border border-sky-500/50 px-1.5 py-0.5 text-xs text-sky-300">
+                이관된 라벨 · 확인 필요
+              </span>
+            )}
             {clip.region && (
               <span className="rounded border border-zinc-600 px-1.5 py-0.5 text-xs text-zinc-300">
                 {clip.region}

@@ -86,6 +86,9 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         if "userLabel" in body and body["userLabel"] not in (None, "pvp", "pve"):
             raise HTTPException(400, "userLabel 은 pvp / pve / null 만 가능하다")
         meta = {**clip.meta, **{k: v for k, v in body.items() if k in ("title", "pinned", "userLabel")}}
+        if "userLabel" in body:
+            meta["labelSource"] = "user" if body["userLabel"] is not None else None
+            meta["labelConflict"] = False
         clip.meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
         return meta | {"id": clip_id}
 

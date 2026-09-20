@@ -77,6 +77,14 @@ export function ClipCard({
         <span className="absolute left-1 top-1">
           <ScoreChip score={clip.pvpScore} signals={clip.pvpSignals ?? []} />
         </span>
+        {clip.labelConflict && (
+          <span
+            className="absolute bottom-6 left-1 rounded bg-sky-600/90 px-1 text-xs"
+            title="옛 클립의 교전/사냥 라벨이 섞여 있어 자동으로 옮긴 라벨이다. 맞으면 같은 버튼을 다시 눌러 확정한다."
+          >
+            이관 · 확인 필요
+          </span>
+        )}
         {clip.audioStatus && clip.audioStatus !== 'full' && (
           <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 text-xs text-amber-300">
             {clip.audioStatus === 'none' ? '소리 없음' : '소리 일부'}

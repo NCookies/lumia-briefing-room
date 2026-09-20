@@ -18,7 +18,7 @@ class ClipQuery:
     pinned_only: bool = False
     trashed_only: bool = False
     min_pvp_score: float | None = None
-    label: str | None = None  # pvp / pve / unlabeled
+    label: str | None = None  # pvp / pve / unlabeled / conflict
 
 
 def filter_clip_summaries(clips: list[ClipSummary], query: ClipQuery) -> list[ClipSummary]:
@@ -43,7 +43,10 @@ def filter_clip_summaries(clips: list[ClipSummary], query: ClipQuery) -> list[Cl
             continue
         if query.min_pvp_score is not None and (meta.get("pvpScore") or 0.0) < query.min_pvp_score:
             continue
-        if query.label is not None:
+        if query.label == "conflict":
+            if not meta.get("labelConflict"):
+                continue
+        elif query.label is not None:
             wanted = None if query.label == "unlabeled" else query.label
             if meta.get("userLabel") != wanted:
                 continue

@@ -163,3 +163,10 @@ def test_metadata_records_audio_status_from_the_cut():
 
 def test_metadata_audio_status_defaults_to_full():
     assert _build().audio_status == "full"
+
+
+def test_metadata_starts_without_a_label_source():
+    meta = _build()
+
+    assert meta.label_source is None
+    assert meta.label_conflict is False

@@ -55,6 +55,8 @@ class ClipMetadata:
     enemy_ring_mean: float | None
     region: str | None
     user_label: str | None
+    label_source: str | None
+    label_conflict: bool
     game_day: int | None
     day_night: str | None
     phase_index: int | None
@@ -118,6 +120,8 @@ def build_metadata(
         enemy_ring_mean=interval.enemy_ring_mean,
         region=interval.region,
         user_label=None,
+        label_source=None,
+        label_conflict=False,
         game_day=game_day,
         day_night=day_night,
         phase_index=phase,

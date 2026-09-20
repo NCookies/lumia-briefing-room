@@ -255,3 +255,24 @@ def test_list_clips_supports_score_label_and_sort_params(client):
 
     unlabeled = client.get("/api/clips", params={"label": "unlabeled", "sort": "pvp"}).json()
     assert [c["id"] for c in unlabeled] == ["c", "a"]
+
+
+def test_patching_a_label_marks_it_as_a_user_label_and_clears_the_conflict_flag(client):
+    clips_dir = client.app.state.clips_dir_for_test
+    _write_clip(clips_dir, "a", userLabel="pvp", labelSource="migrated", labelConflict=True)
+
+    data = client.patch("/api/clips/a", json={"userLabel": "pve"}).json()
+
+    assert data["labelSource"] == "user"
+    assert data["labelConflict"] is False
+
+
+def test_label_filter_conflict_lists_only_migrated_labels_that_need_a_look(client):
+    clips_dir = client.app.state.clips_dir_for_test
+    _write_clip(clips_dir, "a", userLabel="pvp", labelConflict=True)
+    _write_clip(clips_dir, "b", userLabel="pvp", labelConflict=False)
+    _write_clip(clips_dir, "c")
+
+    ids = [c["id"] for c in client.get("/api/clips", params={"label": "conflict"}).json()]
+
+    assert ids == ["a"]
