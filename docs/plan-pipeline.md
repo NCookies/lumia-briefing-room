@@ -7,7 +7,7 @@
 ## 0. 진행 상태 (세션이 끊겨도 여기부터 이어간다)
 
 - [x] 계획 수립
-- [ ] `config.py` — SPEC §7 전체 스키마, 기본값, JSON 로드/저장
+- [x] `config.py` — SPEC §7 전체 스키마, 기본값, JSON 로드/저장
 - [ ] `pipeline/playerlog.py` — 로그 파싱, 매치 경계 추출, tail follow
 - [ ] `pipeline/filters.py` — 생성 필터 적용 (§7.3)
 - [ ] `pipeline/clip.py` — ffmpeg 컷 + 썸네일
