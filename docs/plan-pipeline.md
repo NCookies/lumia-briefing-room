@@ -32,7 +32,7 @@
 - [x] `cli/watch.py` — 실제 배선(진짜 `tail_follow`, 진짜 `process_match`, 진짜
   `RecordingSession`). `python -m lumia_briefing_room.cli.watch --recording-root ...`
   로 실행하면 부팅 시 백로그 복구 → 실시간 감시가 Ctrl+C 전까지 계속 돈다
-- [ ] `pipeline/retention.py` — 휴지통 이동/복구/자동정리 (§7.6)
+- [x] `pipeline/retention.py` — 휴지통 이동/복구/자동정리 (§7.6)
 - [ ] 트레이 상주 + 자동 시작 (§6 2단계, `ui.autoStart`) — Windows 전용, `pystray`+레지스트리
 - [ ] 열람 UI (SPEC 3단계) — 아직 손 안 댐. FastAPI + React, SPEC §4 참조
 
@@ -195,6 +195,38 @@ def process_match(
 3. `apply_filter()` 로 생성 대상 추리기
 4. 남은 교전마다 `resolve_clip_range` → `merge_overlapping` → `cut_clip` + `make_thumbnail`
 5. `build_metadata` + `write_metadata`
+
+### 2.7 pipeline/watcher.py — 실시간 감시 + 백로그
+
+당초 스케치대로 `process`/`now`/`sleep` 을 주입받는 순수 함수로 짰다(§0 참고).
+`rescue_copy()` 의 목적지 폴더명은 **원본과 똑같이** `bg_<appid>_...` 를 유지해야
+한다 — `RecordingSession.load()` 가 폴더명 자체에서 appid/시작시각을 파싱하기
+때문에, 구분을 위해 접두사/접미사를 붙이면 다시 못 읽는다(실제로 이 실수를
+했다가 테스트로 잡았다). 격리는 `dest_root`(호출자가 고르는 상위 폴더)로 한다.
+
+### 2.8 pipeline/retention.py — 휴지통
+
+SPEC §7.6 그대로 "삭제 = 휴지통 이동"이다.
+
+```python
+def trash_clip(meta_path: Path, trash_dir: Path, *, now=...) -> Path: ...
+def restore_clip(trashed_meta_path: Path, clips_dir: Path) -> Path: ...
+def purge_expired(trash_dir: Path, *, trash_days: int, now=...) -> list[Path]: ...
+def is_protected(meta: dict, cfg: RetentionConfig) -> bool: ...
+def select_for_auto_clean(metas: list[dict], cfg: RetentionConfig, *, now=...) -> list[dict]: ...
+```
+
+- 클립 하나는 `<id>.json` + `<id>.mp4` + (있으면) `.thumbs/<id>.jpg` 세 파일이다.
+  `trash_clip`/`restore_clip` 은 메타데이터의 `thumbnailPath` 를 보고 같이 옮기며,
+  clips_dir 기준 상대 경로 구조(`.thumbs/...`)를 휴지통 안에서도 그대로 유지한다.
+- `select_for_auto_clean` 은 실제 파일 스캔을 하지 않는다 — 호출 규약으로
+  `meta["_created_at"]`(datetime), `meta["_size_bytes"]`(int) 를 요구한다.
+  **실제 클립 목록을 스캔해서 이 두 필드를 채우는 계층은 아직 없다** — UI/CLI
+  단계에서 만들 것 (§3 확인 필요에 추가하지 않은 이유: 순수 로직은 이미 완결돼
+  있고 남은 건 "파일 mtime/크기 읽기"라는 뻔한 I/O 뿐이라 막는 게 아니다).
+- 세 한도(maxAgeDays/maxTotalGB/maxCount)가 동시에 걸리면 순서대로 적용되고,
+  같은 클립이 여러 조건에 걸려도 중복 선택되지 않는다. 최종 반환 순서는
+  원래(오래된 것부터) 순서를 유지한다.
 
 ## 3. 확인 필요 (추측으로 메우지 않은 것)
 
