@@ -23,6 +23,7 @@ class FrameState:
     region: str | None = None
     enemy_rings: int | None = None
     game_day: int | None = None
+    team_combat: bool | None = None
 
 
 @dataclass(frozen=True)

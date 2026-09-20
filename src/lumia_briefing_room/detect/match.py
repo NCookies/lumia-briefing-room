@@ -21,7 +21,7 @@ from lumia_briefing_room.detect.intervals import to_intervals
 from lumia_briefing_room.detect.minimap import count_enemy_rings
 from lumia_briefing_room.detect.region import load_region_templates, read_region, region_score
 from lumia_briefing_room.detect.spectator import read_spectating
-from lumia_briefing_room.detect.teammate import dead_slots, new_deaths
+from lumia_briefing_room.detect.teammate import combat_slots, dead_slots, new_deaths
 from lumia_briefing_room.detect.types import CombatInterval, FrameState, MatchDetection
 from lumia_briefing_room.profiles.models import ResolutionProfile
 from lumia_briefing_room.video.frames import crop_roi, extract_keyframe_frames
@@ -72,7 +72,20 @@ def analyze_frame(
     )
 
     dead_teammates = None
+    team_combat = None
     if spectating is not None:
+        team_combat = bool(
+            combat_slots(
+                [
+                    crop_roi(frame, profile.rois["team_ring1"]),
+                    crop_roi(frame, profile.rois["team_ring2"]),
+                ],
+                [
+                    crop_roi(frame, profile.rois["team_bar1"]),
+                    crop_roi(frame, profile.rois["team_bar2"]),
+                ],
+            )
+        )
         dead_teammates = tuple(
             dead_slots(
                 [
@@ -130,6 +143,7 @@ def analyze_frame(
         region=region,
         enemy_rings=enemy_rings,
         game_day=game_day,
+        team_combat=team_combat,
     )
 
 
@@ -175,6 +189,7 @@ def finalize_match(
     *,
     gaps: list[tuple[float, float]] | None = None,
     tag_tolerance: float = TAG_TOLERANCE_SEC,
+    use_team_combat: bool = True,
 ) -> MatchDetection:
     """프레임별 판독을 교전 구간 + 태그로 합친다. (plan.md §3, §5.3~5.6)"""
     gaps = gaps or []
@@ -196,9 +211,17 @@ def finalize_match(
     def _spectating(t: float) -> bool:
         return any(a <= t <= b for a, b in spectator_ranges)
 
-    combat_ranges = to_intervals(
-        [(s.t, False if _spectating(s.t) else s.combat) for s in states]
-    )
+    def _fighting(s: FrameState) -> bool | None:
+        """내 배지 OR 팀원 전투. 배지는 구도를 잡거나 거리를 벌리는 동안 꺼지지만 팀원 링은 켜져 있다."""
+        if _spectating(s.t):
+            return False
+        if s.combat is True or (use_team_combat and s.team_combat is True):
+            return True
+        if s.combat is None and (not use_team_combat or s.team_combat is None):
+            return None
+        return False
+
+    combat_ranges = to_intervals([(s.t, _fighting(s)) for s in states])
 
     face_stats = [
         FaceStat(t=s.t, value=s.face_value, sat=s.face_sat)

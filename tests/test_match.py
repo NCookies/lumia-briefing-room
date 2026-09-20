@@ -534,3 +534,74 @@ def test_finalize_match_game_day_is_none_when_never_read():
     states = [_day_state(0.0, False, None), _day_state(3.0, True, None), _day_state(6.0, True, None)]
 
     assert finalize_match(states).intervals[0].game_day is None
+
+
+def _team_frame(profile, *, ring_slot=None, dead_slot=None, alive=True):
+    frame = _frame_with_minimap(profile, alive=alive)
+    for slot in (1, 2):
+        bar = profile.rois[f"team_bar{slot}"]
+        frame[bar.y0 : bar.y1, bar.x0 : bar.x0 + 40] = (90, 220, 40)
+    if ring_slot:
+        ring = profile.rois[f"team_ring{ring_slot}"]
+        frame[ring.y0 : ring.y1, ring.x0 : ring.x1] = (230, 40, 40)
+    if dead_slot:
+        bar = profile.rois[f"team_bar{dead_slot}"]
+        frame[bar.y0 : bar.y1, bar.x0 : bar.x1] = (20, 20, 20)
+        frame[bar.y0 : bar.y1, bar.x0 : bar.x0 + 10] = (240, 150, 30)
+    return frame
+
+
+def test_analyze_frame_reads_team_combat_from_a_red_teammate_ring():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+
+    assert analyze_frame(_team_frame(profile, ring_slot=2), profile, t=0.0).team_combat is True
+    assert analyze_frame(_team_frame(profile), profile, t=0.0).team_combat is False
+
+
+def test_analyze_frame_team_combat_ignores_a_dead_teammates_red_portrait():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    frame = _team_frame(profile, ring_slot=1, dead_slot=1)
+
+    assert analyze_frame(frame, profile, t=0.0).team_combat is False
+
+
+def test_analyze_frame_team_combat_is_none_without_the_hud():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    blank = np.full((1440, 2560, 3), 5, np.uint8)
+
+    assert analyze_frame(blank, profile, t=0.0).team_combat is None
+
+
+def _tc_state(t, combat, team):
+    return FrameState(
+        t=t, combat=combat, face_value=111.0, face_sat=26.0, k=0, a=0,
+        day_night="day", spectating=False, team_combat=team,
+    )
+
+
+def test_finalize_match_bridges_a_badge_gap_while_a_teammate_is_fighting():
+    states = [_tc_state(0.0, False, False)]
+    states += [_tc_state(3.0, True, False), _tc_state(6.0, True, False)]
+    states += [_tc_state(9.0 + 3 * i, False, True) for i in range(8)]
+    states += [_tc_state(33.0, True, True), _tc_state(36.0, True, True), _tc_state(39.0, False, False)]
+
+    bridged = finalize_match(states).intervals
+    badge_only = finalize_match(states, use_team_combat=False).intervals
+
+    assert len(bridged) == 1 and bridged[0].end == 36.0
+    assert len(badge_only) == 2
+
+
+def test_finalize_match_starts_an_interval_from_team_combat_alone():
+    states = [_tc_state(0.0, False, False), _tc_state(3.0, False, True), _tc_state(6.0, False, True),
+              _tc_state(9.0, False, False)]
+
+    assert len(finalize_match(states).intervals) == 1
+    assert finalize_match(states, use_team_combat=False).intervals == []
+
+
+def test_finalize_match_unread_team_state_does_not_hide_a_badge_reading():
+    states = [_tc_state(0.0, False, None), _tc_state(3.0, True, None), _tc_state(6.0, True, None),
+              _tc_state(9.0, False, None)]
+
+    assert len(finalize_match(states).intervals) == 1
