@@ -25,8 +25,8 @@
 - [ ] 매치 타임라인 뷰 (v1.1 로 미룸)
 - [x] 필터 UI (`FilterBar.tsx`) — 태그/낮밤/게임모드/고정만/클립·휴지통 탭
 - [x] 정리 UI (삭제/복구/고정/이름변경) — 내보내기는 v1.1 로 미룸
-- [ ] pywebview 셸 배선 (§4-1, 아직 미착수)
-- [ ] 빌드 산출물을 FastAPI 정적 서빙에 연결
+- [x] pywebview 셸 배선 (`cli/serve.py::open_ui`) — §4-1 해결, 아래 참고
+- [x] 빌드 산출물을 FastAPI 정적 서빙에 연결 (`api/static.py`, `cli/serve.py`)
 
 **✅ 실제 Playwright + 실제 설치된 Edge 로 프론트엔드까지 검증했다.** 실제
 `uvicorn`(백엔드) + 실제 `vite`(프론트, `/api` 를 백엔드로 프록시) 를 동시에 띄우고,
@@ -62,21 +62,27 @@
 
 ### 2.1 파일 구조
 
+실제로는 계획했던 routes_*.py 분할 대신 `app.py` 하나에 모든 라우트를 모았다
+(라우트 수가 적어 분할할 이유가 없었다) — 최종 구조:
+
 ```
 src/lumia_briefing_room/
-└── api/
-    ├── __init__.py
-    ├── app.py              FastAPI 앱 팩토리 (create_app(cfg) -> FastAPI)
-    ├── clips.py            클립 스캔 + 조회/필터 (pipeline/retention.py 의
-    │                       select_for_auto_clean 이 요구하는 _created_at/_size_bytes 를
-    │                       실제로 채우는 계층 — plan-pipeline.md §2.8 에서 남겨둔 자리)
-    ├── routes_clips.py     GET /api/clips, GET /api/clips/{id}
-    ├── routes_actions.py   POST /api/clips/{id}/trash|restore|pin|unpin
-    ├── routes_media.py     GET /api/clips/{id}/video, /thumbnail
-    └── routes_config.py    GET/PUT /api/config
+├── api/
+│   ├── __init__.py
+│   ├── app.py              FastAPI 앱 팩토리 (create_app(cfg) -> FastAPI).
+│   │                       클립 목록/조회/수정/trash/restore/영구삭제,
+│   │                       Range 지원 video/thumbnail, config 조회/저장 라우트 전부.
+│   ├── clips.py            클립 스캔 + 조회 (scan_clips/find_clip/to_summary_dict)
+│   ├── filters.py          저장된 메타데이터 위에서 도는 UI 필터
+│   └── static.py           frontend/dist 를 찾아 FastAPI 에 정적으로 얹는다
+│                           (find_frontend_dist/mount_static)
+└── cli/
+    └── serve.py            uvicorn(백그라운드 스레드) + pywebview(또는 기본
+                             브라우저, 메인 스레드)로 API+정적 프론트를 띄우는 CLI
+                             (build_app/run_server_in_thread/wait_until_started/open_ui)
 
-cli/
-└── serve.py                uvicorn 으로 API(+정적 프론트 빌드)를 띄우는 CLI
+frontend/                    Vite + React + TypeScript + Tailwind, `npm run build`
+                             결과가 frontend/dist 에 생기면 static.py 가 자동으로 찾는다
 ```
 
 ### 2.2 클립 스캔 — `api/clips.py`
@@ -160,15 +166,23 @@ SPEC §4 가 정한 스택 그대로: **Vite + React + TypeScript + Tailwind**, 
 
 ## 4. 확인 필요
 
-### 4-1. pywebview 와 FastAPI(uvicorn)를 한 프로세스에서 같이 띄우는 법
+### 4-1. pywebview 와 FastAPI(uvicorn)를 한 프로세스에서 같이 띄우는 법 — ✅ 해결됨
 
-uvicorn 은 보통 자체 이벤트루프(asyncio)를 블로킹으로 돈다. pywebview 의
-`webview.start()` 도 메인 스레드를 요구하는 경우가 많다(플랫폼別). Windows 에서는
-pywebview 가 별도 스레드에서도 대체로 동작한다고 알려져 있지만, **이 환경에서
-직접 확인하지 않았다.** 계획: uvicorn 을 백그라운드 스레드로 띄우고 `webview.start()`
-를 메인 스레드에서 호출 — 안 되면 `ui.shell=browser`(기본 브라우저로 열기) 를
-사실상의 기본 경로로 삼는다. `cli/app.py` 의 트레이 "열기"가 이미 그 폴백 자리를
-잡아뒀다(§_on_open, plan-pipeline.md).
+`cli/serve.py` 로 구현: uvicorn 을 백그라운드 스레드(`run_server_in_thread`)로
+띄우고, 메인 스레드에서 `open_ui()` 가 pywebview 를 시도한다(없거나 실패하면
+`webbrowser.open()` 으로 대체). 실제로 만들어 `npm run build` 산출물(`frontend/
+dist`)을 `api/static.py::mount_static()` 으로 같은 FastAPI 앱에 얹고, 실제
+uvicorn 서버를 띄워 curl 로 확인: `GET /` 가 프론트 `index.html`(정적 자산 포함)을
+정상 서빙하면서 `GET /api/clips` 도 그대로 실제 클립 메타데이터를 반환함 — 정적
+마운트가 API 라우트를 가리지 않는다(FastAPI 라우트를 먼저 등록하고 `Mount("/")`
+를 나중에 추가하면 Starlette 가 등록 순서대로 매칭하기 때문).
+
+트레이 상주 프로세스(`cli/app.py`)의 "열기" 메뉴는 pystray 의 `icon.run()` 이 이미
+메인 스레드를 점유하고 있어 같은 스레드에서 `webview.start()` 를 또 요구하는
+pywebview 와 충돌한다 — 그래서 트레이 경로(`make_on_open`)는 **항상 기본
+브라우저**를 연다(서버는 최초 1회만 기동, 이후엔 재사용). 전용 창이 필요하면
+`python -m lumia_briefing_room.cli.serve` 를 독립 실행하면 되고, 그 경로에서는
+pywebview 창을 그대로 시도한다.
 
 ### 4-2. 대용량 HEVC 클립의 브라우저 재생 (research §4.10 의 연장) — ✅ 해결됨
 
