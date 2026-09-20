@@ -36,8 +36,15 @@
 - [x] `autostart.py` — 레지스트리 Run 키 (실제 HKCU 레지스트리로 테스트, 정리까지 확인)
 - [x] `tray.py` — 메뉴 구조(순수 테스트) + `pystray.Icon` 배선. 실제 이벤트루프
   (`icon.run()`)는 GUI라 테스트 불가 — 수동 확인 필요 (§3 확인 필요 참고)
-- [ ] 트레이 앱을 실제로 띄우는 `cli/app.py` (tray + watch 를 한 프로세스로 묶기)
+- [x] `cli/app.py` — tray(메인 스레드) + watch(백그라운드 데몬 스레드)를 한 프로세스로,
+  부팅 시 `ui.autoStart` 설정을 레지스트리에 반영. **감시 정지/재개 토글은 아직
+  표시만 바뀌고 실제로 멈추지 않는다** (§3 확인 필요에 추가)
 - [ ] 열람 UI (SPEC 3단계) — 아직 손 안 댐. FastAPI + React, SPEC §4 참조
+
+**SPEC §6 2단계(파이프라인 자동화)가 여기서 사실상 완료됐다.** `python -m
+lumia_briefing_room.cli.app --recording-root ...` 하나로 트레이 상주 + 자동 시작 +
+백로그 복구 + 실시간 감시 + 검출 + 컷 + 메타데이터까지 전부 돈다. 남은 건 SPEC
+3단계(열람 UI)뿐이다.
 
 **다음에 이어서 할 일 순서**: `pipeline/retention.py` (삭제/복구) → 트레이 앱 → UI.
 
@@ -257,6 +264,19 @@ SPEC §2.6 은 버퍼 길이를 `session.mpd` → `localconfig.vdf` → 120분 �
 - **확인 방법**: `userdata\<id>\config\localconfig.vdf` 의 `GameRecording.PerGameSettings.<appid>.minutes`
   (또는 전역값)를 읽는 최소 VDF 파서를 만들면 된다. VDF 는 중첩 중괄호 기반의
   단순 텍스트 포맷이라 정규식 기반 파서로도 충분할 것으로 보인다(미검증).
+
+### 3-5. 트레이의 "감시 중" 토글이 실제로 감시를 멈추지 않는다
+
+`cli/app.py::_on_toggle_watch()` 는 로그만 남기고 아무 것도 안 한다. `run_forever()`
+는 애초에 "멈춰라" 신호를 받을 방법이 없다(무한 `for line in lines` 뿐).
+
+- **영향**: 사용자가 트레이 메뉴에서 "감시 중"을 눌러도 실제로는 계속 감시·처리한다.
+  단순 표시 오류가 아니라 **기능 자체가 없다.**
+- **막는가**: 아니다. 자동 감시가 기본 동작이고 끄고 싶은 경우는 부차적이다.
+- **고치는 방법**: `run_forever()` 가 `stop_event: threading.Event` 를 선택적으로 받아
+  매 반복 `stop_event.is_set()` 을 확인하고 빠져나오게 하면 된다 — `tail_follow()` 는
+  `poll_interval_sec` 마다 깨어나므로 반응 지연은 그 정도다. `cli/app.py` 가 그
+  `Event` 를 만들어 tray 콜백과 watch 스레드가 공유하게 배선하면 끝난다.
 
 ### 3-3. `cut_clip()` 의 오디오 먹싱 경로 — ✅ 실제 녹화본으로 검증됨
 
