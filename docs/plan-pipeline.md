@@ -25,54 +25,33 @@
 에 썸네일이 생기는 버그**였다. `_resolve_clip_paths()` 로 분리하고 회귀 테스트를 추가했다.
 - [x] `pipeline/watcher.py` (판단 로직만) — remaining_margin/should_rescue/백로그 탐지/
   세션 찾기. **아직 없는 것: 실제 무한루프(`run_forever`) — tail_follow() 소비하며
-  process_match() 호출하는 배선.** 다음 작업으로 바로 이어갈 것
+  process_match() 호출하는 배선.**
+- [x] `pipeline/watcher.py` 의 `rescue_copy()`, `resolve_buffer_minutes()`,
+  `run_once()`, `run_forever()` — 전부 `process`/`now`/`sleep` 을 주입받는
+  순수 함수라 무한루프·실시간 지연 없이 테스트했다
+- [x] `cli/watch.py` — 실제 배선(진짜 `tail_follow`, 진짜 `process_match`, 진짜
+  `RecordingSession`). `python -m lumia_briefing_room.cli.watch --recording-root ...`
+  로 실행하면 부팅 시 백로그 복구 → 실시간 감시가 Ctrl+C 전까지 계속 돈다
 - [ ] `pipeline/retention.py` — 휴지통 이동/복구/자동정리 (§7.6)
 - [ ] 트레이 상주 + 자동 시작 (§6 2단계, `ui.autoStart`) — Windows 전용, `pystray`+레지스트리
 - [ ] 열람 UI (SPEC 3단계) — 아직 손 안 댐. FastAPI + React, SPEC §4 참조
 
-**다음에 이어서 할 일 순서**: `pipeline/watcher.py` 의 `run_forever()` 배선(아래 §2.7 설계 참조) → `pipeline/retention.py` (삭제/복구) → 트레이 앱 → UI.
+**다음에 이어서 할 일 순서**: `pipeline/retention.py` (삭제/복구) → 트레이 앱 → UI.
 
-### 다음 세션이 여기서 바로 이어가는 법
+**✅ `cli/watch.py` 도 실제 데이터로 end-to-end 검증했다.** 실제 `Player.log`(매치 23개)
++ 실제 녹화본으로 `discover_backlog → run_once → make_processor → (구출 복사) →
+process_match` 를 통째로 돌렸다. 대상 매치는 남은 여유가 임계 이하라 **구출 복사가
+실제로 트리거됐고**(`resolve_buffer_minutes` 가 120분으로 정확히 판단), 20분짜리
+실제 매치에서 **클립 7개**(각 27~174초, 73MB~524MB)가 정상적으로 만들어졌다.
+`died`/`dayNight` 값도 전부 그럴듯했다. 백로그 복구 경로 전체가 실제로 동작한다.
 
-`pipeline/watcher.py` 에 판단 로직(여유시간 계산, 백로그 탐지, 세션 찾기)은 다 있고
-**실제로 도는 루프가 없다.** 다음 작업은 그 배선뿐이다:
+### `run_forever` 의 "직전 MATCH_START 기억" 문제 — 해소됨
 
-```python
-def run_once(cfg, ffmpeg_path, recording_root, ...):
-    """부팅 시 1회: 백로그 복구."""
-    state = ProcessedState.load(state_path)
-    matches = discover_backlog(player_log, player_prev_log, local_tz=local_tz)
-    for m in unprocessed_matches(matches, state):          # 이미 오름차순(오래된 것부터)
-        session_dir = find_session_for_time(recording_root, m.start_utc)
-        if session_dir is None:
-            log.warning("세션을 못 찾음 — 소실", m)         # SPEC §7.2.1 "소실은 소실이다"
-            continue
-        session = RecordingSession.load(session_dir)
-        margin = remaining_margin_minutes(m.start_utc, datetime.now(timezone.utc), buffer_minutes)
-        if should_rescue(margin, cfg.watch.rescue_threshold_min):
-            ...  # 원본을 tmp 로 먼저 복사 (아직 안 만듦 - rescue_copy() 필요)
-        process_match(session, m.start_utc, m.end_utc, cfg, ffmpeg_path=ffmpeg_path)
-        state = state.with_added(match_key(m))
-        state.save(state_path)
-
-
-def run_forever(cfg, ffmpeg_path, recording_root, ...):
-    """부팅 후: run_once() 로 백로그 처리 -> tail_follow 로 실시간 감시."""
-    run_once(...)
-    for line in tail_follow(player_log_path, poll_interval_sec=cfg.watch.poll_interval_ms / 1000):
-        event = parse_line(line)
-        if event is None or event.type is not LogEventType.MATCH_END:
-            continue
-        time.sleep(cfg.watch.delay_sec)     # 마지막 세그먼트가 .tmp 에서 확정되길 대기
-        # 이 시점의 매치 시작 시각을 어떻게 아는가가 관건 -
-        # tail_follow 는 한 줄씩만 주므로 직전 MATCH_START 를 기억해둬야 한다
-        ...
-```
-
-**확인 필요 (§3에 추가)**: `run_forever` 가 라이브 스트림에서 직전 `MATCH_START` 를 어떻게
-기억하는지(간단한 상태 변수면 되지만, 앱이 재시작되면 그 상태가 날아간다 — 재시작 직후엔
-`run_once` 의 백로그 복구가 대신 잡아준다는 전제가 맞는지 확인할 것), 그리고 구출 복사
-(`rescue_copy()` — 세그먼트를 통째로 tmp 에 복사, §7.2.1)는 아직 함수조차 없다.
+우려했던 지점(앱 재시작 시 진행 중이던 매치를 놓치는 문제)은 `discover_backlog()` 의
+기존 동작으로 그냥 풀렸다: `extract_matches()` 가 마지막 미완료 매치를 `end_utc=None`
+으로 이미 돌려주므로, `cli/watch.py::run()` 이 그 값을 `initial_start_utc` 로
+`run_forever()` 에 그대로 넘긴다. 앱이 매치 도중에 시작해도, 그 매치가 끝나면
+실시간 감시가 정상적으로 잡는다. 별도 영속 상태가 필요 없었다.
 
 ## 1. 이번 회차에서 만든 것
 
@@ -219,15 +198,30 @@ def process_match(
 
 ## 3. 확인 필요 (추측으로 메우지 않은 것)
 
-### 3-1. `[LOADING][GAME]` 이 로그 시작 직후라 이전 매치 시작을 못 찾는 경우
+### 3-1. `[LOADING][GAME]` 이 로그 시작 직후라 이전 매치 시작을 못 찾는 경우 — ✅ 해소됨
 
-`Player.log` 는 **현재 세션 것만** 들고 있고 `Player-prev.log` 가 그 이전 것이다(research §3.1). 두 파일을 모두 읽어야 백로그를 놓치지 않는데, **둘의 시각 순서를 어떻게 잇는지는 파일 자체에 나와 있지 않다**(파일 mtime 비교로 순서를 정해야 함). `extract_matches` 는 지금 파일 하나만 받는다 — 여러 파일을 이어붙이는 건 `pipeline/watcher.py` 단계에서 다룬다.
+`discover_backlog()` 가 `Player-prev.log` 를 먼저, `Player.log` 를 그다음에 읽는다.
+mtime 비교가 필요할 걱정을 했었는데 — **애초에 필요 없었다.** `Player-prev.log` 는
+"그 이전 실행 전체", `Player.log` 는 "이번 실행 전체"라 파일 자체가 이미 시간순이다.
+실제 로그로도 확인했다(§0 참고, 매치 23개 정상 추출).
 
 ### 3-2. 매치 종료 후 다음 세션의 `session.mpd` 가 어떤 상태인가
 
-매치가 끝난 시점에 `session.mpd` 가 아직 `type="dynamic"`인지, 트리거 지연(`watch.delaySec`) 동안 바뀌는지 실측하지 않았다. `RecordingSession.load()` 는 이미 두 경우(dynamic/static) 를 다 처리하므로 **막지는 않지만**, 트리거 직후 바로 로드했을 때 세그먼트가 아직 `.tmp` 상태일 위험은 `watch.delaySec` 로 완화하는 것 외에 검증한 바 없다.
+매치가 끝난 시점에 `session.mpd` 가 아직 `type="dynamic"`인지, 트리거 지연(`watch.delaySec`) 동안 바뀌는지 실측하지 않았다. `RecordingSession.load()` 는 이미 두 경우(dynamic/static) 를 다 처리하므로 **막지는 않지만**, 트리거 직후 바로 로드했을 때 세그먼트가 아직 `.tmp` 상태일 위험은 `watch.delaySec` 로 완화하는 것 외에 검증한 바 없다. 실제 `cli/watch.py` 를 며칠 실사용하며 확인할 것.
 
-이 둘 다 `pipeline/watcher.py`(다음 작업)에서 실측하며 확정한다.
+### 3-4. `localconfig.vdf` 파싱 미구현 — `resolve_buffer_minutes()` 의 폴백 한 단계가 빠짐
+
+SPEC §2.6 은 버퍼 길이를 `session.mpd` → `localconfig.vdf` → 120분 순으로 찾으라고
+한다. `resolve_buffer_minutes()` 는 **가운데 단계를 건너뛴다** — Valve 의 VDF 포맷은
+별도 파서가 필요해서 이번 범위 밖으로 뒀다. 지금은 현재 녹화 중인 세션이 있으면
+거기서 읽고, 없으면 바로 120분 기본값으로 떨어진다.
+
+- **영향**: 사용자가 스팀에서 버퍼를 120분이 아닌 값으로 바꿔놓은 상태에서, 마침
+  현재 녹화 중인 세션이 하나도 없는 시점에 앱을 켜면 잘못된 기본값(120분)을 쓴다.
+- **막는가**: 아니다. 실사용 중 대부분은 녹화 세션이 최소 하나는 있어 정상 동작한다.
+- **확인 방법**: `userdata\<id>\config\localconfig.vdf` 의 `GameRecording.PerGameSettings.<appid>.minutes`
+  (또는 전역값)를 읽는 최소 VDF 파서를 만들면 된다. VDF 는 중첩 중괄호 기반의
+  단순 텍스트 포맷이라 정규식 기반 파서로도 충분할 것으로 보인다(미검증).
 
 ### 3-3. `cut_clip()` 의 오디오 먹싱 경로 — ✅ 실제 녹화본으로 검증됨
 

@@ -1,12 +1,20 @@
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from lumia_briefing_room.pipeline.playerlog import MatchBoundary
+from lumia_briefing_room.video.segments import SegmentRange
+from lumia_briefing_room.video.session import RecordingSession
+from lumia_briefing_room.config import Config, WatchConfig
 from lumia_briefing_room.pipeline.watcher import (
     ProcessedState,
     discover_backlog,
     find_session_for_time,
     match_key,
     remaining_margin_minutes,
+    rescue_copy,
+    resolve_buffer_minutes,
+    run_forever,
+    run_once,
     should_rescue,
     unprocessed_matches,
 )
@@ -203,3 +211,246 @@ def test_find_session_for_time_ignores_non_session_directories(tmp_path):
     (tmp_path / "not_a_session").mkdir()
     (tmp_path / "clips").mkdir()
     assert find_session_for_time(tmp_path, datetime.now(tz=UTC)) is None
+
+
+def _write_chunk(session_dir: Path, stream: int, n: int, content: bytes = b"x") -> None:
+    (session_dir / f"chunk-stream{stream}-{n:05d}.m4s").write_bytes(content)
+
+
+def test_rescue_copy_copies_mpd_init_and_requested_segments(tmp_path):
+    src = _make_session_dir(tmp_path, 1049590, datetime(2026, 1, 1, tzinfo=UTC))
+    (src / "init-stream0.m4s").write_bytes(b"init0")
+    (src / "init-stream1.m4s").write_bytes(b"init1")
+    for n in (10, 11, 12):
+        _write_chunk(src, 0, n, f"v{n}".encode())
+        _write_chunk(src, 1, n, f"a{n}".encode())
+    session = RecordingSession.load(src)
+
+    dest = rescue_copy(session, SegmentRange(first=10, last=12), tmp_path / "rescue_root")
+
+    assert (dest / "session.mpd").exists()
+    assert (dest / "init-stream0.m4s").read_bytes() == b"init0"
+    assert (dest / "init-stream1.m4s").read_bytes() == b"init1"
+    for n in (10, 11, 12):
+        assert (dest / f"chunk-stream0-{n:05d}.m4s").read_bytes() == f"v{n}".encode()
+        assert (dest / f"chunk-stream1-{n:05d}.m4s").read_bytes() == f"a{n}".encode()
+
+
+def test_rescue_copy_skips_missing_segments(tmp_path):
+    src = _make_session_dir(tmp_path, 1049590, datetime(2026, 1, 1, tzinfo=UTC))
+    (src / "init-stream0.m4s").write_bytes(b"init0")
+    _write_chunk(src, 0, 10)
+    # 11번은 없음 - 링버퍼가 이미 지웠다고 가정
+    _write_chunk(src, 0, 12)
+    session = RecordingSession.load(src)
+
+    dest = rescue_copy(session, SegmentRange(first=10, last=12), tmp_path / "rescue_root")
+
+    assert (dest / "chunk-stream0-00010.m4s").exists()
+    assert not (dest / "chunk-stream0-00011.m4s").exists()
+    assert (dest / "chunk-stream0-00012.m4s").exists()
+
+
+def test_rescue_copy_result_is_loadable_as_a_session(tmp_path):
+    src = _make_session_dir(tmp_path, 1049590, datetime(2026, 1, 1, tzinfo=UTC))
+    (src / "init-stream0.m4s").write_bytes(b"init0")
+    _write_chunk(src, 0, 10)
+    session = RecordingSession.load(src)
+
+    dest = rescue_copy(session, SegmentRange(first=10, last=10), tmp_path / "rescue_root")
+
+    # 회귀: 목적지 폴더명이 원본과 같은 bg_<appid>_<날짜>_<시각> 패턴을 유지해야
+    # RecordingSession.load() 가 폴더명에서 appid/시작시각을 다시 읽을 수 있다.
+    assert dest.name == src.name
+    reloaded = RecordingSession.load(dest)
+    assert reloaded.width == session.width
+    assert reloaded.start_utc == session.start_utc
+
+
+def test_run_once_processes_unprocessed_matches_in_order(tmp_path):
+    session_dir = _make_session_dir(tmp_path, 1049590, datetime(2026, 1, 1, tzinfo=UTC))
+    m1 = MatchBoundary(
+        start_utc=datetime(2026, 1, 1, 0, 5, tzinfo=UTC),
+        end_utc=datetime(2026, 1, 1, 0, 20, tzinfo=UTC),
+    )
+    m2 = MatchBoundary(
+        start_utc=datetime(2026, 1, 1, 0, 30, tzinfo=UTC),
+        end_utc=datetime(2026, 1, 1, 0, 45, tzinfo=UTC),
+    )
+    calls = []
+
+    state = run_once(
+        [m1, m2],
+        ProcessedState(frozenset()),
+        recording_root=tmp_path,
+        now=lambda: datetime(2026, 1, 1, 1, 0, tzinfo=UTC),
+        rescue_threshold_min=20.0,
+        buffer_minutes=120.0,
+        process=lambda session_dir_, match, rescue: calls.append((session_dir_, match, rescue)),
+        state_path=tmp_path / "state.json",
+    )
+
+    assert [c[1] for c in calls] == [m1, m2]
+    assert state.processed_keys == {match_key(m1), match_key(m2)}
+    assert ProcessedState.load(tmp_path / "state.json").processed_keys == state.processed_keys
+
+
+def test_run_once_skips_already_processed():
+    m1 = MatchBoundary(
+        start_utc=datetime(2026, 1, 1, 0, 5, tzinfo=UTC),
+        end_utc=datetime(2026, 1, 1, 0, 20, tzinfo=UTC),
+    )
+    calls = []
+    run_once(
+        [m1],
+        ProcessedState(frozenset({match_key(m1)})),
+        recording_root=Path("."),
+        now=lambda: datetime(2026, 1, 1, 1, 0, tzinfo=UTC),
+        rescue_threshold_min=20.0,
+        buffer_minutes=120.0,
+        process=lambda *a: calls.append(a),
+        state_path=Path("/dev/null/unused"),
+    )
+    assert calls == []
+
+
+def test_run_once_skips_when_session_not_found(tmp_path):
+    m1 = MatchBoundary(
+        start_utc=datetime(2026, 1, 1, 0, 5, tzinfo=UTC),
+        end_utc=datetime(2026, 1, 1, 0, 20, tzinfo=UTC),
+    )
+    calls = []
+    state = run_once(
+        [m1],
+        ProcessedState(frozenset()),
+        recording_root=tmp_path,  # 세션 폴더가 하나도 없음
+        now=lambda: datetime(2026, 1, 1, 1, 0, tzinfo=UTC),
+        rescue_threshold_min=20.0,
+        buffer_minutes=120.0,
+        process=lambda *a: calls.append(a),
+        state_path=tmp_path / "state.json",
+    )
+    assert calls == []
+    assert state.processed_keys == frozenset()  # 처리 못 했으니 이력에도 안 남는다
+
+
+def test_run_once_passes_rescue_flag_based_on_margin(tmp_path):
+    session_dir = _make_session_dir(tmp_path, 1049590, datetime(2026, 1, 1, tzinfo=UTC))
+    m1 = MatchBoundary(
+        start_utc=datetime(2026, 1, 1, 0, 5, tzinfo=UTC),
+        end_utc=datetime(2026, 1, 1, 0, 20, tzinfo=UTC),
+    )
+    calls = []
+    run_once(
+        [m1],
+        ProcessedState(frozenset()),
+        recording_root=tmp_path,
+        now=lambda: datetime(2026, 1, 1, 2, 3, tzinfo=UTC),  # margin = 120 - 118 = 2 <= 20
+        rescue_threshold_min=20.0,
+        buffer_minutes=120.0,
+        process=lambda session_dir_, match, rescue: calls.append(rescue),
+        state_path=tmp_path / "state.json",
+    )
+    assert calls == [True]
+
+
+def test_run_forever_dispatches_match_on_end_event(tmp_path):
+    session_dir = _make_session_dir(tmp_path, 1049590, datetime(2026, 9, 19, 13, 0, 0, tzinfo=UTC))
+    lines = [GAME_START, LOBBY_RETURN]
+    calls = []
+    sleeps = []
+
+    run_forever(
+        lines,
+        local_tz=KST,
+        recording_root=tmp_path,
+        now=lambda: datetime(2026, 9, 19, 13, 30, 0, tzinfo=UTC),
+        delay_sec=5.0,
+        rescue_threshold_min=20.0,
+        buffer_minutes=120.0,
+        process=lambda session_dir_, match, rescue: calls.append((session_dir_, match, rescue)),
+        sleep=lambda s: sleeps.append(s),
+    )
+
+    assert len(calls) == 1
+    assert calls[0][0] == session_dir
+    assert sleeps == [5.0]
+
+
+def test_run_forever_ignores_end_without_prior_start(tmp_path):
+    calls = []
+    run_forever(
+        [LOBBY_RETURN],
+        local_tz=KST,
+        recording_root=tmp_path,
+        now=lambda: datetime(2026, 9, 19, 13, 30, 0, tzinfo=UTC),
+        delay_sec=5.0,
+        rescue_threshold_min=20.0,
+        buffer_minutes=120.0,
+        process=lambda *a: calls.append(a),
+        sleep=lambda s: None,
+    )
+    assert calls == []
+
+
+def test_run_forever_handles_multiple_matches_in_stream(tmp_path):
+    session_dir = _make_session_dir(tmp_path, 1049590, datetime(2026, 9, 19, 13, 0, 0, tzinfo=UTC))
+    lines = [GAME_START, LOBBY_RETURN, GAME_START_2, LOBBY_RETURN_2]
+    calls = []
+
+    run_forever(
+        lines,
+        local_tz=KST,
+        recording_root=tmp_path,
+        now=lambda: datetime(2026, 9, 19, 14, 0, 0, tzinfo=UTC),
+        delay_sec=0.0,
+        rescue_threshold_min=20.0,
+        buffer_minutes=120.0,
+        process=lambda session_dir_, match, rescue: calls.append(match),
+        sleep=lambda s: None,
+    )
+
+    assert len(calls) == 2
+
+
+def test_run_forever_seeds_last_start_from_initial_param(tmp_path):
+    session_dir = _make_session_dir(tmp_path, 1049590, datetime(2026, 9, 19, 13, 0, 0, tzinfo=UTC))
+    initial_start = datetime(2026, 9, 19, 13, 5, 0, tzinfo=UTC)
+    calls = []
+
+    run_forever(
+        [LOBBY_RETURN],
+        local_tz=KST,
+        recording_root=tmp_path,
+        now=lambda: datetime(2026, 9, 19, 13, 30, 0, tzinfo=UTC),
+        delay_sec=0.0,
+        rescue_threshold_min=20.0,
+        buffer_minutes=120.0,
+        process=lambda session_dir_, match, rescue: calls.append(match),
+        sleep=lambda s: None,
+        initial_start_utc=initial_start,
+    )
+
+    assert len(calls) == 1
+    assert calls[0].start_utc == initial_start
+
+
+def test_resolve_buffer_minutes_uses_explicit_config_value(tmp_path):
+    cfg = Config(watch=WatchConfig(buffer_minutes=90.0))
+    assert resolve_buffer_minutes(cfg, tmp_path) == 90.0
+
+
+def test_resolve_buffer_minutes_reads_from_dynamic_session(tmp_path):
+    _make_session_dir(tmp_path, 1049590, datetime(2026, 1, 1, tzinfo=UTC))
+    cfg = Config(watch=WatchConfig(buffer_minutes="auto"))
+    assert resolve_buffer_minutes(cfg, tmp_path) == 120.0
+
+
+def test_resolve_buffer_minutes_falls_back_to_default_when_no_session(tmp_path):
+    cfg = Config(watch=WatchConfig(buffer_minutes="auto"))
+    assert resolve_buffer_minutes(cfg, tmp_path) == 120.0
+
+
+def test_resolve_buffer_minutes_falls_back_when_root_missing():
+    cfg = Config(watch=WatchConfig(buffer_minutes="auto"))
+    assert resolve_buffer_minutes(cfg, Path("/does/not/exist")) == 120.0

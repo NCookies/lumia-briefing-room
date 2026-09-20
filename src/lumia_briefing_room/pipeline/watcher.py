@@ -1,16 +1,27 @@
-"""실시간 Player.log 감시 + 백로그 복구의 순수 로직. (SPEC §7.2, §7.2.1)
+"""실시간 Player.log 감시 + 백로그 복구. (SPEC §7.2, §7.2.1)
 
-이 모듈은 "판단"만 한다 — 실제로 무한 루프를 돌며 tail_follow() 를 소비하고
-process_match() 를 호출하는 배선(`run_forever` 류)은 아직 없다.
-plan-pipeline.md §0 체크리스트의 다음 항목이다.
+`run_once`/`run_forever` 는 실제 I/O(ffmpeg 호출, 파일 시스템 감시)를 직접 하지
+않는다 — `process` 콜백과 `now`/`sleep` 을 주입받는다. 그래야 무한루프·실시간
+지연 없이 테스트할 수 있다. 진짜 배선(실제 tail_follow, 실제 process_match 호출)은
+`cli/watch.py` 가 맡는다.
 """
 
 import json
+import shutil
+import time
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from datetime import datetime, tzinfo
+from datetime import datetime, timezone, tzinfo
 from pathlib import Path
 
-from lumia_briefing_room.pipeline.playerlog import MatchBoundary, extract_matches
+from lumia_briefing_room.config import Config
+from lumia_briefing_room.pipeline.playerlog import (
+    LogEventType,
+    MatchBoundary,
+    extract_matches,
+    parse_line,
+)
+from lumia_briefing_room.video.segments import SegmentRange
 from lumia_briefing_room.video.session import RecordingSession, SessionParseError
 
 
@@ -96,3 +107,146 @@ def find_session_for_time(recording_root: Path, t: datetime) -> Path | None:
     if not candidates:
         return None
     return max(candidates, key=lambda s: s.start_utc).directory
+
+
+def resolve_buffer_minutes(cfg: Config, recording_root: Path) -> float:
+    """SPEC §2.6: session.mpd -> localconfig.vdf -> 120분 기본값.
+
+    localconfig.vdf(Valve VDF 포맷) 파싱은 아직 만들지 않았다 — 별도의
+    파서가 필요해 이번 범위 밖으로 남긴다(plan-pipeline.md §3 확인 필요).
+    지금은 현재 녹화 중인(dynamic) 세션이 있으면 거기서 읽고, 없으면 바로
+    기본값 120분으로 떨어진다.
+    """
+    if cfg.watch.buffer_minutes != "auto":
+        return float(cfg.watch.buffer_minutes)
+
+    if recording_root.exists():
+        for entry in recording_root.iterdir():
+            if not entry.is_dir() or not entry.name.startswith("bg_"):
+                continue
+            try:
+                session = RecordingSession.load(entry)
+            except SessionParseError:
+                continue
+            if session.buffer_minutes is not None:
+                return session.buffer_minutes
+
+    return 120.0
+
+
+def rescue_copy(
+    session: RecordingSession,
+    seg_range: SegmentRange,
+    dest_root: Path,
+    *,
+    stream_video: int = 0,
+    stream_audio: int = 1,
+) -> Path:
+    """SPEC §7.2.1 구출 정책: 원본 세그먼트를 통째로 tmp 로 복사한다.
+
+    분석 도중 링버퍼가 원본을 지워도 되도록, session.mpd + init + 존재하는
+    세그먼트를 그대로 복사해 RecordingSession.load() 로 다시 읽을 수 있는
+    독립된 폴더를 만든다.
+
+    목적지 폴더 이름은 원본과 **똑같이** `bg_<appid>_<날짜>_<시각>` 를 유지한다 —
+    RecordingSession.load() 가 폴더명 자체에서 appid/시작시각을 읽기 때문에
+    다른 이름을 붙이면 다시 로드할 수 없다. 격리는 `dest_root` 로 한다.
+    """
+    dest = dest_root / session.directory.name
+    dest.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(session.directory / "session.mpd", dest / "session.mpd")
+
+    for stream in (stream_video, stream_audio):
+        init_src = session.directory / f"init-stream{stream}.m4s"
+        if init_src.exists():
+            shutil.copy2(init_src, dest / init_src.name)
+        for n in seg_range.numbers():
+            src = session.directory / f"chunk-stream{stream}-{n:05d}.m4s"
+            if src.exists():
+                shutil.copy2(src, dest / src.name)
+
+    return dest
+
+
+ProcessCallback = Callable[[Path, MatchBoundary, bool], None]
+
+
+def run_once(
+    matches: list[MatchBoundary],
+    state: ProcessedState,
+    *,
+    recording_root: Path,
+    now: Callable[[], datetime],
+    rescue_threshold_min: float,
+    buffer_minutes: float,
+    process: ProcessCallback,
+    state_path: Path,
+) -> ProcessedState:
+    """SPEC §7.2.1 백로그 복구: 처리 안 된 매치를 오래된 것부터 처리한다.
+
+    세션을 못 찾으면(소실) 건너뛰고 처리 이력에도 남기지 않는다 — 나중에
+    세션이 나타날 리는 없지만, 최소한 "처리했다고 잘못 기록"하지는 않는다.
+    """
+    for m in unprocessed_matches(matches, state):
+        session_dir = find_session_for_time(recording_root, m.start_utc)
+        if session_dir is None:
+            continue
+
+        margin = remaining_margin_minutes(m.start_utc, now(), buffer_minutes)
+        process(session_dir, m, should_rescue(margin, rescue_threshold_min))
+
+        state = state.with_added(match_key(m))
+        state.save(state_path)
+
+    return state
+
+
+def run_forever(
+    lines: Iterable[str],
+    *,
+    local_tz: tzinfo,
+    recording_root: Path,
+    now: Callable[[], datetime],
+    delay_sec: float,
+    rescue_threshold_min: float,
+    buffer_minutes: float,
+    process: ProcessCallback,
+    sleep: Callable[[float], None] = time.sleep,
+    initial_start_utc: datetime | None = None,
+) -> None:
+    """실시간 로그 라인 스트림을 소비하며 매치 종료마다 process 를 호출한다.
+
+    `lines` 로 실제 `tail_follow()` (끝나지 않는 제너레이터) 를 넘기면 계속 돈다.
+    `initial_start_utc` 는 부팅 시점에 이미 진행 중이던 매치의 시작 시각이다 —
+    `discover_backlog()` 결과의 마지막 항목이 end_utc=None 이면 그게 이거다.
+    (앱이 매치 도중에 시작돼 그 MATCH_START 줄을 못 본 경우를 위함. 앱이 매치
+    종료 후에 재시작되면 그 매치는 이미 run_once() 의 백로그 복구가 처리한다.)
+    """
+    last_start_utc = initial_start_utc
+
+    for line in lines:
+        event = parse_line(line)
+        if event is None:
+            continue
+
+        if event.type is LogEventType.MATCH_START:
+            last_start_utc = event.local_time.replace(tzinfo=local_tz).astimezone(timezone.utc)
+            continue
+
+        # MATCH_END
+        if last_start_utc is None:
+            continue  # 시작을 모르는 매치 — extract_matches() 와 동일하게 무시
+
+        end_utc = event.local_time.replace(tzinfo=local_tz).astimezone(timezone.utc)
+        sleep(delay_sec)  # 마지막 세그먼트가 .tmp 에서 확정되길 대기 (SPEC §7.2)
+
+        session_dir = find_session_for_time(recording_root, last_start_utc)
+        if session_dir is not None:
+            margin = remaining_margin_minutes(last_start_utc, now(), buffer_minutes)
+            process(
+                session_dir,
+                MatchBoundary(start_utc=last_start_utc, end_utc=end_utc),
+                should_rescue(margin, rescue_threshold_min),
+            )
+
+        last_start_utc = None
