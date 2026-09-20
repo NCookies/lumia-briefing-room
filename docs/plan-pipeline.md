@@ -12,8 +12,17 @@
 - [x] `pipeline/filters.py` — 생성 필터 적용 (§7.3)
 - [x] `pipeline/clip.py` — ffmpeg 컷 + 썸네일
 - [x] `pipeline/metadata.py` — 클립 메타데이터 JSON (§3 스키마)
-- [ ] `pipeline/orchestrator.py` — 위 전부를 잇는 `process_match()`
-- [ ] `cli/process_match.py` — 매치 하나를 수동으로 돌리는 CLI
+- [x] `pipeline/orchestrator.py` — 위 전부를 잇는 `process_match()`
+- [x] `cli/process_match.py` — 매치 하나를 수동으로 돌리는 CLI
+
+**✅ 실제 녹화본으로 전체 파이프라인 end-to-end 검증 완료** (research §4.7 사망 시퀀스 구간):
+검출 → 필터 → 컷 → 썸네일 → 메타데이터 JSON 까지 전부 실행돼 실제 클립(mp4)과
+썸네일(jpg), 메타데이터(json)가 만들어졌다. 메타데이터의 `tags:["death"]`,
+`dayNight:"day"`, `matchKills:2` 모두 이미 확인된 실제 사실과 일치했다.
+
+이 과정에서 실제 버그 하나를 잡았다: `clips_dir` 를 오버라이드해도 썸네일 경로가
+`cfg.paths.clips`(설정 파일 기본 경로) 를 따라가 **지정하지 않은 `%USERPROFILE%\Videos\...`
+에 썸네일이 생기는 버그**였다. `_resolve_clip_paths()` 로 분리하고 회귀 테스트를 추가했다.
 - [ ] `pipeline/watcher.py` — 실시간 tail 감시 + 트리거 (§7.2, §7.2.1 백로그/구출)
 - [ ] `pipeline/retention.py` — 휴지통 이동/복구/자동정리 (§7.6)
 - [ ] 트레이 상주 + 자동 시작 (§6 2단계, `ui.autoStart`) — Windows 전용, `pystray`+레지스트리
