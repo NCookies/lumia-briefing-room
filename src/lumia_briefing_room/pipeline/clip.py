@@ -54,6 +54,28 @@ class CutResult:
     segment_end: int
     duration_sec: float
     source_incomplete: bool
+    audio_status: str = "full"
+
+
+def audio_input_args(video_run: list[int], audio_run: list[int], segment_duration: float) -> list[str]:
+    """오디오 조각이 비디오보다 늦게(또는 일찍) 시작하면 그만큼 밀어서 싱크를 맞춘다.
+
+    오디오 조각이 중간에 비면 가장 긴 연속 구간만 쓰는데, 그걸 클립 0초에 그대로 붙이면
+    소리가 화면과 어긋난다.
+    """
+    offset = (audio_run[0] - video_run[0]) * segment_duration
+    if offset > 0:
+        return ["-itsoffset", f"{offset:.3f}"]
+    if offset < 0:
+        return ["-ss", f"{-offset:.3f}"]
+    return []
+
+
+def audio_status(video_run: list[int], audio_run: list[int]) -> str:
+    if not audio_run:
+        return "none"
+    covers = audio_run[0] <= video_run[0] and audio_run[-1] >= video_run[-1]
+    return "full" if covers else "partial"
 
 
 def cut_clip(
@@ -92,10 +114,12 @@ def cut_clip(
         cmd = [str(ffmpeg_path), "-hide_banner", "-v", "error", "-y", "-i", str(video_path)]
         map_args = ["-map", "0:v:0"]
 
+        used_audio: list[int] = []
         if include_audio:
             audio_path = td_path / "audio.mp4"
             used_audio = write_merged_segment_file(session, stream_audio, numbers, audio_path)
             if used_audio:
+                cmd += audio_input_args(used_video, used_audio, session.segment_duration_sec)
                 cmd += ["-i", str(audio_path)]
                 map_args += ["-map", "1:a:0"]
 
@@ -111,6 +135,7 @@ def cut_clip(
         segment_end=used_video[-1],
         duration_sec=(used_video[-1] - used_video[0] + 1) * session.segment_duration_sec,
         source_incomplete=source_incomplete,
+        audio_status=audio_status(used_video, used_audio),
     )
 
 

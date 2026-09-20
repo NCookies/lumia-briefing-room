@@ -77,6 +77,11 @@ export function ClipCard({
         <span className="absolute left-1 top-1">
           <ScoreChip score={clip.pvpScore} signals={clip.pvpSignals ?? []} />
         </span>
+        {clip.audioStatus && clip.audioStatus !== 'full' && (
+          <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 text-xs text-amber-300">
+            {clip.audioStatus === 'none' ? '소리 없음' : '소리 일부'}
+          </span>
+        )}
         {clip.sourceIncomplete && (
           <span className="absolute right-1 top-1 rounded bg-amber-600/90 px-1 text-xs">일부 손실</span>
         )}

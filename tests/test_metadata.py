@@ -150,3 +150,16 @@ def test_metadata_pvp_defaults_to_zero_when_not_scored():
 
     assert meta.pvp_score == 0.0
     assert meta.pvp_signals == []
+
+
+def test_metadata_records_audio_status_from_the_cut():
+    meta = _build(cut_result=CutResult(
+        segment_start=2782, segment_end=2795, duration_sec=39.0,
+        source_incomplete=False, audio_status="partial",
+    ))
+
+    assert meta.audio_status == "partial"
+
+
+def test_metadata_audio_status_defaults_to_full():
+    assert _build().audio_status == "full"

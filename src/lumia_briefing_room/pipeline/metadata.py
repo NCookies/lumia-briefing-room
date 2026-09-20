@@ -41,6 +41,7 @@ class ClipMetadata:
     duration_sec: float
     thumbnail_path: str | None
     source_incomplete: bool
+    audio_status: str
     combat_start_offset_sec: float
     combat_end_offset_sec: float
     preroll_source: str
@@ -103,6 +104,7 @@ def build_metadata(
         duration_sec=cut_result.duration_sec,
         thumbnail_path=thumbnail_path,
         source_incomplete=cut_result.source_incomplete,
+        audio_status=cut_result.audio_status,
         combat_start_offset_sec=interval.start,
         combat_end_offset_sec=interval.end,
         preroll_source=clip_range.preroll_source,

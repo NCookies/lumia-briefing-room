@@ -40,17 +40,22 @@ export function PlayerModal({ clips, index, onIndexChange, onLabel, onClose }: P
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-2"
       onClick={onClose}
     >
       <div
-        className="flex max-h-full w-full max-w-5xl flex-col gap-3"
+        className="flex w-[min(97vw,calc((100vh-8.5rem)*1.7778))] flex-col gap-2"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex flex-wrap items-center justify-between gap-2 text-zinc-100">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-medium">{clip.title}</h2>
             <ScoreChip score={clip.pvpScore} signals={clip.pvpSignals ?? []} />
+            {clip.audioStatus && clip.audioStatus !== 'full' && (
+              <span className="rounded border border-amber-500/50 px-1.5 py-0.5 text-xs text-amber-300">
+                {clip.audioStatus === 'none' ? '소리 없음 (원본에 오디오가 없다)' : '소리 일부 (원본 오디오 일부 소실)'}
+              </span>
+            )}
             {clip.region && (
               <span className="rounded border border-zinc-600 px-1.5 py-0.5 text-xs text-zinc-300">
                 {clip.region}
@@ -74,7 +79,7 @@ export function PlayerModal({ clips, index, onIndexChange, onLabel, onClose }: P
           src={videoUrl(clip.id)}
           controls
           autoPlay
-          className="max-h-[68vh] w-full rounded bg-black"
+          className="aspect-video w-full rounded bg-black object-contain"
         />
 
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-zinc-300">

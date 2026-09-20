@@ -150,3 +150,31 @@ def test_make_thumbnail_creates_image_with_requested_width(tmp_path, make_synthe
     )
 
     assert thumb_path.exists() and thumb_path.stat().st_size > 0
+
+
+def test_audio_input_args_delay_audio_that_starts_after_the_video():
+    from lumia_briefing_room.pipeline.clip import audio_input_args
+
+    assert audio_input_args([10, 11, 12], [13, 14], 3.0) == ["-itsoffset", "9.000"]
+
+
+def test_audio_input_args_trim_audio_that_starts_before_the_video():
+    from lumia_briefing_room.pipeline.clip import audio_input_args
+
+    assert audio_input_args([12, 13], [10, 11, 12, 13], 3.0) == ["-ss", "6.000"]
+
+
+def test_audio_input_args_empty_when_audio_and_video_start_together():
+    from lumia_briefing_room.pipeline.clip import audio_input_args
+
+    assert audio_input_args([10, 11], [10, 11], 3.0) == []
+
+
+def test_audio_status_full_partial_none():
+    from lumia_briefing_room.pipeline.clip import audio_status
+
+    assert audio_status([10, 11, 12], [10, 11, 12]) == "full"
+    assert audio_status([10, 11, 12], [9, 10, 11, 12, 13]) == "full"
+    assert audio_status([10, 11, 12], [11, 12]) == "partial"
+    assert audio_status([10, 11, 12], [10, 11]) == "partial"
+    assert audio_status([10, 11, 12], []) == "none"

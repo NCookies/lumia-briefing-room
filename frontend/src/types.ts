@@ -23,6 +23,7 @@ export interface Clip {
   durationSec: number
   thumbnailPath: string | null
   sourceIncomplete: boolean
+  audioStatus?: 'full' | 'partial' | 'none'
   combatStartOffsetSec: number
   combatEndOffsetSec: number
   prerollSource: string
