@@ -11,7 +11,7 @@
 - [x] `pipeline/playerlog.py` — 로그 파싱, 매치 경계 추출, tail follow
 - [x] `pipeline/filters.py` — 생성 필터 적용 (§7.3)
 - [x] `pipeline/clip.py` — ffmpeg 컷 + 썸네일
-- [ ] `pipeline/metadata.py` — 클립 메타데이터 JSON (§3 스키마)
+- [x] `pipeline/metadata.py` — 클립 메타데이터 JSON (§3 스키마)
 - [ ] `pipeline/orchestrator.py` — 위 전부를 잇는 `process_match()`
 - [ ] `cli/process_match.py` — 매치 하나를 수동으로 돌리는 CLI
 - [ ] `pipeline/watcher.py` — 실시간 tail 감시 + 트리거 (§7.2, §7.2.1 백로그/구출)
