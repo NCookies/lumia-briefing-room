@@ -105,3 +105,48 @@ def test_write_metadata_produces_spec_camelcase_keys(tmp_path):
     assert data["matchKills"] == 4
     assert data["matchAssists"] == 9
     assert data["teamCharacters"] == []
+
+
+def _build(**overrides):
+    from lumia_briefing_room.detect.pvp import PvpScore
+
+    kwargs = dict(
+        title="낮 묘지 교전",
+        session=_FakeSession(),
+        match_start_utc=datetime(2026, 9, 19, 15, 22, 20, tzinfo=timezone.utc),
+        game_mode="battle_royale",
+        interval=CombatInterval(
+            start=8351.0, end=8378.5, tags=frozenset({"no_result"}), k_delta=0, a_delta=0,
+            died=False, day_night="day", confidence=0.9, region="묘지", enemy_ring_mean=0.8,
+        ),
+        clip_range=ClipRange(start=8343.0, end=8386.5, preroll_source="combat"),
+        cut_result=CutResult(segment_start=2782, segment_end=2795, duration_sec=39.0, source_incomplete=False),
+        thumbnail_path=None,
+        pvp=PvpScore(score=0.4, signals=["enemy_rings"]),
+    )
+    kwargs.update(overrides)
+    return build_metadata(**kwargs)
+
+
+def test_metadata_carries_pvp_region_and_label_fields(tmp_path):
+    meta = _build()
+    path = tmp_path / "m.json"
+
+    write_metadata(meta, path)
+    data = json.loads(path.read_text(encoding="utf-8"))
+
+    assert data["pvpScore"] == 0.4
+    assert data["pvpSignals"] == ["enemy_rings"]
+    assert data["region"] == "묘지"
+    assert data["enemyRingMean"] == 0.8
+    assert data["teamWipe"] is None
+    assert data["userLabel"] is None
+
+
+def test_metadata_pvp_defaults_to_zero_when_not_scored():
+    from lumia_briefing_room.detect.pvp import PvpScore
+
+    meta = _build(pvp=PvpScore(score=0.0))
+
+    assert meta.pvp_score == 0.0
+    assert meta.pvp_signals == []

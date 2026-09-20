@@ -1,4 +1,5 @@
 from lumia_briefing_room.config import FilterConfig
+from lumia_briefing_room.detect.pvp import score_interval
 from lumia_briefing_room.detect.types import CombatInterval
 
 _PRESET_TAGS: dict[str, frozenset[str]] = {
@@ -71,6 +72,8 @@ def apply_filter(
         if cfg.game_mode != "any" and game_mode != cfg.game_mode:
             continue
         if not _phase_ok(phase, cfg):
+            continue
+        if cfg.min_pvp_score > 0 and score_interval(interval, cfg.pvp_weights).score < cfg.min_pvp_score:
             continue
         result.append(interval)
     return result

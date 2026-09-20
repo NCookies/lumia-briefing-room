@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 from lumia_briefing_room.config import dataclass_to_camel_dict
+from lumia_briefing_room.detect.pvp import PvpScore
 from lumia_briefing_room.detect.types import CombatInterval
 from lumia_briefing_room.pipeline.clip import ClipRange, CutResult
 from lumia_briefing_room.video.session import RecordingSession
@@ -47,6 +48,12 @@ class ClipMetadata:
     kill_delta: int
     assist_delta: int
     died: bool
+    pvp_score: float
+    pvp_signals: list[str]
+    team_wipe: str | None
+    enemy_ring_mean: float | None
+    region: str | None
+    user_label: str | None
     game_day: int | None
     day_night: str | None
     phase_index: int | None
@@ -71,6 +78,7 @@ def build_metadata(
     clip_range: ClipRange,
     cut_result: CutResult,
     thumbnail_path: str | None,
+    pvp: PvpScore | None = None,
     game_day: int | None = None,
     my_character: str | None = None,
     team_characters: list[str] | None = None,
@@ -102,6 +110,12 @@ def build_metadata(
         kill_delta=interval.k_delta,
         assist_delta=interval.a_delta,
         died=interval.died,
+        pvp_score=pvp.score if pvp else 0.0,
+        pvp_signals=list(pvp.signals) if pvp else [],
+        team_wipe=None,
+        enemy_ring_mean=interval.enemy_ring_mean,
+        region=interval.region,
+        user_label=None,
         game_day=game_day,
         day_night=day_night,
         phase_index=phase,

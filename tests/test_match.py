@@ -413,3 +413,56 @@ def test_finalize_match_region_is_none_when_never_read():
     states = [_region_state(0.0, False, None), _region_state(3.0, True, None), _region_state(6.0, True, None)]
 
     assert finalize_match(states).intervals[0].region is None
+
+
+def _ring_state(t, combat, rings, spectating=False):
+    return FrameState(
+        t=t, combat=combat, face_value=111.0, face_sat=26.0, k=0, a=0,
+        day_night="day", spectating=spectating, enemy_rings=rings,
+    )
+
+
+def test_finalize_match_averages_enemy_rings_over_the_interval():
+    states = [
+        _ring_state(0.0, False, 0), _ring_state(3.0, True, 2),
+        _ring_state(6.0, True, 0), _ring_state(9.0, True, 1), _ring_state(12.0, False, 5),
+    ]
+
+    interval = finalize_match(states).intervals[0]
+
+    assert interval.enemy_ring_mean == 1.0
+
+
+def test_finalize_match_enemy_rings_skip_unread_and_spectating_samples():
+    states = [
+        _ring_state(0.0, False, 0), _ring_state(3.0, True, 3),
+        _ring_state(6.0, True, None), _ring_state(9.0, True, 1), _ring_state(12.0, False, 0),
+    ]
+
+    assert finalize_match(states).intervals[0].enemy_ring_mean == 2.0
+
+
+def test_finalize_match_enemy_ring_mean_is_none_when_never_read():
+    states = [_ring_state(0.0, False, None), _ring_state(3.0, True, None), _ring_state(6.0, True, None)]
+
+    assert finalize_match(states).intervals[0].enemy_ring_mean is None
+
+
+def test_analyze_frame_counts_enemy_rings_on_the_minimap_while_alive():
+    import cv2
+
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    frame = _frame_with_minimap(profile, alive=True)
+    roi = profile.rois["minimap"]
+    for dx, dy in ((80, 80), (200, 120)):
+        cx, cy = roi.x0 + dx, roi.y0 + dy
+        cv2.circle(frame, (cx, cy), 12, (8, 8, 8), -1)
+        cv2.circle(frame, (cx, cy), 12, (230, 40, 40), 3)
+
+    assert analyze_frame(frame, profile, t=0.0).enemy_rings == 2
+
+
+def test_analyze_frame_skips_minimap_while_spectating():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+
+    assert analyze_frame(_frame_with_minimap(profile), profile, t=0.0).enemy_rings is None

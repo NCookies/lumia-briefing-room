@@ -6,6 +6,7 @@ import numpy as np
 
 from lumia_briefing_room.config import ClipConfig, Config, resolve_paths
 from lumia_briefing_room.detect.match import detect_match
+from lumia_briefing_room.detect.pvp import score_interval
 from lumia_briefing_room.detect.types import CombatInterval
 from lumia_briefing_room.pipeline.clip import ClipRange, cut_clip, make_thumbnail, resolve_clip_range
 from lumia_briefing_room.pipeline.filters import apply_filter
@@ -16,12 +17,21 @@ from lumia_briefing_room.video.session import RecordingSession
 _DAY_NIGHT_KR = {"day": "낮", "night": "밤"}
 
 
-def default_title(day_night: str | None) -> str:
+def default_title(day_night: str | None, region: str | None = None) -> str:
     """SPEC §7.7 titleTemplate 의 축소판.
 
-    일차/캐릭터 인식이 아직 없어(plan.md §8-5, v2 후보) 낮/밤만 반영한다.
+    일차/캐릭터 인식이 아직 없어(plan.md §8-5, v2 후보) 낮/밤과 지역만 반영한다.
     """
-    return f"{_DAY_NIGHT_KR.get(day_night, '알 수 없음')} 교전"
+    parts = [_DAY_NIGHT_KR.get(day_night, "알 수 없음")]
+    if region:
+        parts.append(region)
+    parts.append("교전")
+    return " ".join(parts)
+
+
+def _mean_of_known(values: list[float | None]) -> float | None:
+    known = [v for v in values if v is not None]
+    return sum(known) / len(known) if known else None
 
 
 def _aggregate_interval(intervals: list[CombatInterval]) -> CombatInterval:
@@ -40,6 +50,7 @@ def _aggregate_interval(intervals: list[CombatInterval]) -> CombatInterval:
         confidence=min(iv.confidence for iv in intervals),
         teammate_deaths=sum(iv.teammate_deaths for iv in intervals),
         region=next((iv.region for iv in intervals if iv.region), None),
+        enemy_ring_mean=_mean_of_known([iv.enemy_ring_mean for iv in intervals]),
     )
 
 
@@ -147,7 +158,8 @@ def process_match(
             thumbnail_rel = str(thumb_path)
 
         meta = build_metadata(
-            title=default_title(aggregated.day_night),
+            title=default_title(aggregated.day_night, aggregated.region),
+            pvp=score_interval(aggregated, cfg.filter.pvp_weights),
             session=session,
             match_start_utc=match_start,
             game_mode=game_mode,

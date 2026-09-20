@@ -17,6 +17,7 @@ from lumia_briefing_room.detect.daynight import read_day_night
 from lumia_briefing_room.detect.death import FaceStat, detect_death
 from lumia_briefing_room.detect.glyph import text_score
 from lumia_briefing_room.detect.intervals import to_intervals
+from lumia_briefing_room.detect.minimap import count_enemy_rings
 from lumia_briefing_room.detect.region import load_region_templates, read_region, region_score
 from lumia_briefing_room.detect.spectator import read_spectating
 from lumia_briefing_room.detect.teammate import dead_slots, new_deaths
@@ -79,6 +80,10 @@ def analyze_frame(
             )
         )
 
+    enemy_rings = None
+    if spectating is False:
+        enemy_rings = count_enemy_rings(crop_roi(frame, profile.rois["minimap"]))
+
     if spectating:
         combat = None
         face_value = face_sat = None
@@ -117,6 +122,7 @@ def analyze_frame(
         spectating=spectating,
         dead_teammates=dead_teammates,
         region=region,
+        enemy_rings=enemy_rings,
     )
 
 
@@ -204,6 +210,8 @@ def finalize_match(
 
         in_range = [s for s in states if start <= s.t <= end and not _spectating(s.t)]
         region = next((s.region for s in in_range if s.region), None)
+        rings = [s.enemy_rings for s in in_range if s.enemy_rings is not None]
+        enemy_ring_mean = sum(rings) / len(rings) if rings else None
         day_night = _mode([s.day_night for s in in_range if s.day_night])
         solid = sum(1 for s in in_range if s.combat is True)
         confidence = solid / len(in_range) if in_range else 0.0
@@ -226,6 +234,7 @@ def finalize_match(
                 k_delta=k_delta, a_delta=a_delta, died=died,
                 day_night=day_night, confidence=confidence,
                 teammate_deaths=team_deaths, region=region,
+                enemy_ring_mean=enemy_ring_mean,
             )
         )
 

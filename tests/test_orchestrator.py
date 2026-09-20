@@ -130,3 +130,26 @@ def test_aggregate_interval_sums_teammate_deaths():
     merged = _aggregate_interval([iv(0, 5, 1), iv(8, 12, 2)])
 
     assert merged.teammate_deaths == 3
+
+
+def test_aggregate_interval_averages_enemy_ring_means_and_keeps_first_region():
+    from lumia_briefing_room.detect.types import CombatInterval
+    from lumia_briefing_room.pipeline.orchestrator import _aggregate_interval
+
+    def iv(start, end, rings, region):
+        return CombatInterval(
+            start=start, end=end, tags=frozenset({"no_result"}), k_delta=0, a_delta=0,
+            died=False, day_night="day", confidence=1.0, enemy_ring_mean=rings, region=region,
+        )
+
+    merged = _aggregate_interval([iv(0, 5, 1.0, None), iv(8, 12, None, "묘지"), iv(14, 20, 2.0, "성당")])
+
+    assert merged.enemy_ring_mean == 1.5
+    assert merged.region == "묘지"
+
+
+def test_default_title_includes_region_when_known():
+    from lumia_briefing_room.pipeline.orchestrator import default_title
+
+    assert default_title("day", "묘지") == "낮 묘지 교전"
+    assert default_title("night") == "밤 교전"
