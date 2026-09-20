@@ -6,6 +6,7 @@
 - [docs/research.md](docs/research.md) — 0단계 조사 결과(실측)
 - [docs/plan.md](docs/plan.md) — 검출기 구현 계획 및 진행 상태
 - [docs/plan-pipeline.md](docs/plan-pipeline.md) — 파이프라인 자동화(SPEC 2단계) 구현 계획 및 진행 상태
+- [docs/plan-ui.md](docs/plan-ui.md) — 열람 UI(SPEC 3단계) 구현 계획 및 진행 상태
 
 ## 개발 환경
 
