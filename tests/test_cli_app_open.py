@@ -90,3 +90,15 @@ def test_watch_controller_auto_start_runs_immediately(monkeypatch):
     _on_toggle_watch, watch_enabled = make_watch_controller("fake-args", auto_start=True)
     assert started.wait(timeout=1.0)
     assert watch_enabled() is True
+
+
+def test_should_open_ui_on_start_follows_flag_and_start_minimized():
+    from lumia_briefing_room.cli.app import should_open_ui_on_start
+    from lumia_briefing_room.config import Config, UiConfig
+
+    minimized = Config(ui=UiConfig(start_minimized=True))
+    visible = Config(ui=UiConfig(start_minimized=False))
+
+    assert should_open_ui_on_start(minimized, open_ui=False) is False
+    assert should_open_ui_on_start(minimized, open_ui=True) is True
+    assert should_open_ui_on_start(visible, open_ui=False) is True

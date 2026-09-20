@@ -38,6 +38,14 @@ $env:LUMIA_FFMPEG = "C:\path\to\ffmpeg.exe"   # PowerShell
 > 코드가 바뀌어 아래 내용이 실제와 달라지면 그때그때 이 섹션을 같이 고친다
 > ([CLAUDE.md](CLAUDE.md) 참고).
 
+### 0. 가장 간편한 방법 — `run.bat` 더블클릭
+
+가상환경 활성화 없이 [run.bat](run.bat) 을 더블클릭(또는 PowerShell 에서 `.un.bat`)하면
+1번(트레이 상주)이 `--open-ui` 로 실행돼 열람 UI 도 바로 브라우저로 열린다.
+UI 를 보려면 먼저 `cd frontend && npm install && npm run build` 를 한 번 해둘 것.
+프로그램은 트레이 아이콘(작업표시줄 우측 `^` 숨겨진 아이콘 안일 수 있음)으로 상주하며,
+터미널 창은 로그용이라 닫으면 프로그램도 종료된다.
+
 ### 1. 실사용 — 트레이 상주 (평소에 쓰는 방법)
 
 트레이 아이콘으로 상주하면서 `Player.log` 를 실시간 감시하다 매치가 끝날 때마다
@@ -55,8 +63,11 @@ python -m lumia_briefing_room.cli.app \
   [--recording-root "H:\steam video\video"] \
   [--config PATH] [--ffmpeg PATH] [--player-log-dir PATH] \
   [--game-mode battle_royale|cobalt] \
-  [--k-templates PATH] [--a-templates PATH] [--hwaccel d3d11va]
+  [--k-templates PATH] [--a-templates PATH] [--hwaccel d3d11va] [--open-ui]
 ```
+
+`--open-ui` 를 주지 않으면 UI 는 자동으로 열리지 않고 트레이 메뉴 "열기" 로 연다
+(`ui.startMinimized=false` 로 설정해도 시작 시 자동으로 열린다).
 
 ### 2. 열람 UI만 독립 실행
 

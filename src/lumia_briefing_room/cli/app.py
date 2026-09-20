@@ -105,9 +105,15 @@ def make_watch_controller(args, *, auto_start: bool = True):
     return on_toggle_watch, watch_enabled
 
 
+def should_open_ui_on_start(cfg, *, open_ui: bool) -> bool:
+    return open_ui or not cfg.ui.start_minimized
+
+
 def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    parser.add_argument("--open-ui", action="store_true", help="시작하자마자 열람 UI 를 연다")
+    args = parser.parse_args(argv)
 
     cfg = load_config(args.config)
     apply_autostart_setting(cfg)
@@ -117,6 +123,9 @@ def main(argv: list[str] | None = None) -> None:
     on_open = make_on_open(
         host="127.0.0.1", port=resolve_port(cfg.ui.port), config_path=args.config
     )
+
+    if should_open_ui_on_start(cfg, open_ui=args.open_ui):
+        threading.Thread(target=on_open, daemon=True).start()
 
     icon = build_icon(
         on_open=on_open,
