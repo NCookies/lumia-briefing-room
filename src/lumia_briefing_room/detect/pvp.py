@@ -7,8 +7,10 @@ from lumia_briefing_room.detect.types import CombatInterval
 ENEMY_RINGS_FULL_AT = 1.5
 
 # enemyRings 는 0: 라벨 57개로 재보니 증거 없는 교전(8)과 사냥(21)을 못 가른다(AUC 0.53).
+# teammateDeathSplit: 1~2일차는 무료 부활이라 팀원이 흩어져 사냥하다 혼자 죽는다(스플릿). 그 날의 팀원 사망은 덜 믿는다.
 # 신호 자체와 enemyRingMean 은 계속 기록하고, 가중치만 뺐다.
-DEFAULT_WEIGHTS = {"enemyRings": 0.0, "death": 0.9, "teammateDeath": 0.8}
+FREE_REVIVE_LAST_DAY = 2
+DEFAULT_WEIGHTS = {"enemyRings": 0.0, "death": 0.9, "teammateDeath": 0.8, "teammateDeathSplit": 0.5}
 
 
 @dataclass(frozen=True)
@@ -39,7 +41,10 @@ def score_interval(interval: CombatInterval, weights: dict[str, float]) -> PvpSc
         candidates.append(weights.get("death", 0.0))
     if interval.teammate_deaths > 0:
         signals.append("teammate_death")
-        candidates.append(weights.get("teammateDeath", 0.0))
+        key = "teammateDeath"
+        if interval.game_day is not None and interval.game_day <= FREE_REVIVE_LAST_DAY and "teammateDeathSplit" in weights:
+            key = "teammateDeathSplit"
+        candidates.append(weights.get(key, 0.0))
 
     mean = interval.enemy_ring_mean
     ring_weight = weights.get("enemyRings", 0.0)

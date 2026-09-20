@@ -4,7 +4,7 @@ from lumia_briefing_room.detect.types import CombatInterval
 from lumia_briefing_room.pipeline.filters import apply_filter
 
 
-def iv(*, k=0, a=0, died=False, team=0, rings=None, start=0.0, end=20.0):
+def iv(*, k=0, a=0, died=False, team=0, rings=None, start=0.0, end=20.0, day=None):
     tags = set()
     if k: tags.add("kill")
     if a: tags.add("assist")
@@ -12,7 +12,7 @@ def iv(*, k=0, a=0, died=False, team=0, rings=None, start=0.0, end=20.0):
     if team: tags.add("teammate_death")
     return CombatInterval(
         start=start, end=end, tags=frozenset(tags or {"no_result"}), k_delta=k, a_delta=a,
-        died=died, day_night="day", confidence=1.0, teammate_deaths=team, enemy_ring_mean=rings,
+        died=died, day_night="day", confidence=1.0, teammate_deaths=team, enemy_ring_mean=rings, game_day=day,
     )
 
 
@@ -96,3 +96,21 @@ def test_default_weights_do_not_use_the_minimap_because_labels_showed_no_separat
 def test_a_zero_weighted_signal_is_not_listed_as_evidence():
     assert score_interval(iv(rings=3.0), {"enemyRings": 0.0}).signals == []
     assert score_interval(iv(died=True, rings=3.0), {"enemyRings": 0.0, "death": 0.9}).signals == ["death"]
+
+
+SPLIT_WEIGHTS = {**WEIGHTS, "teammateDeathSplit": 0.5}
+
+
+def test_teammate_death_on_free_revive_days_is_discounted_because_teammates_split_and_die_alone():
+    early = score_interval(iv(team=1, day=2), SPLIT_WEIGHTS)
+    later = score_interval(iv(team=1, day=3), SPLIT_WEIGHTS)
+    unknown = score_interval(iv(team=1, day=None), SPLIT_WEIGHTS)
+
+    assert early.score == 0.5 and early.signals == ["teammate_death"]
+    assert later.score == 0.8
+    assert unknown.score == 0.8
+
+
+def test_the_split_discount_does_not_touch_my_own_death_or_kills():
+    assert score_interval(iv(team=1, died=True, day=1), SPLIT_WEIGHTS).score == 0.9
+    assert score_interval(iv(team=1, k=1, day=1), SPLIT_WEIGHTS).score == 1.0

@@ -120,7 +120,7 @@ class FilterConfig:
     my_character: list[str] = field(default_factory=list)
     min_pvp_score: float = 0.0
     pvp_weights: dict[str, float] = field(
-        default_factory=lambda: {"enemyRings": 0.0, "death": 0.9, "teammateDeath": 0.8}
+        default_factory=lambda: {"enemyRings": 0.0, "death": 0.9, "teammateDeath": 0.8, "teammateDeathSplit": 0.5}
     )
 
 

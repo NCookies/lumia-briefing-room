@@ -31,7 +31,7 @@ def rescore_meta(meta: dict, weights: dict[str, float]) -> dict:
         k_delta=meta.get("killDelta", 0), a_delta=meta.get("assistDelta", 0),
         died=bool(meta.get("died")), day_night=meta.get("dayNight"), confidence=1.0,
         teammate_deaths=1 if "teammate_death" in tags else 0,
-        enemy_ring_mean=meta.get("enemyRingMean"),
+        enemy_ring_mean=meta.get("enemyRingMean"), game_day=meta.get("gameDay"),
     )
     result = score_interval(interval, weights)
     return {**meta, "tags": tags, "pvpScore": result.score, "pvpSignals": result.signals}
