@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 
 from lumia_briefing_room.api.clips import find_clip, scan_clips, to_summary_dict
-from lumia_briefing_room.api.filters import ClipQuery, filter_clip_summaries
+from lumia_briefing_room.api.filters import ClipQuery, filter_clip_summaries, sort_clip_summaries
 from lumia_briefing_room.config import (
     Config,
     dataclass_from_camel_dict,
@@ -51,6 +51,9 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         gameMode: str | None = None,
         pinned: bool = False,
         trashed: bool = False,
+        minPvpScore: float | None = None,
+        label: str | None = None,
+        sort: str | None = None,
     ):
         clips_dir = _clips_dir(app)
         source = (clips_dir / ".trash") if trashed else clips_dir
@@ -61,8 +64,10 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             game_mode=gameMode,
             pinned_only=pinned,
             trashed_only=trashed,
+            min_pvp_score=minPvpScore,
+            label=label,
         )
-        filtered = filter_clip_summaries(summaries, query)
+        filtered = sort_clip_summaries(filter_clip_summaries(summaries, query), sort)
         return [_serialize(c) for c in filtered]
 
     @app.get("/api/clips/{clip_id}")
@@ -78,7 +83,9 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         clip = find_clip(clips_dir, clip_id)
         if clip is None:
             raise HTTPException(404, "클립을 찾을 수 없다")
-        meta = {**clip.meta, **{k: v for k, v in body.items() if k in ("title", "pinned")}}
+        if "userLabel" in body and body["userLabel"] not in (None, "pvp", "pve"):
+            raise HTTPException(400, "userLabel 은 pvp / pve / null 만 가능하다")
+        meta = {**clip.meta, **{k: v for k, v in body.items() if k in ("title", "pinned", "userLabel")}}
         clip.meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
         return meta | {"id": clip_id}
 

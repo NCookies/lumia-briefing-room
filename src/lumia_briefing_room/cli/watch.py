@@ -93,6 +93,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--k-templates", type=Path, default=None)
     parser.add_argument("--a-templates", type=Path, default=None)
     parser.add_argument("--hwaccel", type=str, default=None)
+    parser.add_argument("--once", action="store_true", help="백로그만 처리하고 종료한다")
     return parser
 
 
@@ -143,6 +144,10 @@ def run(
         buffer_minutes=buffer_minutes,
         process=process, state_path=state_path,
     )
+
+    if args.once:
+        log.info("백로그 처리 완료 - --once 라서 종료한다")
+        return
 
     # 부팅 시점에 이미 진행 중이던 매치(끝나지 않은 채로 로그 끝에 남음)를
     # 실시간 감시가 이어서 잡을 수 있게 시드한다 (watcher.run_forever 문서 참고).

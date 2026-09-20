@@ -220,3 +220,38 @@ def test_put_config_persists(client, tmp_path):
 
     resp2 = client.get("/api/config")
     assert resp2.json()["filter"]["preset"] == "won"
+
+
+def test_patch_user_label_accepts_pvp_pve_and_null(client):
+    clips_dir = client.app.state.clips_dir_for_test
+    _write_clip(clips_dir, "a")
+
+    assert client.patch("/api/clips/a", json={"userLabel": "pvp"}).json()["userLabel"] == "pvp"
+    assert client.patch("/api/clips/a", json={"userLabel": "pve"}).json()["userLabel"] == "pve"
+    assert client.patch("/api/clips/a", json={"userLabel": None}).json()["userLabel"] is None
+    assert json.loads((clips_dir / "a.json").read_text(encoding="utf-8"))["userLabel"] is None
+
+
+def test_patch_user_label_rejects_other_values(client):
+    clips_dir = client.app.state.clips_dir_for_test
+    _write_clip(clips_dir, "a")
+
+    resp = client.patch("/api/clips/a", json={"userLabel": "maybe"})
+
+    assert resp.status_code == 400
+
+
+def test_list_clips_supports_score_label_and_sort_params(client):
+    clips_dir = client.app.state.clips_dir_for_test
+    _write_clip(clips_dir, "a", pvpScore=0.2)
+    _write_clip(clips_dir, "b", pvpScore=1.0, userLabel="pvp")
+    _write_clip(clips_dir, "c", pvpScore=0.6)
+
+    ranked = client.get("/api/clips", params={"sort": "pvp"}).json()
+    assert [c["id"] for c in ranked] == ["b", "c", "a"]
+
+    strong = client.get("/api/clips", params={"minPvpScore": "0.5", "sort": "pvp"}).json()
+    assert [c["id"] for c in strong] == ["b", "c"]
+
+    unlabeled = client.get("/api/clips", params={"label": "unlabeled", "sort": "pvp"}).json()
+    assert [c["id"] for c in unlabeled] == ["c", "a"]

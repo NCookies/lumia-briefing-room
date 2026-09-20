@@ -63,3 +63,10 @@ def test_make_processor_rescues_before_processing(tmp_path, make_synthetic_sessi
     rescued = work_dir / session_dir.name
     assert rescued.exists()
     assert (rescued / "session.mpd").exists()
+
+
+def test_once_flag_defaults_to_off_and_can_be_enabled():
+    from lumia_briefing_room.cli.watch import build_parser
+
+    assert build_parser().parse_args([]).once is False
+    assert build_parser().parse_args(["--once"]).once is True

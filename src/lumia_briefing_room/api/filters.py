@@ -17,6 +17,8 @@ class ClipQuery:
     game_mode: str | None = None
     pinned_only: bool = False
     trashed_only: bool = False
+    min_pvp_score: float | None = None
+    label: str | None = None  # pvp / pve / unlabeled
 
 
 def filter_clip_summaries(clips: list[ClipSummary], query: ClipQuery) -> list[ClipSummary]:
@@ -39,6 +41,21 @@ def filter_clip_summaries(clips: list[ClipSummary], query: ClipQuery) -> list[Cl
             continue
         if query.pinned_only and not meta.get("pinned"):
             continue
+        if query.min_pvp_score is not None and (meta.get("pvpScore") or 0.0) < query.min_pvp_score:
+            continue
+        if query.label is not None:
+            wanted = None if query.label == "unlabeled" else query.label
+            if meta.get("userLabel") != wanted:
+                continue
 
         result.append(c)
     return result
+
+
+def sort_clip_summaries(clips: list[ClipSummary], key: str | None) -> list[ClipSummary]:
+    """`pvp`: 점수 높은 순(점수 없는 건 맨 뒤), `recent`: 최신순. 그 외는 스캔 순서 그대로."""
+    if key == "pvp":
+        return sorted(clips, key=lambda c: c.meta.get("pvpScore") or -1.0, reverse=True)
+    if key == "recent":
+        return sorted(clips, key=lambda c: c.id, reverse=True)
+    return clips

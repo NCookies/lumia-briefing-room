@@ -68,3 +68,45 @@ def test_combined_filters_are_and():
     ]
     result = filter_clip_summaries(clips, ClipQuery(tags=["kill"], day_night="day"))
     assert [c.id for c in result] == ["a"]
+
+
+def test_filter_by_min_pvp_score():
+    clips = [cs("low", pvpScore=0.1), cs("mid", pvpScore=0.5), cs("high", pvpScore=1.0), cs("none")]
+
+    kept = filter_clip_summaries(clips, ClipQuery(min_pvp_score=0.5))
+
+    assert [c.id for c in kept] == ["mid", "high"]
+
+
+def test_filter_by_label():
+    clips = [cs("a", userLabel="pvp"), cs("b", userLabel="pve"), cs("c", userLabel=None), cs("d")]
+
+    assert [c.id for c in filter_clip_summaries(clips, ClipQuery(label="pvp"))] == ["a"]
+    assert [c.id for c in filter_clip_summaries(clips, ClipQuery(label="pve"))] == ["b"]
+    assert [c.id for c in filter_clip_summaries(clips, ClipQuery(label="unlabeled"))] == ["c", "d"]
+
+
+def test_sort_by_pvp_score_descending_keeps_unscored_last():
+    from lumia_briefing_room.api.filters import sort_clip_summaries
+
+    clips = [cs("a", pvpScore=0.2), cs("b"), cs("c", pvpScore=1.0), cs("d", pvpScore=0.6)]
+
+    assert [c.id for c in sort_clip_summaries(clips, "pvp")] == ["c", "d", "a", "b"]
+
+
+def test_sort_recent_orders_by_id_descending():
+    from lumia_briefing_room.api.filters import sort_clip_summaries
+
+    clips = [cs("20260920_120000_01"), cs("20260920_130000_01"), cs("20260920_130000_02")]
+
+    assert [c.id for c in sort_clip_summaries(clips, "recent")] == [
+        "20260920_130000_02", "20260920_130000_01", "20260920_120000_01",
+    ]
+
+
+def test_sort_unknown_key_keeps_scan_order():
+    from lumia_briefing_room.api.filters import sort_clip_summaries
+
+    clips = [cs("b"), cs("a")]
+
+    assert sort_clip_summaries(clips, None) == clips
