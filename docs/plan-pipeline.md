@@ -9,7 +9,7 @@
 - [x] 계획 수립
 - [x] `config.py` — SPEC §7 전체 스키마, 기본값, JSON 로드/저장
 - [x] `pipeline/playerlog.py` — 로그 파싱, 매치 경계 추출, tail follow
-- [ ] `pipeline/filters.py` — 생성 필터 적용 (§7.3)
+- [x] `pipeline/filters.py` — 생성 필터 적용 (§7.3)
 - [ ] `pipeline/clip.py` — ffmpeg 컷 + 썸네일
 - [ ] `pipeline/metadata.py` — 클립 메타데이터 JSON (§3 스키마)
 - [ ] `pipeline/orchestrator.py` — 위 전부를 잇는 `process_match()`
