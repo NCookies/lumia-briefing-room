@@ -45,9 +45,14 @@ $env:LUMIA_FFMPEG = "C:\path\to\ffmpeg.exe"   # PowerShell
 "감시 중" 토글로 감시를 정지/재개할 수 있다. `ui.autoStart` 설정에 따라
 윈도우 로그인 시 자동 실행되도록 레지스트리에 등록된다.
 
+**녹화 폴더(`--recording-root`)는 보통 지정할 필요가 없다** — 스팀 레지스트리와
+`localconfig.vdf` 의 배경 녹화 설정(`BackgroundRecordPath`)을 읽어 자동으로
+찾는다(`steam_paths.py`). 스팀이 이 계정에 없거나 배경 녹화를 한 번도 켠 적이
+없어서 자동으로 못 찾을 때만 아래처럼 직접 지정한다.
+
 ```bash
 python -m lumia_briefing_room.cli.app \
-  --recording-root "H:\steam video\video" \
+  [--recording-root "H:\steam video\video"] \
   [--config PATH] [--ffmpeg PATH] [--player-log-dir PATH] \
   [--game-mode battle_royale|cobalt] \
   [--k-templates PATH] [--a-templates PATH] [--hwaccel d3d11va]
@@ -77,8 +82,10 @@ npm run dev -- --port 5173
 
 ### 4. 감시만 (트레이 없이, 콘솔 포그라운드로)
 
+`--recording-root` 는 1번과 마찬가지로 자동 탐지되므로 보통 생략해도 된다.
+
 ```bash
-python -m lumia_briefing_room.cli.watch --recording-root "H:\steam video\video" [옵션은 1번과 동일]
+python -m lumia_briefing_room.cli.watch [--recording-root "H:\steam video\video"] [나머지 옵션은 1번과 동일]
 ```
 
 ### 5. 매치 하나만 수동으로 처리 (백로그 복구 / 디버깅용)
@@ -89,8 +96,8 @@ python -m lumia_briefing_room.cli.watch --recording-root "H:\steam video\video" 
 ```bash
 python -m lumia_briefing_room.cli.process_match \
   "<세션 폴더>" "<시작 ISO>" "<종료 ISO>" \
-  --ffmpeg "<ffmpeg 경로>" --clips-dir "<출력 폴더>" \
-  [--config PATH] [--game-mode battle_royale|cobalt] \
+  --clips-dir "<출력 폴더>" \
+  [--config PATH] [--ffmpeg PATH] [--game-mode battle_royale|cobalt] \
   [--k-templates PATH] [--a-templates PATH] [--hwaccel d3d11va]
 ```
 
@@ -101,8 +108,8 @@ python -m lumia_briefing_room.cli.process_match \
 ```bash
 python -m lumia_briefing_room.cli.detect_match \
   "<세션 폴더>" "<시작 ISO>" "<종료 ISO>" \
-  --ffmpeg "<ffmpeg 경로>" --hwaccel d3d11va \
-  --k-templates data/templates/digits/2560x1440.npz
+  --k-templates data/templates/digits/2560x1440.npz \
+  [--ffmpeg PATH] [--hwaccel d3d11va]
 ```
 
 ## 개발 도구 (tools/)

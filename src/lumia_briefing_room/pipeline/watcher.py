@@ -7,6 +7,7 @@
 """
 
 import json
+import re
 import shutil
 import time
 from collections.abc import Callable, Iterable
@@ -21,8 +22,11 @@ from lumia_briefing_room.pipeline.playerlog import (
     extract_matches,
     parse_line,
 )
+from lumia_briefing_room.steam_paths import find_steam_install_path, read_buffer_minutes_override
 from lumia_briefing_room.video.segments import SegmentRange
 from lumia_briefing_room.video.session import RecordingSession, SessionParseError
+
+_BG_FOLDER_APPID_RE = re.compile(r"^bg_(\d+)_")
 
 
 def remaining_margin_minutes(match_start_utc: datetime, now_utc: datetime, buffer_minutes: float) -> float:
@@ -109,27 +113,41 @@ def find_session_for_time(recording_root: Path, t: datetime) -> Path | None:
     return max(candidates, key=lambda s: s.start_utc).directory
 
 
-def resolve_buffer_minutes(cfg: Config, recording_root: Path) -> float:
-    """SPEC §2.6: session.mpd -> localconfig.vdf -> 120분 기본값.
+def resolve_buffer_minutes(
+    cfg: Config, recording_root: Path, *, steam_path: Path | None = None
+) -> float:
+    """SPEC §2.6: session.mpd -> localconfig.vdf -> 120분 기본값. (plan-pipeline.md §3-4)
 
-    localconfig.vdf(Valve VDF 포맷) 파싱은 아직 만들지 않았다 — 별도의
-    파서가 필요해 이번 범위 밖으로 남긴다(plan-pipeline.md §3 확인 필요).
-    지금은 현재 녹화 중인(dynamic) 세션이 있으면 거기서 읽고, 없으면 바로
-    기본값 120분으로 떨어진다.
+    현재 녹화 중인(dynamic) 세션이 있으면 거기서 읽는다. 없으면 남아있는 세션
+    폴더 이름에서라도 appid 를 뽑아 `localconfig.vdf` 의 게임별 설정(`PerGameSettings.
+    <appid>.minutes`)을 찾는다. 그것도 없으면(스팀 미설치, 세션 폴더가 하나도
+    없음, 게임별 설정 자체가 없음) 120분 기본값으로 떨어진다.
     """
     if cfg.watch.buffer_minutes != "auto":
         return float(cfg.watch.buffer_minutes)
 
+    app_id: int | None = None
     if recording_root.exists():
         for entry in recording_root.iterdir():
-            if not entry.is_dir() or not entry.name.startswith("bg_"):
+            if not entry.is_dir():
                 continue
+            m = _BG_FOLDER_APPID_RE.match(entry.name)
+            if not m:
+                continue
+            app_id = app_id if app_id is not None else int(m.group(1))
             try:
                 session = RecordingSession.load(entry)
             except SessionParseError:
                 continue
             if session.buffer_minutes is not None:
                 return session.buffer_minutes
+
+    if app_id is not None:
+        resolved_steam_path = steam_path if steam_path is not None else find_steam_install_path()
+        if resolved_steam_path is not None:
+            minutes = read_buffer_minutes_override(resolved_steam_path, str(app_id))
+            if minutes is not None:
+                return minutes
 
     return 120.0
 

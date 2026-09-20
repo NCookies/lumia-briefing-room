@@ -30,6 +30,7 @@ from lumia_briefing_room.pipeline.watcher import (
     run_forever,
     run_once,
 )
+from lumia_briefing_room.steam_paths import discover_recording_root
 from lumia_briefing_room.video.segments import segment_time_range
 from lumia_briefing_room.video.session import RecordingSession
 
@@ -100,9 +101,13 @@ def run(
     if ffmpeg_path is None:
         raise SystemExit("ffmpeg 를 찾을 수 없다")
 
-    recording_root = args.recording_root or cfg.paths.steam_recording
+    recording_root = args.recording_root or cfg.paths.steam_recording or discover_recording_root()
     if recording_root is None:
-        raise SystemExit("--recording-root 또는 paths.steamRecording 설정이 필요하다")
+        raise SystemExit(
+            "녹화 폴더를 찾을 수 없다 - 스팀 배경 녹화를 한 번도 설정한 적이 없거나 "
+            "스팀이 이 계정으로 설치되어 있지 않은 것으로 보인다. "
+            "--recording-root 또는 paths.steamRecording 설정으로 직접 지정할 것."
+        )
 
     player_log_dir = args.player_log_dir or cfg.watch.player_log or default_player_log_dir()
     player_log = player_log_dir / "Player.log"

@@ -454,3 +454,33 @@ def test_resolve_buffer_minutes_falls_back_to_default_when_no_session(tmp_path):
 def test_resolve_buffer_minutes_falls_back_when_root_missing():
     cfg = Config(watch=WatchConfig(buffer_minutes="auto"))
     assert resolve_buffer_minutes(cfg, Path("/does/not/exist")) == 120.0
+
+
+def _write_localconfig_with_minutes(steam_path: Path, app_id: str, minutes: str) -> None:
+    config_dir = steam_path / "userdata" / "100000001" / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    vdf = (
+        '"UserLocalConfigStore"\n{\n\t"GameRecording"\n\t{\n'
+        f'\t\t"PerGameSettings"\n\t\t{{\n\t\t\t"{app_id}"\n\t\t\t{{\n'
+        f'\t\t\t\t"minutes"\t\t"{minutes}"\n\t\t\t}}\n\t\t}}\n\t}}\n}}\n'
+    )
+    (config_dir / "localconfig.vdf").write_text(vdf, encoding="utf-8")
+
+
+def test_resolve_buffer_minutes_reads_per_game_override_when_no_active_session(tmp_path):
+    # bg_ 폴더는 남아있지만(appid 는 알 수 있음) session.mpd 가 없어 활성 세션 정보는 없다.
+    (tmp_path / "bg_1049590_20260101_000000").mkdir()
+    steam_path = tmp_path / "steam"
+    _write_localconfig_with_minutes(steam_path, "1049590", "45")
+
+    cfg = Config(watch=WatchConfig(buffer_minutes="auto"))
+    assert resolve_buffer_minutes(cfg, tmp_path, steam_path=steam_path) == 45.0
+
+
+def test_resolve_buffer_minutes_falls_back_to_default_when_appid_unknown(tmp_path):
+    steam_path = tmp_path / "steam"
+    _write_localconfig_with_minutes(steam_path, "1049590", "45")
+
+    cfg = Config(watch=WatchConfig(buffer_minutes="auto"))
+    # recording_root 가 비어있어(bg_ 폴더가 하나도 없음) appid 를 못 뽑으므로 vdf 를 못 쓴다.
+    assert resolve_buffer_minutes(cfg, tmp_path, steam_path=steam_path) == 120.0

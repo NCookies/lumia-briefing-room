@@ -251,19 +251,31 @@ mtime 비교가 필요할 걱정을 했었는데 — **애초에 필요 없었�
 
 매치가 끝난 시점에 `session.mpd` 가 아직 `type="dynamic"`인지, 트리거 지연(`watch.delaySec`) 동안 바뀌는지 실측하지 않았다. `RecordingSession.load()` 는 이미 두 경우(dynamic/static) 를 다 처리하므로 **막지는 않지만**, 트리거 직후 바로 로드했을 때 세그먼트가 아직 `.tmp` 상태일 위험은 `watch.delaySec` 로 완화하는 것 외에 검증한 바 없다. 실제 `cli/watch.py` 를 며칠 실사용하며 확인할 것.
 
-### 3-4. `localconfig.vdf` 파싱 미구현 — `resolve_buffer_minutes()` 의 폴백 한 단계가 빠짐
+### 3-4. `localconfig.vdf` 파싱 — ✅ 해결됨 (덤으로 녹화 경로 자동탐지도 됨)
 
-SPEC §2.6 은 버퍼 길이를 `session.mpd` → `localconfig.vdf` → 120분 순으로 찾으라고
-한다. `resolve_buffer_minutes()` 는 **가운데 단계를 건너뛴다** — Valve 의 VDF 포맷은
-별도 파서가 필요해서 이번 범위 밖으로 뒀다. 지금은 현재 녹화 중인 세션이 있으면
-거기서 읽고, 없으면 바로 120분 기본값으로 떨어진다.
+`src/lumia_briefing_room/steam_paths.py` 를 새로 만들었다:
 
-- **영향**: 사용자가 스팀에서 버퍼를 120분이 아닌 값으로 바꿔놓은 상태에서, 마침
-  현재 녹화 중인 세션이 하나도 없는 시점에 앱을 켜면 잘못된 기본값(120분)을 쓴다.
-- **막는가**: 아니다. 실사용 중 대부분은 녹화 세션이 최소 하나는 있어 정상 동작한다.
-- **확인 방법**: `userdata\<id>\config\localconfig.vdf` 의 `GameRecording.PerGameSettings.<appid>.minutes`
-  (또는 전역값)를 읽는 최소 VDF 파서를 만들면 된다. VDF 는 중첩 중괄호 기반의
-  단순 텍스트 포맷이라 정규식 기반 파서로도 충분할 것으로 보인다(미검증).
+- `find_steam_install_path()` — 레지스트리(`HKCU\Software\Valve\Steam\SteamPath`,
+  실패 시 `HKLM\...\Valve\Steam\InstallPath`)에서 스팀 설치 위치를 찾는다.
+  **이 PC 의 실제 레지스트리로 테스트함** (`c:\program files (x86)\steam`).
+- `parse_vdf()` — 중첩 중괄호 기반 VDF 텍스트를 파싱하는 최소 재귀 파서.
+  **이 PC 의 실제 `localconfig.vdf` 원문 조각을 그대로 테스트 픽스처로 씀**
+  (tab 구분자, `\\` 이스케이프 포함).
+- `read_buffer_minutes_override(steam_path, app_id)` — `GameRecording.
+  PerGameSettings.<appid>.minutes` 를 찾는다. `resolve_buffer_minutes()` 에 배선:
+  활성 세션이 없어도 **남아있는 세션 폴더 이름에서 appid 만은 뽑아** VDF 조회에
+  쓴다 — session.mpd 가 없어도(오래돼서 지워졌어도) 폴더명(`bg_<appid>_...`)만
+  있으면 이 폴백이 동작한다. 정말 세션 폴더가 하나도 없을 때만 120분 기본값으로
+  떨어진다(이 경우는 원래 코멘트보다도 더 드물어졌다).
+- `read_background_record_path()` / `discover_recording_root()` — 덤으로,
+  `GameRecording.BackgroundRecordPath` 를 읽어 **녹화 폴더 자체도 자동으로
+  찾게** 했다(원래 계획엔 없던 확장 — 사용자 요청: 다른 사람도 쓸 수 있게
+  `--recording-root` 를 안 넣어도 되게). `cli/watch.py::run()` 이
+  `--recording-root` → `paths.steamRecording` → `discover_recording_root()`
+  순으로 폴백한다. **이 PC 에서 실제로 `H:\steam video\video` 를 정확히 찾아냄.**
+
+여러 스팀 계정이 있으면(이 PC 는 2개) 값이 실제로 설정된 계정을 찾을 때까지
+전부 훑는다 — research.md §1.1 에서 확인한 대로 계정마다 설정 여부가 다르다.
 
 ### 3-5. 트레이의 "감시 중" 토글이 실제로 감시를 멈추지 않는다 — ✅ 해결됨
 
