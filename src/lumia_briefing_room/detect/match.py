@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import numpy as np
 
 from lumia_briefing_room.detect.badge import read_badge
 from lumia_briefing_room.detect.color import channel_stats
-from lumia_briefing_room.detect.counter import final_confirmed_value, read_field, to_events
+from lumia_briefing_room.detect.counter import (
+    final_confirmed_value,
+    load_templates,
+    read_field,
+    to_events,
+)
 from lumia_briefing_room.detect.daynight import read_day_night
 from lumia_briefing_room.detect.death import FaceStat, detect_death
 from lumia_briefing_room.detect.glyph import text_score
@@ -18,6 +24,28 @@ from lumia_briefing_room.video.segments import SegmentRange, existing_segment_nu
 from lumia_briefing_room.video.session import RecordingSession
 
 TAG_TOLERANCE_SEC = 3.0
+
+log = logging.getLogger(__name__)
+
+
+def resolve_templates(
+    profile: ResolutionProfile,
+    k_templates: dict[int, np.ndarray] | None,
+    a_templates: dict[int, np.ndarray] | None,
+) -> tuple[dict[int, np.ndarray] | None, dict[int, np.ndarray] | None]:
+    if k_templates is not None and a_templates is not None:
+        return k_templates, a_templates
+
+    loaded = load_templates(profile.templates) if profile.templates else None
+    if loaded is None:
+        log.warning(
+            "숫자 템플릿을 찾을 수 없다(%dx%d) - kill/assist 태그가 비어서 나온다",
+            profile.width, profile.height,
+        )
+    return (
+        k_templates if k_templates is not None else loaded,
+        a_templates if a_templates is not None else loaded,
+    )
 
 
 def analyze_frame(
@@ -153,6 +181,7 @@ def detect_match(
 ) -> MatchDetection:
     """매치 구간(세그먼트 범위) 하나를 통째로 검출한다. (plan.md §9-6)"""
     profile = profile or ResolutionProfile.for_resolution(session.width, session.height)
+    k_templates, a_templates = resolve_templates(profile, k_templates, a_templates)
 
     existing = existing_segment_numbers(session, stream, seg_range.first, seg_range.last)
     gap_segments = seg_range.gaps(existing)

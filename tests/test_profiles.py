@@ -45,3 +45,13 @@ def test_known_resolution_returns_measured_profile():
 def test_profile_without_templates_has_none_path():
     profile = ResolutionProfile.for_resolution(1920, 1080)
     assert profile.templates is None
+
+
+def test_counter_rois_are_as_wide_as_the_digit_templates():
+    from lumia_briefing_room.detect.counter import load_templates
+
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    template_width = next(iter(load_templates(profile.templates).values())).shape[1]
+
+    assert profile.rois["k_value"].width == template_width
+    assert profile.rois["a_value"].width == template_width

@@ -180,3 +180,40 @@ def test_detect_match_processes_synthetic_session_and_reports_gap(
 
     assert result.source_incomplete is True
     assert result.gaps == [(3.0, 4.0)]
+
+
+def test_resolve_templates_loads_profile_templates_when_not_given():
+    from lumia_briefing_room.detect.match import resolve_templates
+
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    assert profile.templates is not None
+
+    k, a = resolve_templates(profile, None, None)
+
+    assert k and a
+    assert set(k) == set(a)
+
+
+def test_resolve_templates_keeps_explicit_templates():
+    from lumia_briefing_room.detect.match import resolve_templates
+
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    explicit = {7: np.zeros((3, 3), np.float32)}
+
+    k, a = resolve_templates(profile, explicit, None)
+
+    assert k is explicit
+    assert a and a is not explicit
+
+
+def test_resolve_templates_warns_when_profile_has_none(caplog):
+    from lumia_briefing_room.detect.match import resolve_templates
+
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    assert profile.templates is None
+
+    with caplog.at_level("WARNING"):
+        k, a = resolve_templates(profile, None, None)
+
+    assert k is None and a is None
+    assert any("템플릿" in r.message for r in caplog.records)
