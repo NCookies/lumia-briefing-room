@@ -19,13 +19,27 @@
 `206 Partial Content` + `Content-Range: bytes 0-1023/78557811` 정상 응답,
 썸네일도 28KB 그대로 서빙됐다. TestClient(ASGI 직접호출)와 실제 TCP 서버
 양쪽에서 Range 구현이 큰 파일에도 정확히 동작함을 확인했다.
-- [ ] React 프론트엔드 스캐폴딩 (Vite + TS + Tailwind)
-- [ ] 클립 목록 뷰 (카드 그리드)
-- [ ] 매치 타임라인 뷰
-- [ ] 필터 UI
-- [ ] 정리 UI (삭제/복구/고정/내보내기)
-- [ ] pywebview 셸 배선
+- [x] React 프론트엔드 스캐폴딩 (Vite + TS + Tailwind, `frontend/`)
+- [x] 클립 목록 뷰 (카드 그리드, `ClipCard.tsx`) — 썸네일/제목(더블클릭 수정)/태그뱃지/
+  재생시간/`sourceIncomplete` 뱃지
+- [ ] 매치 타임라인 뷰 (v1.1 로 미룸)
+- [x] 필터 UI (`FilterBar.tsx`) — 태그/낮밤/게임모드/고정만/클립·휴지통 탭
+- [x] 정리 UI (삭제/복구/고정/이름변경) — 내보내기는 v1.1 로 미룸
+- [ ] pywebview 셸 배선 (§4-1, 아직 미착수)
 - [ ] 빌드 산출물을 FastAPI 정적 서빙에 연결
+
+**✅ 실제 Playwright + 실제 설치된 Edge 로 프론트엔드까지 검증했다.** 실제
+`uvicorn`(백엔드) + 실제 `vite`(프론트, `/api` 를 백엔드로 프록시) 를 동시에 띄우고,
+`process_match()` 로 만든 실제 클립(78MB HEVC mp4 + 실제 썸네일)을 그리드에서
+확인: 썸네일/제목/태그가 정확히 렌더링됨. 재생 모달을 열어 실제 설치된
+`msedge.exe` 로 재생한 결과 `videoWidth: 2560, videoHeight: 1440` 로 정상 디코딩되고
+실제 게임 화면(인게임 HUD `TK 9 K 2 A 5`)이 그대로 보였다 — **§4-2 확정, 아래 참고**.
+고정(pin)→휴지통 이동(trash)→복구(restore) 라운드트립은 실제 API(curl)로 직접
+검증: `PATCH pinned:true` → `POST trash`(목록에서 사라지고 `?trashed=true` 로 보임)
+→ `POST restore`(`pinned:true` 그대로 유지된 채 기본 목록에 복귀) 정상 동작 확인.
+(참고: `trash`/`restore` 응답 바디는 `{id, trashed}` 만 반환하고 전체 메타데이터를
+안 돌려준다 — 프론트는 응답을 안 쓰고 재조회하므로 문제 없지만, API 단독으로 확인할
+땐 헷갈릴 수 있어 기록해둔다.)
 
 **범위 판단**: SPEC §3 3단계가 요구하는 전체(타임라인 뷰 + 그리드 뷰 + 모든 필터 +
 정리 도구 + 재생)를 한 번에 다 만들지 않는다. **백엔드 API를 먼저 완결하고
@@ -156,11 +170,17 @@ pywebview 가 별도 스레드에서도 대체로 동작한다고 알려져 있�
 사실상의 기본 경로로 삼는다. `cli/app.py` 의 트레이 "열기"가 이미 그 폴백 자리를
 잡아뒀다(§_on_open, plan-pipeline.md).
 
-### 4-2. 대용량 HEVC 클립의 브라우저 재생 (research §4.10 의 연장)
+### 4-2. 대용량 HEVC 클립의 브라우저 재생 (research §4.10 의 연장) — ✅ 해결됨
 
-research §4.10 에서 **OS 코덱은 있음을 확인**했지만, `<video>` 태그로 로컬 서버발
-HEVC 스트림을 재생하는 것까지는 확인하지 않았다(Chromium 계열은 라이선스 문제로
-HEVC `<video>` 재생을 기본적으로 막아둔 빌드가 흔하다 — pywebview 의 백엔드가
-Edge WebView2 라면 OS 코덱을 타므로 될 가능성이 높지만 **실측 전이다**). 안 되면
-SPEC §7.5 의 H.264 프록시 생성(`encode.proxy.enabled`)을 UI 쪽에서 기본으로
-켜는 결정이 필요해진다 — 이건 이번 계획 §2 백엔드 완성 직후 가장 먼저 실측할 것.
+**실측 완료.** Playwright 로 두 가지를 비교했다:
+- Playwright 번들 `chromium-headless-shell`: `<video>` 가 `readyState:4`/길이/
+  `currentTime` 진행은 정상이지만 `videoWidth`/`videoHeight` 가 계속 0 — HEVC
+  디코더가 없어 화면은 검은색(오디오/탐색바만 동작).
+- **실제 설치된 Microsoft Edge**(`executablePath: 'C:/Program Files (x86)/Microsoft/
+  Edge/Application/msedge.exe'`, Playwright 로 직접 실행): `videoWidth: 2560,
+  videoHeight: 1440` 로 재생 전/후 모두 정상, 스크린샷에 실제 게임 화면이 보임.
+
+pywebview 의 Windows 백엔드가 Edge WebView2(=이 Edge 와 같은 엔진)이므로 **프록시
+생성(`encode.proxy.enabled`) 없이 원본 HEVC mp4 를 그대로 재생해도 된다** —
+Chromium 번들(headless-shell)에서만 안 되는 것이지, 실제 배포 환경(WebView2)에서는
+문제 없음을 확인했다. H.264 프록시는 계획대로 v1.1 이후 "필요해지면" 검토.
