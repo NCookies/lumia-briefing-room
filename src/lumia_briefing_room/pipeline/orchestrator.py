@@ -39,6 +39,7 @@ def _aggregate_interval(intervals: list[CombatInterval]) -> CombatInterval:
         day_night=intervals[0].day_night,
         confidence=min(iv.confidence for iv in intervals),
         teammate_deaths=sum(iv.teammate_deaths for iv in intervals),
+        region=next((iv.region for iv in intervals if iv.region), None),
     )
 
 

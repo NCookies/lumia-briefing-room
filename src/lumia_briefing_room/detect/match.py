@@ -17,6 +17,7 @@ from lumia_briefing_room.detect.daynight import read_day_night
 from lumia_briefing_room.detect.death import FaceStat, detect_death
 from lumia_briefing_room.detect.glyph import text_score
 from lumia_briefing_room.detect.intervals import to_intervals
+from lumia_briefing_room.detect.region import load_region_templates, read_region, region_score
 from lumia_briefing_room.detect.spectator import read_spectating
 from lumia_briefing_room.detect.teammate import dead_slots, new_deaths
 from lumia_briefing_room.detect.types import CombatInterval, FrameState, MatchDetection
@@ -59,6 +60,7 @@ def analyze_frame(
     t: float,
     k_templates: dict[int, np.ndarray] | None = None,
     a_templates: dict[int, np.ndarray] | None = None,
+    region_templates: dict[str, np.ndarray] | None = None,
 ) -> FrameState:
     """프레임 하나에서 교전/사망/카운터/낮밤 신호를 전부 읽는다. (plan.md §5)"""
     spectating = read_spectating(
@@ -88,6 +90,12 @@ def analyze_frame(
 
     day_night = read_day_night(crop_roi(frame, profile.rois["day_night"]))
 
+    region = None
+    if region_templates and spectating is False:
+        region = read_region(
+            region_score(crop_roi(frame, profile.rois["region_text"])), region_templates
+        ).name
+
     k_value = None
     if k_templates:
         k_crop = crop_roi(frame, profile.rois["k_value"])
@@ -108,7 +116,18 @@ def analyze_frame(
         day_night=day_night,
         spectating=spectating,
         dead_teammates=dead_teammates,
+        region=region,
     )
+
+
+def resolve_region_templates(profile: ResolutionProfile) -> dict[str, np.ndarray] | None:
+    if profile.region_templates is None:
+        log.warning(
+            "지역명 템플릿을 찾을 수 없다(%dx%d) - 클립 제목에 지역이 빠진다",
+            profile.width, profile.height,
+        )
+        return None
+    return load_region_templates(profile.region_templates)
 
 
 def _overlaps(start: float, end: float, t: float, tolerance: float) -> bool:
@@ -184,6 +203,7 @@ def finalize_match(
         )
 
         in_range = [s for s in states if start <= s.t <= end and not _spectating(s.t)]
+        region = next((s.region for s in in_range if s.region), None)
         day_night = _mode([s.day_night for s in in_range if s.day_night])
         solid = sum(1 for s in in_range if s.combat is True)
         confidence = solid / len(in_range) if in_range else 0.0
@@ -205,7 +225,7 @@ def finalize_match(
                 start=start, end=end, tags=frozenset(tags),
                 k_delta=k_delta, a_delta=a_delta, died=died,
                 day_night=day_night, confidence=confidence,
-                teammate_deaths=team_deaths,
+                teammate_deaths=team_deaths, region=region,
             )
         )
 
@@ -230,6 +250,7 @@ def detect_match(
     """매치 구간(세그먼트 범위) 하나를 통째로 검출한다. (plan.md §9-6)"""
     profile = profile or ResolutionProfile.for_resolution(session.width, session.height)
     k_templates, a_templates = resolve_templates(profile, k_templates, a_templates)
+    region_templates = resolve_region_templates(profile)
 
     existing = existing_segment_numbers(session, stream, seg_range.first, seg_range.last)
     gap_segments = seg_range.gaps(existing)
@@ -245,7 +266,10 @@ def detect_match(
     ):
         t = (seg_num - 1) * duration
         states.append(
-            analyze_frame(frame, profile, t=t, k_templates=k_templates, a_templates=a_templates)
+            analyze_frame(
+                frame, profile, t=t, k_templates=k_templates, a_templates=a_templates,
+                region_templates=region_templates,
+            )
         )
 
     return finalize_match(states, gaps=gaps)

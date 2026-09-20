@@ -338,3 +338,78 @@ def test_analyze_frame_teammates_unknown_without_minimap():
     frame = np.full((1440, 2560, 3), 5, np.uint8)
 
     assert analyze_frame(frame, profile, t=0.0).dead_teammates is None
+
+
+def _region_templates(profile):
+    from lumia_briefing_room.detect.region import build_region_template, region_score
+
+    roi = profile.rois["region_text"]
+    rng = np.random.default_rng(7)
+    ink = rng.random((roi.height, 40)) > 0.5
+    patch = np.full((roi.height, roi.width, 3), 20, np.uint8)
+    patch[6:26, 8:48][ink[6:26]] = 255
+    return {"묘지": build_region_template([region_score(patch)])}, patch
+
+
+def _frame_with_minimap(profile, *, alive=False):
+    frame = np.full((1440, 2560, 3), 20, np.uint8)
+    header = profile.rois["minimap_icons"]
+    frame[header.y0 + 20 : header.y0 + 45, header.x0 : header.x1] = 210
+    if alive:
+        strip = profile.rois["hp_strip"]
+        frame[strip.y0 + 80 : strip.y0 + 95, strip.x0 : strip.x0 + 200] = (90, 220, 40)
+    return frame
+
+
+def test_analyze_frame_reads_region_name():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    templates, patch = _region_templates(profile)
+    frame = _frame_with_minimap(profile, alive=True)
+    roi = profile.rois["region_text"]
+    frame[roi.y0 : roi.y1, roi.x0 : roi.x1] = patch
+
+    state = analyze_frame(frame, profile, t=0.0, region_templates=templates)
+
+    assert state.region == "묘지"
+
+
+def test_analyze_frame_region_is_none_without_templates():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+
+    assert analyze_frame(_frame_with_minimap(profile, alive=True), profile, t=0.0).region is None
+
+
+def test_analyze_frame_skips_region_while_spectating():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    templates, patch = _region_templates(profile)
+    frame = _frame_with_minimap(profile)
+    roi = profile.rois["region_text"]
+    frame[roi.y0 : roi.y1, roi.x0 : roi.x1] = patch
+
+    state = analyze_frame(frame, profile, t=0.0, region_templates=templates)
+
+    assert state.spectating is True
+    assert state.region is None
+
+
+def _region_state(t, combat, region, spectating=False):
+    return FrameState(
+        t=t, combat=combat, face_value=111.0, face_sat=26.0, k=0, a=0,
+        day_night="day", spectating=spectating, region=region,
+    )
+
+
+def test_finalize_match_takes_the_first_region_seen_in_the_interval():
+    states = [
+        _region_state(0.0, False, "학교"),
+        _region_state(3.0, True, None), _region_state(6.0, True, "묘지"),
+        _region_state(9.0, True, "성당"), _region_state(12.0, False, "성당"),
+    ]
+
+    assert finalize_match(states).intervals[0].region == "묘지"
+
+
+def test_finalize_match_region_is_none_when_never_read():
+    states = [_region_state(0.0, False, None), _region_state(3.0, True, None), _region_state(6.0, True, None)]
+
+    assert finalize_match(states).intervals[0].region is None

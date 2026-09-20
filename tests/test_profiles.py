@@ -55,3 +55,14 @@ def test_counter_rois_are_as_wide_as_the_digit_templates():
 
     assert profile.rois["k_value"].width == template_width
     assert profile.rois["a_value"].width == template_width
+
+
+def test_measured_profile_points_at_region_templates():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+
+    assert profile.region_templates is not None
+    assert profile.region_templates.exists()
+
+
+def test_unmeasured_profile_has_no_region_templates():
+    assert ResolutionProfile.for_resolution(1920, 1080).region_templates is None

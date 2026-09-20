@@ -20,6 +20,7 @@ class FrameState:
     day_night: str | None
     spectating: bool | None = None
     dead_teammates: tuple[int, ...] | None = None
+    region: str | None = None
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,7 @@ class CombatInterval:
     day_night: str | None
     confidence: float
     teammate_deaths: int = 0
+    region: str | None = None
 
 
 @dataclass(frozen=True)

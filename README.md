@@ -133,6 +133,7 @@ python -m lumia_briefing_room.cli.detect_match \
 | `tools/collect_frames.py` | 라벨링용 프레임 수집 |
 | `tools/label_combat.py` | 검출기 결과로 라벨 초안 생성 |
 | `tools/build_templates.py` | 라벨셋 → 숫자 본보기(npz) |
+| `tools/build_regions.py` | 라벨셋 → 지역명 본보기(npz) |
 | `tools/eval_detect.py` | 라벨셋 대비 검출 정확도 리포트 |
 
 가상환경을 활성화한 상태에서 실행할 것.

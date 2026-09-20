@@ -7,6 +7,7 @@ from pathlib import Path
 _BUILTIN_DIR = Path(__file__).parent / "builtin"
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _TEMPLATES_DIR = _PROJECT_ROOT / "data" / "templates" / "digits"
+_REGION_TEMPLATES_DIR = _PROJECT_ROOT / "data" / "templates" / "regions"
 
 _MEASURED_RESOLUTIONS: tuple[tuple[int, int], ...] = ((2560, 1440),)
 
@@ -48,6 +49,11 @@ def _templates_path(width: int, height: int) -> Path | None:
     return path if path.exists() else None
 
 
+def _region_templates_path(width: int, height: int) -> Path | None:
+    path = _REGION_TEMPLATES_DIR / f"{width}x{height}.npz"
+    return path if path.exists() else None
+
+
 @dataclass(frozen=True)
 class ResolutionProfile:
     width: int
@@ -55,6 +61,7 @@ class ResolutionProfile:
     rois: dict[str, Roi]
     measured: bool
     templates: Path | None = None
+    region_templates: Path | None = None
 
     @classmethod
     def builtin(cls, width: int, height: int) -> "ResolutionProfile":
@@ -67,6 +74,7 @@ class ResolutionProfile:
             rois=rois,
             measured=True,
             templates=_templates_path(width, height),
+            region_templates=_region_templates_path(width, height),
         )
 
     @classmethod
