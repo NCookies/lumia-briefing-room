@@ -25,6 +25,7 @@
 - [ ] 매치 타임라인 뷰 (v1.1 로 미룸)
 - [x] 필터 UI (`FilterBar.tsx`) — 태그/낮밤/게임모드/고정만/클립·휴지통 탭
 - [x] 정리 UI (삭제/복구/고정/이름변경) — 내보내기는 v1.1 로 미룸
+- [x] **교전 라벨링 UI** (SPEC 4단계, [plan-pvp.md §2.6](plan-pvp.md)) — 카드 라벨 버튼, 모달 키보드 라벨링(1/2/0, 자동 다음), 교전 가능성 칩·정렬·점수 슬라이더·라벨 필터
 - [x] pywebview 셸 배선 (`cli/serve.py::open_ui`) — §4-1 해결, 아래 참고
 - [x] 빌드 산출물을 FastAPI 정적 서빙에 연결 (`api/static.py`, `cli/serve.py`)
 
@@ -122,9 +123,9 @@ UI 필터는 **이미 저장된 메타데이터 dict** 위에서 동작해야 �
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| GET | `/api/clips` | 목록. 쿼리파라미터로 필터(`tags`, `dayNight`, `gameMode`, `pinned`, `trashed`) |
+| GET | `/api/clips` | 목록. 쿼리파라미터로 필터(`tags`, `dayNight`, `gameMode`, `pinned`, `trashed`, `minPvpScore`, `label`=pvp/pve/unlabeled) 와 정렬(`sort`=pvp/recent) |
 | GET | `/api/clips/{id}` | 메타데이터 하나 |
-| PATCH | `/api/clips/{id}` | 제목 수정, pin 토글 (SPEC: "제목은 수동 편집 가능") |
+| PATCH | `/api/clips/{id}` | 제목 수정, pin 토글, 교전/사냥 라벨(`userLabel`: pvp/pve/null, 그 외 400) |
 | POST | `/api/clips/{id}/trash` | 휴지통으로 |
 | POST | `/api/clips/{id}/restore` | 복구 |
 | DELETE | `/api/clips/{id}` | 휴지통에서 완전 삭제 (유예기간 무시하고 수동) |
@@ -145,9 +146,10 @@ Range 요청(`Range: bytes=100-199`)을 반드시 포함시킨다.**
 ## 3. 프론트엔드 — 최소 버전
 
 SPEC §4 가 정한 스택 그대로: **Vite + React + TypeScript + Tailwind**, 셸은
-**pywebview**. React 자체 테스트(Vitest 등)는 이번 1차 범위에서는 만들지 않는다 —
-백엔드만큼의 TDD 를 프론트에도 요구하면 이번 회차 안에 화면이 안 나온다. 대신
-**타입(TypeScript)과 백엔드 계약 일치**로 최소한의 안전망을 삼는다.
+**pywebview**. 화면 전체를 테스트하지는 않는다 — 백엔드만큼의 TDD 를 프론트 컴포넌트에
+요구하면 화면이 안 나온다. 대신 **타입(TypeScript)과 백엔드 계약 일치**를 기본 안전망으로 삼고,
+**라벨링 흐름의 순수 로직**(다음 안 한 클립 찾기·키 매핑·낙관적 갱신, `src/labeling.ts`)만
+Node 내장 테스트 러너로 TDD 한다(`npm test`, 의존성 추가 없음). 화면은 실제 Edge 로 확인한다.
 
 ### 최소 화면
 

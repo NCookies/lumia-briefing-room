@@ -94,7 +94,7 @@ npm run dev -- --port 5173
 
 ### 4. 감시만 (트레이 없이, 콘솔 포그라운드로)
 
-`--recording-root` 는 1번과 마찬가지로 자동 탐지되므로 보통 생략해도 된다.
+`--recording-root` 는 1번과 마찬가지로 자동 탐지되므로 보통 생략해도 된다. `--once` 를 주면 백로그만 처리하고 종료한다(클립을 지우고 다시 만들 때).
 
 ```bash
 python -m lumia_briefing_room.cli.watch [--recording-root "H:\steam video\video"] [나머지 옵션은 1번과 동일]
@@ -124,6 +124,17 @@ python -m lumia_briefing_room.cli.detect_match \
   [--ffmpeg PATH] [--hwaccel d3d11va]
 ```
 
+### 7. 교전 라벨링 — 사냥 클립 걸러내기
+
+열람 UI 의 클립 카드와 플레이어 모달에서 **교전 / 사냥**을 찍는다. 모달은 라벨링 모드다:
+`1` 교전 · `2` 사냥 · `0` 해제 · `←`/`→` 이동 · `Esc` 닫기. 라벨하면 다음 "안 한" 클립으로 자동 이동한다.
+필터에서 "라벨 안 한 것"만 보고, 정렬은 "교전 가능성순"(기본)이다.
+
+```bash
+python tools/eval_pvp.py          # 라벨로 점수를 평가: 오탐, 적 링 분포, 임계별 정밀도/재현율
+python tools/rescore_clips.py     # 가중치를 고친 뒤 점수를 다시 계산 (사용자 라벨은 보존)
+```
+
 ## 개발 도구 (tools/)
 
 `scripts/probe/` 와 달리 실사용하며 계속 돌리는 도구다.
@@ -134,6 +145,8 @@ python -m lumia_briefing_room.cli.detect_match \
 | `tools/label_combat.py` | 검출기 결과로 라벨 초안 생성 |
 | `tools/build_templates.py` | 라벨셋 → 숫자 본보기(npz) |
 | `tools/build_regions.py` | 라벨셋 → 지역명 본보기(npz) |
+| `tools/rescore_clips.py` | 저장된 클립 메타데이터의 교전 점수를 재검출 없이 다시 계산 |
+| `tools/eval_pvp.py` | UI 에서 찍은 교전/사냥 라벨로 점수를 평가 (가중치·임계 튜닝) |
 | `tools/eval_detect.py` | 라벨셋 대비 검출 정확도 리포트 |
 
 가상환경을 활성화한 상태에서 실행할 것.
