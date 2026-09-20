@@ -18,6 +18,7 @@ from lumia_briefing_room.detect.death import FaceStat, detect_death
 from lumia_briefing_room.detect.glyph import text_score
 from lumia_briefing_room.detect.intervals import to_intervals
 from lumia_briefing_room.detect.spectator import read_spectating
+from lumia_briefing_room.detect.teammate import dead_slots, new_deaths
 from lumia_briefing_room.detect.types import CombatInterval, FrameState, MatchDetection
 from lumia_briefing_room.profiles.models import ResolutionProfile
 from lumia_briefing_room.video.frames import crop_roi, extract_keyframe_frames
@@ -65,6 +66,17 @@ def analyze_frame(
         crop_roi(frame, profile.rois["hp_strip"]),
     )
 
+    dead_teammates = None
+    if spectating is not None:
+        dead_teammates = tuple(
+            dead_slots(
+                [
+                    crop_roi(frame, profile.rois["team_bar1"]),
+                    crop_roi(frame, profile.rois["team_bar2"]),
+                ]
+            )
+        )
+
     if spectating:
         combat = None
         face_value = face_sat = None
@@ -95,6 +107,7 @@ def analyze_frame(
         a=a_value,
         day_night=day_night,
         spectating=spectating,
+        dead_teammates=dead_teammates,
     )
 
 
@@ -152,6 +165,10 @@ def finalize_match(
     ]
     death_ranges = detect_death(face_stats)
 
+    teammate_deaths = new_deaths(
+        [(s.t, list(s.dead_teammates)) for s in states if s.dead_teammates is not None]
+    )
+
     k_events = to_events([(s.t, s.k) for s in states], "K")
     a_events = to_events([(s.t, s.a) for s in states], "A")
 
@@ -161,6 +178,10 @@ def finalize_match(
         a_delta = sum(e.delta for e in a_events if _overlaps(start, end, e.t, tag_tolerance))
         died = any(_intervals_overlap(start, end, d_start, d_end) for d_start, d_end in death_ranges)
         died = died or any(_overlaps(start, end, sp_start, DEATH_LINK_SEC) for sp_start, _ in spectator_ranges)
+
+        team_deaths = sum(
+            1 for t, _ in teammate_deaths if _overlaps(start, end, t, DEATH_LINK_SEC)
+        )
 
         in_range = [s for s in states if start <= s.t <= end and not _spectating(s.t)]
         day_night = _mode([s.day_night for s in in_range if s.day_night])
@@ -174,6 +195,8 @@ def finalize_match(
             tags.add("assist")
         if died:
             tags.add("death")
+        if team_deaths:
+            tags.add("teammate_death")
         if not tags:
             tags.add("no_result")
 
@@ -182,13 +205,14 @@ def finalize_match(
                 start=start, end=end, tags=frozenset(tags),
                 k_delta=k_delta, a_delta=a_delta, died=died,
                 day_night=day_night, confidence=confidence,
+                teammate_deaths=team_deaths,
             )
         )
 
     return MatchDetection(
         intervals=intervals, k_final=k_final, a_final=a_final,
         gaps=gaps, source_incomplete=bool(gaps),
-        spectator_ranges=spectator_ranges,
+        spectator_ranges=spectator_ranges, teammate_deaths=teammate_deaths,
     )
 
 

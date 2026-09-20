@@ -19,6 +19,7 @@ class FrameState:
     a: int | None
     day_night: str | None
     spectating: bool | None = None
+    dead_teammates: tuple[int, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,7 @@ class CombatInterval:
     died: bool
     day_night: str | None
     confidence: float
+    teammate_deaths: int = 0
 
 
 @dataclass(frozen=True)
@@ -41,3 +43,4 @@ class MatchDetection:
     gaps: list[tuple[float, float]]
     source_incomplete: bool
     spectator_ranges: list[tuple[float, float]] = field(default_factory=list)
+    teammate_deaths: list[tuple[float, int]] = field(default_factory=list)

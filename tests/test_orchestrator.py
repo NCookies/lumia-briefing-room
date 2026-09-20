@@ -115,3 +115,18 @@ def test_plan_clips_sorts_out_of_order_input():
     plans = _plan_clips(intervals, cfg)
     assert len(plans) == 2
     assert plans[0].range.start < plans[1].range.start
+
+
+def test_aggregate_interval_sums_teammate_deaths():
+    from lumia_briefing_room.detect.types import CombatInterval
+    from lumia_briefing_room.pipeline.orchestrator import _aggregate_interval
+
+    def iv(start, end, deaths):
+        return CombatInterval(
+            start=start, end=end, tags=frozenset({"teammate_death"}), k_delta=0, a_delta=0,
+            died=False, day_night="day", confidence=1.0, teammate_deaths=deaths,
+        )
+
+    merged = _aggregate_interval([iv(0, 5, 1), iv(8, 12, 2)])
+
+    assert merged.teammate_deaths == 3

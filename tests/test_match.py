@@ -274,3 +274,67 @@ def test_analyze_frame_reads_spectating_from_ui_rois():
 
     assert state.spectating is True
     assert state.combat is None
+
+
+def _team_state(t, combat, dead):
+    return FrameState(
+        t=t, combat=combat, face_value=111.0, face_sat=26.0, k=0, a=0,
+        day_night="day", spectating=False, dead_teammates=dead,
+    )
+
+
+def test_finalize_match_tags_teammate_death_inside_combat():
+    states = [
+        _team_state(0.0, False, ()), _team_state(3.0, True, ()),
+        _team_state(6.0, True, (1,)), _team_state(9.0, True, (1,)),
+        _team_state(12.0, False, (1,)), _team_state(15.0, False, (1,)),
+    ]
+
+    detection = finalize_match(states)
+
+    interval = detection.intervals[0]
+    assert "teammate_death" in interval.tags
+    assert "no_result" not in interval.tags
+    assert interval.teammate_deaths == 1
+    assert detection.teammate_deaths == [(6.0, 1)]
+
+
+def test_finalize_match_ignores_teammate_already_dead_before_combat():
+    states = [
+        _team_state(0.0, False, (1,)), _team_state(3.0, True, (1,)),
+        _team_state(6.0, True, (1,)), _team_state(9.0, False, (1,)),
+    ]
+
+    detection = finalize_match(states)
+
+    assert detection.intervals[0].tags == frozenset({"no_result"})
+    assert detection.teammate_deaths == []
+
+
+def test_finalize_match_skips_samples_without_hud_when_tracking_teammates():
+    states = [
+        _team_state(0.0, False, ()), _team_state(3.0, True, None),
+        _team_state(6.0, True, ()), _team_state(9.0, False, ()),
+    ]
+
+    assert finalize_match(states).teammate_deaths == []
+
+
+def test_analyze_frame_reads_dead_teammate_from_bar_roi():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    frame = np.full((1440, 2560, 3), 20, np.uint8)
+    header = profile.rois["minimap_icons"]
+    frame[header.y0 + 20 : header.y0 + 45, header.x0 : header.x1] = 210
+    bar = profile.rois["team_bar2"]
+    frame[bar.y0 : bar.y1, bar.x0 : bar.x0 + 10] = (240, 150, 30)
+
+    state = analyze_frame(frame, profile, t=0.0)
+
+    assert state.dead_teammates == (1,)
+
+
+def test_analyze_frame_teammates_unknown_without_minimap():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    frame = np.full((1440, 2560, 3), 5, np.uint8)
+
+    assert analyze_frame(frame, profile, t=0.0).dead_teammates is None
