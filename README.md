@@ -40,7 +40,7 @@ $env:LUMIA_FFMPEG = "C:\path\to\ffmpeg.exe"   # PowerShell
 
 ### 0. 가장 간편한 방법 — `run.bat` 더블클릭
 
-가상환경 활성화 없이 [run.bat](run.bat) 을 더블클릭(또는 PowerShell 에서 `.un.bat`)하면
+가상환경 활성화 없이 [run.bat](run.bat) 을 더블클릭(또는 PowerShell 에서 `.\run.bat`)하면
 1번(트레이 상주)이 `--open-ui` 로 실행돼 열람 UI 도 바로 브라우저로 열린다.
 UI 를 보려면 먼저 `cd frontend && npm install && npm run build` 를 한 번 해둘 것.
 프로그램은 트레이 아이콘(작업표시줄 우측 `^` 숨겨진 아이콘 안일 수 있음)으로 상주하며,
