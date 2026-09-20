@@ -17,6 +17,7 @@ from lumia_briefing_room.detect.daynight import read_day_night
 from lumia_briefing_room.detect.death import FaceStat, detect_death
 from lumia_briefing_room.detect.glyph import text_score
 from lumia_briefing_room.detect.intervals import to_intervals
+from lumia_briefing_room.detect.spectator import read_spectating
 from lumia_briefing_room.detect.types import CombatInterval, FrameState, MatchDetection
 from lumia_briefing_room.profiles.models import ResolutionProfile
 from lumia_briefing_room.video.frames import crop_roi, extract_keyframe_frames
@@ -24,6 +25,8 @@ from lumia_briefing_room.video.segments import SegmentRange, existing_segment_nu
 from lumia_briefing_room.video.session import RecordingSession
 
 TAG_TOLERANCE_SEC = 3.0
+DEATH_LINK_SEC = 8.0
+MIN_SPECTATOR_SAMPLES = 2
 
 log = logging.getLogger(__name__)
 
@@ -57,11 +60,19 @@ def analyze_frame(
     a_templates: dict[int, np.ndarray] | None = None,
 ) -> FrameState:
     """프레임 하나에서 교전/사망/카운터/낮밤 신호를 전부 읽는다. (plan.md §5)"""
-    combat = read_badge(crop_roi(frame, profile.rois["badge"]))
+    spectating = read_spectating(
+        crop_roi(frame, profile.rois["minimap_icons"]),
+        crop_roi(frame, profile.rois["hp_strip"]),
+    )
 
-    face_stats = channel_stats(crop_roi(frame, profile.rois["face"]))
-    face_value = float(face_stats.v.mean())
-    face_sat = float(face_stats.s.mean())
+    if spectating:
+        combat = None
+        face_value = face_sat = None
+    else:
+        combat = read_badge(crop_roi(frame, profile.rois["badge"]))
+        face_stats = channel_stats(crop_roi(frame, profile.rois["face"]))
+        face_value = float(face_stats.v.mean())
+        face_sat = float(face_stats.s.mean())
 
     day_night = read_day_night(crop_roi(frame, profile.rois["day_night"]))
 
@@ -83,6 +94,7 @@ def analyze_frame(
         k=k_value,
         a=a_value,
         day_night=day_night,
+        spectating=spectating,
     )
 
 
@@ -121,12 +133,22 @@ def finalize_match(
             gaps=gaps, source_incomplete=bool(gaps),
         )
 
-    combat_ranges = to_intervals([(s.t, s.combat) for s in states])
+    spectator_ranges = to_intervals(
+        [(s.t, s.spectating) for s in states],
+        gap_fill_samples=1, min_combat_samples=MIN_SPECTATOR_SAMPLES,
+    )
+
+    def _spectating(t: float) -> bool:
+        return any(a <= t <= b for a, b in spectator_ranges)
+
+    combat_ranges = to_intervals(
+        [(s.t, False if _spectating(s.t) else s.combat) for s in states]
+    )
 
     face_stats = [
         FaceStat(t=s.t, value=s.face_value, sat=s.face_sat)
         for s in states
-        if s.face_value is not None and s.face_sat is not None
+        if s.face_value is not None and s.face_sat is not None and not _spectating(s.t)
     ]
     death_ranges = detect_death(face_stats)
 
@@ -138,8 +160,9 @@ def finalize_match(
         k_delta = sum(e.delta for e in k_events if _overlaps(start, end, e.t, tag_tolerance))
         a_delta = sum(e.delta for e in a_events if _overlaps(start, end, e.t, tag_tolerance))
         died = any(_intervals_overlap(start, end, d_start, d_end) for d_start, d_end in death_ranges)
+        died = died or any(_overlaps(start, end, sp_start, DEATH_LINK_SEC) for sp_start, _ in spectator_ranges)
 
-        in_range = [s for s in states if start <= s.t <= end]
+        in_range = [s for s in states if start <= s.t <= end and not _spectating(s.t)]
         day_night = _mode([s.day_night for s in in_range if s.day_night])
         solid = sum(1 for s in in_range if s.combat is True)
         confidence = solid / len(in_range) if in_range else 0.0
@@ -165,6 +188,7 @@ def finalize_match(
     return MatchDetection(
         intervals=intervals, k_final=k_final, a_final=a_final,
         gaps=gaps, source_incomplete=bool(gaps),
+        spectator_ranges=spectator_ranges,
     )
 
 

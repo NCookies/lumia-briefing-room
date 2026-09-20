@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -18,6 +18,7 @@ class FrameState:
     k: int | None
     a: int | None
     day_night: str | None
+    spectating: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -39,3 +40,4 @@ class MatchDetection:
     a_final: int | None
     gaps: list[tuple[float, float]]
     source_incomplete: bool
+    spectator_ranges: list[tuple[float, float]] = field(default_factory=list)

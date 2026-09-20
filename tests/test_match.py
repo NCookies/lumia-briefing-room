@@ -217,3 +217,60 @@ def test_resolve_templates_warns_when_profile_has_none(caplog):
 
     assert k is None and a is None
     assert any("템플릿" in r.message for r in caplog.records)
+
+
+def _spec_states(spectating_from, count, *, combat_until=12.0, step=3.0, total=15):
+    states = []
+    for i in range(total):
+        t = i * step
+        spectating = spectating_from <= t < spectating_from + count * step
+        states.append(
+            FrameState(
+                t=t, combat=(t <= combat_until) and not spectating,
+                face_value=111.0, face_sat=26.0, k=0, a=0, day_night="day",
+                spectating=spectating,
+            )
+        )
+    return states
+
+
+def test_finalize_match_tags_death_when_spectator_ui_follows_combat():
+    detection = finalize_match(_spec_states(15.0, 4))
+
+    assert len(detection.intervals) == 1
+    assert "death" in detection.intervals[0].tags
+    assert detection.intervals[0].died is True
+    assert detection.spectator_ranges == [(15.0, 24.0)]
+
+
+def test_finalize_match_ignores_single_spectating_sample():
+    detection = finalize_match(_spec_states(15.0, 1))
+
+    assert detection.spectator_ranges == []
+    assert "death" not in detection.intervals[0].tags
+
+
+def test_finalize_match_spectator_frames_do_not_count_as_combat():
+    states = _spec_states(9.0, 4, combat_until=99.0)
+    detection = finalize_match(states)
+
+    assert detection.intervals[0].end < 9.0
+
+
+def test_finalize_match_spectator_far_from_combat_is_not_linked_to_it():
+    detection = finalize_match(_spec_states(39.0, 2, combat_until=9.0, total=20))
+
+    assert detection.spectator_ranges == [(39.0, 42.0)]
+    assert "death" not in detection.intervals[0].tags
+
+
+def test_analyze_frame_reads_spectating_from_ui_rois():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    frame = np.full((1440, 2560, 3), 20, np.uint8)
+    header = profile.rois["minimap_icons"]
+    frame[header.y0 + 20 : header.y0 + 45, header.x0 : header.x1] = 210
+
+    state = analyze_frame(frame, profile, t=0.0)
+
+    assert state.spectating is True
+    assert state.combat is None
