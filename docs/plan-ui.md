@@ -9,7 +9,9 @@
 - [x] 계획 수립 (이 문서)
 - [x] `api/clips.py` — 클립 스캔 (scan_clips/find_clip/to_summary_dict)
 - [x] `api/filters.py` — 저장된 메타데이터 위에서 도는 UI 필터
-- [ ] FastAPI 라우트 (REST API 나머지)
+- [x] FastAPI 라우트 (`api/app.py`) — 클립 목록/조회/수정/삭제/복구/영구삭제,
+  Range 지원 비디오 스트리밍, 썸네일, 설정 조회/저장. TestClient 로 전부 테스트
+  (실제 서버 안 띄우고 ASGI 로 직접 호출 — 빠르고 결정적)
 - [ ] React 프론트엔드 스캐폴딩 (Vite + TS + Tailwind)
 - [ ] 클립 목록 뷰 (카드 그리드)
 - [ ] 매치 타임라인 뷰

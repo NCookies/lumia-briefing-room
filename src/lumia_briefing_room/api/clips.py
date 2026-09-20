@@ -8,9 +8,6 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-_SKIP_DIRS = {".trash", ".thumbs", ".proxy"}
-
-
 @dataclass(frozen=True)
 class ClipSummary:
     id: str
@@ -29,14 +26,15 @@ def _load_one(meta_path: Path) -> ClipSummary:
 
 
 def scan_clips(clips_dir: Path) -> list[ClipSummary]:
-    """clips_dir 바로 아래(휴지통/썸네일/프록시 폴더 제외)의 메타데이터를 전부 읽는다."""
+    """clips_dir 바로 아래의 메타데이터를 전부 읽는다.
+
+    `glob("*.json")` 은 비재귀라 `.trash`/`.thumbs`/`.proxy` 서브폴더 안의
+    파일은 애초에 안 잡힌다 — 동시에 이 함수는 `clips_dir` 자리에 `.trash`
+    폴더를 직접 넘겨 휴지통만 스캔하는 용도로도 쓰인다(api/app.py).
+    """
     if not clips_dir.exists():
         return []
-    return [
-        _load_one(p)
-        for p in sorted(clips_dir.glob("*.json"))
-        if p.parent.name not in _SKIP_DIRS
-    ]
+    return [_load_one(p) for p in sorted(clips_dir.glob("*.json"))]
 
 
 def find_clip(clips_dir: Path, clip_id: str) -> ClipSummary | None:
