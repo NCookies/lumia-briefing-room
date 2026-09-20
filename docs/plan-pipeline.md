@@ -33,7 +33,10 @@
   `RecordingSession`). `python -m lumia_briefing_room.cli.watch --recording-root ...`
   로 실행하면 부팅 시 백로그 복구 → 실시간 감시가 Ctrl+C 전까지 계속 돈다
 - [x] `pipeline/retention.py` — 휴지통 이동/복구/자동정리 (§7.6)
-- [ ] 트레이 상주 + 자동 시작 (§6 2단계, `ui.autoStart`) — Windows 전용, `pystray`+레지스트리
+- [x] `autostart.py` — 레지스트리 Run 키 (실제 HKCU 레지스트리로 테스트, 정리까지 확인)
+- [x] `tray.py` — 메뉴 구조(순수 테스트) + `pystray.Icon` 배선. 실제 이벤트루프
+  (`icon.run()`)는 GUI라 테스트 불가 — 수동 확인 필요 (§3 확인 필요 참고)
+- [ ] 트레이 앱을 실제로 띄우는 `cli/app.py` (tray + watch 를 한 프로세스로 묶기)
 - [ ] 열람 UI (SPEC 3단계) — 아직 손 안 댐. FastAPI + React, SPEC §4 참조
 
 **다음에 이어서 할 일 순서**: `pipeline/retention.py` (삭제/복구) → 트레이 앱 → UI.
