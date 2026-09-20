@@ -23,12 +23,56 @@
 이 과정에서 실제 버그 하나를 잡았다: `clips_dir` 를 오버라이드해도 썸네일 경로가
 `cfg.paths.clips`(설정 파일 기본 경로) 를 따라가 **지정하지 않은 `%USERPROFILE%\Videos\...`
 에 썸네일이 생기는 버그**였다. `_resolve_clip_paths()` 로 분리하고 회귀 테스트를 추가했다.
-- [ ] `pipeline/watcher.py` — 실시간 tail 감시 + 트리거 (§7.2, §7.2.1 백로그/구출)
+- [x] `pipeline/watcher.py` (판단 로직만) — remaining_margin/should_rescue/백로그 탐지/
+  세션 찾기. **아직 없는 것: 실제 무한루프(`run_forever`) — tail_follow() 소비하며
+  process_match() 호출하는 배선.** 다음 작업으로 바로 이어갈 것
 - [ ] `pipeline/retention.py` — 휴지통 이동/복구/자동정리 (§7.6)
 - [ ] 트레이 상주 + 자동 시작 (§6 2단계, `ui.autoStart`) — Windows 전용, `pystray`+레지스트리
 - [ ] 열람 UI (SPEC 3단계) — 아직 손 안 댐. FastAPI + React, SPEC §4 참조
 
-**다음에 이어서 할 일 순서**: `pipeline/watcher.py` (실시간 감시 루프) → `pipeline/retention.py` (삭제/복구) → 트레이 앱 → UI. 아래 각 절에 파일별 설계가 이미 있으니 순서대로 만들면 된다.
+**다음에 이어서 할 일 순서**: `pipeline/watcher.py` 의 `run_forever()` 배선(아래 §2.7 설계 참조) → `pipeline/retention.py` (삭제/복구) → 트레이 앱 → UI.
+
+### 다음 세션이 여기서 바로 이어가는 법
+
+`pipeline/watcher.py` 에 판단 로직(여유시간 계산, 백로그 탐지, 세션 찾기)은 다 있고
+**실제로 도는 루프가 없다.** 다음 작업은 그 배선뿐이다:
+
+```python
+def run_once(cfg, ffmpeg_path, recording_root, ...):
+    """부팅 시 1회: 백로그 복구."""
+    state = ProcessedState.load(state_path)
+    matches = discover_backlog(player_log, player_prev_log, local_tz=local_tz)
+    for m in unprocessed_matches(matches, state):          # 이미 오름차순(오래된 것부터)
+        session_dir = find_session_for_time(recording_root, m.start_utc)
+        if session_dir is None:
+            log.warning("세션을 못 찾음 — 소실", m)         # SPEC §7.2.1 "소실은 소실이다"
+            continue
+        session = RecordingSession.load(session_dir)
+        margin = remaining_margin_minutes(m.start_utc, datetime.now(timezone.utc), buffer_minutes)
+        if should_rescue(margin, cfg.watch.rescue_threshold_min):
+            ...  # 원본을 tmp 로 먼저 복사 (아직 안 만듦 - rescue_copy() 필요)
+        process_match(session, m.start_utc, m.end_utc, cfg, ffmpeg_path=ffmpeg_path)
+        state = state.with_added(match_key(m))
+        state.save(state_path)
+
+
+def run_forever(cfg, ffmpeg_path, recording_root, ...):
+    """부팅 후: run_once() 로 백로그 처리 -> tail_follow 로 실시간 감시."""
+    run_once(...)
+    for line in tail_follow(player_log_path, poll_interval_sec=cfg.watch.poll_interval_ms / 1000):
+        event = parse_line(line)
+        if event is None or event.type is not LogEventType.MATCH_END:
+            continue
+        time.sleep(cfg.watch.delay_sec)     # 마지막 세그먼트가 .tmp 에서 확정되길 대기
+        # 이 시점의 매치 시작 시각을 어떻게 아는가가 관건 -
+        # tail_follow 는 한 줄씩만 주므로 직전 MATCH_START 를 기억해둬야 한다
+        ...
+```
+
+**확인 필요 (§3에 추가)**: `run_forever` 가 라이브 스트림에서 직전 `MATCH_START` 를 어떻게
+기억하는지(간단한 상태 변수면 되지만, 앱이 재시작되면 그 상태가 날아간다 — 재시작 직후엔
+`run_once` 의 백로그 복구가 대신 잡아준다는 전제가 맞는지 확인할 것), 그리고 구출 복사
+(`rescue_copy()` — 세그먼트를 통째로 tmp 에 복사, §7.2.1)는 아직 함수조차 없다.
 
 ## 1. 이번 회차에서 만든 것
 
