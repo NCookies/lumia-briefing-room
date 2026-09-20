@@ -12,7 +12,7 @@ from lumia_briefing_room.video.frames import (
 from lumia_briefing_room.video.session import RecordingSession
 
 FFMPEG_PATH = discover_ffmpeg()
-requires_ffmpeg = pytest.mark.skipif(FFMPEG_PATH is None, reason="ffmpeg 를 찾을 수 없다")
+requires_ffmpeg = pytest.mark.skipif(FFMPEG_PATH is None, reason="ffmpeg를 찾을 수 없다")
 
 
 def test_reshape_raw_frames_splits_into_correct_count_and_shape():

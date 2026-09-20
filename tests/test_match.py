@@ -17,7 +17,7 @@ try:
 except Exception:  # pragma: no cover
     FFMPEG_PATH = None
 
-requires_ffmpeg = pytest.mark.skipif(FFMPEG_PATH is None, reason="ffmpeg 를 찾을 수 없다")
+requires_ffmpeg = pytest.mark.skipif(FFMPEG_PATH is None, reason="ffmpeg를 찾을 수 없다")
 
 
 def fs(t, combat, *, k=0, a=0, day_night="day", face=(111.0, 26.0)):

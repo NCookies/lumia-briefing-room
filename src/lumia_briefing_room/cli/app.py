@@ -135,9 +135,9 @@ def _run_watch_safely(args, stop_event: threading.Event) -> None:
     try:
         run(args, should_stop=stop_event.is_set)
     except SystemExit as exc:
-        log.error("감시 스레드 종료: %s", exc)
+        log.error("감시를 시작하지 못했다 - %s", exc)
     except Exception:
-        log.exception("감시 스레드에서 처리되지 않은 예외")
+        log.exception("감시 중 처리되지 않은 예외가 발생했다")
 
 
 def _on_quit() -> None:

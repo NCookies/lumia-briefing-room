@@ -10,7 +10,7 @@ import argparse
 from datetime import datetime, timezone
 from pathlib import Path
 
-from lumia_briefing_room.config import discover_ffmpeg, load_config
+from lumia_briefing_room.config import FFMPEG_NOT_FOUND_MESSAGE, discover_ffmpeg, load_config
 from lumia_briefing_room.detect.counter import load_templates
 from lumia_briefing_room.pipeline.orchestrator import process_match
 from lumia_briefing_room.video.session import RecordingSession
@@ -44,7 +44,7 @@ def main(argv: list[str] | None = None) -> None:
     cfg = load_config(args.config)
     ffmpeg_path = args.ffmpeg or discover_ffmpeg()
     if ffmpeg_path is None:
-        raise SystemExit("ffmpeg 를 찾을 수 없다")
+        raise SystemExit(FFMPEG_NOT_FOUND_MESSAGE)
 
     session = RecordingSession.load(args.session_dir)
     k_templates = load_templates(args.k_templates) if args.k_templates else None

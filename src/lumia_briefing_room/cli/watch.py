@@ -16,7 +16,13 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
-from lumia_briefing_room.config import Config, discover_ffmpeg, load_config, resolve_paths
+from lumia_briefing_room.config import (
+    FFMPEG_NOT_FOUND_MESSAGE,
+    Config,
+    discover_ffmpeg,
+    load_config,
+    resolve_paths,
+)
 from lumia_briefing_room.detect.counter import load_templates
 from lumia_briefing_room.pipeline.clip import ClipCutError
 from lumia_briefing_room.pipeline.orchestrator import process_match
@@ -99,7 +105,7 @@ def run(
     cfg = load_config(args.config)
     ffmpeg_path = args.ffmpeg or discover_ffmpeg()
     if ffmpeg_path is None:
-        raise SystemExit("ffmpeg 를 찾을 수 없다")
+        raise SystemExit(FFMPEG_NOT_FOUND_MESSAGE)
 
     recording_root = args.recording_root or cfg.paths.steam_recording or discover_recording_root()
     if recording_root is None:

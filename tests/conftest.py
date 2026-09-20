@@ -13,7 +13,7 @@ from lumia_briefing_room.config import discover_ffmpeg
 
 FFMPEG_PATH = discover_ffmpeg()
 
-requires_ffmpeg = pytest.mark.skipif(FFMPEG_PATH is None, reason="ffmpeg 를 찾을 수 없다")
+requires_ffmpeg = pytest.mark.skipif(FFMPEG_PATH is None, reason="ffmpeg를 찾을 수 없다")
 
 
 @pytest.fixture
@@ -93,7 +93,7 @@ def build_synthetic_session(
     (research.md §2.2: 실제 스팀 녹화도 세그먼트당 키프레임 1개, 3.000초 간격).
     """
     if FFMPEG_PATH is None:
-        raise RuntimeError("ffmpeg 를 찾을 수 없다")
+        raise RuntimeError("ffmpeg를 찾을 수 없다")
 
     total_frames = segment_frames * num_segments
 

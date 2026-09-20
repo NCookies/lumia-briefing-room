@@ -12,7 +12,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from lumia_briefing_room.config import discover_ffmpeg
+from lumia_briefing_room.config import FFMPEG_NOT_FOUND_MESSAGE, discover_ffmpeg
 from lumia_briefing_room.detect.counter import load_templates
 from lumia_briefing_room.detect.match import detect_match
 from lumia_briefing_room.detect.types import MatchDetection
@@ -68,7 +68,7 @@ def run(args: argparse.Namespace) -> MatchDetection:
 
     ffmpeg_path = args.ffmpeg or discover_ffmpeg()
     if ffmpeg_path is None:
-        raise SystemExit("ffmpeg 를 찾을 수 없다")
+        raise SystemExit(FFMPEG_NOT_FOUND_MESSAGE)
 
     k_templates = load_templates(args.k_templates) if args.k_templates else None
     a_templates = load_templates(args.a_templates) if args.a_templates else None
