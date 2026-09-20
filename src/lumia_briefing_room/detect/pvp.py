@@ -6,7 +6,9 @@ from lumia_briefing_room.detect.types import CombatInterval
 
 ENEMY_RINGS_FULL_AT = 1.5
 
-DEFAULT_WEIGHTS = {"enemyRings": 0.7, "death": 0.9, "teammateDeath": 0.8}
+# enemyRings 는 0: 라벨 57개로 재보니 증거 없는 교전(8)과 사냥(21)을 못 가른다(AUC 0.53).
+# 신호 자체와 enemyRingMean 은 계속 기록하고, 가중치만 뺐다.
+DEFAULT_WEIGHTS = {"enemyRings": 0.0, "death": 0.9, "teammateDeath": 0.8}
 
 
 @dataclass(frozen=True)
@@ -40,8 +42,9 @@ def score_interval(interval: CombatInterval, weights: dict[str, float]) -> PvpSc
         candidates.append(weights.get("teammateDeath", 0.0))
 
     mean = interval.enemy_ring_mean
-    if mean and mean > 0:
+    ring_weight = weights.get("enemyRings", 0.0)
+    if mean and mean > 0 and ring_weight > 0:
         signals.append("enemy_rings")
-        candidates.append(weights.get("enemyRings", 0.0) * min(mean / ENEMY_RINGS_FULL_AT, 1.0))
+        candidates.append(ring_weight * min(mean / ENEMY_RINGS_FULL_AT, 1.0))
 
     return PvpScore(score=round(max(candidates, default=0.0), 4), signals=signals)

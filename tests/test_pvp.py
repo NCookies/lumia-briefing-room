@@ -83,3 +83,16 @@ def test_pvp_settings_survive_the_config_round_trip():
 
     assert restored.filter.min_pvp_score == 0.4
     assert restored.filter.pvp_weights == {"enemyRings": 0.9}
+
+
+def test_default_weights_do_not_use_the_minimap_because_labels_showed_no_separation():
+    from lumia_briefing_room.detect.pvp import DEFAULT_WEIGHTS
+
+    assert DEFAULT_WEIGHTS["enemyRings"] == 0.0
+    assert FilterConfig().pvp_weights["enemyRings"] == 0.0
+    assert score_interval(iv(rings=3.0), DEFAULT_WEIGHTS).score == 0.0
+
+
+def test_a_zero_weighted_signal_is_not_listed_as_evidence():
+    assert score_interval(iv(rings=3.0), {"enemyRings": 0.0}).signals == []
+    assert score_interval(iv(died=True, rings=3.0), {"enemyRings": 0.0, "death": 0.9}).signals == ["death"]

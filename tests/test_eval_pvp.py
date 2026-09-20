@@ -26,12 +26,15 @@ def test_counts_labels_and_flags_confirmed_evidence_on_hunting_clips():
 
 def test_ring_stats_only_use_clips_without_confirmed_evidence():
     report = evaluate_labels(
-        [m("pvp", 1.0, 5.0), m("pvp", 0.4, 1.2), m("pve", 0.1, 0.2), m("pve", 0.2, 0.4)]
+        [
+            m("pvp", 1.0, 5.0, ["kill_delta"]), m("pvp", 0.9, 4.0, ["death"]),
+            m("pvp", 0.0, 1.2), m("pve", 0.0, 0.2), m("pve", 0.0, 0.4),
+        ]
     )
 
     assert report["rings"]["pvp"]["mean"] == 1.2
-    assert report["rings"]["pve"]["mean"] == 0.3
     assert report["rings"]["pvp"]["n"] == 1
+    assert report["rings"]["pve"]["mean"] == 0.3
 
 
 def test_threshold_sweep_finds_a_clean_split():
@@ -64,3 +67,15 @@ def test_load_clips_reads_every_json_in_a_folder(tmp_path):
     (tmp_path / "b.json").write_text(json.dumps({"userLabel": None}), encoding="utf-8")
 
     assert len(load_clips(tmp_path)) == 2
+
+
+def test_ring_auc_is_half_when_the_signal_does_not_separate_and_one_when_it_does():
+    flat = evaluate_labels([m("pvp", 0.0, 0.4), m("pvp", 0.0, 0.2), m("pve", 0.0, 0.4), m("pve", 0.0, 0.2)])
+    clean = evaluate_labels([m("pvp", 0.0, 1.0), m("pvp", 0.0, 0.9), m("pve", 0.0, 0.1), m("pve", 0.0, 0.2)])
+
+    assert flat["ring_auc"] == 0.5
+    assert clean["ring_auc"] == 1.0
+
+
+def test_ring_auc_is_none_without_both_classes():
+    assert evaluate_labels([m("pvp", 0.0, 0.4)])["ring_auc"] is None

@@ -17,6 +17,17 @@ import statistics
 from pathlib import Path
 
 
+CONFIRMED_SIGNALS = {"kill_delta", "assist_delta", "death", "teammate_death"}
+
+
+def auc(positive: list[float], negative: list[float]) -> float | None:
+    """양성이 음성보다 클 확률. 0.5 = 구분 못함, 1.0 = 완벽."""
+    if not positive or not negative:
+        return None
+    wins = sum((p > n) + 0.5 * (p == n) for p in positive for n in negative)
+    return wins / (len(positive) * len(negative))
+
+
 def load_clips(clips_dir: Path) -> list[dict]:
     return [json.loads(p.read_text(encoding="utf-8")) for p in sorted(clips_dir.glob("*.json"))]
 
@@ -41,10 +52,13 @@ def evaluate_labels(clips: list[dict]) -> dict:
     def score(c: dict) -> float:
         return c.get("pvpScore") or 0.0
 
+    def has_evidence(c: dict) -> bool:
+        return bool(set(c.get("pvpSignals", [])) & CONFIRMED_SIGNALS)
+
     def rings(group: list[dict]) -> list[float]:
         return [
             c["enemyRingMean"] for c in group
-            if score(c) < 1.0 and c.get("enemyRingMean") is not None
+            if not has_evidence(c) and c.get("enemyRingMean") is not None
         ]
 
     sweep = []
@@ -66,6 +80,7 @@ def evaluate_labels(clips: list[dict]) -> dict:
         "pve": len(pve),
         "confirmed_but_pve": sum(1 for c in pve if score(c) >= 1.0),
         "rings": {"pvp": _ring_stats(rings(pvp)), "pve": _ring_stats(rings(pve))},
+        "ring_auc": auc(rings(pvp), rings(pve)),
         "sweep": sweep,
         "best": best,
     }
@@ -79,6 +94,8 @@ def main() -> None:
     print(f"라벨 {report['labeled']}개 (교전 {report['pvp']} / 사냥 {report['pve']})")
     if report["confirmed_but_pve"]:
         print(f"⚠ 확정 증거가 있는데 사냥이라 라벨된 클립 {report['confirmed_but_pve']}개 — 검출기 오탐 확인 필요")
+    if report["ring_auc"] is not None:
+        print(f"적 링 평균 AUC(증거 없는 클립만): {report['ring_auc']:.2f}  (0.5 = 구분 못함)")
     for name in ("pvp", "pve"):
         r = report["rings"][name]
         print(f"확정 증거 없는 {name} 의 적 링 평균: n={r['n']} 평균={r['mean']} 중앙={r['median']} 범위={r['min']}~{r['max']}")
