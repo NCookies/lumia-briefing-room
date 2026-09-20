@@ -3,7 +3,12 @@ import pytest
 
 from lumia_briefing_room.config import discover_ffmpeg
 from lumia_briefing_room.profiles.models import Roi
-from lumia_briefing_room.video.frames import crop_roi, extract_keyframe_frames, reshape_raw_frames
+from lumia_briefing_room.video.frames import (
+    crop_roi,
+    extract_keyframe_frames,
+    reshape_raw_frames,
+    write_merged_segment_file,
+)
 from lumia_briefing_room.video.session import RecordingSession
 
 FFMPEG_PATH = discover_ffmpeg()
@@ -67,6 +72,42 @@ def test_extract_keyframe_frames_can_crop_roi(tmp_path, make_synthetic_session):
     )
     crops = [crop_roi(frame, roi) for _, frame in results]
     assert all(c.shape == (20, 20, 3) for c in crops)
+
+
+@requires_ffmpeg
+def test_write_merged_segment_file_produces_playable_mp4(tmp_path, make_synthetic_session):
+    session_dir = make_synthetic_session(
+        tmp_path, width=64, height=48, fps=10, segment_frames=10, num_segments=5
+    )
+    session = RecordingSession.load(session_dir)
+    out_path = tmp_path / "merged.mp4"
+
+    used = write_merged_segment_file(session, 0, [1, 2, 3, 4, 5], out_path)
+
+    assert used == [1, 2, 3, 4, 5]
+    assert out_path.exists() and out_path.stat().st_size > 0
+
+
+@requires_ffmpeg
+def test_write_merged_segment_file_uses_largest_contiguous_run(tmp_path, make_synthetic_session):
+    session_dir = make_synthetic_session(
+        tmp_path, width=64, height=48, fps=10, segment_frames=10, num_segments=6
+    )
+    (session_dir / "chunk-stream0-00002.m4s").unlink()
+    session = RecordingSession.load(session_dir)
+    out_path = tmp_path / "merged.mp4"
+
+    used = write_merged_segment_file(session, 0, [1, 2, 3, 4, 5, 6], out_path)
+
+    assert used == [3, 4, 5, 6]
+
+
+def test_write_merged_segment_file_returns_empty_when_nothing_exists(tmp_path):
+    class _FakeSession:
+        directory = tmp_path
+
+    used = write_merged_segment_file(_FakeSession(), 0, [1, 2, 3], tmp_path / "out.mp4")
+    assert used == []
 
 
 @requires_ffmpeg

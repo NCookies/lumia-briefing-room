@@ -106,6 +106,33 @@ def _decode_run(
         yield segment_number, frame
 
 
+def largest_contiguous_run(items: list[tuple[int, Path]]) -> list[tuple[int, Path]]:
+    runs = _contiguous_runs(items)
+    return max(runs, key=len) if runs else []
+
+
+def write_merged_segment_file(
+    session: RecordingSession, stream: int, segment_numbers: list[int], out_path: Path
+) -> list[int]:
+    """존재하는 세그먼트 중 가장 긴 연속 구간만 이어붙여 유효한 fMP4 파일을 만든다.
+
+    gap 을 넘어 이어붙이면 프래그먼트 바이트 오프셋이 깨질 수 있어(§ 위 주석)
+    가장 긴 연속 구간만 쓴다. 반환값은 실제로 쓰인 세그먼트 번호(오름차순)다.
+    """
+    existing = _existing_chunk_paths(session, stream, segment_numbers)
+    run = largest_contiguous_run(existing)
+    if not run:
+        return []
+
+    init_bytes = (session.directory / f"init-stream{stream}.m4s").read_bytes()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "wb") as out:
+        out.write(init_bytes)
+        for _, chunk_path in run:
+            out.write(chunk_path.read_bytes())
+    return [n for n, _ in run]
+
+
 def extract_keyframe_frames(
     session: RecordingSession,
     *,

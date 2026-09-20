@@ -10,7 +10,7 @@
 - [x] `config.py` — SPEC §7 전체 스키마, 기본값, JSON 로드/저장
 - [x] `pipeline/playerlog.py` — 로그 파싱, 매치 경계 추출, tail follow
 - [x] `pipeline/filters.py` — 생성 필터 적용 (§7.3)
-- [ ] `pipeline/clip.py` — ffmpeg 컷 + 썸네일
+- [x] `pipeline/clip.py` — ffmpeg 컷 + 썸네일
 - [ ] `pipeline/metadata.py` — 클립 메타데이터 JSON (§3 스키마)
 - [ ] `pipeline/orchestrator.py` — 위 전부를 잇는 `process_match()`
 - [ ] `cli/process_match.py` — 매치 하나를 수동으로 돌리는 CLI
@@ -175,3 +175,18 @@ def process_match(
 매치가 끝난 시점에 `session.mpd` 가 아직 `type="dynamic"`인지, 트리거 지연(`watch.delaySec`) 동안 바뀌는지 실측하지 않았다. `RecordingSession.load()` 는 이미 두 경우(dynamic/static) 를 다 처리하므로 **막지는 않지만**, 트리거 직후 바로 로드했을 때 세그먼트가 아직 `.tmp` 상태일 위험은 `watch.delaySec` 로 완화하는 것 외에 검증한 바 없다.
 
 이 둘 다 `pipeline/watcher.py`(다음 작업)에서 실측하며 확정한다.
+
+### 3-3. `cut_clip()` 의 오디오 먹싱 경로 — ✅ 실제 녹화본으로 검증됨
+
+`tests/conftest.py` 의 합성 세션 픽스처는 비디오 트랙만 있어(오디오까지 만들려면
+픽스처가 상당히 복잡해진다) 오디오 먹싱 분기가 합성 테스트로는 커버되지 않았다.
+
+대신 **실제 녹화본으로 직접 확인했다.** research §4.7의 그 사망 시퀀스 구간을
+`cut_clip()` 으로 잘라(`ClipRange(11450, 11495)`, 48초) 결과 파일을 열어봤다:
+
+- HEVC 비디오 + AAC 오디오 둘 다 포함, 전체 디코딩 오류 없음(2875/2880 프레임)
+- 중간 프레임을 뽑아 보니 **실제로 "팀원이 사망하였습니다" 장면, `K 2 A 5`** — research 가 기록한 바로 그 순간이 정확히 잘렸다
+- `CutResult(segment_start=3817, segment_end=3832, duration_sec=48.0, source_incomplete=False)`
+
+오디오 먹싱 경로가 실제 데이터로 동작함을 확인했다. 합성 테스트로 회귀를 못 잡는다는
+한계는 남아있지만(§0 향후 과제로 오디오 있는 합성 픽스처를 만들면 해소된다), 기능 자체는 검증됐다.
