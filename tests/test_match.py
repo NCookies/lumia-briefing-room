@@ -592,11 +592,14 @@ def test_finalize_match_bridges_a_badge_gap_while_a_teammate_is_fighting():
     assert len(badge_only) == 2
 
 
-def test_finalize_match_never_starts_an_interval_from_team_combat_alone():
+def test_finalize_match_keeps_a_fight_only_teammates_were_seen_in_because_missing_a_fight_costs_more_than_a_false_clip():
     states = [_tc_state(0.0, False, False), _tc_state(3.0, False, True), _tc_state(6.0, False, True),
               _tc_state(9.0, False, False)]
 
-    assert finalize_match(states).intervals == []
+    intervals = finalize_match(states).intervals
+
+    assert [(iv.start, iv.end) for iv in intervals] == [(3.0, 6.0)]
+    assert intervals[0].confidence == 0.0
 
 
 def test_finalize_match_team_combat_extends_an_interval_that_has_my_own_badge():
@@ -632,5 +635,33 @@ def test_finalize_match_ignores_the_pre_match_waiting_room():
 def test_finalize_match_still_detects_fights_outside_the_waiting_room():
     states = [_room_state(0.0, False, "묘지"), _room_state(3.0, True, "묘지"),
               _room_state(6.0, True, "묘지"), _room_state(9.0, False, "묘지")]
+
+    assert len(finalize_match(states).intervals) == 1
+
+
+def _sp_state(t, combat, spectating):
+    return FrameState(
+        t=t, combat=None if spectating else combat, face_value=None if spectating else 111.0,
+        face_sat=None if spectating else 26.0, k=None if spectating else 0, a=None if spectating else 0,
+        day_night="day", spectating=spectating,
+    )
+
+
+def test_finalize_match_makes_a_clip_for_a_death_that_no_badge_interval_explains():
+    states = [_sp_state(3.0 * i, False, False) for i in range(20)]
+    states += [_sp_state(60.0, True, False), _sp_state(63.0, False, True), _sp_state(66.0, False, True),
+               _sp_state(69.0, False, True)]
+
+    intervals = finalize_match(states).intervals
+
+    assert len(intervals) == 1
+    assert intervals[0].died and "death" in intervals[0].tags
+    assert intervals[0].start < 60.0 <= intervals[0].end < 63.0
+
+
+def test_finalize_match_does_not_duplicate_a_death_already_inside_an_interval():
+    states = [_sp_state(0.0, False, False)]
+    states += [_sp_state(3.0 * i, True, False) for i in range(1, 6)]
+    states += [_sp_state(18.0, False, True), _sp_state(21.0, False, True), _sp_state(24.0, False, True)]
 
     assert len(finalize_match(states).intervals) == 1

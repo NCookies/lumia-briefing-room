@@ -31,6 +31,7 @@ from lumia_briefing_room.video.session import RecordingSession
 TAG_TOLERANCE_SEC = 3.0
 WAITING_ROOM_REGIONS = frozenset({"브리핑 룸"})
 DEATH_LINK_SEC = 8.0
+UNEXPLAINED_DEATH_LOOKBACK_SEC = 12.0
 MIN_SPECTATOR_SAMPLES = 2
 
 log = logging.getLogger(__name__)
@@ -170,6 +171,10 @@ def resolve_day_templates(profile: ResolutionProfile) -> dict[str, np.ndarray] |
     return load_region_templates(profile.day_templates)
 
 
+def states_step(states: list[FrameState]) -> float:
+    return states[1].t - states[0].t if len(states) > 1 else 3.0
+
+
 def _overlaps(start: float, end: float, t: float, tolerance: float) -> bool:
     return start - tolerance <= t <= end + tolerance
 
@@ -217,9 +222,7 @@ def finalize_match(
     def _fighting(s: FrameState) -> bool | None:
         """내 배지 OR 팀원 전투. 배지는 구도를 잡거나 거리를 벌리는 동안 꺼지지만 팀원 링은 켜져 있다.
 
-        팀원 전투는 내 전투를 이어줄 뿐 스스로 구간을 시작하지 못한다(아래 필터) — 스플릿으로
-        팀원이 따로 싸우거나 끝난 교전의 여운으로 깜빡이는 링이 클립이 되면 안 된다. 브리핑 룸은
-        본게임 전 대기방이라 교전이 아니다.
+        브리핑 룸은 본게임 전 대기방이라 교전이 아니다.
         """
         if _spectating(s.t) or s.region in WAITING_ROOM_REGIONS:
             return False
@@ -230,11 +233,14 @@ def finalize_match(
         return False
 
     combat_ranges = to_intervals([(s.t, _fighting(s)) for s in states])
-    if use_team_combat:
-        combat_ranges = [
-            (start, end) for start, end in combat_ranges
-            if any(s.combat is True and start <= s.t <= end for s in states)
-        ]
+    for sp_start, _ in spectator_ranges:
+        if not any(_overlaps(a, b, sp_start, DEATH_LINK_SEC) for a, b in combat_ranges):
+            first = states[0].t
+            start = max(first, sp_start - UNEXPLAINED_DEATH_LOOKBACK_SEC)
+            end = sp_start - states_step(states)
+            if start <= end:
+                combat_ranges.append((start, end))
+    combat_ranges.sort()
 
     face_stats = [
         FaceStat(t=s.t, value=s.face_value, sat=s.face_sat)
