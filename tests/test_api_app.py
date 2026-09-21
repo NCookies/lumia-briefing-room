@@ -462,3 +462,36 @@ def test_permanently_deleting_the_last_clip_of_a_game_removes_its_result_image(c
 
     client.delete("/api/clips/b")
     assert not image.exists()
+
+
+def test_trim_rejects_an_invalid_range_and_unknown_clip(client):
+    _write_clip(client.app.state.clips_dir_for_test, "a", durationSec=20.0)
+
+    assert client.post("/api/clips/a/trim", json={"start": 5, "end": 5}).status_code == 400
+    assert client.post("/api/clips/a/trim", json={"start": 0, "end": 99}).status_code == 400
+    assert client.post("/api/clips/a/trim", json={}).status_code == 400
+    assert client.post("/api/clips/zzz/trim", json={"start": 0, "end": 5}).status_code == 404
+
+
+def test_trim_cuts_the_clip_and_returns_updated_metadata(client):
+    import subprocess
+
+    from conftest import FFMPEG_PATH
+
+    if FFMPEG_PATH is None:
+        pytest.skip("ffmpeg를 찾을 수 없다")
+    clips = client.app.state.clips_dir_for_test
+    _write_clip(clips, "a", durationSec=10.0, videoOffsetSec=50.0)
+    subprocess.run(
+        [str(FFMPEG_PATH), "-hide_banner", "-v", "error", "-y", "-f", "lavfi", "-i",
+         "testsrc=size=320x180:rate=30:duration=10", "-c:v", "libx264", "-g", "30", "-pix_fmt", "yuv420p",
+         str(clips / "a.mp4")],
+        check=True,
+    )
+
+    resp = client.post("/api/clips/a/trim", json={"start": 2, "end": 8})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["durationSec"] == 6.0 and body["videoOffsetSec"] == 52.0 and body["trimmed"] is True
+    assert body["id"] == "a" and body["sizeBytes"] == (clips / "a.mp4").stat().st_size

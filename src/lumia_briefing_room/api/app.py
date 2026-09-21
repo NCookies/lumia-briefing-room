@@ -1,6 +1,7 @@
 """로컬 전용 FastAPI 앱. (plan-ui.md §2) 127.0.0.1 에만 바인드해서 쓴다(SPEC §3)."""
 
 import json
+import subprocess
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Response
@@ -17,6 +18,7 @@ from lumia_briefing_room.api.export import (
 from lumia_briefing_room.api.filters import ClipQuery, filter_clip_summaries, sort_clip_summaries
 from lumia_briefing_room.config import (
     Config,
+    discover_ffmpeg,
     dataclass_from_camel_dict,
     dataclass_to_camel_dict,
     load_config,
@@ -25,6 +27,7 @@ from lumia_briefing_room.config import (
 )
 from lumia_briefing_room.pipeline.cleanup import plan_cleanup, remove_orphan_result_images, run_cleanup
 from lumia_briefing_room.pipeline.retention import restore_clip, trash_clip
+from lumia_briefing_room.pipeline.trim import trim_clip, validate_range
 
 
 def _deep_merge(base: dict, overrides: dict) -> dict:
@@ -207,6 +210,25 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         if path is not None and path.exists():
             app.state.config = load_config(path)
         return app.state.config
+
+    @app.post("/api/clips/{clip_id}/trim")
+    def trim(clip_id: str, body: dict):
+        clip = find_clip(_clips_dir(app), clip_id)
+        if clip is None:
+            raise HTTPException(404, "클립을 찾을 수 없다")
+        try:
+            start, end = float(body["start"]), float(body["end"])
+            validate_range(start, end, float(clip.meta.get("durationSec", 0.0)))
+        except (KeyError, TypeError, ValueError) as e:
+            raise HTTPException(400, f"구간이 올바르지 않다: {e}")
+        ffmpeg = discover_ffmpeg()
+        if ffmpeg is None:
+            raise HTTPException(503, "ffmpeg 를 찾을 수 없다")
+        try:
+            trim_clip(clip.meta_path, start, end, ffmpeg_path=ffmpeg, thumbnail=current_config().encode.thumbnail)
+        except (OSError, subprocess.CalledProcessError) as e:
+            raise HTTPException(500, f"자르기 실패: {e}")
+        return _serialize(find_clip(_clips_dir(app), clip_id))
 
     @app.post("/api/cleanup")
     def cleanup(body: dict):
