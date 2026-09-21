@@ -52,11 +52,29 @@ def test_kill_and_death_together_passes_won_and_lost():
     assert apply_filter([kill_and_death], FilterConfig(preset="lost")) == [kill_and_death]
 
 
-def test_min_duration_filters_short_intervals():
-    short = ci(0, 3, {"kill"})
-    long = ci(0, 10, {"kill"})
+def test_min_duration_filters_short_intervals_without_hard_evidence():
+    short = ci(0, 3, {"no_result"})
+    long = ci(0, 10, {"no_result"})
     cfg = FilterConfig(preset="all", min_duration_sec=4)
     assert apply_filter([short, long], cfg) == [long]
+
+
+def test_min_duration_never_drops_kill_assist_or_death_intervals():
+    """킬·어시·사망은 확정 증거다. 배지가 잠깐만 켜진 1~3초 구간이어도 그 교전은 클립이 되어야 한다(재현율 우선)."""
+    cfg = FilterConfig(preset="all", min_duration_sec=4)
+    short_kill = ci(0, 1, {"kill"})
+    short_assist = ci(0, 2, {"assist", "teammate_death"})
+    short_death = ci(0, 3, {"death"})
+    short_hunt = ci(0, 3, {"no_result"})
+
+    kept = apply_filter([short_kill, short_assist, short_death, short_hunt], cfg)
+
+    assert kept == [short_kill, short_assist, short_death]
+
+
+def test_max_duration_still_applies_to_intervals_with_hard_evidence():
+    cfg = FilterConfig(preset="all", max_duration_sec=50)
+    assert apply_filter([ci(0, 100, {"kill"})], cfg) == []
 
 
 def test_max_duration_filters_long_intervals():

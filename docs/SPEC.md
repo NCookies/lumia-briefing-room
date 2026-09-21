@@ -1201,7 +1201,7 @@ eplay\<캐릭터>` 처럼 폴더를 나눠 보관한다.
 | `filter.reviveCost` | `any` | `any` / `free`(phaseIndex ≤ 3) / `credit`(≥ 4) — §2.0의 부활 규칙 |
 | `filter.minPvpScore` | `0.0` | **§2.12.** 이 점수 미만은 클립을 안 만든다. 기본 0 = 전부 통과 |
 | `filter.pvpWeights` | `{enemyRings: 0.7, death: 0.9, teammateDeath: 0.8}` | 증거별 가중치. 킬/어시는 항상 1.0. **라벨로 튜닝하기 전까지는 임시값** — 고친 뒤 `tools/rescore_clips.py` 로 재계산 |
-| `filter.minDurationSec` | 4 | 이보다 짧은 교전은 버린다 (몬스터 한 대 때린 것 등) |
+| `filter.minDurationSec` | 4 | 이보다 짧은 교전은 버린다 (몬스터 한 대 때린 것 등). **단 킬·어시·사망 태그가 있는 구간은 길이와 상관없이 남긴다** — 배지가 1~3초만 켜진 채 킬이 난 교전을 버려 클립이 교전 한복판에서 끊기던 실사용 문제(2026-09-22, 다시보기)로 고쳤다. §1 의 재현율 우선 원칙 |
 | `filter.maxDurationSec` | `null` | 상한 |
 | `filter.gameMode` | `any` | `any` / `battle_royale` / `cobalt` |
 | `filter.myCharacter` | `[]` (전부) | 캐릭터 이름 (인식 구현 후) |

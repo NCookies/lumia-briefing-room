@@ -25,6 +25,9 @@ def _tags_pass(tags: frozenset[str], include: frozenset[str], exclude: frozenset
     return True
 
 
+HARD_EVIDENCE_TAGS = frozenset({"kill", "assist", "death"})
+
+
 def _phase_ok(phase: int | None, cfg: FilterConfig) -> bool:
     """SPEC §2.0: 무료 부활 = phaseIndex <= 3, 크레딧 = phaseIndex >= 4.
 
@@ -61,7 +64,11 @@ def apply_filter(
     result = []
     for interval, phase in zip(intervals, phases):
         duration = interval.end - interval.start
-        if cfg.min_duration_sec is not None and duration < cfg.min_duration_sec:
+        if (
+            cfg.min_duration_sec is not None
+            and duration < cfg.min_duration_sec
+            and not (interval.tags & HARD_EVIDENCE_TAGS)
+        ):
             continue
         if cfg.max_duration_sec is not None and duration > cfg.max_duration_sec:
             continue
