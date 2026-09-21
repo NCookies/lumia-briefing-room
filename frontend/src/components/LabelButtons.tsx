@@ -5,6 +5,7 @@ interface Props {
   onChange: (label: UserLabel) => void
   showKeys?: boolean
   size?: 'sm' | 'lg'
+  onlyActive?: boolean
 }
 
 const OPTIONS: { label: 'pvp' | 'pve'; text: string; key: string; active: string }[] = [
@@ -12,11 +13,11 @@ const OPTIONS: { label: 'pvp' | 'pve'; text: string; key: string; active: string
   { label: 'pve', text: '사냥', key: '2', active: 'border-zinc-300 bg-zinc-500/40 text-zinc-100' },
 ]
 
-export function LabelButtons({ value, onChange, showKeys = false, size = 'sm' }: Props) {
+export function LabelButtons({ value, onChange, showKeys = false, size = 'sm', onlyActive = false }: Props) {
   const pad = size === 'lg' ? 'px-5 py-2 text-base' : 'px-2 py-0.5 text-xs'
   return (
     <div className="flex gap-1">
-      {OPTIONS.map((o) => (
+      {OPTIONS.filter((o) => !onlyActive || value === null || value === o.label).map((o) => (
         <button
           key={o.label}
           type="button"

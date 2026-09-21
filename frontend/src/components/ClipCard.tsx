@@ -150,7 +150,7 @@ export function ClipCard({
             </div>
           ) : (
             <>
-              <LabelButtons value={clip.userLabel} onChange={(l) => onLabel(clip, l)} />
+              <LabelButtons value={clip.userLabel} onChange={(l) => onLabel(clip, l)} onlyActive />
               <div className="flex gap-2 text-xs">
                 <button
                   type="button"
