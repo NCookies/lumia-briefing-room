@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from lumia_briefing_room.config import Config
+from lumia_briefing_room.pipeline.label_migrate import load_metas, migrate_labels
 from lumia_briefing_room.pipeline.orchestrator import process_match
 from lumia_briefing_room.pipeline.playerlog import MatchBoundary
 from lumia_briefing_room.pipeline.retention import restore_clip, trash_clip
@@ -109,7 +110,7 @@ def reprocess_game(
         trashed = [trash_clip(path, trash_dir) for path in old]
 
     try:
-        return process(session, start, end, cfg, ffmpeg_path=ffmpeg_path, clips_dir=clips_dir)
+        written = process(session, start, end, cfg, ffmpeg_path=ffmpeg_path, clips_dir=clips_dir)
     except Exception:
         log.exception("다시 분석 실패 - 기존 클립을 되돌린다")
         with guard:
@@ -118,3 +119,10 @@ def reprocess_game(
             for path in trashed:
                 restore_clip(path, clips_dir)
         raise
+
+    try:
+        report = migrate_labels(load_metas(trashed), list(written))
+        log.info("라벨 이관: %s", report)
+    except Exception:
+        log.exception("라벨 이관에 실패했다 - 새 클립은 라벨 없이 둔다")
+    return written

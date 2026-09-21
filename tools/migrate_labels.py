@@ -14,56 +14,16 @@ usage:
 from __future__ import annotations
 
 import argparse
-import json
+import sys
 from pathlib import Path
 
-MIN_OVERLAP_SEC = 3.0
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-
-def _overlap(a: dict, b: dict) -> float:
-    a0, a1 = a["videoOffsetSec"], a["videoOffsetSec"] + a["durationSec"]
-    b0, b1 = b["videoOffsetSec"], b["videoOffsetSec"] + b["durationSec"]
-    return max(0.0, min(a1, b1) - max(a0, b0))
-
-
-def migrate_label(new: dict, olds: list[dict]) -> tuple[str | None, bool, list[str]]:
-    hits = [
-        o for o in olds
-        if o.get("userLabel") and o["sessionDir"] == new["sessionDir"] and _overlap(new, o) >= MIN_OVERLAP_SEC
-    ]
-    if not hits:
-        return None, False, []
-    labels = {o["userLabel"] for o in hits}
-    label = "pvp" if "pvp" in labels else "pve"
-    return label, len(labels) > 1, [o["id"] for o in hits]
-
-
-def _load(folder: Path) -> list[dict]:
-    clips = []
-    for path in sorted(folder.glob("*.json")):
-        meta = json.loads(path.read_text(encoding="utf-8"))
-        meta["id"] = path.stem
-        clips.append(meta)
-    return clips
+from lumia_briefing_room.pipeline.label_migrate import load_metas, migrate_label, migrate_labels  # noqa: E402,F401
 
 
 def migrate_folder(old_dir: Path, new_dir: Path) -> dict[str, int]:
-    olds = _load(old_dir)
-    report = {"migrated": 0, "conflicts": 0, "skipped_user_labeled": 0, "unlabeled": 0}
-    for path in sorted(new_dir.glob("*.json")):
-        fresh = json.loads(path.read_text(encoding="utf-8"))
-        if fresh.get("userLabel") and fresh.get("labelSource") == "user":
-            report["skipped_user_labeled"] += 1
-            continue
-        label, conflict, _ = migrate_label({**fresh, "id": path.stem}, olds)
-        if label is None:
-            report["unlabeled"] += 1
-            continue
-        fresh.update({"userLabel": label, "labelSource": "migrated", "labelConflict": conflict})
-        path.write_text(json.dumps(fresh, ensure_ascii=False, indent=2), encoding="utf-8")
-        report["migrated"] += 1
-        report["conflicts"] += int(conflict)
-    return report
+    return migrate_labels(load_metas(sorted(old_dir.glob("*.json"))), sorted(new_dir.glob("*.json")))
 
 
 def main() -> None:

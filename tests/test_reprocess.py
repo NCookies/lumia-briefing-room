@@ -144,3 +144,35 @@ def test_reprocess_refuses_without_touching_anything_when_it_cannot_run(tmp_path
 
     if problem != "no_clips":
         assert (clips / "a_01.json").exists() and not (clips / ".trash").exists()
+
+
+def test_reprocess_carries_labels_from_the_old_clips_to_overlapping_new_ones(tmp_path):
+    clips = tmp_path / "clips"
+    write_clip(clips, "a_01", userLabel="pvp", labelSource="user", videoOffsetSec=100.0, durationSec=30.0)
+    write_clip(clips, "a_02", userLabel="pve", labelSource="user", videoOffsetSec=300.0, durationSec=30.0)
+
+    def process(session, start, end, cfg, *, ffmpeg_path, clips_dir):
+        write_clip(clips_dir, "a_01", videoOffsetSec=110.0, durationSec=40.0)
+        write_clip(clips_dir, "a_02", videoOffsetSec=900.0, durationSec=20.0)
+        return [clips_dir / "a_01.json", clips_dir / "a_02.json"]
+
+    call(tmp_path, process=process)
+
+    first = json.loads((clips / "a_01.json").read_text(encoding="utf-8"))
+    second = json.loads((clips / "a_02.json").read_text(encoding="utf-8"))
+    assert (first["userLabel"], first["labelSource"]) == ("pvp", "migrated")
+    assert second.get("userLabel") is None
+
+
+def test_reprocess_keeps_the_new_clips_when_label_migration_itself_fails(tmp_path, monkeypatch):
+    clips = tmp_path / "clips"
+    write_clip(clips, "a_01", userLabel="pvp", videoOffsetSec=0.0, durationSec=30.0)
+
+    def boom(*a, **k):
+        raise RuntimeError("이관 실패")
+
+    monkeypatch.setattr("lumia_briefing_room.pipeline.reprocess.migrate_labels", boom)
+
+    written = call(tmp_path, process=lambda s, st, en, cfg, **kw: [write_clip(kw["clips_dir"], "a_01") or kw["clips_dir"] / "a_01.json"])
+
+    assert written == [clips / "a_01.json"] and (clips / "a_01.json").exists()
