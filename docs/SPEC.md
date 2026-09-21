@@ -1231,6 +1231,7 @@ UI에서 제공할 동작:
 | `ui.theme` | `dark` | |
 | `ui.startMinimized` | `true` | 트레이로 시작 |
 | `ui.autoStart` | `true` | 레지스트리 Run 키 등록 |
+| `ui.confirmDelete` | `true` | 클립·게임을 삭제(휴지통 이동)할 때 확인 창을 띄운다. 완전 삭제는 항상 확인 |
 
 ### 7.7.1 플레이어
 

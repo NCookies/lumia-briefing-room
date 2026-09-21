@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { clampRange, formatTime, MIN_LENGTH, type TrimRange } from '../trimming'
+import { useConfirm } from '../confirmContext'
+import { clampRange, formatTime, initialRange, MIN_LENGTH, type TrimRange } from '../trimming'
 
 interface Props {
   duration: number
@@ -10,7 +11,8 @@ interface Props {
 }
 
 export function TrimPanel({ duration, getVideo, busy, onApply, onCancel }: Props) {
-  const [range, setRange] = useState<TrimRange>({ start: 0, end: duration })
+  const ask = useConfirm()
+  const [range, setRange] = useState<TrimRange>(() => initialRange(getVideo()?.currentTime ?? 0, duration))
   const [previewing, setPreviewing] = useState(false)
 
   useEffect(() => {
@@ -55,9 +57,13 @@ export function TrimPanel({ duration, getVideo, busy, onApply, onCancel }: Props
   const removed = duration - kept
   const pct = (t: number) => `${(t / duration) * 100}%`
 
-  const apply = () => {
-    if (!confirm(`${formatTime(range.start)} ~ ${formatTime(range.end)} 구간만 남기고 나머지 ${removed.toFixed(1)}초는 삭제합니다. 삭제한 부분은 복구할 수 없습니다. 계속하시겠습니까?`)) return
-    onApply(range.start, range.end)
+  const apply = async () => {
+    const result = await ask({
+      message: `${formatTime(range.start)} ~ ${formatTime(range.end)} 구간만 남기고 나머지 ${removed.toFixed(1)}초는 삭제합니다.\n삭제한 부분은 복구할 수 없습니다. 계속하시겠습니까?`,
+      confirmLabel: '자르기',
+      danger: true,
+    })
+    if (result.ok) onApply(range.start, range.end)
   }
 
   return (

@@ -528,3 +528,11 @@ def test_deleting_many_clips_at_once_all_succeed(client):
 
     assert statuses == [200] * 8
     assert client.get("/api/clips", params={"trashed": "true"}).json() == []
+
+
+def test_confirm_delete_option_defaults_to_true_and_can_be_turned_off(client):
+    assert client.get("/api/config").json()["ui"]["confirmDelete"] is True
+
+    client.put("/api/config", json={"ui": {"confirmDelete": False}})
+
+    assert client.get("/api/config").json()["ui"]["confirmDelete"] is False

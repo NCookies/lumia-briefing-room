@@ -12,10 +12,18 @@ const TABS: { id: Tab; label: string }[] = [
 ]
 
 interface Props {
+  confirmDelete: boolean
+  onConfirmDeleteChange: (value: boolean) => void
   onClose: () => void
 }
 
-function GeneralPanel() {
+function GeneralPanel({
+  confirmDelete,
+  onConfirmDeleteChange,
+}: {
+  confirmDelete: boolean
+  onConfirmDeleteChange: (value: boolean) => void
+}) {
   const [nickname, setDraft] = useState('')
   const [status, setStatus] = useState<string | null>(null)
 
@@ -35,6 +43,17 @@ function GeneralPanel() {
   }
 
   return (
+    <div className="flex flex-col gap-6">
+    <section className="flex flex-col gap-2">
+      <h3 className="text-sm font-medium text-zinc-200">삭제</h3>
+      <label className="flex items-center gap-2 text-sm text-zinc-300">
+        <input type="checkbox" checked={confirmDelete} onChange={(e) => onConfirmDeleteChange(e.target.checked)} />
+        클립을 삭제할 때 확인 창 표시
+      </label>
+      <p className="text-xs text-zinc-500">
+        끄면 삭제 버튼을 누르는 즉시 휴지통으로 이동합니다. 완전 삭제는 이 설정과 관계없이 항상 확인합니다.
+      </p>
+    </section>
     <section className="flex flex-col gap-2">
       <h3 className="text-sm font-medium text-zinc-200">내 닉네임</h3>
       <p className="text-xs text-zinc-500">
@@ -54,6 +73,7 @@ function GeneralPanel() {
       </div>
       {status && <span className="text-xs text-zinc-400">{status}</span>}
     </section>
+    </div>
   )
 }
 
@@ -100,7 +120,7 @@ function ExportPanel() {
   )
 }
 
-export function SettingsModal({ onClose }: Props) {
+export function SettingsModal({ confirmDelete, onConfirmDeleteChange, onClose }: Props) {
   const [tab, setTab] = useState<Tab>('general')
 
   useEffect(() => {
@@ -139,7 +159,9 @@ export function SettingsModal({ onClose }: Props) {
             ))}
           </nav>
           <div className="min-w-0 flex-1 overflow-y-auto p-4">
-            {tab === 'general' && <GeneralPanel />}
+            {tab === 'general' && (
+              <GeneralPanel confirmDelete={confirmDelete} onConfirmDeleteChange={onConfirmDeleteChange} />
+            )}
             {tab === 'export' && <ExportPanel />}
             {tab === 'cleanup' && <CleanupPanel />}
           </div>

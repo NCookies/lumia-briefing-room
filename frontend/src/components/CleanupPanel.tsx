@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useConfirm } from '../confirmContext'
 import { getRetention, runCleanup, setRetention } from '../exportApi'
 import { TAG_LABELS } from '../labels'
 import { describeCleanup, parseLimit, type CleanupResult, type RetentionSettings } from '../retention'
@@ -41,6 +42,7 @@ const toSettings = (d: Draft): RetentionSettings => ({
 })
 
 export function CleanupPanel() {
+  const ask = useConfirm()
   const [draft, setDraft] = useState<Draft | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [preview, setPreview] = useState<CleanupResult | null>(null)
@@ -81,7 +83,8 @@ export function CleanupPanel() {
   }
 
   const runNow = async () => {
-    if (!confirm('지금 정리를 실행합니다. 계속하시겠습니까?')) return
+    const confirmed = await ask({ message: '지금 정리를 실행합니다. 계속하시겠습니까?', confirmLabel: '정리 실행', danger: true })
+    if (!confirmed.ok) return
     try {
       await save()
       const result = await runCleanup(false)

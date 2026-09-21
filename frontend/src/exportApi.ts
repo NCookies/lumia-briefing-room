@@ -66,6 +66,15 @@ export async function runCleanup(dryRun: boolean): Promise<CleanupResult> {
   return jsonOrThrow(await postJson(`${BASE}/cleanup`, { dryRun }), '자동 정리')
 }
 
+export async function getConfirmDelete(): Promise<boolean> {
+  const cfg = await jsonOrThrow<{ ui?: { confirmDelete?: boolean } }>(await fetch(`${BASE}/config`), '설정 조회')
+  return cfg.ui?.confirmDelete ?? true
+}
+
+export async function setConfirmDelete(confirmDelete: boolean): Promise<void> {
+  await jsonOrThrow(await postJson(`${BASE}/config`, { ui: { confirmDelete } }, 'PUT'), '설정 저장')
+}
+
 export async function setExportDefault(dir: string): Promise<void> {
   await jsonOrThrow(await postJson(`${BASE}/config`, { paths: { exportDefault: dir } }, 'PUT'), '설정 저장')
 }

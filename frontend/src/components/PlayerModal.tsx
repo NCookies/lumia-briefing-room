@@ -97,7 +97,11 @@ export function PlayerModal({
         ›
       </button>
       <div
-        className="flex w-[min(97vw,calc((100vh-8.5rem)*1.7778))] flex-col gap-2"
+        className={`flex flex-col gap-2 ${
+          trimming
+            ? 'w-[min(97vw,calc((100vh-16.5rem)*1.7778))]'
+            : 'w-[min(97vw,calc((100vh-8.5rem)*1.7778))]'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex flex-wrap items-center justify-between gap-2 text-zinc-100">

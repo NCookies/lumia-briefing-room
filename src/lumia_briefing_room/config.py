@@ -187,6 +187,7 @@ class UiConfig:
     theme: str = "dark"
     start_minimized: bool = True
     auto_start: bool = True
+    confirm_delete: bool = True
 
 
 @dataclass

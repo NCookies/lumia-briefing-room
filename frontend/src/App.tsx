@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { deleteClipForever, listClips, patchClip, restoreClip, trashClip, trimClip } from './api'
+import { useConfirm } from './confirmContext'
+import { getConfirmDelete, setConfirmDelete } from './exportApi'
 import { ClipCard } from './components/ClipCard'
 import { DEFAULT_FILTER, FilterBar, type FilterState } from './components/FilterBar'
 import { ExportDialog } from './components/ExportDialog'
@@ -22,6 +24,9 @@ export default function App() {
   const [resultViewId, setResultViewId] = useState<string | null>(null)
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
   const [playingId, setPlayingId] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDeleteState] = useState(true)
+  const ask = useConfirm()
 
   const reload = useCallback(() => {
     setLoading(true)
@@ -44,50 +49,83 @@ export default function App() {
     reload()
   }, [reload])
 
-  const handleTogglePin = async (clip: Clip) => {
-    await patchClip(clip.id, { pinned: !clip.pinned })
-    reload()
+  useEffect(() => {
+    getConfirmDelete()
+      .then(setConfirmDeleteState)
+      .catch(() => {})
+  }, [])
+
+  const runAndReload = async (action: () => Promise<unknown>) => {
+    setActionError(null)
+    try {
+      await action()
+    } catch (e) {
+      setActionError((e as Error).message)
+    } finally {
+      reload()
+    }
   }
 
-  const handleRename = async (clip: Clip, title: string) => {
-    await patchClip(clip.id, { title })
-    reload()
+  const runAll = async (clipsToHandle: Clip[], action: (id: string) => Promise<void>) => {
+    const results = await Promise.allSettled(clipsToHandle.map((c) => action(c.id)))
+    const failed = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+    if (failed.length > 0) {
+      throw new Error(`클립 ${failed.length}개를 처리하지 못했습니다. ${(failed[0].reason as Error).message}`)
+    }
   }
+
+  const changeConfirmDelete = (value: boolean) => {
+    setConfirmDeleteState(value)
+    setConfirmDelete(value).catch((e: Error) => setActionError(e.message))
+  }
+
+  const confirmTrash = async (message: string): Promise<boolean> => {
+    if (!confirmDelete) return true
+    const result = await ask({ message, confirmLabel: '삭제', danger: true, allowSkip: true })
+    if (result.ok && result.skipNext) changeConfirmDelete(false)
+    return result.ok
+  }
+
+  const confirmTrashClip = (clip: Clip) =>
+    confirmTrash(`"${clip.title}" 클립을 삭제하시겠습니까?\n삭제한 클립은 휴지통에서 복구할 수 있습니다.`)
+
+  const handleTogglePin = (clip: Clip) => runAndReload(() => patchClip(clip.id, { pinned: !clip.pinned }))
+
+  const handleRename = (clip: Clip, title: string) => runAndReload(() => patchClip(clip.id, { title }))
 
   const handleTrash = async (clip: Clip) => {
-    await trashClip(clip.id)
-    reload()
+    if (await confirmTrashClip(clip)) await runAndReload(() => trashClip(clip.id))
   }
 
-  const handleRestore = async (clip: Clip) => {
-    await restoreClip(clip.id)
-    reload()
-  }
+  const handleRestore = (clip: Clip) => runAndReload(() => restoreClip(clip.id))
 
   const handleDeleteForever = async (clip: Clip) => {
-    if (!confirm(`"${clip.title}" 클립을 완전히 삭제합니다. 계속하시겠습니까?`)) return
-    await deleteClipForever(clip.id)
-    reload()
+    const result = await ask({
+      message: `"${clip.title}" 클립을 완전히 삭제합니다. 계속하시겠습니까?`,
+      confirmLabel: '완전 삭제',
+      danger: true,
+    })
+    if (result.ok) await runAndReload(() => deleteClipForever(clip.id))
   }
 
   const gameLabel = (group: GameGroup<Clip>) =>
     `게임 ${group.number}(${group.clips.length}개, ${formatBytes(totalSize(group.clips))})`
 
   const handleTrashGame = async (group: GameGroup<Clip>) => {
-    if (!confirm(`${gameLabel(group)}의 클립을 모두 휴지통으로 이동합니다. 계속하시겠습니까?`)) return
-    await Promise.all(group.clips.map((c) => trashClip(c.id)))
-    reload()
+    if (await confirmTrash(`${gameLabel(group)}의 클립을 모두 삭제하시겠습니까?\n삭제한 클립은 휴지통에서 복구할 수 있습니다.`)) {
+      await runAndReload(() => runAll(group.clips, trashClip))
+    }
   }
 
-  const handleRestoreGame = async (group: GameGroup<Clip>) => {
-    await Promise.all(group.clips.map((c) => restoreClip(c.id)))
-    reload()
-  }
+  const handleRestoreGame = (group: GameGroup<Clip>) => runAndReload(() => runAll(group.clips, restoreClip))
 
   const handleDeleteGameForever = async (group: GameGroup<Clip>) => {
-    if (!confirm(`${gameLabel(group)}의 클립을 완전히 삭제합니다. 계속하시겠습니까?`)) return
-    await Promise.all(group.clips.map((c) => deleteClipForever(c.id)))
-    reload()
+    const result = await ask({
+      message: `${gameLabel(group)}의 클립을 완전히 삭제합니다. 계속하시겠습니까?`,
+      confirmLabel: '완전 삭제',
+      danger: true,
+    })
+    if (result.ok) await runAndReload(() => runAll(group.clips, deleteClipForever))
   }
 
   const handleLabel = (clip: Clip, label: UserLabel) => {
@@ -135,6 +173,7 @@ export default function App() {
       <main className="flex-1 p-4">
         {loading && <p className="text-zinc-400">불러오는 중입니다...</p>}
         {error && <p className="text-rose-400">오류가 발생했습니다: {error}</p>}
+        {actionError && <p className="mb-2 text-rose-400">{actionError}</p>}
         {!loading && !error && clips.length === 0 && (
           <p className="text-zinc-500">
             {filter.trashed ? '휴지통이 비어 있습니다' : '조건에 맞는 클립이 없습니다'}
@@ -212,17 +251,24 @@ export default function App() {
             reload()
           }}
           paused={exportTarget !== null}
-          onTrash={(clip) => {
+          onTrash={async (clip) => {
             const next = ordered[playingIndex + 1] ?? ordered[playingIndex - 1]
+            if (!(await confirmTrashClip(clip))) return
             setPlayingId(next?.id ?? null)
-            void handleTrash(clip)
+            await runAndReload(() => trashClip(clip.id))
           }}
           onClose={() => setPlayingId(null)}
         />
       )}
       {exportTarget && <ExportDialog clip={exportTarget} onClose={() => setExportTarget(null)} />}
       {resultViewId && <ResultViewer clipId={resultViewId} onClose={() => setResultViewId(null)} />}
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {showSettings && (
+        <SettingsModal
+          confirmDelete={confirmDelete}
+          onConfirmDeleteChange={changeConfirmDelete}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
     </div>
   )
 }

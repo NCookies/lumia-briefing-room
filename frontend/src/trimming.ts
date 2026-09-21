@@ -18,3 +18,8 @@ export function formatTime(seconds: number): string {
   const s = (tenths % 600) / 10
   return `${m}:${s.toFixed(1).padStart(4, '0')}`
 }
+
+export function initialRange(playhead: number, duration: number): TrimRange {
+  const start = Number.isFinite(playhead) && playhead <= duration - MIN_LENGTH ? Math.max(playhead, 0) : 0
+  return { start, end: duration }
+}
