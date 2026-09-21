@@ -1,4 +1,5 @@
 import { TAG_LABELS } from '../labels'
+import type { ClipSort } from '../grouping'
 import type { ClipTag } from '../types'
 
 const ALL_TAGS: ClipTag[] = ['kill', 'assist', 'death', 'teammate_death', 'no_result']
@@ -9,7 +10,7 @@ export interface FilterState {
   gameMode: string
   pinnedOnly: boolean
   trashed: boolean
-  sort: 'pvp' | 'recent'
+  sort: ClipSort
   label: '' | 'unlabeled' | 'pvp' | 'pve' | 'conflict'
   minPvpScore: number
 }
@@ -20,7 +21,7 @@ export const DEFAULT_FILTER: FilterState = {
   gameMode: '',
   pinnedOnly: false,
   trashed: false,
-  sort: 'pvp',
+  sort: 'asc',
   label: '',
   minPvpScore: 0,
 }
@@ -45,8 +46,9 @@ export function FilterBar({ value, onChange }: Props) {
         value={value.sort}
         onChange={(e) => onChange({ ...value, sort: e.target.value as FilterState['sort'] })}
       >
+        <option value="asc">오래된 순 (asc)</option>
+        <option value="desc">최신 순 (desc)</option>
         <option value="pvp">교전 가능성순</option>
-        <option value="recent">최신순</option>
       </select>
 
       <select

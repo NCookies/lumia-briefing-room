@@ -1,17 +1,23 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { deleteClipForever, listClips, patchClip, restoreClip, trashClip } from './api'
 import { ClipCard } from './components/ClipCard'
 import { DEFAULT_FILTER, FilterBar, type FilterState } from './components/FilterBar'
 import { PlayerModal } from './components/PlayerModal'
+import { groupByGame } from './grouping'
 import { applyLabel, progress } from './labeling'
 import type { Clip, UserLabel } from './types'
+
+function formatGameStart(iso: string): string {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('ko-KR', { hour12: false })
+}
 
 export default function App() {
   const [filter, setFilter] = useState<FilterState>(DEFAULT_FILTER)
   const [clips, setClips] = useState<Clip[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [playingIndex, setPlayingIndex] = useState<number | null>(null)
+  const [playingId, setPlayingId] = useState<string | null>(null)
 
   const reload = useCallback(() => {
     setLoading(true)
@@ -24,7 +30,6 @@ export default function App() {
       trashed: filter.trashed,
       minPvpScore: filter.minPvpScore || undefined,
       label: filter.label || undefined,
-      sort: filter.sort,
     })
       .then(setClips)
       .catch((e: Error) => setError(e.message))
@@ -69,7 +74,10 @@ export default function App() {
     })
   }
 
-  const { labeled, total } = progress(clips)
+  const groups = useMemo(() => groupByGame(clips, filter.sort), [clips, filter.sort])
+  const ordered = useMemo(() => groups.flatMap((g) => g.clips), [groups])
+  const playingIndex = playingId === null ? -1 : ordered.findIndex((c) => c.id === playingId)
+  const { labeled, total } = progress(ordered)
 
   return (
     <div className="flex min-h-screen flex-col bg-zinc-900 text-zinc-100">
@@ -93,31 +101,43 @@ export default function App() {
           </p>
         )}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {clips.map((clip, i) => (
-            <ClipCard
-              key={clip.id}
-              clip={clip}
-              trashed={filter.trashed}
-              onPlay={() => setPlayingIndex(i)}
-              onTogglePin={handleTogglePin}
-              onRename={handleRename}
-              onTrash={handleTrash}
-              onRestore={handleRestore}
-              onDeleteForever={handleDeleteForever}
-              onLabel={handleLabel}
-            />
+        <div className="flex flex-col gap-6">
+          {groups.map((group) => (
+            <section key={group.key}>
+              <h2 className="mb-2 flex items-baseline gap-2 border-b border-zinc-700 pb-1 text-sm font-medium text-zinc-300">
+                <span>게임 {group.number}</span>
+                <span className="text-xs font-normal text-zinc-500">
+                  {formatGameStart(group.matchStartUtc)} · 클립 {group.clips.length}개
+                </span>
+              </h2>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {group.clips.map((clip) => (
+                  <ClipCard
+                    key={clip.id}
+                    clip={clip}
+                    trashed={filter.trashed}
+                    onPlay={() => setPlayingId(clip.id)}
+                    onTogglePin={handleTogglePin}
+                    onRename={handleRename}
+                    onTrash={handleTrash}
+                    onRestore={handleRestore}
+                    onDeleteForever={handleDeleteForever}
+                    onLabel={handleLabel}
+                  />
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       </main>
 
-      {playingIndex !== null && clips[playingIndex] && (
+      {playingIndex >= 0 && (
         <PlayerModal
-          clips={clips}
+          clips={ordered}
           index={playingIndex}
-          onIndexChange={setPlayingIndex}
+          onIndexChange={(i) => setPlayingId(ordered[i]?.id ?? null)}
           onLabel={handleLabel}
-          onClose={() => setPlayingIndex(null)}
+          onClose={() => setPlayingId(null)}
         />
       )}
     </div>

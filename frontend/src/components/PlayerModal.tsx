@@ -1,8 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { videoUrl } from '../api'
 import { SIGNAL_LABELS } from '../labels'
 import { applyLabel, labelForKey, nextUnlabeledIndex, progress } from '../labeling'
 import type { Clip, UserLabel } from '../types'
+import { loadVolume, saveVolume } from '../volume'
 import { LabelButtons } from './LabelButtons'
 import { ScoreChip } from './ScoreChip'
 import { TagBadge } from './TagBadge'
@@ -17,6 +18,7 @@ interface Props {
 
 export function PlayerModal({ clips, index, onIndexChange, onLabel, onClose }: Props) {
   const clip = clips[index]
+  const volumeRef = useRef(loadVolume())
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -81,6 +83,16 @@ export function PlayerModal({ clips, index, onIndexChange, onLabel, onClose }: P
 
         <video
           key={clip.id}
+          ref={(el) => {
+            if (!el) return
+            el.volume = volumeRef.current.volume
+            el.muted = volumeRef.current.muted
+          }}
+          onVolumeChange={(e) => {
+            const v = e.currentTarget
+            volumeRef.current = { volume: v.volume, muted: v.muted }
+            saveVolume(volumeRef.current)
+          }}
           src={videoUrl(clip.id)}
           controls
           autoPlay
