@@ -24,9 +24,10 @@ from lumia_briefing_room.detect.spectator import read_spectating
 from lumia_briefing_room.detect.teammate import combat_slots, dead_slots, new_deaths
 from lumia_briefing_room.detect.types import CombatInterval, FrameState, MatchDetection
 from lumia_briefing_room.profiles.models import ResolutionProfile
-from lumia_briefing_room.video.frames import crop_roi, extract_keyframe_frames
-from lumia_briefing_room.video.segments import SegmentRange, existing_segment_numbers
+from lumia_briefing_room.video.frames import crop_roi
+from lumia_briefing_room.video.segments import SegmentRange
 from lumia_briefing_room.video.session import RecordingSession
+from lumia_briefing_room.video.source import FrameSource, SteamSegmentSource
 
 TAG_TOLERANCE_SEC = 3.0
 WAITING_ROOM_REGIONS = frozenset({"브리핑 룸"})
@@ -336,6 +337,29 @@ def finalize_match(
     )
 
 
+def detect_source(
+    source: FrameSource,
+    *,
+    profile: ResolutionProfile | None = None,
+    k_templates: dict[int, np.ndarray] | None = None,
+    a_templates: dict[int, np.ndarray] | None = None,
+) -> MatchDetection:
+    """프레임 공급자 하나를 통째로 검출한다. 스팀 세그먼트든 영상 파일이든 같은 시계열 처리를 쓴다."""
+    profile = profile or ResolutionProfile.for_resolution(source.width, source.height)
+    k_templates, a_templates = resolve_templates(profile, k_templates, a_templates)
+    region_templates = resolve_region_templates(profile)
+    day_templates = resolve_day_templates(profile)
+
+    states = [
+        analyze_frame(
+            frame, profile, t=t, k_templates=k_templates, a_templates=a_templates,
+            region_templates=region_templates, day_templates=day_templates,
+        )
+        for t, frame in source.frames()
+    ]
+    return finalize_match(states, gaps=source.gaps())
+
+
 def detect_match(
     session: RecordingSession,
     seg_range: SegmentRange,
@@ -348,29 +372,9 @@ def detect_match(
     hwaccel: str | None = None,
 ) -> MatchDetection:
     """매치 구간(세그먼트 범위) 하나를 통째로 검출한다. (plan.md §9-6)"""
-    profile = profile or ResolutionProfile.for_resolution(session.width, session.height)
-    k_templates, a_templates = resolve_templates(profile, k_templates, a_templates)
-    region_templates = resolve_region_templates(profile)
-    day_templates = resolve_day_templates(profile)
-
-    existing = existing_segment_numbers(session, stream, seg_range.first, seg_range.last)
-    gap_segments = seg_range.gaps(existing)
-    duration = session.segment_duration_sec
-    gaps = [
-        ((g0 - 1) * duration, g1 * duration) for g0, g1 in gap_segments
-    ]
-
-    states: list[FrameState] = []
-    for seg_num, frame in extract_keyframe_frames(
-        session, stream=stream, segment_numbers=existing,
-        ffmpeg_path=ffmpeg_path, hwaccel=hwaccel,
-    ):
-        t = (seg_num - 1) * duration
-        states.append(
-            analyze_frame(
-                frame, profile, t=t, k_templates=k_templates, a_templates=a_templates,
-                region_templates=region_templates, day_templates=day_templates,
-            )
-        )
-
-    return finalize_match(states, gaps=gaps)
+    source = SteamSegmentSource(
+        session, seg_range, stream=stream, ffmpeg_path=ffmpeg_path, hwaccel=hwaccel
+    )
+    return detect_source(
+        source, profile=profile, k_templates=k_templates, a_templates=a_templates
+    )
