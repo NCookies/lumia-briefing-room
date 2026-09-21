@@ -192,3 +192,20 @@ def test_read_scoreboard_retries_only_rows_without_a_character():
     board = read_scoreboard(frame, profile, Reader([line("1위", 40)], names, ranks), ROSTER_NAMES)
 
     assert [(r.nickname, r.character) for r in board] == [("팀원가", "루치아"), ("TeamMateB", "엘레나")]
+
+
+def test_read_scoreboard_can_skip_the_expensive_character_retries():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    frame = np.zeros((1440, 2560, 3), dtype=np.uint8)
+    names = [line("팀원가", 245), line("루치아", 278), line("TeamMateB", 347)]
+    ranks = [line("1", 250, x=40), line("1", 352, x=40)]
+
+    class Reader(FakeReader):
+        def read(self, rgb, *, lang="korean"):
+            if rgb.shape[1] in (178 * 4, 240 * 4):
+                raise AssertionError("재시도가 돌면 안 된다")
+            return super().read(rgb, lang=lang)
+
+    board = read_scoreboard(frame, profile, Reader([line("1위", 40)], names, ranks), ROSTER_NAMES, recover=False)
+
+    assert [(r.nickname, r.character) for r in board] == [("팀원가", "루치아"), ("TeamMateB", None)]

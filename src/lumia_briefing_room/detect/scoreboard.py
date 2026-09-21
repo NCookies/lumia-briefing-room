@@ -137,9 +137,13 @@ def _to_frame(lines: list[TextLine], y0: int, scale: int) -> list[TextLine]:
 
 
 def read_scoreboard(
-    frame: np.ndarray, profile: ResolutionProfile, reader: TextReader, roster: list[str]
+    frame: np.ndarray, profile: ResolutionProfile, reader: TextReader, roster: list[str], *, recover: bool = True
 ) -> list[BoardRow] | None:
-    """결과 후 `순위표` 탭에서 플레이어마다 (순위, 닉네임, 캐릭터 이름) 을 읽는다. 순위표 화면이 아니면 None."""
+    """결과 후 `순위표` 탭에서 플레이어마다 (순위, 닉네임, 캐릭터 이름) 을 읽는다. 순위표 화면이 아니면 None.
+
+    `recover` 가 참이면 이름을 못 읽은 모든 행을 다시 읽는다(행마다 OCR 최대 54번). 필요한 건 내 팀원 행뿐이라
+    실사용은 끄고 `recover_character` 를 팀원에게만 쓴다.
+    """
     panel = reader.read(crop_roi(frame, profile.rois["scoreboard_panel"]))
     if not any(PLACEMENT_RE.match(l.text.strip()) for l in panel):
         return None
@@ -153,10 +157,11 @@ def read_scoreboard(
     rows = group_rows(merge_passes(passes, roster), roster)
     if not rows:
         return None
-    rows = [
-        row if row.character else BoardRow(None, row.nickname, recover_character(frame, row.y, roster, reader), row.y)
-        for row in rows
-    ]
+    if recover:
+        rows = [
+            row if row.character else BoardRow(None, row.nickname, recover_character(frame, row.y, roster, reader), row.y)
+            for row in rows
+        ]
 
     ranks_roi = profile.rois["scoreboard_ranks"]
     rank_lines = _to_frame(

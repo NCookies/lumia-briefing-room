@@ -15,7 +15,7 @@ from lumia_briefing_room.detect.day import read_game_day
 from lumia_briefing_room.detect.ocr import OcrReader, TextReader
 from lumia_briefing_room.detect.region import load_region_templates
 from lumia_briefing_room.detect.result import ResultScreen, read_result_screen
-from lumia_briefing_room.detect.scoreboard import BoardRow, find_team, read_scoreboard
+from lumia_briefing_room.detect.scoreboard import BoardRow, find_team, read_scoreboard, recover_character
 from lumia_briefing_room.profiles.models import ResolutionProfile
 from lumia_briefing_room.video.frames import crop_roi, extract_keyframe_frames
 from lumia_briefing_room.video.segments import SegmentRange, existing_segment_numbers
@@ -111,8 +111,11 @@ def scan_forward_for_result(
     return EndScreens(result, board)
 
 
-def attach_board(screens: EndScreens) -> ResultScreen | None:
-    """순위표에서 내 팀을 찾아 결과에 붙인다. 결과 화면에서 못 읽은 내 캐릭터도 표에서 채운다."""
+def attach_board(screens: EndScreens, *, recover: Callable[[BoardRow], str | None] | None = None) -> ResultScreen | None:
+    """순위표에서 내 팀을 찾아 결과에 붙인다. 결과 화면에서 못 읽은 내 캐릭터도 표에서 채운다.
+
+    `recover` 는 캐릭터 이름을 못 읽은 행을 비싼 재시도로 다시 읽는다. 내 팀원(과 결과 화면에서 못 읽은 내 행)에게만 부른다.
+    """
     result = screens.result
     if result is None or not screens.board:
         return result
@@ -120,11 +123,32 @@ def attach_board(screens: EndScreens) -> ResultScreen | None:
     if team is None:
         return result
     me, mates = team
+    if recover is not None:
+        mates = [replace(m, character=recover(m)) if m.character is None else m for m in mates]
+        if not result.character and me.character is None:
+            me = replace(me, character=recover(me))
     return replace(
         result,
         character=result.character or me.character,
         teammates=[{"nickname": m.nickname, "character": m.character} for m in mates],
     )
+
+
+def _board_reader(profile, reader):
+    """순위표를 재시도 없이 읽고, 나중에 팀원만 다시 읽을 수 있게 그 프레임을 기억한다."""
+    seen: dict[str, np.ndarray] = {}
+
+    def read_board(frame: np.ndarray):
+        rows = read_scoreboard(frame, profile, reader, _roster(), recover=False)
+        if rows:
+            seen["frame"] = frame
+        return rows
+
+    def recover(row: BoardRow) -> str | None:
+        frame = seen.get("frame")
+        return recover_character(frame, row.y, _roster(), reader) if frame is not None else None
+
+    return read_board, recover
 
 
 @lru_cache(maxsize=1)
@@ -166,13 +190,15 @@ def find_result_screen(
             return False
         return read_game_day(crop_roi(frame, profile.rois["day_digit"]), day_templates) is not None
 
+    read_board, recover = _board_reader(profile, reader)
     return attach_board(
         scan_for_result(
             frames,
             lambda f: read_result_screen(f, profile, reader),
             is_ingame=is_ingame,
-            read_board=lambda f: read_scoreboard(f, profile, reader, _roster()),
-        )
+            read_board=read_board,
+        ),
+        recover=recover,
     )
 
 
@@ -230,11 +256,13 @@ def find_result_after(
             return False
         return read_game_day(crop_roi(frame, profile.rois["day_digit"]), day_templates) is not None
 
+    read_board, recover = _board_reader(profile, reader)
     return attach_board(
         scan_forward_for_result(
             batches(),
             lambda f: read_result_screen(f, profile, reader),
             is_ingame=is_ingame,
-            read_board=lambda f: read_scoreboard(f, profile, reader, _roster()),
-        )
+            read_board=read_board,
+        ),
+        recover=recover,
     )

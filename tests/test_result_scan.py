@@ -174,3 +174,29 @@ def test_scan_window_reaches_past_the_logged_match_end_but_never_before_the_firs
     assert last == 974 + RESULT_TAIL_SEGMENTS
     assert first == last - MAX_SCAN_FRAMES + 1
     assert scan_window(SegmentRange(first=10, last=20))[0] == 10
+
+
+def test_attach_board_recovers_only_my_teammates_missing_a_character_never_other_teams():
+    board = [
+        BoardRow(rank=1, nickname="팀원가", character=None, y=245),
+        BoardRow(rank=1, nickname="나", character="마르티나", y=347),
+        BoardRow(rank=1, nickname="동료", character="루치아", y=442),
+        BoardRow(rank=2, nickname="적1", character=None, y=540),
+        BoardRow(rank=3, nickname="적2", character=None, y=640),
+    ]
+    asked = []
+
+    def recover(row):
+        asked.append(row.nickname)
+        return "엘레나"
+
+    attached = attach_board(EndScreens(RESULT, board), recover=recover)
+
+    assert asked == ["팀원가"]
+    assert attached.teammates == [{"nickname": "팀원가", "character": "엘레나"}, {"nickname": "동료", "character": "루치아"}]
+
+
+def test_attach_board_skips_recovery_when_everyone_on_my_team_is_already_read():
+    board = [BoardRow(rank=1, nickname="팀원가", character="루치아"), BoardRow(rank=1, nickname="나", character="마르티나")]
+
+    attach_board(EndScreens(RESULT, board), recover=lambda row: (_ for _ in ()).throw(AssertionError("불필요한 재시도")))
