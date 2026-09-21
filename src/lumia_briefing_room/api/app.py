@@ -1,7 +1,10 @@
 """로컬 전용 FastAPI 앱. (plan-ui.md §2) 127.0.0.1 에만 바인드해서 쓴다(SPEC §3)."""
 
+import functools
 import json
 import subprocess
+import threading
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Response
@@ -48,6 +51,18 @@ def _serialize(clip_summary) -> dict:
     return meta
 
 
+def _unlink(path: Path, *, attempts: int = 5) -> None:
+    """Windows 는 다른 요청이 그 파일을 읽는 중이면 지우기가 PermissionError 로 실패한다 — 잠깐 기다려 다시 시도한다."""
+    for attempt in range(attempts):
+        try:
+            path.unlink(missing_ok=True)
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(0.05)
+
+
 def _clips_dir(app: FastAPI) -> Path:
     return resolve_paths(app.state.config.paths).clips
 
@@ -56,8 +71,20 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     app = FastAPI(title="Lumia Briefing Room API")
     app.state.config = cfg
     app.state.config_path = config_path
+    lock = threading.RLock()
+
+    def locked(fn):
+        """클립 파일을 읽거나 옮기거나 지우는 요청은 한 번에 하나씩 처리한다. 동시에 지우는 요청끼리 부딪혀 500 이 나던 문제를 막는다."""
+
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            with lock:
+                return fn(*args, **kwargs)
+
+        return wrapper
 
     @app.get("/api/clips")
+    @locked
     def list_clips(
         tags: str = "",
         dayNight: str | None = None,
@@ -91,6 +118,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         return _serialize(clip)
 
     @app.patch("/api/clips/{clip_id}")
+    @locked
     def patch_clip(clip_id: str, body: dict):
         clips_dir = _clips_dir(app)
         clip = find_clip(clips_dir, clip_id)
@@ -106,6 +134,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         return meta | {"id": clip_id}
 
     @app.post("/api/clips/{clip_id}/trash")
+    @locked
     def trash(clip_id: str):
         clip = find_clip(_clips_dir(app), clip_id)
         if clip is None:
@@ -115,6 +144,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         return {"id": clip_id, "trashed": True}
 
     @app.post("/api/clips/{clip_id}/restore")
+    @locked
     def restore(clip_id: str):
         clips_dir = _clips_dir(app)
         clip = find_clip(clips_dir / ".trash", clip_id)
@@ -124,29 +154,33 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         return {"id": clip_id, "trashed": False}
 
     @app.delete("/api/clips/{clip_id}")
+    @locked
     def delete(clip_id: str):
         clips_dir = _clips_dir(app)
         clip = find_clip(clips_dir / ".trash", clip_id)
         if clip is None:
             raise HTTPException(400, "휴지통에 있는 클립만 완전히 삭제할 수 있습니다")
         for f in [clip.meta_path.with_suffix(".mp4"), clip.meta_path]:
-            f.unlink(missing_ok=True)
+            _unlink(f)
         thumb = clip.meta.get("thumbnailPath")
         if thumb:
-            Path(thumb).unlink(missing_ok=True)
+            _unlink(Path(thumb))
         remove_orphan_result_images(clips_dir, clips_dir / ".trash")
         return {"id": clip_id, "deleted": True}
 
+    def find_any(clip_id: str):
+        return find_clip(_clips_dir(app), clip_id) or find_clip(_clips_dir(app) / ".trash", clip_id)
+
     @app.get("/api/clips/{clip_id}/video")
     def video(clip_id: str, request: Request):
-        clip = find_clip(_clips_dir(app), clip_id)
+        clip = find_any(clip_id)
         if clip is None:
             raise HTTPException(404, "클립을 찾을 수 없습니다")
         return _serve_range(clip.meta_path.with_suffix(".mp4"), request, media_type="video/mp4")
 
     @app.get("/api/clips/{clip_id}/thumbnail")
     def thumbnail(clip_id: str):
-        clip = find_clip(_clips_dir(app), clip_id)
+        clip = find_any(clip_id)
         if clip is None:
             raise HTTPException(404, "클립을 찾을 수 없습니다")
         thumb = clip.meta.get("thumbnailPath")
@@ -156,7 +190,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
 
     @app.get("/api/clips/{clip_id}/result-image")
     def result_image(clip_id: str):
-        clip = find_clip(_clips_dir(app), clip_id) or find_clip(_clips_dir(app) / ".trash", clip_id)
+        clip = find_any(clip_id)
         if clip is None:
             raise HTTPException(404, "클립을 찾을 수 없습니다")
         path = (clip.meta.get("matchResult") or {}).get("imagePath")
@@ -212,6 +246,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         return app.state.config
 
     @app.post("/api/clips/{clip_id}/trim")
+    @locked
     def trim(clip_id: str, body: dict):
         clip = find_clip(_clips_dir(app), clip_id)
         if clip is None:
@@ -233,6 +268,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         return _serialize(find_clip(_clips_dir(app), clip_id))
 
     @app.post("/api/cleanup")
+    @locked
     def cleanup(body: dict):
         cfg = current_config()
         resolved = resolve_paths(cfg.paths)

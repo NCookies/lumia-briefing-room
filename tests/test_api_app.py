@@ -495,3 +495,36 @@ def test_trim_cuts_the_clip_and_returns_updated_metadata(client):
     body = resp.json()
     assert body["durationSec"] == 6.0 and body["videoOffsetSec"] == 52.0 and body["trimmed"] is True
     assert body["id"] == "a" and body["sizeBytes"] == (clips / "a.mp4").stat().st_size
+
+
+def test_trashed_clip_still_serves_its_thumbnail_and_video(client):
+    clips = client.app.state.clips_dir_for_test
+    _write_clip(clips, "a", video=b"0123456789")
+    client.post("/api/clips/a/trash")
+
+    thumb = client.get("/api/clips/a/thumbnail")
+    video = client.get("/api/clips/a/video")
+
+    assert thumb.status_code == 200 and thumb.headers["content-type"] == "image/jpeg"
+    assert video.status_code == 200 and video.content == b"0123456789"
+
+
+def test_deleting_many_clips_at_once_all_succeed(client):
+    import threading
+
+    clips = client.app.state.clips_dir_for_test
+    ids = [f"c{i}" for i in range(8)]
+    for clip_id in ids:
+        _write_clip(clips, clip_id)
+        client.post(f"/api/clips/{clip_id}/trash")
+    statuses = []
+
+    def delete(clip_id):
+        statuses.append(client.delete(f"/api/clips/{clip_id}").status_code)
+
+    threads = [threading.Thread(target=delete, args=(clip_id,)) for clip_id in ids]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+
+    assert statuses == [200] * 8
+    assert client.get("/api/clips", params={"trashed": "true"}).json() == []

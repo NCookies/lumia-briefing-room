@@ -26,7 +26,7 @@ def _load_one(meta_path: Path) -> ClipSummary:
 
 
 def scan_clips(clips_dir: Path) -> list[ClipSummary]:
-    """clips_dir 바로 아래의 메타데이터를 전부 읽는다.
+    """clips_dir 바로 아래의 메타데이터를 전부 읽는다. 읽는 도중 지워졌거나 깨진 파일은 건너뛴다(동시에 삭제하는 요청과 겹칠 수 있다).
 
     `glob("*.json")` 은 비재귀라 `.trash`/`.thumbs`/`.proxy` 서브폴더 안의
     파일은 애초에 안 잡힌다 — 동시에 이 함수는 `clips_dir` 자리에 `.trash`
@@ -34,14 +34,21 @@ def scan_clips(clips_dir: Path) -> list[ClipSummary]:
     """
     if not clips_dir.exists():
         return []
-    return [_load_one(p) for p in sorted(clips_dir.glob("*.json"))]
+    clips = []
+    for path in sorted(clips_dir.glob("*.json")):
+        try:
+            clips.append(_load_one(path))
+        except (OSError, ValueError):
+            continue
+    return clips
 
 
 def find_clip(clips_dir: Path, clip_id: str) -> ClipSummary | None:
     meta_path = clips_dir / f"{clip_id}.json"
-    if not meta_path.exists():
+    try:
+        return _load_one(meta_path)
+    except (OSError, ValueError):
         return None
-    return _load_one(meta_path)
 
 
 def to_summary_dict(clip: ClipSummary) -> dict:
