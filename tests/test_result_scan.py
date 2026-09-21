@@ -7,6 +7,7 @@ from lumia_briefing_room.detect.scoreboard import BoardRow
 from lumia_briefing_room.pipeline.result_scan import (
     EndScreens,
     attach_board,
+    contiguous_segments,
     scan_for_result,
     scan_forward_for_result,
 )
@@ -147,3 +148,17 @@ def test_attach_board_keeps_the_result_screen_character_and_ignores_unmatched_bo
     assert attach_board(EndScreens(RESULT, [BoardRow(rank=1, nickname="다른사람", character=None)])) == RESULT
     assert attach_board(EndScreens(RESULT, None)) == RESULT
     assert attach_board(EndScreens(None, board)) is None
+
+
+def test_contiguous_segments_starts_right_after_the_last_clip():
+    assert contiguous_segments([1, 2, 3, 4, 5], after=2, before=None) == [3, 4, 5]
+
+
+def test_contiguous_segments_is_empty_when_the_footage_after_the_clip_was_already_deleted():
+    assert contiguous_segments([2871, 2872, 2873], after=2544, before=None) == []
+
+
+def test_contiguous_segments_stops_at_a_gap_and_at_the_next_game_start():
+    assert contiguous_segments([3, 4, 5, 9, 10], after=2, before=None) == [3, 4, 5]
+    assert contiguous_segments([3, 4, 5, 6, 7], after=2, before=6) == [3, 4, 5]
+    assert contiguous_segments([], after=2, before=None) == []

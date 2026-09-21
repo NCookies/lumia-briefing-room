@@ -1,4 +1,4 @@
-"""자동 제목 규칙: 일차·낮/밤·지역·교전 뒤에 ` · 내 캐릭터, 팀원 캐릭터` 를 붙인다. 사용자가 직접 바꾼 제목은 건드리지 않는다."""
+"""자동 제목 규칙: 일차·낮/밤·지역·교전 뒤에 ` · 내 캐릭터` 를 붙인다(팀원은 게임 행에만 표시). 사용자가 직접 바꾼 제목은 건드리지 않는다."""
 
 from __future__ import annotations
 
@@ -8,8 +8,7 @@ SEPARATOR = " · "
 
 
 def characters_of(meta: dict) -> list[str]:
-    names = [meta.get("myCharacter"), *(meta.get("teamCharacters") or [])]
-    return [n for n in names if n]
+    return [meta["myCharacter"]] if meta.get("myCharacter") else []
 
 
 def _bases(meta: dict) -> set[str]:

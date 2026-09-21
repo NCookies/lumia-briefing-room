@@ -127,10 +127,7 @@ def _read_result(session, seg_range, ffmpeg_path: Path, hwaccel: str | None) -> 
 
 
 def _characters(result: ResultScreen | None) -> list[str]:
-    if result is None:
-        return []
-    mates = [t["character"] for t in result.teammates or [] if t.get("character")]
-    return [name for name in [result.character, *mates] if name]
+    return [result.character] if result is not None and result.character else []
 
 
 def _save_result_image(result: ResultScreen | None, path: Path) -> str | None:

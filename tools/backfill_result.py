@@ -21,12 +21,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from lumia_briefing_room.config import discover_ffmpeg  # noqa: E402
 from lumia_briefing_room.detect.result import ResultScreen  # noqa: E402
 from lumia_briefing_room.pipeline.metadata import match_result_dict  # noqa: E402
+from lumia_briefing_room.pipeline.titles import retitle  # noqa: E402
 from lumia_briefing_room.pipeline.result_scan import (  # noqa: E402
     find_result_after,
     result_image_name,
     save_result_image,
 )
 from lumia_briefing_room.steam_paths import discover_recording_root  # noqa: E402
+from lumia_briefing_room.video.segments import segment_number_at  # noqa: E402
 from lumia_briefing_room.video.session import RecordingSession, SessionParseError  # noqa: E402
 
 
@@ -40,7 +42,10 @@ def apply_match_result(meta: dict, result: ResultScreen, image_path: str | None 
     new = {**meta, "matchResult": match_result_dict(result, image_path)}
     if result.character and not new.get("myCharacter"):
         new["myCharacter"] = result.character
-    return new
+    mates = [t["character"] for t in result.teammates or [] if t.get("character")]
+    if mates:
+        new["teamCharacters"] = mates
+    return retitle(new)
 
 
 def group_by_match(metas: dict[str, dict]) -> dict[tuple[str, str], MatchGroup]:
@@ -50,6 +55,16 @@ def group_by_match(metas: dict[str, dict]) -> dict[tuple[str, str], MatchGroup]:
         group.ids.append(clip_id)
         group.last_segment = max(group.last_segment, meta["segmentEnd"])
     return groups
+
+
+def next_game_segment(session, session_name: str, match_start: str, groups: dict) -> int | None:
+    """같은 세션에서 이 경기 다음에 시작한 경기의 시작 세그먼트. 없으면 None."""
+    later = [
+        datetime.fromisoformat(start.replace("Z", "+00:00"))
+        for (name, start) in groups
+        if name == session_name and start > match_start
+    ]
+    return segment_number_at(session, min(later)) if later else None
 
 
 def main() -> None:
@@ -69,7 +84,8 @@ def main() -> None:
 
     metas = {p.stem: json.loads(p.read_text(encoding="utf-8")) for p in sorted(args.clips_dir.glob("*.json"))}
     filled = missing_raw = not_found = skipped = 0
-    for (session_name, match_start), group in sorted(group_by_match(metas).items()):
+    groups = group_by_match(metas)
+    for (session_name, match_start), group in sorted(groups.items()):
         if not args.force and all(metas[i].get("matchResult") for i in group.ids):
             skipped += 1
             continue
@@ -83,7 +99,10 @@ def main() -> None:
             missing_raw += 1
             continue
 
-        result = find_result_after(session, group.last_segment, ffmpeg_path=ffmpeg)
+        result = find_result_after(
+            session, group.last_segment, ffmpeg_path=ffmpeg,
+            before_segment=next_game_segment(session, session_name, match_start, groups),
+        )
         if result is None:
             not_found += 1
             print(f"{match_start}: 결과 화면을 못 찾았다(원본이 지워졌거나 결과 화면이 없다)")

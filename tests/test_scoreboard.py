@@ -7,6 +7,7 @@ from lumia_briefing_room.detect.scoreboard import (
     group_rows,
     merge_passes,
     read_scoreboard,
+    recover_character,
     snap_character,
 )
 from lumia_briefing_room.profiles.models import ResolutionProfile
@@ -112,6 +113,8 @@ class FakeReader:
         self.calls += 1
         if self.calls == 1:
             return self.panel
+        if rgb.shape[1] in (178 * 4, 240 * 4):
+            return []
         is_rank = rgb.shape[1] < 400
         scale = rgb.shape[1] / (160 if is_rank else 500)
         source = self.ranks if is_rank else self.names
@@ -146,3 +149,46 @@ def test_group_rows_skips_level_numbers_between_the_nickname_and_the_subtitle():
     rows = group_rows(lines, ROSTER_NAMES)
 
     assert [(r.nickname, r.character) for r in rows] == [("팀원가", "루치아"), ("TeamMateB", None)]
+
+
+class RetryReader:
+    """처음 `succeed_after` 번은 아무것도 못 읽다가 그다음부터 부제를 읽어 주는 리더."""
+
+    def __init__(self, succeed_after, text="엘레나"):
+        self.succeed_after, self.text, self.calls = succeed_after, text, 0
+
+    def read(self, rgb, *, lang="korean"):
+        self.calls += 1
+        return [line(self.text, 0)] if self.calls > self.succeed_after else []
+
+
+def test_recover_character_retries_shifted_crops_until_a_known_name_is_read():
+    frame = np.zeros((1440, 2560, 3), dtype=np.uint8)
+    reader = RetryReader(succeed_after=7)
+
+    assert recover_character(frame, 347, ROSTER_NAMES, reader) == "엘레나"
+    assert reader.calls > 7
+
+
+def test_recover_character_gives_up_when_nothing_matches():
+    frame = np.zeros((1440, 2560, 3), dtype=np.uint8)
+
+    assert recover_character(frame, 347, ROSTER_NAMES, RetryReader(succeed_after=10**6)) is None
+    assert recover_character(frame, 347, ROSTER_NAMES, RetryReader(succeed_after=0, text="은위리")) is None
+
+
+def test_read_scoreboard_retries_only_rows_without_a_character():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    frame = np.zeros((1440, 2560, 3), dtype=np.uint8)
+    names = [line("팀원가", 245), line("루치아", 278), line("TeamMateB", 347)]
+    ranks = [line("1", 250, x=40), line("1", 352, x=40)]
+
+    class Reader(FakeReader):
+        def read(self, rgb, *, lang="korean"):
+            if rgb.shape[1] in (178 * 4, 240 * 4):
+                return [line("엘레나", 0)]
+            return super().read(rgb, lang=lang)
+
+    board = read_scoreboard(frame, profile, Reader([line("1위", 40)], names, ranks), ROSTER_NAMES)
+
+    assert [(r.nickname, r.character) for r in board] == [("팀원가", "루치아"), ("TeamMateB", "엘레나")]

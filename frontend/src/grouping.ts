@@ -88,6 +88,6 @@ export function withResultImage<T extends Groupable>(groups: GameGroup<T>[]): Ga
 }
 
 export function formatTeammates(result: MatchResult | null | undefined): string | null {
-  const names = (result?.teammates ?? []).map((t) => t.character ?? t.nickname)
+  const names = (result?.teammates ?? []).map((t) => t.character ?? '미확인')
   return names.length > 0 ? names.join(', ') : null
 }

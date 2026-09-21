@@ -76,7 +76,7 @@ export function GameSection({
 
           <div className="w-40 text-sm text-zinc-200">
             <div>{result?.character ?? ''}</div>
-            {formatTeammates(result) && <div className="truncate text-xs text-zinc-500">{formatTeammates(result)}</div>}
+            {formatTeammates(result) && <div className="truncate text-xs text-zinc-400">{formatTeammates(result)}</div>}
           </div>
 
           <div className="w-28">

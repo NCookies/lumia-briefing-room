@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import difflib
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 
 import cv2
@@ -25,6 +26,16 @@ MIN_LINE_SCORE = 0.5
 # (밝기 하한, 이득, 배율): 밝은 글자만 강조해 흐린 부제(캐릭터 이름)를 살린다. 마지막은 원본 2배.
 PASSES: tuple[tuple[int | None, float | None, int], ...] = ((90, 2.0, 3), (90, 3.0, 2), (60, 2.0, 2), (None, None, 2))
 RANK_SCALE = 2
+
+# 못 읽은 부제는 닉네임 아래 좁은 띠를 위치·폭을 조금씩 바꿔 가며 다시 읽는다. 푸른 행의 글자는 min 채널에서 사라지고 R/max 채널에서 남고,
+# 한 픽셀만 어긋나도 읽히지 않는 경우가 있어 여러 위치를 시도한다.
+RETRY_X0 = (815, 822, 830)
+RETRY_WIDTHS = (178, 240)
+RETRY_DY = (15, 17, 19)
+RETRY_HEIGHT = 34
+RETRY_CHANNELS = ("R", "max", "G")
+RETRY_LO, RETRY_GAIN, RETRY_SCALE = 90, 3.0, 4
+RETRY_AGREE = 2
 
 
 @dataclass(frozen=True)
@@ -91,6 +102,32 @@ def _enhance(rgb: np.ndarray, lo: int | None, gain: float | None, scale: int) ->
     return np.stack([big] * 3, axis=-1)
 
 
+def _channel_image(strip: np.ndarray, channel: str) -> np.ndarray:
+    a = strip.astype(np.int16)
+    plane = {"R": a[..., 0], "G": a[..., 1], "max": a.max(axis=-1)}[channel]
+    bright = np.clip((plane - RETRY_LO) * RETRY_GAIN, 0, 255).astype(np.uint8)
+    big = cv2.resize(bright, None, fx=RETRY_SCALE, fy=RETRY_SCALE, interpolation=cv2.INTER_CUBIC)
+    return np.stack([big] * 3, axis=-1)
+
+
+def recover_character(frame: np.ndarray, nick_y: int, roster: list[str], reader: TextReader) -> str | None:
+    """캐릭터 이름을 못 읽은 행의 부제 띠를 위치를 바꿔 가며 다시 읽는다. 같은 이름이 RETRY_AGREE 번 나오면 채택한다."""
+    votes: Counter[str] = Counter()
+    for x0 in RETRY_X0:
+        for width in RETRY_WIDTHS:
+            for dy in RETRY_DY:
+                top = nick_y + dy
+                strip = frame[top : top + RETRY_HEIGHT, x0 : x0 + width]
+                for channel in RETRY_CHANNELS:
+                    for line in reader.read(_channel_image(strip, channel)):
+                        name = snap_character(line.text, roster)
+                        if name:
+                            votes[name] += 1
+                            if votes[name] >= RETRY_AGREE:
+                                return name
+    return None
+
+
 def _to_frame(lines: list[TextLine], y0: int, scale: int) -> list[TextLine]:
     return [
         TextLine(text=l.text, score=l.score, x=l.x // scale, y=y0 + l.y // scale, h=l.h // scale)
@@ -116,6 +153,10 @@ def read_scoreboard(
     rows = group_rows(merge_passes(passes, roster), roster)
     if not rows:
         return None
+    rows = [
+        row if row.character else BoardRow(None, row.nickname, recover_character(frame, row.y, roster, reader), row.y)
+        for row in rows
+    ]
 
     ranks_roi = profile.rois["scoreboard_ranks"]
     rank_lines = _to_frame(

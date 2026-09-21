@@ -47,7 +47,7 @@ def test_group_by_match_groups_clips_of_one_game_and_tracks_last_segment():
     assert groups[("s1", "t2")].last_segment == 50
 
 
-def test_apply_match_result_fills_team_characters_and_retitles_an_auto_title():
+def test_apply_match_result_fills_team_characters_but_titles_only_with_my_character():
     result = ResultScreen(
         placement=1, total=8, match_type="rank", match_label="랭크", outcome="최종 생존", nickname="나",
         character="마커스", character_raw="MARKU",
@@ -58,7 +58,7 @@ def test_apply_match_result_fills_team_characters_and_retitles_an_auto_title():
     new = apply_match_result(meta, result)
 
     assert new["teamCharacters"] == ["루치아"]
-    assert new["title"] == "5일차 낮 경찰서 교전 · 마커스, 루치아"
+    assert new["title"] == "5일차 낮 경찰서 교전 · 마커스"
     assert new["matchResult"]["teammates"] == result.teammates
 
 

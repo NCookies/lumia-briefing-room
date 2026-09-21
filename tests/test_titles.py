@@ -17,8 +17,8 @@ def test_default_title_appends_known_characters_after_a_dot():
     assert default_title("day", "경찰서", 5, None) == "5일차 낮 경찰서 교전"
 
 
-def test_characters_of_puts_my_character_first_and_skips_blanks():
-    assert characters_of(meta(myCharacter="마커스", teamCharacters=["루치아", "", None])) == ["마커스", "루치아"]
+def test_characters_of_is_only_my_character_never_the_teammates():
+    assert characters_of(meta(myCharacter="마커스", teamCharacters=["루치아", "", None])) == ["마커스"]
     assert characters_of(meta()) == []
 
 
@@ -30,15 +30,15 @@ def test_is_auto_title_recognizes_generated_titles_with_or_without_characters():
     assert not is_auto_title(meta(title="5일차 낮 경찰서 교전 멋진 킬"))
 
 
-def test_retitle_adds_characters_to_an_auto_title():
+def test_retitle_adds_only_my_character_to_an_auto_title():
     new = retitle(meta(myCharacter="마커스", teamCharacters=["루치아"]))
 
-    assert new["title"] == "5일차 낮 경찰서 교전 · 마커스, 루치아"
+    assert new["title"] == "5일차 낮 경찰서 교전 · 마커스"
 
 
-def test_retitle_replaces_an_old_character_suffix_and_never_touches_custom_titles():
-    old = meta(title="5일차 낮 경찰서 교전 · 마커스", myCharacter="마커스", teamCharacters=["루치아"])
+def test_retitle_drops_teammates_from_an_old_title_and_never_touches_custom_titles():
+    old = meta(title="5일차 낮 경찰서 교전 · 마커스, 루치아", myCharacter="마커스", teamCharacters=["루치아"])
     custom = meta(title="내가 붙인 제목", myCharacter="마커스")
 
-    assert retitle(old)["title"] == "5일차 낮 경찰서 교전 · 마커스, 루치아"
+    assert retitle(old)["title"] == "5일차 낮 경찰서 교전 · 마커스"
     assert retitle(custom) is custom

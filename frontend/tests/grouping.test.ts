@@ -142,12 +142,12 @@ test('withResultImage keeps only games that have a saved result screenshot, in t
   assert.deepEqual(withResultImage(groups).map((g) => g.clips[0].id), ['c', 'a'])
 })
 
-test('formatTeammates lists teammate characters and falls back to the nickname when unknown', () => {
+test('formatTeammates lists teammate characters, never nicknames, and marks unknown ones', () => {
   const teammates = [
     { nickname: '팀원가', character: '루치아' },
     { nickname: 'TeamMateB', character: null },
   ]
-  assert.equal(formatTeammates(result({ teammates })), '루치아, TeamMateB')
+  assert.equal(formatTeammates(result({ teammates })), '루치아, 미확인')
   assert.equal(formatTeammates(result({ teammates: [] })), null)
   assert.equal(formatTeammates(result()), null)
   assert.equal(formatTeammates(null), null)

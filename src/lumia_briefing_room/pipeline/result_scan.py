@@ -26,7 +26,7 @@ log = logging.getLogger(__name__)
 MAX_SCAN_FRAMES = 40
 FORWARD_BATCH = 20
 FORWARD_MAX_BATCHES = 60
-FORWARD_MAX_OCR = 30
+FORWARD_MAX_OCR = 600
 FORWARD_BOARD_FRAMES = 45
 
 _reader: TextReader | None = None
@@ -165,6 +165,21 @@ def find_result_screen(
     )
 
 
+def contiguous_segments(existing: list[int], *, after: int, before: int | None) -> list[int]:
+    """마지막 클립 바로 뒤(after+1)부터 끊김 없이 이어진 세그먼트만 돌려준다. `before` 는 다음 경기 시작 세그먼트다.
+
+    링버퍼가 그 경기 원본을 이미 지웠으면 남은 세그먼트가 한참 뒤에서 시작한다. 그걸 이어 훑으면 다른 경기의 결과 화면을 이 경기 것으로
+    잘못 붙이므로, 바로 이어지지 않으면 빈 목록이다.
+    """
+    available = set(existing)
+    numbers: list[int] = []
+    n = after + 1
+    while n in available and (before is None or n < before):
+        numbers.append(n)
+        n += 1
+    return numbers
+
+
 def find_result_after(
     session: RecordingSession,
     after_segment: int,
@@ -173,16 +188,22 @@ def find_result_after(
     profile: ResolutionProfile | None = None,
     reader: TextReader | None = None,
     hwaccel: str | None = None,
+    before_segment: int | None = None,
 ) -> ResultScreen | None:
-    """경기 끝 시각을 모를 때(이미 저장된 클립 보강) 마지막 클립 뒤에서 앞으로 훑어 첫 결과 화면을 찾는다."""
+    """경기 끝 시각을 모를 때(이미 저장된 클립 보강) 마지막 클립 뒤에서 앞으로 훑어 첫 결과 화면을 찾는다.
+
+    이 경기의 원본이 이어져 있는 구간(다음 경기 시작 `before_segment` 전까지)만 훑는다. 원본이 지워졌으면 None 이다.
+    """
     profile = profile or ResolutionProfile.for_resolution(session.width, session.height)
     reader = reader or get_reader()
     day_templates = load_region_templates(profile.day_templates) if profile.day_templates else None
 
-    last_existing = max(existing_segment_numbers(session, 0, after_segment, after_segment + FORWARD_BATCH * FORWARD_MAX_BATCHES), default=None)
-    if last_existing is None:
+    window_end = after_segment + FORWARD_BATCH * FORWARD_MAX_BATCHES
+    numbers = contiguous_segments(
+        existing_segment_numbers(session, 0, after_segment + 1, window_end), after=after_segment, before=before_segment
+    )
+    if not numbers:
         return None
-    numbers = existing_segment_numbers(session, 0, after_segment + 1, last_existing)
 
     def batches():
         for i in range(0, len(numbers), FORWARD_BATCH):
