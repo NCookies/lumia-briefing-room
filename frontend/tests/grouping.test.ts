@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { formatAgo, formatKda, formatMatchResult, groupByGame, totalSize } from '../src/grouping.ts'
+import { formatAgo, formatKda, formatMatchResult, groupByGame, totalSize, withResultImage } from '../src/grouping.ts'
 
 const c = (id: string, matchStartUtc: string, sessionDir = 's1', pvpScore: number | null = null) => ({
   id,
@@ -126,4 +126,18 @@ test('formatAgo picks minutes, hours or days', () => {
 test('totalSize adds clip sizes and treats a missing size as zero', () => {
   assert.equal(totalSize([{ sizeBytes: 100 }, { sizeBytes: 250 }, {}]), 350)
   assert.equal(totalSize([]), 0)
+})
+
+test('withResultImage keeps only games that have a saved result screenshot, in the given order', () => {
+  const shot = { ...result(), imagePath: 'x.jpg' }
+  const groups = groupByGame(
+    [
+      { ...c('a', 't1', 's'), matchResult: shot },
+      { ...c('b', 't2', 's'), matchResult: result() },
+      { ...c('c', 't3', 's'), matchResult: shot },
+    ],
+    'desc',
+  )
+
+  assert.deepEqual(withResultImage(groups).map((g) => g.clips[0].id), ['c', 'a'])
 })

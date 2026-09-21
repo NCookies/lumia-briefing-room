@@ -35,25 +35,63 @@ export function ResultCard({ clipId, result, onOpen }: CardProps) {
 }
 
 interface ViewerProps {
-  clipId: string
+  games: { key: string; clipId: string; caption: string }[]
+  index: number
+  onIndexChange: (index: number) => void
   onClose: () => void
 }
 
-export function ResultViewer({ clipId, onClose }: ViewerProps) {
+const NAV =
+  'fixed top-1/2 z-[75] flex h-24 w-14 -translate-y-1/2 items-center justify-center rounded-xl bg-zinc-800/80 text-4xl text-zinc-100 hover:bg-zinc-600 disabled:cursor-default disabled:opacity-20 disabled:hover:bg-zinc-800/80'
+
+export function ResultViewer({ games, index, onIndexChange, onClose }: ViewerProps) {
+  const game = games[index]
+  const hasPrev = index > 0
+  const hasNext = index < games.length - 1
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
+      if (e.key === 'ArrowLeft' && hasPrev) onIndexChange(index - 1)
+      if (e.key === 'ArrowRight' && hasNext) onIndexChange(index + 1)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [index, hasPrev, hasNext, onIndexChange, onClose])
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-2" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-2 bg-black/90 p-2" onClick={onClose}>
+      <button
+        type="button"
+        aria-label="이전 게임"
+        className={`${NAV} left-2`}
+        disabled={!hasPrev}
+        onClick={(e) => {
+          e.stopPropagation()
+          onIndexChange(index - 1)
+        }}
+      >
+        ‹
+      </button>
+      <button
+        type="button"
+        aria-label="다음 게임"
+        className={`${NAV} right-2`}
+        disabled={!hasNext}
+        onClick={(e) => {
+          e.stopPropagation()
+          onIndexChange(index + 1)
+        }}
+      >
+        ›
+      </button>
+      <div className="text-sm text-zinc-200" onClick={(e) => e.stopPropagation()}>
+        {game.caption} · {index + 1}/{games.length}
+      </div>
       <img
-        src={resultImageUrl(clipId)}
+        src={resultImageUrl(game.clipId)}
         alt="결과표"
-        className="max-h-full max-w-full rounded"
+        className="max-h-[calc(100%-2rem)] max-w-full rounded"
         onClick={(e) => e.stopPropagation()}
       />
     </div>

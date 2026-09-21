@@ -8,7 +8,7 @@ import { ExportDialog } from './components/ExportDialog'
 import { GameSection } from './components/GameSection'
 import { PlayerModal } from './components/PlayerModal'
 import { ResultCard, ResultViewer } from './components/ResultCard'
-import { groupByGame, totalSize, type GameGroup } from './grouping'
+import { formatMatchResult, groupByGame, totalSize, withResultImage, type GameGroup } from './grouping'
 import { applyLabel, progress } from './labeling'
 import { SettingsModal } from './components/SettingsModal'
 import { formatBytes } from './retention'
@@ -21,7 +21,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [exportTarget, setExportTarget] = useState<Clip | null>(null)
   const [showSettings, setShowSettings] = useState(false)
-  const [resultViewId, setResultViewId] = useState<string | null>(null)
+  const [resultViewKey, setResultViewKey] = useState<string | null>(null)
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -138,6 +138,16 @@ export default function App() {
 
   const groups = useMemo(() => groupByGame(clips, filter.sort), [clips, filter.sort])
   const ordered = useMemo(() => groups.flatMap((g) => g.clips), [groups])
+  const resultGames = useMemo(
+    () =>
+      withResultImage(groups).map((g) => ({
+        key: g.key,
+        clipId: g.clips[0].id,
+        caption: [`게임 ${g.number}`, formatMatchResult(g.result)].filter(Boolean).join(' · '),
+      })),
+    [groups],
+  )
+  const resultViewIndex = resultViewKey === null ? -1 : resultGames.findIndex((g) => g.key === resultViewKey)
   const playingIndex = playingId === null ? -1 : ordered.findIndex((c) => c.id === playingId)
   const toggleGame = (key: string) =>
     setExpandedKeys((prev) => {
@@ -216,7 +226,7 @@ export default function App() {
                 <ResultCard
                   clipId={group.clips[0].id}
                   result={group.result}
-                  onOpen={() => setResultViewId(group.clips[0].id)}
+                  onOpen={() => setResultViewKey(group.key)}
                 />
               )}
               {group.clips.map((clip) => (
@@ -261,7 +271,14 @@ export default function App() {
         />
       )}
       {exportTarget && <ExportDialog clip={exportTarget} onClose={() => setExportTarget(null)} />}
-      {resultViewId && <ResultViewer clipId={resultViewId} onClose={() => setResultViewId(null)} />}
+      {resultViewIndex >= 0 && (
+        <ResultViewer
+          games={resultGames}
+          index={resultViewIndex}
+          onIndexChange={(i) => setResultViewKey(resultGames[i].key)}
+          onClose={() => setResultViewKey(null)}
+        />
+      )}
       {showSettings && (
         <SettingsModal
           confirmDelete={confirmDelete}

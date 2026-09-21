@@ -82,3 +82,7 @@ export function formatAgo(iso: string, now: Date = new Date()): string {
 export function totalSize(clips: { sizeBytes?: number }[]): number {
   return clips.reduce((sum, c) => sum + (c.sizeBytes ?? 0), 0)
 }
+
+export function withResultImage<T extends Groupable>(groups: GameGroup<T>[]): GameGroup<T>[] {
+  return groups.filter((g) => g.result?.imagePath)
+}
