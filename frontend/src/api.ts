@@ -11,6 +11,7 @@ export interface ClipQuery {
   minPvpScore?: number
   label?: string
   sort?: string
+  source?: 'steam' | 'vod'
 }
 
 async function checkOk(res: Response, action: string): Promise<Response> {
@@ -30,6 +31,7 @@ export async function listClips(query: ClipQuery = {}): Promise<Clip[]> {
   if (query.minPvpScore) params.set('minPvpScore', String(query.minPvpScore))
   if (query.label) params.set('label', query.label)
   if (query.sort) params.set('sort', query.sort)
+  if (query.source) params.set('source', query.source)
 
   const res = await checkOk(await fetch(`${BASE}/clips?${params}`), '클립 목록 조회')
   const clips: Clip[] = await res.json()
@@ -67,8 +69,8 @@ export function videoUrl(id: string, version?: number): string {
   return `${BASE}/clips/${id}/video${version === undefined ? '' : `?v=${version}`}`
 }
 
-export async function emptyTrash(): Promise<{ deleted: number; bytes: number }> {
-  const res = await checkOk(await fetch(`${BASE}/trash/empty`, { method: 'POST' }), '휴지통 비우기')
+export async function emptyTrash(source: 'steam' | 'vod' = 'steam'): Promise<{ deleted: number; bytes: number }> {
+  const res = await checkOk(await fetch(`${BASE}/trash/empty?source=${source}`, { method: 'POST' }), '휴지통 비우기')
   return res.json()
 }
 

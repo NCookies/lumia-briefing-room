@@ -4,8 +4,8 @@ export type ClipSort = 'asc' | 'desc' | 'pvp'
 
 interface Groupable {
   id: string
-  matchStartUtc: string
-  sessionDir: string
+  matchStartUtc?: string
+  sessionDir?: string
   pvpScore: number | null
   matchResult?: MatchResult | null
 }
@@ -23,7 +23,7 @@ const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id 
 export function groupByGame<T extends Groupable>(clips: T[], sort: ClipSort): GameGroup<T>[] {
   const map = new Map<string, GameGroup<T>>()
   for (const clip of clips) {
-    const key = `${clip.sessionDir}|${clip.matchStartUtc}`
+    const key = `${clip.sessionDir ?? ''}|${clip.matchStartUtc ?? ''}`
     const group = map.get(key)
     if (group) {
       group.clips.push(clip)
@@ -32,7 +32,7 @@ export function groupByGame<T extends Groupable>(clips: T[], sort: ClipSort): Ga
       map.set(key, {
         key,
         number: 0,
-        matchStartUtc: clip.matchStartUtc,
+        matchStartUtc: clip.matchStartUtc ?? '',
         result: clip.matchResult ?? null,
         clips: [clip],
       })

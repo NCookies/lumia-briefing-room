@@ -28,14 +28,21 @@ export interface MatchResult {
 export interface Clip {
   id: string
   title: string
-  sessionDir: string
-  sessionStartUtc: string
-  matchStartUtc: string
+  source?: 'steam' | 'vod'
+  sessionDir?: string
+  sessionStartUtc?: string
+  matchStartUtc?: string
+  vodId?: string
+  vodFile?: string
+  streamer?: string | null
+  vodGameIndex?: number
+  gameStartOffsetSec?: number
+  gameEndOffsetSec?: number
   gameMode: string
   sourceWidth: number
   sourceHeight: number
-  segmentStart: number
-  segmentEnd: number
+  segmentStart?: number
+  segmentEnd?: number
   videoOffsetSec: number
   durationSec: number
   thumbnailPath: string | null
