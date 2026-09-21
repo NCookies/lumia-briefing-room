@@ -159,3 +159,61 @@ def test_tail_follow_yields_pending_lines_before_stopping(tmp_path):
     assert next(gen) == "a\n"
     with pytest.raises(StopIteration):
         next(gen)
+
+
+def test_tail_follow_restarts_from_the_top_when_the_file_is_truncated_and_rewritten(tmp_path):
+    path = tmp_path / "log.txt"
+    path.write_text("old line one\nold line two\n", encoding="utf-8")
+    gen = tail_follow(path, start_at_end=True, poll_interval_sec=0.01)
+
+    path.write_text("new\n", encoding="utf-8")
+
+    assert next(gen) == "new\n"
+
+
+def test_tail_follow_follows_a_file_that_is_deleted_and_recreated(tmp_path):
+    path = tmp_path / "log.txt"
+    path.write_text("x" * 50 + "\n", encoding="utf-8")
+    gen = tail_follow(path, start_at_end=True, poll_interval_sec=0.01)
+
+    path.unlink()
+    path.write_text("fresh\n" + "y" * 80 + "\n", encoding="utf-8")
+
+    assert next(gen) == "fresh\n"
+
+
+def test_tail_follow_survives_the_file_being_briefly_missing(tmp_path):
+    path = tmp_path / "log.txt"
+    path.write_text("a\n", encoding="utf-8")
+    gen = tail_follow(path, start_at_end=False, poll_interval_sec=0.01, should_stop=lambda: False)
+    assert next(gen) == "a\n"
+    path.unlink()
+    import threading
+
+    threading.Timer(0.1, lambda: path.write_text("b\n", encoding="utf-8")).start()
+
+    assert next(gen) == "b\n"
+
+
+def test_tail_follow_never_holds_the_file_open_between_polls(tmp_path):
+    path = tmp_path / "log.txt"
+    path.write_text("a\n", encoding="utf-8")
+    gen = tail_follow(path, start_at_end=False, poll_interval_sec=0.01)
+    assert next(gen) == "a\n"
+
+    path.rename(tmp_path / "moved.txt")
+    path.write_text("b\n", encoding="utf-8")
+
+    assert next(gen) == "b\n"
+
+
+def test_tail_follow_waits_for_the_end_of_a_partly_written_line(tmp_path):
+    path = tmp_path / "log.txt"
+    path.write_text("half", encoding="utf-8")
+    gen = tail_follow(path, start_at_end=False, poll_interval_sec=0.01)
+
+    import threading
+
+    threading.Timer(0.1, lambda: open(path, "a", encoding="utf-8").write(" done\n")).start()
+
+    assert next(gen) == "half done\n"
