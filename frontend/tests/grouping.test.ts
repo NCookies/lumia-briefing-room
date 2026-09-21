@@ -28,13 +28,13 @@ test('groupByGame ascending orders games and clips oldest first', () => {
   )
 })
 
-test('groupByGame descending orders games and clips newest first', () => {
+test('groupByGame descending orders games newest first but keeps clips oldest first', () => {
   const groups = groupByGame(clips, 'desc')
   assert.deepEqual(
     groups.map((g) => g.clips.map((x) => x.id)),
     [
-      ['20260920_130000_02', '20260920_130000_01'],
-      ['20260920_120000_02', '20260920_120000_01'],
+      ['20260920_130000_01', '20260920_130000_02'],
+      ['20260920_120000_01', '20260920_120000_02'],
     ],
   )
 })
@@ -44,15 +44,25 @@ test('groupByGame separates same start time in different sessions', () => {
   assert.equal(groups.length, 2)
 })
 
-test('groupByGame pvp keeps games in time order and ranks clips by score', () => {
+test('groupByGame pvp orders games by their best score and keeps clips oldest first', () => {
   const groups = groupByGame(
-    [c('a', 't1', 's', 0.2), c('b', 't1', 's', 0.9), c('c', 't0', 's', null)],
+    [
+      c('a2', 't1', 's', 0.9),
+      c('a1', 't1', 's', 0.2),
+      c('b1', 't2', 's', 0.5),
+      c('c1', 't0', 's', null),
+    ],
     'pvp',
   )
   assert.deepEqual(
     groups.map((g) => g.clips.map((x) => x.id)),
-    [['c'], ['b', 'a']],
+    [['a1', 'a2'], ['b1'], ['c1']],
   )
+})
+
+test('groupByGame pvp breaks score ties by oldest game first', () => {
+  const groups = groupByGame([c('b', 't2', 's', 0.5), c('a', 't1', 's', 0.5)], 'pvp')
+  assert.deepEqual(groups.map((g) => g.clips[0].id), ['a', 'b'])
 })
 
 test('groupByGame numbers games from the oldest regardless of direction', () => {

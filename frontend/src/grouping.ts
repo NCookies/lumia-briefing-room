@@ -39,16 +39,19 @@ export function groupByGame<T extends Groupable>(clips: T[], sort: ClipSort): Ga
     }
   }
 
-  const games = [...map.values()].sort((a, b) =>
-    a.matchStartUtc < b.matchStartUtc ? -1 : a.matchStartUtc > b.matchStartUtc ? 1 : a.key < b.key ? -1 : 1,
-  )
+  const byTime = (a: GameGroup<T>, b: GameGroup<T>) =>
+    a.matchStartUtc < b.matchStartUtc ? -1 : a.matchStartUtc > b.matchStartUtc ? 1 : a.key < b.key ? -1 : 1
+  const games = [...map.values()].sort(byTime)
   games.forEach((g, i) => {
     g.number = i + 1
-    if (sort === 'pvp') g.clips.sort((a, b) => (b.pvpScore ?? -1) - (a.pvpScore ?? -1))
-    else g.clips.sort(byId)
-    if (sort === 'desc') g.clips.reverse()
+    g.clips.sort(byId)
   })
-  if (sort === 'desc') games.reverse()
+
+  if (sort === 'desc') return games.reverse()
+  if (sort === 'pvp') {
+    const best = (g: GameGroup<T>) => Math.max(...g.clips.map((c) => c.pvpScore ?? -1))
+    return games.sort((a, b) => best(b) - best(a) || byTime(a, b))
+  }
   return games
 }
 
