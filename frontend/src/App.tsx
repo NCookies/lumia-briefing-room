@@ -7,6 +7,14 @@ import { groupByGame } from './grouping'
 import { applyLabel, progress } from './labeling'
 import type { Clip, UserLabel } from './types'
 
+const GAME_COLORS = [
+  { border: 'border-sky-500/70', header: 'bg-sky-500/25 text-sky-100' },
+  { border: 'border-emerald-500/70', header: 'bg-emerald-500/25 text-emerald-100' },
+  { border: 'border-amber-500/70', header: 'bg-amber-500/25 text-amber-100' },
+  { border: 'border-fuchsia-500/70', header: 'bg-fuchsia-500/25 text-fuchsia-100' },
+  { border: 'border-rose-500/70', header: 'bg-rose-500/25 text-rose-100' },
+]
+
 function formatGameStart(iso: string): string {
   const d = new Date(iso)
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('ko-KR', { hour12: false })
@@ -103,14 +111,19 @@ export default function App() {
 
         <div className="flex flex-col gap-6">
           {groups.map((group) => (
-            <section key={group.key}>
-              <h2 className="mb-2 flex items-baseline gap-2 border-b border-zinc-700 pb-1 text-sm font-medium text-zinc-300">
+            <section
+              key={group.key}
+              className={`overflow-hidden rounded-xl border-2 ${GAME_COLORS[(group.number - 1) % GAME_COLORS.length].border}`}
+            >
+              <h2
+                className={`flex items-baseline gap-3 px-4 py-2 text-base font-semibold ${GAME_COLORS[(group.number - 1) % GAME_COLORS.length].header}`}
+              >
                 <span>게임 {group.number}</span>
-                <span className="text-xs font-normal text-zinc-500">
+                <span className="text-xs font-normal opacity-80">
                   {formatGameStart(group.matchStartUtc)} · 클립 {group.clips.length}개
                 </span>
               </h2>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {group.clips.map((clip) => (
                   <ClipCard
                     key={clip.id}
@@ -137,6 +150,11 @@ export default function App() {
           index={playingIndex}
           onIndexChange={(i) => setPlayingId(ordered[i]?.id ?? null)}
           onLabel={handleLabel}
+          onTrash={(clip) => {
+            const next = ordered[playingIndex + 1] ?? ordered[playingIndex - 1]
+            setPlayingId(next?.id ?? null)
+            void handleTrash(clip)
+          }}
           onClose={() => setPlayingId(null)}
         />
       )}
