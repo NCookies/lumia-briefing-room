@@ -7,6 +7,13 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 
 from lumia_briefing_room.api.clips import find_clip, scan_clips, to_summary_dict
+from lumia_briefing_room.api.export import (
+    export_video,
+    is_valid_folder_name,
+    list_roots,
+    list_subdirs,
+    parent_of,
+)
 from lumia_briefing_room.api.filters import ClipQuery, filter_clip_summaries, sort_clip_summaries
 from lumia_briefing_room.config import (
     Config,
@@ -139,6 +146,46 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         if not thumb or not Path(thumb).exists():
             raise HTTPException(404, "썸네일이 없다")
         return FileResponse(thumb, media_type="image/jpeg")
+
+    @app.get("/api/fs/dirs")
+    def fs_dirs(path: str = ""):
+        if not path:
+            return {"path": "", "parent": None, "dirs": list_roots()}
+        target = Path(path)
+        if not target.is_dir():
+            raise HTTPException(404, "폴더를 찾을 수 없다")
+        try:
+            dirs = list_subdirs(target)
+        except OSError as e:
+            raise HTTPException(403, f"폴더를 열 수 없다: {e}")
+        return {"path": str(target), "parent": parent_of(target), "dirs": dirs}
+
+    @app.post("/api/fs/mkdir")
+    def fs_mkdir(body: dict):
+        base = Path(str(body.get("path", "")))
+        name = str(body.get("name", ""))
+        if not is_valid_folder_name(name):
+            raise HTTPException(400, "폴더 이름이 올바르지 않다")
+        if not base.is_dir():
+            raise HTTPException(404, "폴더를 찾을 수 없다")
+        created = base / name
+        created.mkdir(exist_ok=True)
+        return {"path": str(created)}
+
+    @app.post("/api/clips/{clip_id}/export")
+    def export_clip(clip_id: str, body: dict):
+        clip = find_clip(_clips_dir(app), clip_id)
+        if clip is None:
+            raise HTTPException(404, "클립을 찾을 수 없다")
+        directory = Path(str(body.get("dir", "")))
+        if not directory.is_dir():
+            raise HTTPException(404, "저장할 폴더를 찾을 수 없다")
+        stem = str(body.get("filename") or clip.meta.get("title") or clip_id)
+        if stem.lower().endswith(".mp4"):
+            stem = stem[:-4]
+        saved = export_video(clip.meta_path.with_suffix(".mp4"), directory, stem)
+        put_config({"paths": {"exportDefault": str(directory)}})
+        return {"path": str(saved)}
 
     @app.get("/api/config")
     def get_config():

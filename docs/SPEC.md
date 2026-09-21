@@ -996,7 +996,7 @@ Microsoft.HEVCVideoExtension   2.5.33.0   Status: Ok
 | `paths.thumbnails` | `<clips>\.thumbs` | 썸네일 JPEG |
 | `paths.proxies` | `<clips>\.proxy` | H.264 프록시 (쓸 때만) |
 | `paths.trash` | `<clips>\.trash` | 삭제 유예 중인 클립 |
-| `paths.exportDefault` | `%USERPROFILE%\Videos` | "내보내기" 기본 제안 경로 |
+| `paths.exportDefault` | `%USERPROFILE%\Videos` | "내보내기" 기본 제안 경로. 영상을 저장할 때마다 마지막에 고른 폴더로 갱신된다 |
 | `paths.steamRecording` | 자동 탐지 | 자동 탐지 실패 시 수동 지정 (§2.4) |
 
 - **임시 폴더는 SSD 같은 빠른 디스크로 옮길 수 있게 한다.** 병합은 수백 MB~GB 단위 I/O라 체감 차이가 크다.

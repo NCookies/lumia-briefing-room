@@ -15,6 +15,7 @@ interface Props {
   onRestore: (clip: Clip) => void
   onDeleteForever: (clip: Clip) => void
   onLabel: (clip: Clip, label: UserLabel) => void
+  onExport: (clip: Clip) => void
 }
 
 function formatDuration(sec: number): string {
@@ -38,6 +39,7 @@ export function ClipCard({
   onRestore,
   onDeleteForever,
   onLabel,
+  onExport,
 }: Props) {
   const [editing, setEditing] = useState(false)
   const [draftTitle, setDraftTitle] = useState(clip.title)
@@ -150,6 +152,13 @@ export function ClipCard({
             <>
               <LabelButtons value={clip.userLabel} onChange={(l) => onLabel(clip, l)} />
               <div className="flex gap-2 text-xs">
+                <button
+                  type="button"
+                  className="text-zinc-400 hover:text-sky-300"
+                  onClick={() => onExport(clip)}
+                >
+                  저장
+                </button>
                 <button
                   type="button"
                   className={clip.pinned ? 'text-amber-400' : 'text-zinc-400 hover:text-amber-300'}

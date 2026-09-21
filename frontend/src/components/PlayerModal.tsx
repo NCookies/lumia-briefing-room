@@ -14,15 +14,18 @@ interface Props {
   onIndexChange: (index: number) => void
   onLabel: (clip: Clip, label: UserLabel) => void
   onTrash: (clip: Clip) => void
+  onExport: (clip: Clip) => void
+  paused: boolean
   onClose: () => void
 }
 
-export function PlayerModal({ clips, index, onIndexChange, onLabel, onTrash, onClose }: Props) {
+export function PlayerModal({ clips, index, onIndexChange, onLabel, onTrash, onExport, paused, onClose }: Props) {
   const clip = clips[index]
   const volumeRef = useRef(loadVolume())
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (paused) return
       if (e.target instanceof HTMLInputElement) return
       if (e.key === 'Escape') return onClose()
       if (e.key === 'ArrowRight') return onIndexChange(Math.min(index + 1, clips.length - 1))
@@ -37,7 +40,7 @@ export function PlayerModal({ clips, index, onIndexChange, onLabel, onTrash, onC
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [clips, clip, index, onClose, onIndexChange, onLabel])
+  }, [clips, clip, index, paused, onClose, onIndexChange, onLabel])
 
   const { labeled, total } = progress(clips)
   const hasPrev = index > 0
@@ -149,6 +152,13 @@ export function PlayerModal({ clips, index, onIndexChange, onLabel, onTrash, onC
             </span>
           </div>
           <div className="flex items-center gap-4 text-xs text-zinc-400">
+            <button
+              type="button"
+              className="rounded border border-sky-500/50 px-3 py-1 text-sm text-sky-300 hover:bg-sky-500/20"
+              onClick={() => onExport(clip)}
+            >
+              저장
+            </button>
             <button
               type="button"
               className="rounded border border-rose-500/50 px-3 py-1 text-sm text-rose-300 hover:bg-rose-500/20"

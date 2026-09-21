@@ -26,6 +26,7 @@
 - [x] 필터 UI (`FilterBar.tsx`) — 태그/낮밤/게임모드/고정만/클립·휴지통 탭
 - [x] 정리 UI (삭제/복구/고정/이름변경) — 내보내기는 v1.1 로 미룸
 - [x] **교전 라벨링 UI** (SPEC 4단계, [plan-pvp.md §2.6](plan-pvp.md)) — 카드 라벨 버튼, 모달 키보드 라벨링(1/2/0, 자동 다음), 교전 가능성 칩·정렬·점수 슬라이더·라벨 필터
+- [x] **영상 저장 폴더 선택 · 옵션 모달** — 서버 쪽 폴더 탐색/생성/복사 API(`api/export.py`), 저장 대화상자, 마지막 저장 폴더 기억(`paths.exportDefault`), 헤더 ⚙ 옵션에서 기본 폴더 설정
 - [x] **게임 단위 목록 · 정렬 asc/desc · 볼륨 유지** — `grouping.ts` 로 `sessionDir+matchStartUtc` 기준 섹션 묶음(기본 오름차순), 플레이어 볼륨/음소거를 localStorage 에 저장. 게임 섹션은 색 테두리+헤더로 구분, 플레이어에 좌우 큰 이동 버튼과 삭제 버튼(삭제 후 다음 영상으로 이동)
 - [x] pywebview 셸 배선 (`cli/serve.py::open_ui`) — §4-1 해결, 아래 참고
 - [x] 빌드 산출물을 FastAPI 정적 서빙에 연결 (`api/static.py`, `cli/serve.py`)
@@ -127,6 +128,9 @@ UI 필터는 **이미 저장된 메타데이터 dict** 위에서 동작해야 �
 | GET | `/api/clips` | 목록. 쿼리파라미터로 필터(`tags`, `dayNight`, `gameMode`, `pinned`, `trashed`, `minPvpScore`, `label`=pvp/pve/unlabeled) 와 정렬(`sort`=pvp/recent — 웹 UI 는 이걸 안 쓰고 받은 목록을 게임 단위로 묶어 프론트에서 정렬한다) |
 | GET | `/api/clips/{id}` | 메타데이터 하나 |
 | PATCH | `/api/clips/{id}` | 제목 수정, pin 토글, 교전/사냥 라벨(`userLabel`: pvp/pve/null, 그 외 400) |
+| POST | `/api/clips/{id}/export` | 영상을 `dir` 폴더에 `filename`(기본 제목)으로 복사(중복 시 `(2)`), 그 폴더를 `paths.exportDefault` 에 저장. 폴더 없음 404 |
+| GET | `/api/fs/dirs?path=` | 하위 폴더 목록(path 비면 드라이브 목록). 저장 폴더 선택기용 |
+| POST | `/api/fs/mkdir` | `path` 아래 `name` 폴더 생성(구분자 포함 이름 400) |
 | POST | `/api/clips/{id}/trash` | 휴지통으로 |
 | POST | `/api/clips/{id}/restore` | 복구 |
 | DELETE | `/api/clips/{id}` | 휴지통에서 완전 삭제 (유예기간 무시하고 수동) |

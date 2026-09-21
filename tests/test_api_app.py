@@ -276,3 +276,78 @@ def test_label_filter_conflict_lists_only_migrated_labels_that_need_a_look(clien
     ids = [c["id"] for c in client.get("/api/clips", params={"label": "conflict"}).json()]
 
     assert ids == ["a"]
+
+
+def test_fs_dirs_lists_only_subdirectories_sorted(client, tmp_path):
+    base = tmp_path / "replay"
+    (base / "b").mkdir(parents=True)
+    (base / "a").mkdir()
+    (base / "file.txt").write_text("x")
+
+    resp = client.get("/api/fs/dirs", params={"path": str(base)})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["path"] == str(base)
+    assert body["parent"] == str(tmp_path)
+    assert body["dirs"] == ["a", "b"]
+
+
+def test_fs_dirs_without_path_lists_drives_or_roots(client):
+    body = client.get("/api/fs/dirs").json()
+
+    assert body["path"] == ""
+    assert body["parent"] is None
+    assert body["dirs"]
+
+
+def test_fs_dirs_missing_path_is_404(client, tmp_path):
+    assert client.get("/api/fs/dirs", params={"path": str(tmp_path / "nope")}).status_code == 404
+
+
+def test_fs_mkdir_creates_folder(client, tmp_path):
+    resp = client.post("/api/fs/mkdir", json={"path": str(tmp_path), "name": "레니"})
+
+    assert resp.status_code == 200
+    assert (tmp_path / "레니").is_dir()
+    assert resp.json()["path"] == str(tmp_path / "레니")
+
+
+def test_fs_mkdir_rejects_path_separators(client, tmp_path):
+    resp = client.post("/api/fs/mkdir", json={"path": str(tmp_path), "name": "a/b"})
+
+    assert resp.status_code == 400
+
+
+def test_export_copies_video_and_remembers_folder(client, tmp_path):
+    _write_clip(client.app.state.clips_dir_for_test, "a", title="멋진 킬", video=b"VIDEO")
+    dest = tmp_path / "replay" / "레니"
+    dest.mkdir(parents=True)
+
+    resp = client.post("/api/clips/a/export", json={"dir": str(dest)})
+
+    assert resp.status_code == 200
+    saved = Path(resp.json()["path"])
+    assert saved == dest / "멋진 킬.mp4"
+    assert saved.read_bytes() == b"VIDEO"
+    assert client.get("/api/config").json()["paths"]["exportDefault"] == str(dest)
+    assert json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))["paths"]["exportDefault"] == str(dest)
+
+
+def test_export_uses_given_filename_sanitized_and_never_overwrites(client, tmp_path):
+    _write_clip(client.app.state.clips_dir_for_test, "a", video=b"NEW")
+    (tmp_path / "out").mkdir()
+    (tmp_path / "out" / "x_y.mp4").write_bytes(b"OLD")
+
+    resp = client.post("/api/clips/a/export", json={"dir": str(tmp_path / "out"), "filename": 'x:y'})
+
+    assert Path(resp.json()["path"]).name == "x_y (2).mp4"
+    assert (tmp_path / "out" / "x_y.mp4").read_bytes() == b"OLD"
+
+
+def test_export_missing_dir_or_clip_is_404(client, tmp_path):
+    _write_clip(client.app.state.clips_dir_for_test, "a")
+
+    assert client.post("/api/clips/a/export", json={"dir": str(tmp_path / "nope")}).status_code == 404
+    (tmp_path / "out").mkdir()
+    assert client.post("/api/clips/zzz/export", json={"dir": str(tmp_path / "out")}).status_code == 404

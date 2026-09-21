@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { deleteClipForever, listClips, patchClip, restoreClip, trashClip } from './api'
 import { ClipCard } from './components/ClipCard'
 import { DEFAULT_FILTER, FilterBar, type FilterState } from './components/FilterBar'
+import { ExportDialog } from './components/ExportDialog'
 import { PlayerModal } from './components/PlayerModal'
 import { groupByGame } from './grouping'
 import { applyLabel, progress } from './labeling'
+import { SettingsModal } from './components/SettingsModal'
 import type { Clip, UserLabel } from './types'
 
 const GAME_COLORS = [
@@ -25,6 +27,8 @@ export default function App() {
   const [clips, setClips] = useState<Clip[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [exportTarget, setExportTarget] = useState<Clip | null>(null)
+  const [showSettings, setShowSettings] = useState(false)
   const [playingId, setPlayingId] = useState<string | null>(null)
 
   const reload = useCallback(() => {
@@ -91,11 +95,20 @@ export default function App() {
     <div className="flex min-h-screen flex-col bg-zinc-900 text-zinc-100">
       <header className="flex items-baseline justify-between border-b border-zinc-700 px-4 py-3">
         <h1 className="text-xl font-semibold">루미아 브리핑룸</h1>
-        {!filter.trashed && total > 0 && (
-          <span className="text-sm text-zinc-400">
-            라벨 {labeled}/{total}
-          </span>
-        )}
+        <div className="flex items-baseline gap-4">
+          {!filter.trashed && total > 0 && (
+            <span className="text-sm text-zinc-400">
+              라벨 {labeled}/{total}
+            </span>
+          )}
+          <button
+            type="button"
+            className="rounded border border-zinc-600 px-2 py-1 text-sm text-zinc-300 hover:bg-zinc-700"
+            onClick={() => setShowSettings(true)}
+          >
+            ⚙ 옵션
+          </button>
+        </div>
       </header>
 
       <FilterBar value={filter} onChange={setFilter} />
@@ -136,6 +149,7 @@ export default function App() {
                     onRestore={handleRestore}
                     onDeleteForever={handleDeleteForever}
                     onLabel={handleLabel}
+                    onExport={setExportTarget}
                   />
                 ))}
               </div>
@@ -150,6 +164,8 @@ export default function App() {
           index={playingIndex}
           onIndexChange={(i) => setPlayingId(ordered[i]?.id ?? null)}
           onLabel={handleLabel}
+          onExport={setExportTarget}
+          paused={exportTarget !== null}
           onTrash={(clip) => {
             const next = ordered[playingIndex + 1] ?? ordered[playingIndex - 1]
             setPlayingId(next?.id ?? null)
@@ -158,6 +174,8 @@ export default function App() {
           onClose={() => setPlayingId(null)}
         />
       )}
+      {exportTarget && <ExportDialog clip={exportTarget} onClose={() => setExportTarget(null)} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </div>
   )
 }
