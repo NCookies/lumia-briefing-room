@@ -37,12 +37,14 @@ class Roi:
         )
 
 
-def _load_builtin_rois(width: int, height: int) -> dict[str, Roi] | None:
+def _load_builtin(width: int, height: int) -> tuple[dict[str, Roi], tuple[int, int] | None] | None:
     path = _BUILTIN_DIR / f"{width}x{height}.json"
     if not path.exists():
         return None
     data = json.loads(path.read_text(encoding="utf-8"))
-    return {name: Roi(*coords) for name, coords in data["rois"].items()}
+    rois = {name: Roi(*coords) for name, coords in data["rois"].items()}
+    normalized_to = data.get("normalizedTo")
+    return rois, tuple(normalized_to) if normalized_to else None
 
 
 def _templates_path(width: int, height: int) -> Path | None:
@@ -69,21 +71,39 @@ class ResolutionProfile:
     templates: Path | None = None
     region_templates: Path | None = None
     day_templates: Path | None = None
+    reference_rois: dict[str, Roi] | None = None
 
     @classmethod
     def builtin(cls, width: int, height: int) -> "ResolutionProfile":
-        rois = _load_builtin_rois(width, height)
-        if rois is None:
+        loaded = _load_builtin(width, height)
+        if loaded is None:
             raise ValueError(f"측정된 프로필이 없다: {width}x{height}")
+        rois, normalized_to = loaded
+        ref_w, ref_h = normalized_to or (width, height)
+        reference_rois = None
+        if normalized_to:
+            reference_rois = _load_builtin(ref_w, ref_h)[0]
         return cls(
             width=width,
             height=height,
             rois=rois,
             measured=True,
-            templates=_templates_path(width, height),
-            region_templates=_region_templates_path(width, height),
-            day_templates=_day_templates_path(width, height),
+            templates=_templates_path(ref_w, ref_h),
+            region_templates=_region_templates_path(ref_w, ref_h),
+            day_templates=_day_templates_path(ref_w, ref_h),
+            reference_rois=reference_rois,
         )
+
+    def crop(self, frame, name: str):
+        """ROI 조각을 잘라낸다. 기준 해상도로 정규화되는 프로필이면 기준 ROI 크기로 키워, 기준 해상도의 본보기·픽셀 임계를 그대로 쓰게 한다."""
+        roi = self.rois[name]
+        piece = frame[roi.y0 : roi.y1, roi.x0 : roi.x1]
+        ref = self.reference_rois.get(name) if self.reference_rois else None
+        if ref is None or piece.shape[:2] == (ref.height, ref.width):
+            return piece
+        import cv2
+
+        return cv2.resize(piece, (ref.width, ref.height), interpolation=cv2.INTER_CUBIC)
 
     @classmethod
     def for_resolution(cls, width: int, height: int) -> "ResolutionProfile":

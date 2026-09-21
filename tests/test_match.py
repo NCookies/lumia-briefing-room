@@ -209,7 +209,7 @@ def test_resolve_templates_keeps_explicit_templates():
 def test_resolve_templates_warns_when_profile_has_none(caplog):
     from lumia_briefing_room.detect.match import resolve_templates
 
-    profile = ResolutionProfile.for_resolution(1920, 1080)
+    profile = ResolutionProfile.for_resolution(1600, 900)
     assert profile.templates is None
 
     with caplog.at_level("WARNING"):
@@ -727,3 +727,17 @@ def test_finalize_match_turns_an_assist_outside_the_badge_into_a_combat_interval
     result = finalize_match(states)
 
     assert [i.tags for i in result.intervals] == [frozenset({"assist"})]
+
+
+def test_analyze_frame_reads_badge_and_daynight_on_a_1080p_frame():
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    frame = np.full((1080, 1920, 3), 80, dtype=np.uint8)
+    _paint(frame, profile.rois["badge"], (255, 150, 20))
+    _paint(frame, profile.rois["face"], (120, 100, 90))
+    _paint(frame, profile.rois["day_night"], (255, 200, 20))
+
+    state = analyze_frame(frame, profile, t=7.0)
+
+    assert state.combat is True
+    assert state.face_value == pytest.approx(120.0)
+    assert state.day_night == "day"

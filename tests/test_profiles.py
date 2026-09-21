@@ -30,10 +30,10 @@ def test_builtin_2560x1440_profile_has_expected_rois():
 
 
 def test_unknown_resolution_falls_back_to_proportional_scaling():
-    profile = ResolutionProfile.for_resolution(1920, 1080)
+    profile = ResolutionProfile.for_resolution(1600, 900)
     assert profile.measured is False
     base = ResolutionProfile.builtin(2560, 1440)
-    expected = base.rois["k_value"].scaled(1920 / 2560, 1080 / 1440)
+    expected = base.rois["k_value"].scaled(1600 / 2560, 900 / 1440)
     assert profile.rois["k_value"] == expected
 
 
@@ -43,7 +43,7 @@ def test_known_resolution_returns_measured_profile():
 
 
 def test_profile_without_templates_has_none_path():
-    profile = ResolutionProfile.for_resolution(1920, 1080)
+    profile = ResolutionProfile.for_resolution(1600, 900)
     assert profile.templates is None
 
 
@@ -65,11 +65,54 @@ def test_measured_profile_points_at_region_templates():
 
 
 def test_unmeasured_profile_has_no_region_templates():
-    assert ResolutionProfile.for_resolution(1920, 1080).region_templates is None
+    assert ResolutionProfile.for_resolution(1600, 900).region_templates is None
 
 
 def test_measured_profile_points_at_day_templates_only_when_the_file_exists():
     profile = ResolutionProfile.for_resolution(2560, 1440)
 
     assert profile.day_templates is None or profile.day_templates.exists()
-    assert ResolutionProfile.for_resolution(1920, 1080).day_templates is None
+    assert ResolutionProfile.for_resolution(1600, 900).day_templates is None
+
+
+def test_builtin_1920x1080_profile_is_measured_and_normalized_to_1440p():
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    base = ResolutionProfile.builtin(2560, 1440)
+
+    assert profile.measured is True
+    assert (profile.width, profile.height) == (1920, 1080)
+    assert profile.rois["k_value"] == base.rois["k_value"].scaled(0.75, 0.75)
+    assert profile.reference_rois == base.rois
+
+
+def test_normalized_profile_reuses_the_reference_templates():
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    base = ResolutionProfile.builtin(2560, 1440)
+
+    assert profile.templates == base.templates
+    assert profile.region_templates == base.region_templates
+    assert profile.day_templates == base.day_templates
+
+
+def test_crop_upsizes_normalized_profile_pieces_to_reference_size():
+    import numpy as np
+
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    base = ResolutionProfile.builtin(2560, 1440)
+    frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
+
+    for name in ("k_value", "badge", "minimap", "day_digit"):
+        piece = profile.crop(frame, name)
+        assert piece.shape[:2] == (base.rois[name].height, base.rois[name].width)
+
+
+def test_crop_of_reference_profile_is_the_plain_crop():
+    import numpy as np
+
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    frame = np.arange(1440 * 2560 * 3, dtype=np.uint32).astype(np.uint8).reshape(1440, 2560, 3)
+
+    roi = profile.rois["k_value"]
+    assert np.array_equal(
+        profile.crop(frame, "k_value"), frame[roi.y0 : roi.y1, roi.x0 : roi.x1]
+    )

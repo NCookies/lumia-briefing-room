@@ -24,7 +24,6 @@ from lumia_briefing_room.detect.spectator import read_spectating
 from lumia_briefing_room.detect.teammate import combat_slots, dead_slots, new_deaths
 from lumia_briefing_room.detect.types import CombatInterval, FrameState, MatchDetection
 from lumia_briefing_room.profiles.models import ResolutionProfile
-from lumia_briefing_room.video.frames import crop_roi
 from lumia_briefing_room.video.segments import SegmentRange
 from lumia_briefing_room.video.session import RecordingSession
 from lumia_briefing_room.video.source import FrameSource, SteamSegmentSource
@@ -73,8 +72,8 @@ def analyze_frame(
 ) -> FrameState:
     """프레임 하나에서 교전/사망/카운터/낮밤 신호를 전부 읽는다. (plan.md §5)"""
     spectating = read_spectating(
-        crop_roi(frame, profile.rois["minimap_icons"]),
-        crop_roi(frame, profile.rois["hp_strip"]),
+        profile.crop(frame, "minimap_icons"),
+        profile.crop(frame, "hp_strip"),
     )
 
     dead_teammates = None
@@ -83,58 +82,58 @@ def analyze_frame(
         team_combat = bool(
             combat_slots(
                 [
-                    crop_roi(frame, profile.rois["team_ring1"]),
-                    crop_roi(frame, profile.rois["team_ring2"]),
+                    profile.crop(frame, "team_ring1"),
+                    profile.crop(frame, "team_ring2"),
                 ],
                 [
-                    crop_roi(frame, profile.rois["team_bar1"]),
-                    crop_roi(frame, profile.rois["team_bar2"]),
+                    profile.crop(frame, "team_bar1"),
+                    profile.crop(frame, "team_bar2"),
                 ],
             )
         )
         dead_teammates = tuple(
             dead_slots(
                 [
-                    crop_roi(frame, profile.rois["team_bar1"]),
-                    crop_roi(frame, profile.rois["team_bar2"]),
+                    profile.crop(frame, "team_bar1"),
+                    profile.crop(frame, "team_bar2"),
                 ]
             )
         )
 
     game_day = None
     if day_templates and spectating is not None:
-        game_day = read_game_day(crop_roi(frame, profile.rois["day_digit"]), day_templates)
+        game_day = read_game_day(profile.crop(frame, "day_digit"), day_templates)
 
     enemy_rings = ally_rings = None
     if spectating is False:
-        counts = count_rings(crop_roi(frame, profile.rois["minimap"]))
+        counts = count_rings(profile.crop(frame, "minimap"))
         enemy_rings, ally_rings = counts.enemy, counts.ally
 
     if spectating:
         combat = None
         face_value = face_sat = None
     else:
-        combat = read_badge(crop_roi(frame, profile.rois["badge"]))
-        face_stats = channel_stats(crop_roi(frame, profile.rois["face"]))
+        combat = read_badge(profile.crop(frame, "badge"))
+        face_stats = channel_stats(profile.crop(frame, "face"))
         face_value = float(face_stats.v.mean())
         face_sat = float(face_stats.s.mean())
 
-    day_night = read_day_night(crop_roi(frame, profile.rois["day_night"]))
+    day_night = read_day_night(profile.crop(frame, "day_night"))
 
     region = None
     if region_templates and spectating is False:
         region = read_region(
-            region_score(crop_roi(frame, profile.rois["region_text"])), region_templates
+            region_score(profile.crop(frame, "region_text")), region_templates
         ).name
 
     k_value = None
     if k_templates:
-        k_crop = crop_roi(frame, profile.rois["k_value"])
+        k_crop = profile.crop(frame, "k_value")
         k_value = read_field(text_score(k_crop), k_templates).value
 
     a_value = None
     if a_templates:
-        a_crop = crop_roi(frame, profile.rois["a_value"])
+        a_crop = profile.crop(frame, "a_value")
         a_value = read_field(text_score(a_crop), a_templates).value
 
     return FrameState(
