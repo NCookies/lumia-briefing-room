@@ -18,6 +18,7 @@ from lumia_briefing_room.api.export import (
     list_subdirs,
     parent_of,
 )
+from lumia_briefing_room.api.vods import register_vod_routes
 from lumia_briefing_room.api.filters import ClipQuery, filter_clip_summaries, sort_clip_summaries
 from lumia_briefing_room.config import (
     Config,
@@ -406,6 +407,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             save_config(new_cfg, app.state.config_path)
         return dataclass_to_camel_dict(new_cfg)
 
+    register_vod_routes(app, lock=lock, current_config=current_config, put_config=put_config)
     return app
 
 

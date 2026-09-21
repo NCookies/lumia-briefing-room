@@ -22,7 +22,7 @@
   - [x] V2c `pipeline/vod_detect.py::detect_games` 게임 단위 `finalize_match` (K/A·팀원 신호·사망 구간을 게임마다 초기화)
 - [x] **V3 — VOD 분석 작업 + 클립 컷 + 메타데이터** (2026-09-22 완료)
   - [x] 설정 `paths.vodClips` · `vod.*` / `pipeline/vod_store.py`(영상 id·색인·판독 캐시) / `pipeline/vod_clips.py`(컷·메타데이터) / `pipeline/vod_analyze.py`(`analyze_vod`: 진행률·취소·이어하기·rebuild·force) / `cli/analyze_vod.py`
-- [ ] V4 — API (`/api/vods…`, `/api/clips?source=vod`)
+- [x] **V4 — API** (2026-09-22): `/api/clips?source=vod` + 클립 ID 라우트가 두 폴더를 모두 찾음, `/api/vods`(목록·상태·게임·클립 수) · `PATCH /api/vods/{id}`(스트리머) · `POST|GET /api/vods/{id}/analyze`(시작·진행률) · `POST /api/vods/{id}/analyze/cancel` · `POST /api/vods/{id}/trash|restore` · `DELETE /api/vods/{id}/clips` · `GET /api/fs/videos`(영상 파일 고르기). 분석은 한 번에 하나(409). 설정 `vod.autoAnalyze` 는 아직 아무 동작도 하지 않는다(v1 은 수동 시작만)
 - [ ] V5 — UI (탭 · 다시보기 섹션 · 옵션 "다시보기" 탭)
 - [ ] V6 — 라벨 활용 (평가 도구의 `--source`)
 
