@@ -5,6 +5,7 @@ from pathlib import Path
 
 from lumia_briefing_room.config import dataclass_to_camel_dict
 from lumia_briefing_room.detect.pvp import PvpScore
+from lumia_briefing_room.detect.result import ResultScreen
 from lumia_briefing_room.detect.types import CombatInterval
 from lumia_briefing_room.pipeline.clip import ClipRange, CutResult
 from lumia_briefing_room.video.session import RecordingSession
@@ -69,6 +70,20 @@ class ClipMetadata:
     match_assists: int | None
     match_team_kills: int | None
     detector_confidence: float
+    match_result: dict | None = None
+
+
+def match_result_dict(result: ResultScreen | None) -> dict | None:
+    if result is None:
+        return None
+    return {
+        "matchType": result.match_type,
+        "matchLabel": result.match_label,
+        "placement": result.placement,
+        "total": result.total,
+        "outcome": result.outcome,
+        "nickname": result.nickname,
+    }
 
 
 def build_metadata(
@@ -88,6 +103,7 @@ def build_metadata(
     match_kills: int | None = None,
     match_assists: int | None = None,
     match_team_kills: int | None = None,
+    match_result: ResultScreen | None = None,
 ) -> ClipMetadata:
     day_night = interval.day_night
     phase = phase_index(game_day, day_night) if game_day is not None and day_night is not None else None
@@ -134,6 +150,7 @@ def build_metadata(
         match_assists=match_assists,
         match_team_kills=match_team_kills,
         detector_confidence=interval.confidence,
+        match_result=match_result_dict(match_result),
     )
 
 

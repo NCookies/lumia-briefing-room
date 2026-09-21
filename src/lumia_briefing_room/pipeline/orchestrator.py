@@ -1,3 +1,5 @@
+import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -7,12 +9,16 @@ import numpy as np
 from lumia_briefing_room.config import ClipConfig, Config, resolve_paths
 from lumia_briefing_room.detect.match import detect_match
 from lumia_briefing_room.detect.pvp import score_interval
+from lumia_briefing_room.detect.result import ResultScreen
 from lumia_briefing_room.detect.types import CombatInterval
 from lumia_briefing_room.pipeline.clip import ClipRange, cut_clip, make_thumbnail, resolve_clip_range
 from lumia_briefing_room.pipeline.filters import apply_filter
 from lumia_briefing_room.pipeline.metadata import build_metadata, write_metadata
+from lumia_briefing_room.pipeline.result_scan import find_result_screen
 from lumia_briefing_room.video.segments import segment_time_range
 from lumia_briefing_room.video.session import RecordingSession
+
+log = logging.getLogger(__name__)
 
 _DAY_NIGHT_KR = {"day": "낮", "night": "밤"}
 
@@ -105,6 +111,15 @@ def _resolve_clip_paths(cfg: Config, clips_dir: Path | None) -> tuple[Path, Path
     return clips_root, thumbnails_root
 
 
+def _read_result(session, seg_range, ffmpeg_path: Path, hwaccel: str | None) -> ResultScreen | None:
+    """결과 화면 판독은 부가 정보라 실패해도 클립 생성을 막지 않는다."""
+    try:
+        return find_result_screen(session, seg_range, ffmpeg_path=ffmpeg_path, hwaccel=hwaccel)
+    except Exception:
+        log.exception("결과 화면 판독 실패 - 순위 정보 없이 저장한다")
+        return None
+
+
 def process_match(
     session: RecordingSession,
     match_start: datetime,
@@ -117,6 +132,7 @@ def process_match(
     a_templates: dict[int, np.ndarray] | None = None,
     clips_dir: Path | None = None,
     hwaccel: str | None = None,
+    on_result: Callable[[ResultScreen], None] | None = None,
 ) -> list[Path]:
     """SPEC §3 다이어그램 전체: 매치 하나를 검출부터 메타데이터 저장까지 처리한다.
 
@@ -138,6 +154,9 @@ def process_match(
     resolved.temp.mkdir(parents=True, exist_ok=True)
 
     plans = _plan_clips(filtered, cfg.clip)
+    result = _read_result(session, seg_range, ffmpeg_path, hwaccel)
+    if result is not None and on_result is not None:
+        on_result(result)
 
     written: list[Path] = []
     for i, plan in enumerate(plans, start=1):
@@ -176,6 +195,7 @@ def process_match(
             thumbnail_path=thumbnail_rel,
             match_kills=detection.k_final,
             match_assists=detection.a_final,
+            match_result=result,
         )
         meta_path = clip_path.with_suffix(".json")
         write_metadata(meta, meta_path)

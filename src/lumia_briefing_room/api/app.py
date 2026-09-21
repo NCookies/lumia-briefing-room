@@ -19,6 +19,7 @@ from lumia_briefing_room.config import (
     Config,
     dataclass_from_camel_dict,
     dataclass_to_camel_dict,
+    load_config,
     resolve_paths,
     save_config,
 )
@@ -187,13 +188,20 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         put_config({"paths": {"exportDefault": str(directory)}})
         return {"path": str(saved)}
 
+    def current_config() -> Config:
+        """설정 파일이 진실이다 — 워처가 닉네임을 학습해 파일에 쓰기 때문에 메모리 사본만 믿으면 그 값을 덮어쓴다."""
+        path = app.state.config_path
+        if path is not None and path.exists():
+            app.state.config = load_config(path)
+        return app.state.config
+
     @app.get("/api/config")
     def get_config():
-        return dataclass_to_camel_dict(app.state.config)
+        return dataclass_to_camel_dict(current_config())
 
     @app.put("/api/config")
     def put_config(body: dict):
-        current = dataclass_to_camel_dict(app.state.config)
+        current = dataclass_to_camel_dict(current_config())
         merged = _deep_merge(current, body)
         new_cfg = dataclass_from_camel_dict(Config, merged)
         app.state.config = new_cfg

@@ -170,3 +170,25 @@ def test_metadata_starts_without_a_label_source():
 
     assert meta.label_source is None
     assert meta.label_conflict is False
+
+
+def test_build_metadata_stores_match_result_as_camel_dict_and_defaults_to_none():
+    from lumia_briefing_room.detect.result import ResultScreen
+
+    kwargs = dict(
+        title="t", session=_FakeSession(),
+        match_start_utc=datetime(2026, 9, 19, 15, 22, 20, tzinfo=timezone.utc),
+        game_mode="battle_royale", interval=_interval(),
+        clip_range=ClipRange(start=0.0, end=10.0, preroll_source="combat"),
+        cut_result=CutResult(segment_start=1, segment_end=2, duration_sec=9.0, source_incomplete=False),
+        thumbnail_path=None,
+    )
+    result = ResultScreen(
+        placement=4, total=7, match_type="rank", match_label="랭크", outcome="실험 종료", nickname="나"
+    )
+
+    assert build_metadata(**kwargs).match_result is None
+    assert build_metadata(**kwargs, match_result=result).match_result == {
+        "matchType": "rank", "matchLabel": "랭크", "placement": 4, "total": 7,
+        "outcome": "실험 종료", "nickname": "나",
+    }

@@ -190,6 +190,11 @@ class UiConfig:
 
 
 @dataclass
+class PlayerConfig:
+    nickname: str = ""
+
+
+@dataclass
 class Config:
     paths: PathsConfig = field(default_factory=PathsConfig)
     watch: WatchConfig = field(default_factory=WatchConfig)
@@ -199,6 +204,7 @@ class Config:
     retention: RetentionConfig = field(default_factory=RetentionConfig)
     export: ExportConfig = field(default_factory=ExportConfig)
     ui: UiConfig = field(default_factory=UiConfig)
+    player: PlayerConfig = field(default_factory=PlayerConfig)
 
 
 DEFAULT_CONFIG_PATH = _default_appdata() / "LumiaBriefingRoom" / "config.json"

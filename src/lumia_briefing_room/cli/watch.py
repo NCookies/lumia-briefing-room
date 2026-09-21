@@ -25,6 +25,7 @@ from lumia_briefing_room.config import (
 )
 from lumia_briefing_room.detect.counter import load_templates
 from lumia_briefing_room.pipeline.clip import ClipCutError
+from lumia_briefing_room.pipeline.nickname import learn_nickname
 from lumia_briefing_room.pipeline.orchestrator import process_match
 from lumia_briefing_room.pipeline.playerlog import MatchBoundary, tail_follow
 from lumia_briefing_room.pipeline.watcher import (
@@ -56,6 +57,7 @@ def make_processor(
     k_templates: dict | None,
     a_templates: dict | None,
     hwaccel: str | None,
+    config_path: Path | None = None,
 ) -> ProcessCallback:
     resolved = resolve_paths(cfg.paths)
 
@@ -73,6 +75,7 @@ def make_processor(
                 session, match.start_utc, match.end_utc, cfg,
                 ffmpeg_path=ffmpeg_path, game_mode=game_mode,
                 k_templates=k_templates, a_templates=a_templates, hwaccel=hwaccel,
+                on_result=lambda r: learn_nickname(config_path, r.nickname),
             )
         except ClipCutError as exc:
             log.warning("클립 생성 실패(세그먼트 없음): %s", exc)
@@ -125,6 +128,7 @@ def run(
     process = make_processor(
         cfg, ffmpeg_path, game_mode=args.game_mode,
         k_templates=k_templates, a_templates=a_templates, hwaccel=args.hwaccel,
+        config_path=args.config,
     )
 
     local_tz = datetime.now().astimezone().tzinfo

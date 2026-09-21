@@ -351,3 +351,22 @@ def test_export_missing_dir_or_clip_is_404(client, tmp_path):
     assert client.post("/api/clips/a/export", json={"dir": str(tmp_path / "nope")}).status_code == 404
     (tmp_path / "out").mkdir()
     assert client.post("/api/clips/zzz/export", json={"dir": str(tmp_path / "out")}).status_code == 404
+
+
+def test_config_includes_player_nickname_and_can_be_updated(client, tmp_path):
+    assert client.get("/api/config").json()["player"]["nickname"] == ""
+
+    resp = client.put("/api/config", json={"player": {"nickname": "東京タワー"}})
+
+    assert resp.json()["player"]["nickname"] == "東京タワー"
+    assert client.get("/api/config").json()["player"]["nickname"] == "東京タワー"
+
+
+def test_config_reads_changes_made_to_the_file_by_another_writer(client, tmp_path):
+    from lumia_briefing_room.config import Config, PlayerConfig, save_config
+
+    save_config(Config(player=PlayerConfig(nickname="워처가학습")), tmp_path / "config.json")
+
+    assert client.get("/api/config").json()["player"]["nickname"] == "워처가학습"
+    client.put("/api/config", json={"paths": {"exportDefault": str(tmp_path)}})
+    assert client.get("/api/config").json()["player"]["nickname"] == "워처가학습"
