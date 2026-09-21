@@ -67,6 +67,10 @@ export function videoUrl(id: string): string {
   return `${BASE}/clips/${id}/video`
 }
 
+export function resultImageUrl(id: string): string {
+  return `${BASE}/clips/${id}/result-image`
+}
+
 export function thumbnailUrl(id: string): string {
   return `${BASE}/clips/${id}/thumbnail`
 }

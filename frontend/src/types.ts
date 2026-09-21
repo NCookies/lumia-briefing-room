@@ -17,6 +17,7 @@ export interface MatchResult {
   nickname: string | null
   character?: string | null
   characterRaw?: string | null
+  imagePath?: string | null
 }
 
 export interface Clip {

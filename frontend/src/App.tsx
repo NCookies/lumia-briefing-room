@@ -4,6 +4,7 @@ import { ClipCard } from './components/ClipCard'
 import { DEFAULT_FILTER, FilterBar, type FilterState } from './components/FilterBar'
 import { ExportDialog } from './components/ExportDialog'
 import { PlayerModal } from './components/PlayerModal'
+import { ResultCard, ResultViewer } from './components/ResultCard'
 import { formatMatchResult, groupByGame } from './grouping'
 import { applyLabel, progress } from './labeling'
 import { SettingsModal } from './components/SettingsModal'
@@ -29,6 +30,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [exportTarget, setExportTarget] = useState<Clip | null>(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [resultViewId, setResultViewId] = useState<string | null>(null)
   const [playingId, setPlayingId] = useState<string | null>(null)
 
   const reload = useCallback(() => {
@@ -146,6 +148,13 @@ export default function App() {
                 </span>
               </h2>
               <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {group.result?.imagePath && (
+                  <ResultCard
+                    clipId={group.clips[0].id}
+                    result={group.result}
+                    onOpen={() => setResultViewId(group.clips[0].id)}
+                  />
+                )}
                 {group.clips.map((clip) => (
                   <ClipCard
                     key={clip.id}
@@ -184,6 +193,7 @@ export default function App() {
         />
       )}
       {exportTarget && <ExportDialog clip={exportTarget} onClose={() => setExportTarget(null)} />}
+      {resultViewId && <ResultViewer clipId={resultViewId} onClose={() => setResultViewId(null)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </div>
   )

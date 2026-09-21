@@ -14,7 +14,7 @@ from lumia_briefing_room.detect.types import CombatInterval
 from lumia_briefing_room.pipeline.clip import ClipRange, cut_clip, make_thumbnail, resolve_clip_range
 from lumia_briefing_room.pipeline.filters import apply_filter
 from lumia_briefing_room.pipeline.metadata import build_metadata, write_metadata
-from lumia_briefing_room.pipeline.result_scan import find_result_screen
+from lumia_briefing_room.pipeline.result_scan import find_result_screen, result_image_name, save_result_image
 from lumia_briefing_room.video.segments import segment_time_range
 from lumia_briefing_room.video.session import RecordingSession
 
@@ -120,6 +120,17 @@ def _read_result(session, seg_range, ffmpeg_path: Path, hwaccel: str | None) -> 
         return None
 
 
+def _save_result_image(result: ResultScreen | None, path: Path) -> str | None:
+    if result is None or result.image is None:
+        return None
+    try:
+        save_result_image(result.image, path)
+    except OSError:
+        log.exception("결과 화면 이미지 저장 실패")
+        return None
+    return str(path)
+
+
 def process_match(
     session: RecordingSession,
     match_start: datetime,
@@ -157,6 +168,7 @@ def process_match(
     result = _read_result(session, seg_range, ffmpeg_path, hwaccel)
     if result is not None and on_result is not None:
         on_result(result)
+    result_image_path = _save_result_image(result, thumbnails_root / result_image_name(match_start))
 
     written: list[Path] = []
     for i, plan in enumerate(plans, start=1):
@@ -196,6 +208,7 @@ def process_match(
             match_kills=detection.k_final,
             match_assists=detection.a_final,
             match_result=result,
+            result_image_path=result_image_path,
         )
         meta_path = clip_path.with_suffix(".json")
         write_metadata(meta, meta_path)

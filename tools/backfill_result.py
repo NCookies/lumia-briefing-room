@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -20,7 +21,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from lumia_briefing_room.config import discover_ffmpeg  # noqa: E402
 from lumia_briefing_room.detect.result import ResultScreen  # noqa: E402
 from lumia_briefing_room.pipeline.metadata import match_result_dict  # noqa: E402
-from lumia_briefing_room.pipeline.result_scan import find_result_after  # noqa: E402
+from lumia_briefing_room.pipeline.result_scan import (  # noqa: E402
+    find_result_after,
+    result_image_name,
+    save_result_image,
+)
 from lumia_briefing_room.steam_paths import discover_recording_root  # noqa: E402
 from lumia_briefing_room.video.session import RecordingSession, SessionParseError  # noqa: E402
 
@@ -31,8 +36,8 @@ class MatchGroup:
     last_segment: int = 0
 
 
-def apply_match_result(meta: dict, result: ResultScreen) -> dict:
-    new = {**meta, "matchResult": match_result_dict(result)}
+def apply_match_result(meta: dict, result: ResultScreen, image_path: str | None = None) -> dict:
+    new = {**meta, "matchResult": match_result_dict(result, image_path)}
     if result.character and not new.get("myCharacter"):
         new["myCharacter"] = result.character
     return new
@@ -83,10 +88,18 @@ def main() -> None:
             not_found += 1
             print(f"{match_start}: 결과 화면을 못 찾았다(원본이 지워졌거나 결과 화면이 없다)")
             continue
+        image_path = None
+        if result.image is not None:
+            start = datetime.fromisoformat(match_start.replace("Z", "+00:00"))
+            image_path = str(args.clips_dir / ".thumbs" / result_image_name(start))
+            save_result_image(result.image, Path(image_path))
         for clip_id in group.ids:
             path = args.clips_dir / f"{clip_id}.json"
             fresh = json.loads(path.read_text(encoding="utf-8"))
-            path.write_text(json.dumps(apply_match_result(fresh, result), ensure_ascii=False, indent=2), encoding="utf-8")
+            path.write_text(
+                json.dumps(apply_match_result(fresh, result, image_path), ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
         filled += 1
         print(f"{match_start}: {result.match_type} {result.placement}/{result.total} {result.outcome} ({len(group.ids)}개)")
     print(f"{filled}개 경기 채움, 이미 있음 {skipped}, 원본 없음 {missing_raw}, 못 찾음 {not_found}")

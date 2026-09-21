@@ -73,10 +73,10 @@ class ClipMetadata:
     match_result: dict | None = None
 
 
-def match_result_dict(result: ResultScreen | None) -> dict | None:
+def match_result_dict(result: ResultScreen | None, image_path: str | None = None) -> dict | None:
     if result is None:
         return None
-    return {
+    data = {
         "matchType": result.match_type,
         "matchLabel": result.match_label,
         "placement": result.placement,
@@ -86,6 +86,9 @@ def match_result_dict(result: ResultScreen | None) -> dict | None:
         "character": result.character,
         "characterRaw": result.character_raw,
     }
+    if image_path:
+        data["imagePath"] = image_path
+    return data
 
 
 def build_metadata(
@@ -106,6 +109,7 @@ def build_metadata(
     match_assists: int | None = None,
     match_team_kills: int | None = None,
     match_result: ResultScreen | None = None,
+    result_image_path: str | None = None,
 ) -> ClipMetadata:
     day_night = interval.day_night
     phase = phase_index(game_day, day_night) if game_day is not None and day_night is not None else None
@@ -152,7 +156,7 @@ def build_metadata(
         match_assists=match_assists,
         match_team_kills=match_team_kills,
         detector_confidence=interval.confidence,
-        match_result=match_result_dict(match_result),
+        match_result=match_result_dict(match_result, result_image_path),
     )
 
 

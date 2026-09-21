@@ -212,3 +212,15 @@ def test_build_metadata_stores_match_result_as_camel_dict_and_defaults_to_none()
         "matchType": "rank", "matchLabel": "랭크", "placement": 4, "total": 7,
         "outcome": "실험 종료", "nickname": "나", "character": None, "characterRaw": None,
     }
+
+
+def test_match_result_dict_includes_image_path_only_when_given():
+    from lumia_briefing_room.detect.result import ResultScreen
+    from lumia_briefing_room.pipeline.metadata import match_result_dict
+
+    result = ResultScreen(
+        placement=4, total=7, match_type="rank", match_label="랭크", outcome="실험 종료", nickname="나"
+    )
+
+    assert "imagePath" not in match_result_dict(result)
+    assert match_result_dict(result, image_path="x/r.jpg")["imagePath"] == "x/r.jpg"

@@ -370,3 +370,24 @@ def test_config_reads_changes_made_to_the_file_by_another_writer(client, tmp_pat
     assert client.get("/api/config").json()["player"]["nickname"] == "워처가학습"
     client.put("/api/config", json={"paths": {"exportDefault": str(tmp_path)}})
     assert client.get("/api/config").json()["player"]["nickname"] == "워처가학습"
+
+
+def test_result_image_serves_the_games_result_screenshot(client, tmp_path):
+    image = tmp_path / "r.jpg"
+    image.write_bytes(b"\xff\xd8\xff\xe0resultjpeg")
+    _write_clip(client.app.state.clips_dir_for_test, "a", matchResult={"placement": 4, "imagePath": str(image)})
+
+    resp = client.get("/api/clips/a/result-image")
+
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "image/jpeg"
+    assert resp.content == image.read_bytes()
+
+
+def test_result_image_is_404_without_image(client):
+    _write_clip(client.app.state.clips_dir_for_test, "a")
+    _write_clip(client.app.state.clips_dir_for_test, "b", matchResult={"placement": 4})
+
+    assert client.get("/api/clips/a/result-image").status_code == 404
+    assert client.get("/api/clips/b/result-image").status_code == 404
+    assert client.get("/api/clips/zzz/result-image").status_code == 404

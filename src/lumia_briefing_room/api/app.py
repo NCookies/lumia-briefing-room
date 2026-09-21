@@ -148,6 +148,16 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             raise HTTPException(404, "썸네일이 없다")
         return FileResponse(thumb, media_type="image/jpeg")
 
+    @app.get("/api/clips/{clip_id}/result-image")
+    def result_image(clip_id: str):
+        clip = find_clip(_clips_dir(app), clip_id) or find_clip(_clips_dir(app) / ".trash", clip_id)
+        if clip is None:
+            raise HTTPException(404, "클립을 찾을 수 없다")
+        path = (clip.meta.get("matchResult") or {}).get("imagePath")
+        if not path or not Path(path).exists():
+            raise HTTPException(404, "결과 화면 이미지가 없다")
+        return FileResponse(path, media_type="image/jpeg")
+
     @app.get("/api/fs/dirs")
     def fs_dirs(path: str = ""):
         if not path:

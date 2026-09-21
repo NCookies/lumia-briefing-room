@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
 import numpy as np
+from PIL import Image
 
 from lumia_briefing_room.detect.day import read_game_day
 from lumia_briefing_room.detect.ocr import OcrReader, TextReader
@@ -23,6 +25,16 @@ FORWARD_MAX_BATCHES = 60
 FORWARD_MAX_OCR = 30
 
 _reader: TextReader | None = None
+
+
+def result_image_name(match_start: datetime) -> str:
+    return f"{match_start:%Y%m%d_%H%M%S}_result.jpg"
+
+
+def save_result_image(frame: np.ndarray, path: Path, *, width: int = 1280) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image = Image.fromarray(frame)
+    image.resize((width, round(image.height * width / image.width)), Image.LANCZOS).save(path, quality=85)
 
 
 def get_reader() -> TextReader:

@@ -155,3 +155,13 @@ def test_read_result_screen_prefers_higher_scoring_language_for_nickname():
     result = read_result_screen(blank_frame(profile), profile, reader)
 
     assert result.nickname == "東京タワー"
+
+
+def test_read_result_screen_keeps_the_frame_without_affecting_equality():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    frame = blank_frame(profile)
+
+    result = read_result_screen(frame, profile, FakeReader(PANEL, [line("랭크", 5)]), {})
+
+    assert result.image is frame
+    assert result == read_result_screen(blank_frame(profile), profile, FakeReader(PANEL, [line("랭크", 5)]), {})

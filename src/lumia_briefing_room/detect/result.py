@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
@@ -34,6 +34,7 @@ class ResultScreen:
     nickname: str | None
     character: str | None = None
     character_raw: str | None = None
+    image: np.ndarray | None = field(default=None, compare=False, repr=False)
 
 
 @dataclass(frozen=True)
@@ -137,4 +138,5 @@ def read_result_screen(
         nickname=nickname,
         character=resolve_character(character_raw, table),
         character_raw=character_raw,
+        image=frame,
     )
