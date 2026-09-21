@@ -12,6 +12,7 @@ from lumia_briefing_room.detect.counter import (
     load_templates,
     read_field,
     to_events,
+    with_two_digit_templates,
 )
 from lumia_briefing_room.detect.day import read_game_day
 from lumia_briefing_room.detect.daynight import read_day_night
@@ -48,7 +49,7 @@ def resolve_templates(
     if k_templates is not None and a_templates is not None:
         return k_templates, a_templates
 
-    loaded = load_templates(profile.templates) if profile.templates else None
+    loaded = with_two_digit_templates(load_templates(profile.templates)) if profile.templates else None
     if loaded is None:
         log.warning(
             "숫자 템플릿을 찾을 수 없다(%dx%d) - kill/assist 태그가 비어서 나온다",

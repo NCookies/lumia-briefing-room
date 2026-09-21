@@ -85,6 +85,38 @@ def read_field(
     return ReadResult(value=int(digits), confidence=confidence)
 
 
+TWO_DIGIT_SHIFT = 6
+
+
+def _shifted(template: np.ndarray, dx: int) -> np.ndarray:
+    out = np.zeros_like(template)
+    if dx > 0:
+        out[:, dx:] = template[:, :-dx]
+    elif dx < 0:
+        out[:, :dx] = template[:, -dx:]
+    else:
+        out[:] = template
+    return out
+
+
+def with_two_digit_templates(
+    templates: dict[int, np.ndarray], *, shift: int = TWO_DIGIT_SHIFT
+) -> dict[int, np.ndarray]:
+    """한 자리 본보기에 10~99 조합 본보기를 더한다.
+
+    본보기가 ROI 전체 폭이고 한 자리가 가운데에 있다. 두 자릿수는 십의 자리가 왼쪽, 일의 자리가 오른쪽으로 각각
+    shift 픽셀 벌어져 ROI 를 꽉 채운다(2560x1440 기준 6, 실측). 그래서 두 본보기를 밀어 겹친 것을 새 분류로 쓴다.
+    """
+    expanded = dict(templates)
+    for tens in range(1, 10):
+        for ones in range(10):
+            if tens in templates and ones in templates:
+                expanded[tens * 10 + ones] = np.maximum(
+                    _shifted(templates[tens], -shift), _shifted(templates[ones], shift)
+                )
+    return expanded
+
+
 def save_templates(templates: dict[int, np.ndarray], path: Path) -> None:
     np.savez(path, **{str(d): t for d, t in templates.items()})
 

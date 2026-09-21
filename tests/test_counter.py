@@ -147,3 +147,55 @@ def test_counter_event_is_frozen():
     ev = CounterEvent(t=0.0, field="K", frm=0, to=1, delta=1)
     with pytest.raises(Exception):
         ev.t = 1.0  # type: ignore[misc]
+
+
+def test_two_digit_templates_add_10_to_99_and_keep_single_digits():
+    from lumia_briefing_room.detect.counter import with_two_digit_templates
+
+    single = {d: np.full((4, 12), d / 10, dtype=np.float32) for d in range(10)}
+
+    expanded = with_two_digit_templates(single, shift=2)
+
+    assert set(expanded) == set(range(100))
+    for d in range(10):
+        assert np.array_equal(expanded[d], single[d])
+    assert expanded[12].shape == single[1].shape
+
+
+def test_two_digit_template_places_tens_left_and_ones_right():
+    from lumia_briefing_room.detect.counter import with_two_digit_templates
+
+    tens = np.zeros((2, 8), dtype=np.float32)
+    tens[:, 3:5] = 1.0
+    ones = np.zeros((2, 8), dtype=np.float32)
+    ones[:, 3:5] = 0.5
+    single = {d: tens if d == 1 else ones for d in range(10)}
+
+    expanded = with_two_digit_templates(single, shift=2)
+
+    row = expanded[12][0]
+    assert row[1] == 1.0 and row[2] == 1.0
+    assert row[5] == 0.5 and row[6] == 0.5
+    assert row[3] == 0.0 and row[4] == 0.0
+
+
+def test_read_field_reads_a_two_digit_value_from_composite_templates(render_digit, compose):
+    from lumia_briefing_room.detect.counter import with_two_digit_templates
+
+    templates = _build_digit_templates(render_digit, compose)
+    expanded = with_two_digit_templates(templates, shift=6)
+    score = expanded[12]
+
+    result = read_field(score, expanded, max_digits=2)
+
+    assert result.value == 12
+
+
+def test_single_digit_field_is_still_read_as_a_single_digit_with_expanded_templates(render_digit, compose):
+    from lumia_briefing_room.detect.counter import with_two_digit_templates
+
+    templates = _build_digit_templates(render_digit, compose)
+    expanded = with_two_digit_templates(templates, shift=6)
+
+    for digit in range(10):
+        assert read_field(templates[digit], expanded, max_digits=2).value == digit
