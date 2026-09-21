@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { formatMatchResult, groupByGame } from '../src/grouping.ts'
+import { formatAgo, formatKda, formatMatchResult, groupByGame } from '../src/grouping.ts'
 
 const c = (id: string, matchStartUtc: string, sessionDir = 's1', pvpScore: number | null = null) => ({
   id,
@@ -72,30 +72,43 @@ test('groupByGame exposes the first known match result of the game', () => {
   assert.deepEqual(groups[0].result, result)
 })
 
-test('formatMatchResult writes type, placement and outcome', () => {
-  assert.equal(
-    formatMatchResult({ matchType: 'rank', matchLabel: '랭크', placement: 4, total: 7, outcome: '실험 종료', nickname: null }),
-    '랭크 · 4위 / 7팀 · 실험 종료',
-  )
-  assert.equal(
-    formatMatchResult({ matchType: 'normal', matchLabel: '', placement: 1, total: 8, outcome: null, nickname: null }),
-    '일반 · 1위 / 8팀',
-  )
+const result = (over = {}) => ({
+  matchType: 'rank' as const,
+  matchLabel: '랭크',
+  placement: 4,
+  total: 7,
+  outcome: '실험 종료',
+  nickname: null,
+  ...over,
+})
+
+test('formatMatchResult writes type and placement without team count or routine outcome', () => {
+  assert.equal(formatMatchResult(result()), '랭크 · 4위')
+  assert.equal(formatMatchResult(result({ matchType: 'normal', placement: 1, outcome: '최종 생존' })), '일반 · 1위')
   assert.equal(formatMatchResult(null), null)
 })
 
 test('formatMatchResult omits the game type when it could not be read', () => {
-  assert.equal(
-    formatMatchResult({ matchType: 'unknown', matchLabel: '', placement: 2, total: 8, outcome: '실험 종료', nickname: null }),
-    '2위 / 8팀 · 실험 종료',
-  )
+  assert.equal(formatMatchResult(result({ matchType: 'unknown', placement: 2 })), '2위')
 })
 
-test('formatMatchResult leads with the character name when known', () => {
-  assert.equal(
-    formatMatchResult({
-      matchType: 'rank', matchLabel: '랭크', placement: 1, total: 8, outcome: '최종 생존', nickname: null, character: '마커스',
-    }),
-    '마커스 · 랭크 · 1위 / 8팀 · 최종 생존',
-  )
+test('formatMatchResult leads with the character name and shows an escape outcome', () => {
+  assert.equal(formatMatchResult(result({ placement: 1, character: '마커스' })), '마커스 · 랭크 · 1위')
+  assert.equal(formatMatchResult(result({ placement: 3, outcome: '탈출 성공' })), '랭크 · 3위 · 탈출 성공')
+})
+
+test('formatKda joins TK/K/A and needs all three', () => {
+  assert.equal(formatKda(result({ tk: 13, kills: 3, assists: 6 })), '13 / 3 / 6')
+  assert.equal(formatKda(result({ tk: 2, kills: 0, assists: 0 })), '2 / 0 / 0')
+  assert.equal(formatKda(result({ tk: 13, kills: null, assists: 6 })), null)
+  assert.equal(formatKda(null), null)
+})
+
+test('formatAgo picks minutes, hours or days', () => {
+  const now = new Date('2026-09-21T12:00:00Z')
+  assert.equal(formatAgo('2026-09-21T11:30:00Z', now), '30분 전')
+  assert.equal(formatAgo('2026-09-21T09:00:00Z', now), '3시간 전')
+  assert.equal(formatAgo('2026-09-19T12:00:00Z', now), '2일 전')
+  assert.equal(formatAgo('2026-09-21T11:59:40Z', now), '방금 전')
+  assert.equal(formatAgo('not a date', now), '')
 })

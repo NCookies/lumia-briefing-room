@@ -97,6 +97,7 @@ def test_read_result_screen_marks_rank_game_from_chip_text():
     assert result == ResultScreen(
         placement=4, total=7, match_type="rank", match_label="랭크",
         outcome="실험 종료", nickname="내테스트닉",
+        stats={"tk": None, "kills": None, "deaths": None, "assists": None},
     )
 
 

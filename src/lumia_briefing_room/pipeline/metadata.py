@@ -86,6 +86,7 @@ def match_result_dict(result: ResultScreen | None, image_path: str | None = None
         "character": result.character,
         "characterRaw": result.character_raw,
     }
+    data.update(result.stats or {})
     if image_path:
         data["imagePath"] = image_path
     return data

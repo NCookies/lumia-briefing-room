@@ -54,9 +54,24 @@ export function groupByGame<T extends Groupable>(clips: T[], sort: ClipSort): Ga
 
 export function formatMatchResult(result: MatchResult | null | undefined): string | null {
   if (!result) return null
-  const parts = [`${result.placement}위 / ${result.total}팀`]
+  const parts = [`${result.placement}위`]
   if (result.matchType !== 'unknown') parts.unshift(result.matchType === 'rank' ? '랭크' : '일반')
-  if (result.outcome) parts.push(result.outcome)
+  if (result.outcome?.includes('탈출')) parts.push(result.outcome)
   if (result.character) parts.unshift(result.character)
   return parts.join(' · ')
+}
+
+export function formatKda(result: MatchResult | null | undefined): string | null {
+  if (!result || result.tk == null || result.kills == null || result.assists == null) return null
+  return `${result.tk} / ${result.kills} / ${result.assists}`
+}
+
+export function formatAgo(iso: string, now: Date = new Date()): string {
+  const t = new Date(iso).getTime()
+  if (Number.isNaN(t)) return ''
+  const minutes = Math.floor((now.getTime() - t) / 60000)
+  if (minutes < 1) return '방금 전'
+  if (minutes < 60) return `${minutes}분 전`
+  if (minutes < 60 * 24) return `${Math.floor(minutes / 60)}시간 전`
+  return `${Math.floor(minutes / 60 / 24)}일 전`
 }

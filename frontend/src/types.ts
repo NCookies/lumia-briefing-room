@@ -18,6 +18,10 @@ export interface MatchResult {
   character?: string | null
   characterRaw?: string | null
   imagePath?: string | null
+  tk?: number | null
+  kills?: number | null
+  deaths?: number | null
+  assists?: number | null
 }
 
 export interface Clip {

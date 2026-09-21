@@ -3,25 +3,13 @@ import { deleteClipForever, listClips, patchClip, restoreClip, trashClip } from 
 import { ClipCard } from './components/ClipCard'
 import { DEFAULT_FILTER, FilterBar, type FilterState } from './components/FilterBar'
 import { ExportDialog } from './components/ExportDialog'
+import { GameSection } from './components/GameSection'
 import { PlayerModal } from './components/PlayerModal'
 import { ResultCard, ResultViewer } from './components/ResultCard'
-import { formatMatchResult, groupByGame } from './grouping'
+import { groupByGame } from './grouping'
 import { applyLabel, progress } from './labeling'
 import { SettingsModal } from './components/SettingsModal'
 import type { Clip, UserLabel } from './types'
-
-const GAME_COLORS = [
-  { border: 'border-sky-500/70', header: 'bg-sky-500/25 text-sky-100' },
-  { border: 'border-emerald-500/70', header: 'bg-emerald-500/25 text-emerald-100' },
-  { border: 'border-amber-500/70', header: 'bg-amber-500/25 text-amber-100' },
-  { border: 'border-fuchsia-500/70', header: 'bg-fuchsia-500/25 text-fuchsia-100' },
-  { border: 'border-rose-500/70', header: 'bg-rose-500/25 text-rose-100' },
-]
-
-function formatGameStart(iso: string): string {
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('ko-KR', { hour12: false })
-}
 
 export default function App() {
   const [filter, setFilter] = useState<FilterState>(DEFAULT_FILTER)
@@ -31,6 +19,7 @@ export default function App() {
   const [exportTarget, setExportTarget] = useState<Clip | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [resultViewId, setResultViewId] = useState<string | null>(null)
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
   const [playingId, setPlayingId] = useState<string | null>(null)
 
   const reload = useCallback(() => {
@@ -91,6 +80,13 @@ export default function App() {
   const groups = useMemo(() => groupByGame(clips, filter.sort), [clips, filter.sort])
   const ordered = useMemo(() => groups.flatMap((g) => g.clips), [groups])
   const playingIndex = playingId === null ? -1 : ordered.findIndex((c) => c.id === playingId)
+  const toggleGame = (key: string) =>
+    setExpandedKeys((prev) => {
+      const next = new Set(prev)
+      if (!next.delete(key)) next.add(key)
+      return next
+    })
+
   const { labeled, total } = progress(ordered)
 
   return (
@@ -124,54 +120,57 @@ export default function App() {
           </p>
         )}
 
-        <div className="flex flex-col gap-6">
-          {groups.map((group) => (
-            <section
-              key={group.key}
-              className={`overflow-hidden rounded-xl border-2 ${GAME_COLORS[(group.number - 1) % GAME_COLORS.length].border}`}
+        {groups.length > 0 && (
+          <div className="mb-3 flex items-center gap-3 text-sm text-zinc-400">
+            <span>게임 {groups.length}개</span>
+            <button
+              type="button"
+              className="rounded border border-zinc-600 px-2 py-0.5 hover:bg-zinc-700"
+              onClick={() => setExpandedKeys(new Set(groups.map((g) => g.key)))}
             >
-              <h2
-                className={`flex items-baseline gap-3 px-4 py-2 text-base font-semibold ${GAME_COLORS[(group.number - 1) % GAME_COLORS.length].header}`}
-              >
-                <span>게임 {group.number}</span>
-                {group.result && (
-                  <span
-                    className={`rounded px-2 py-0.5 text-sm ${
-                      group.result.placement === 1 ? 'bg-amber-400/90 text-zinc-900' : 'bg-black/30'
-                    }`}
-                  >
-                    {formatMatchResult(group.result)}
-                  </span>
-                )}
-                <span className="text-xs font-normal opacity-80">
-                  {formatGameStart(group.matchStartUtc)} · 클립 {group.clips.length}개
-                </span>
-              </h2>
-              <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {group.result?.imagePath && (
-                  <ResultCard
-                    clipId={group.clips[0].id}
-                    result={group.result}
-                    onOpen={() => setResultViewId(group.clips[0].id)}
-                  />
-                )}
-                {group.clips.map((clip) => (
-                  <ClipCard
-                    key={clip.id}
-                    clip={clip}
-                    trashed={filter.trashed}
-                    onPlay={() => setPlayingId(clip.id)}
-                    onTogglePin={handleTogglePin}
-                    onRename={handleRename}
-                    onTrash={handleTrash}
-                    onRestore={handleRestore}
-                    onDeleteForever={handleDeleteForever}
-                    onLabel={handleLabel}
-                    onExport={setExportTarget}
-                  />
-                ))}
-              </div>
-            </section>
+              모두 펼치기
+            </button>
+            <button
+              type="button"
+              className="rounded border border-zinc-600 px-2 py-0.5 hover:bg-zinc-700"
+              onClick={() => setExpandedKeys(new Set())}
+            >
+              모두 접기
+            </button>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-3">
+          {groups.map((group) => (
+            <GameSection
+              key={group.key}
+              group={group}
+              expanded={expandedKeys.has(group.key)}
+              onToggle={() => toggleGame(group.key)}
+            >
+              {group.result?.imagePath && (
+                <ResultCard
+                  clipId={group.clips[0].id}
+                  result={group.result}
+                  onOpen={() => setResultViewId(group.clips[0].id)}
+                />
+              )}
+              {group.clips.map((clip) => (
+                <ClipCard
+                  key={clip.id}
+                  clip={clip}
+                  trashed={filter.trashed}
+                  onPlay={() => setPlayingId(clip.id)}
+                  onTogglePin={handleTogglePin}
+                  onRename={handleRename}
+                  onTrash={handleTrash}
+                  onRestore={handleRestore}
+                  onDeleteForever={handleDeleteForever}
+                  onLabel={handleLabel}
+                  onExport={setExportTarget}
+                />
+              ))}
+            </GameSection>
           ))}
         </div>
       </main>

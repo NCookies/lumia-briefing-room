@@ -19,6 +19,10 @@ _BAR_PREFIX = re.compile(r"^[\s|{}\[\]!Il]+(?=\S)")
 _HANGUL = re.compile(r"[가-힣]")
 MIN_OUTCOME_HANGUL = 2
 MIN_OUTCOME_SCORE = 0.8
+MIN_STAT_SCORE = 0.6
+STAT_COLUMN_TOLERANCE = 60
+STAT_ROW_MAX_GAP = 90
+STAT_LABELS = {"TK": "tk", "K": "kills", "D": "deaths", "A": "assists"}
 LANGS = ("korean", "ch")
 
 
@@ -34,6 +38,7 @@ class ResultScreen:
     nickname: str | None
     character: str | None = None
     character_raw: str | None = None
+    stats: dict | None = None
     image: np.ndarray | None = field(default=None, compare=False, repr=False)
 
 
@@ -43,6 +48,7 @@ class PanelParse:
     total: int
     outcome: str | None
     nickname_line: TextLine | None
+    stats: dict | None = None
 
 
 def clean_nickname(text: str) -> str:
@@ -56,6 +62,26 @@ def _is_outcome(line: TextLine) -> bool:
         and len(_HANGUL.findall(line.text)) >= MIN_OUTCOME_HANGUL
         and not _BAR_PREFIX.match(line.text)
     )
+
+
+def parse_stats(lines: list[TextLine]) -> dict:
+    """`TK K D A` 라벨 바로 아래 같은 열의 숫자를 읽는다. 자릿수가 달라도 열 위치(x)로 짝을 짓는다."""
+    stats: dict = {name: None for name in STAT_LABELS.values()}
+    labels = {l.text.strip(): l for l in lines if l.text.strip() in STAT_LABELS}
+    if len(labels) < len(STAT_LABELS):
+        return stats
+    for text, label in labels.items():
+        candidates = [
+            l for l in lines
+            if l.text.strip().isdigit()
+            and l.score >= MIN_STAT_SCORE
+            and 0 < l.y - label.y <= STAT_ROW_MAX_GAP
+            and abs(l.x - label.x) <= STAT_COLUMN_TOLERANCE
+        ]
+        if candidates:
+            nearest = min(candidates, key=lambda l: (l.y - label.y, abs(l.x - label.x)))
+            stats[STAT_LABELS[text]] = int(nearest.text.strip())
+    return stats
 
 
 def parse_panel(lines: list[TextLine]) -> PanelParse | None:
@@ -78,7 +104,9 @@ def parse_panel(lines: list[TextLine]) -> PanelParse | None:
         above = rest[: rest.index(nickname_line)] if nickname_line else rest
         candidates = [l for l in above if _is_outcome(l)]
         outcome_line = candidates[-1] if nickname_line else (candidates[0] if candidates else None)
-        return PanelParse(placement, total, outcome_line.text.strip() if outcome_line else None, nickname_line)
+        return PanelParse(
+            placement, total, outcome_line.text.strip() if outcome_line else None, nickname_line, parse_stats(ordered)
+        )
     return None
 
 
@@ -138,5 +166,6 @@ def read_result_screen(
         nickname=nickname,
         character=resolve_character(character_raw, table),
         character_raw=character_raw,
+        stats=parsed.stats,
         image=frame,
     )
