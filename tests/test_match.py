@@ -665,3 +665,28 @@ def test_finalize_match_does_not_duplicate_a_death_already_inside_an_interval():
     states += [_sp_state(18.0, False, True), _sp_state(21.0, False, True), _sp_state(24.0, False, True)]
 
     assert len(finalize_match(states).intervals) == 1
+
+
+def _saturated_states(total=30):
+    """팀원 신호가 계속 켜져 있는 경기: 배지는 t=30~36 한 번만 켜진다."""
+    return [_tc_state(3.0 * i, 30.0 <= 3.0 * i <= 36.0, True) for i in range(total)]
+
+
+def test_finalize_match_ignores_a_team_combat_signal_that_is_on_almost_all_game():
+    intervals = finalize_match(_saturated_states()).intervals
+
+    assert [(iv.start, iv.end) for iv in intervals] == [(30.0, 36.0)]
+
+
+def test_finalize_match_keeps_using_team_combat_when_it_is_only_on_now_and_then():
+    states = [_tc_state(3.0 * i, False, 10 <= i < 14) for i in range(30)]
+
+    intervals = finalize_match(states).intervals
+
+    assert [(iv.start, iv.end) for iv in intervals] == [(30.0, 39.0)]
+
+
+def test_finalize_match_short_sequences_are_never_judged_saturated():
+    states = [_tc_state(3.0 * i, False, True) for i in range(6)]
+
+    assert len(finalize_match(states).intervals) == 1

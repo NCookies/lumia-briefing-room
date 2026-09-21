@@ -33,6 +33,8 @@ WAITING_ROOM_REGIONS = frozenset({"브리핑 룸"})
 DEATH_LINK_SEC = 8.0
 UNEXPLAINED_DEATH_LOOKBACK_SEC = 12.0
 MIN_SPECTATOR_SAMPLES = 2
+TEAM_COMBAT_SATURATION = 0.6
+MIN_TEAM_COMBAT_SAMPLES = 20
 
 log = logging.getLogger(__name__)
 
@@ -192,6 +194,15 @@ def _mode(values: list[str]) -> str | None:
     return max(counts, key=counts.get)
 
 
+def _team_combat_saturated(states: list[FrameState]) -> bool:
+    """팀원 링 판독이 망가지면(링 색이 바뀌거나 팀원이 접속 불안정 등) 경기 내내 True 가 되어, 전투가 끝나지 않는 거대한 교전 구간 하나가 생긴다.
+
+    정상 경기에서 이 신호는 10~15% 정도만 켜진다(실측). 대부분의 프레임에서 켜져 있으면 신호 자체를 버린다.
+    """
+    seen = [s.team_combat for s in states if s.team_combat is not None]
+    return len(seen) >= MIN_TEAM_COMBAT_SAMPLES and sum(seen) / len(seen) > TEAM_COMBAT_SATURATION
+
+
 def finalize_match(
     states: list[FrameState],
     *,
@@ -201,6 +212,9 @@ def finalize_match(
 ) -> MatchDetection:
     """프레임별 판독을 교전 구간 + 태그로 합친다. (plan.md §3, §5.3~5.6)"""
     gaps = gaps or []
+    if use_team_combat and _team_combat_saturated(states):
+        log.warning("팀원 전투 신호가 경기 내내 켜져 있어 신뢰할 수 없다 - 내 배지만으로 교전을 나눈다")
+        use_team_combat = False
 
     k_final = final_confirmed_value([(s.t, s.k) for s in states])
     a_final = final_confirmed_value([(s.t, s.a) for s in states])
