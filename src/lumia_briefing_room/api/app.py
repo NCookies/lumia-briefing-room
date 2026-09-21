@@ -83,6 +83,31 @@ def _clips_dir(app: FastAPI) -> Path:
     return resolve_paths(app.state.config.paths).clips
 
 
+def _source_root(app: FastAPI, source: str) -> Path:
+    resolved = resolve_paths(app.state.config.paths)
+    if source == "steam":
+        return resolved.clips
+    if source == "vod":
+        return resolved.vod_clips
+    raise HTTPException(400, "source 는 steam 또는 vod 여야 합니다")
+
+
+def _locate(app: FastAPI, clip_id: str):
+    """클립 ID 로 스팀·다시보기 폴더(와 각 휴지통)를 모두 찾는다. ID 가 겹치지 않으므로(다시보기는 vod_ 로 시작) 나머지 라우트는 그대로 쓴다.
+
+    (그 클립이 있는 폴더, 클립, 휴지통에 있는지) 를 돌려준다.
+    """
+    resolved = resolve_paths(app.state.config.paths)
+    for root in (resolved.clips, resolved.vod_clips):
+        clip = find_clip(root, clip_id)
+        if clip is not None:
+            return root, clip, False
+        clip = find_clip(root / ".trash", clip_id)
+        if clip is not None:
+            return root, clip, True
+    return None
+
+
 def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     app = FastAPI(title="Lumia Briefing Room API")
     app.state.config = cfg
@@ -111,10 +136,11 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         minPvpScore: float | None = None,
         label: str | None = None,
         sort: str | None = None,
+        source: str = "steam",
     ):
-        clips_dir = _clips_dir(app)
-        source = (clips_dir / ".trash") if trashed else clips_dir
-        summaries = scan_clips(source)
+        clips_dir = _source_root(app, source)
+        target = (clips_dir / ".trash") if trashed else clips_dir
+        summaries = scan_clips(target)
         query = ClipQuery(
             tags=[t for t in tags.split(",") if t],
             day_night=dayNight,
@@ -129,18 +155,18 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
 
     @app.get("/api/clips/{clip_id}")
     def get_clip(clip_id: str):
-        clip = find_clip(_clips_dir(app), clip_id) or find_clip(_clips_dir(app) / ".trash", clip_id)
-        if clip is None:
+        found = _locate(app, clip_id)
+        if found is None:
             raise HTTPException(404, "클립을 찾을 수 없습니다")
-        return _serialize(clip)
+        return _serialize(found[1])
 
     @app.patch("/api/clips/{clip_id}")
     @locked
     def patch_clip(clip_id: str, body: dict):
-        clips_dir = _clips_dir(app)
-        clip = find_clip(clips_dir, clip_id)
-        if clip is None:
+        found = _locate(app, clip_id)
+        if found is None or found[2]:
             raise HTTPException(404, "클립을 찾을 수 없습니다")
+        clip = found[1]
         if "userLabel" in body and body["userLabel"] not in (None, "pvp", "pve"):
             raise HTTPException(400, "라벨은 교전(pvp), 사냥(pve), 해제(null)만 지정할 수 있습니다")
         meta = {**clip.meta, **{k: v for k, v in body.items() if k in ("title", "pinned", "userLabel")}}
@@ -153,30 +179,30 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     @app.post("/api/clips/{clip_id}/trash")
     @locked
     def trash(clip_id: str):
-        clip = find_clip(_clips_dir(app), clip_id)
-        if clip is None:
+        found = _locate(app, clip_id)
+        if found is None or found[2]:
             raise HTTPException(404, "클립을 찾을 수 없습니다")
-        trash_dir = _clips_dir(app) / ".trash"
-        trash_clip(clip.meta_path, trash_dir)
+        root, clip, _ = found
+        trash_clip(clip.meta_path, root / ".trash")
         return {"id": clip_id, "trashed": True}
 
     @app.post("/api/clips/{clip_id}/restore")
     @locked
     def restore(clip_id: str):
-        clips_dir = _clips_dir(app)
-        clip = find_clip(clips_dir / ".trash", clip_id)
-        if clip is None:
+        found = _locate(app, clip_id)
+        if found is None or not found[2]:
             raise HTTPException(404, "휴지통에 없는 클립입니다")
+        clips_dir, clip, _ = found
         restore_clip(clip.meta_path, clips_dir)
         return {"id": clip_id, "trashed": False}
 
     @app.delete("/api/clips/{clip_id}")
     @locked
     def delete(clip_id: str):
-        clips_dir = _clips_dir(app)
-        clip = find_clip(clips_dir / ".trash", clip_id)
-        if clip is None:
+        found = _locate(app, clip_id)
+        if found is None or not found[2]:
             raise HTTPException(400, "휴지통에 있는 클립만 완전히 삭제할 수 있습니다")
+        clips_dir, clip, _ = found
         archive_if_labeled(clip.meta_path, archive_dir_for(clips_dir))
         for f in [clip.meta_path.with_suffix(".mp4"), clip.meta_path]:
             _unlink(f)
@@ -187,7 +213,8 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         return {"id": clip_id, "deleted": True}
 
     def find_any(clip_id: str):
-        return find_clip(_clips_dir(app), clip_id) or find_clip(_clips_dir(app) / ".trash", clip_id)
+        found = _locate(app, clip_id)
+        return found[1] if found else None
 
     @app.get("/api/clips/{clip_id}/video")
     def video(clip_id: str, request: Request):
@@ -243,9 +270,10 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
 
     @app.post("/api/clips/{clip_id}/export")
     def export_clip(clip_id: str, body: dict):
-        clip = find_clip(_clips_dir(app), clip_id)
-        if clip is None:
+        found = _locate(app, clip_id)
+        if found is None or found[2]:
             raise HTTPException(404, "클립을 찾을 수 없습니다")
+        clip = found[1]
         directory = Path(str(body.get("dir", "")))
         if not directory.is_dir():
             raise HTTPException(404, "저장할 폴더를 찾을 수 없습니다")
@@ -266,9 +294,10 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     @app.post("/api/clips/{clip_id}/trim")
     @locked
     def trim(clip_id: str, body: dict):
-        clip = find_clip(_clips_dir(app), clip_id)
-        if clip is None:
+        found = _locate(app, clip_id)
+        if found is None or found[2]:
             raise HTTPException(404, "클립을 찾을 수 없습니다")
+        clip_root, clip, _ = found
         try:
             start, end = float(body["start"]), float(body["end"])
             validate_range(start, end, float(clip.meta.get("durationSec", 0.0)))
@@ -283,12 +312,12 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             trim_clip(clip.meta_path, start, end, ffmpeg_path=ffmpeg, thumbnail=current_config().encode.thumbnail)
         except (OSError, subprocess.CalledProcessError) as e:
             raise HTTPException(500, f"자르기에 실패했습니다: {e}")
-        return _serialize(find_clip(_clips_dir(app), clip_id))
+        return _serialize(find_clip(clip_root, clip_id))
 
     @app.post("/api/trash/empty")
     @locked
-    def empty_trash():
-        clips_dir = _clips_dir(app)
+    def empty_trash(source: str = "steam"):
+        clips_dir = _source_root(app, source)
         trash_dir = clips_dir / ".trash"
         deleted = freed = 0
         for clip in scan_clips(trash_dir):
