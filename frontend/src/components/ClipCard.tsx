@@ -114,14 +114,25 @@ export function ClipCard({
             }}
           />
         ) : (
-          <button
-            type="button"
-            className="truncate text-left text-sm font-medium text-zinc-100 hover:underline"
-            title="더블클릭하여 제목을 수정할 수 있습니다"
-            onDoubleClick={() => setEditing(true)}
-          >
-            {clip.title}
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              className="min-w-0 flex-1 truncate text-left text-sm font-medium text-zinc-100 hover:underline"
+              title={`${clip.title}\n더블클릭하여 제목을 수정할 수 있습니다`}
+              onDoubleClick={() => setEditing(true)}
+            >
+              {clip.title}
+            </button>
+            <button
+              type="button"
+              aria-label="이름 수정"
+              title="이름 수정"
+              className="shrink-0 rounded px-1 text-zinc-500 hover:bg-zinc-700 hover:text-zinc-100"
+              onClick={() => setEditing(true)}
+            >
+              ✎
+            </button>
+          </div>
         )}
 
         <div className="flex flex-wrap gap-1">

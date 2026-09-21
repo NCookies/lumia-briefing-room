@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { formatAgo, formatKda, totalSize, type GameGroup } from '../grouping'
+import { formatAgo, formatKda, formatTeammates, totalSize, type GameGroup } from '../grouping'
 import { formatBytes } from '../retention'
 import type { Clip } from '../types'
 
@@ -74,7 +74,10 @@ export function GameSection({
             <div className="text-xs text-zinc-500">{formatAgo(group.matchStartUtc)}</div>
           </div>
 
-          <div className="w-28 text-sm text-zinc-200">{result?.character ?? ''}</div>
+          <div className="w-40 text-sm text-zinc-200">
+            <div>{result?.character ?? ''}</div>
+            {formatTeammates(result) && <div className="truncate text-xs text-zinc-500">{formatTeammates(result)}</div>}
+          </div>
 
           <div className="w-28">
             {kda && (

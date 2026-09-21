@@ -15,6 +15,7 @@ interface Props {
   onIndexChange: (index: number) => void
   onLabel: (clip: Clip, label: UserLabel) => void
   onTrash: (clip: Clip) => void
+  onRename: (clip: Clip, title: string) => void
   onExport: (clip: Clip) => void
   onTrim: (clip: Clip, start: number, end: number) => Promise<void>
   paused: boolean
@@ -27,6 +28,7 @@ export function PlayerModal({
   onIndexChange,
   onLabel,
   onTrash,
+  onRename,
   onExport,
   onTrim,
   paused,
@@ -37,6 +39,9 @@ export function PlayerModal({
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [trimming, setTrimming] = useState(false)
   const [trimBusy, setTrimBusy] = useState(false)
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [draftTitle, setDraftTitle] = useState('')
+  const editingRef = useRef(false)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -60,6 +65,25 @@ export function PlayerModal({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [clips, clip, index, paused, trimming, onClose, onIndexChange, onLabel])
+
+  const startRename = () => {
+    setDraftTitle(clip.title)
+    editingRef.current = true
+    setEditingTitle(true)
+  }
+
+  const cancelRename = () => {
+    editingRef.current = false
+    setEditingTitle(false)
+  }
+
+  const commitRename = () => {
+    if (!editingRef.current) return
+    editingRef.current = false
+    setEditingTitle(false)
+    const title = draftTitle.trim()
+    if (title && title !== clip.title) onRename(clip, title)
+  }
 
   const { labeled, total } = progress(clips)
   const hasPrev = index > 0
@@ -106,7 +130,33 @@ export function PlayerModal({
       >
         <div className="flex flex-wrap items-center justify-between gap-2 text-zinc-100">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-medium">{clip.title}</h2>
+            {editingTitle ? (
+              <input
+                className="w-[28rem] max-w-full rounded border border-zinc-600 bg-zinc-900 px-2 py-0.5 text-lg text-zinc-100"
+                value={draftTitle}
+                autoFocus
+                onChange={(e) => setDraftTitle(e.target.value)}
+                onBlur={commitRename}
+                onKeyDown={(e) => {
+                  e.stopPropagation()
+                  if (e.key === 'Enter') commitRename()
+                  if (e.key === 'Escape') cancelRename()
+                }}
+              />
+            ) : (
+              <>
+                <h2 className="text-lg font-medium">{clip.title}</h2>
+                <button
+                  type="button"
+                  aria-label="이름 수정"
+                  title="이름 수정"
+                  className="rounded px-1.5 py-0.5 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-100"
+                  onClick={startRename}
+                >
+                  ✎
+                </button>
+              </>
+            )}
             <ScoreChip score={clip.pvpScore} signals={clip.pvpSignals ?? []} />
             {clip.audioStatus && clip.audioStatus !== 'full' && (
               <span className="rounded border border-amber-500/50 px-1.5 py-0.5 text-xs text-amber-300">

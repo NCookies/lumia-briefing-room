@@ -86,3 +86,8 @@ export function totalSize(clips: { sizeBytes?: number }[]): number {
 export function withResultImage<T extends Groupable>(groups: GameGroup<T>[]): GameGroup<T>[] {
   return groups.filter((g) => g.result?.imagePath)
 }
+
+export function formatTeammates(result: MatchResult | null | undefined): string | null {
+  const names = (result?.teammates ?? []).map((t) => t.character ?? t.nickname)
+  return names.length > 0 ? names.join(', ') : null
+}

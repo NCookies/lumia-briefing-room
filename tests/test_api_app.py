@@ -536,3 +536,39 @@ def test_confirm_delete_option_defaults_to_true_and_can_be_turned_off(client):
     client.put("/api/config", json={"ui": {"confirmDelete": False}})
 
     assert client.get("/api/config").json()["ui"]["confirmDelete"] is False
+
+
+def test_empty_trash_deletes_every_trashed_clip_and_reports_the_size(client):
+    clips = client.app.state.clips_dir_for_test
+    image = clips / ".thumbs" / "20260920_100000_result.jpg"
+    image.parent.mkdir(parents=True, exist_ok=True)
+    image.write_bytes(b"j")
+    for clip_id in ("a", "b", "keep"):
+        _write_clip(clips, clip_id, video=b"x" * 100, matchResult={"imagePath": str(image)})
+    client.post("/api/clips/a/trash")
+    client.post("/api/clips/b/trash")
+
+    body = client.post("/api/trash/empty").json()
+
+    assert body == {"deleted": 2, "bytes": 200}
+    assert client.get("/api/clips", params={"trashed": "true"}).json() == []
+    assert not (clips / ".trash" / "a.mp4").exists() and not (clips / ".trash" / ".thumbs" / "a.jpg").exists()
+    assert (clips / "keep.json").exists()
+    assert image.exists()
+
+
+def test_empty_trash_removes_result_images_no_clip_uses_anymore(client):
+    clips = client.app.state.clips_dir_for_test
+    image = clips / ".thumbs" / "20260920_100000_result.jpg"
+    image.parent.mkdir(parents=True, exist_ok=True)
+    image.write_bytes(b"j")
+    _write_clip(clips, "a", matchResult={"imagePath": str(image)})
+    client.post("/api/clips/a/trash")
+
+    client.post("/api/trash/empty")
+
+    assert not image.exists()
+
+
+def test_empty_trash_when_already_empty_is_a_no_op(client):
+    assert client.post("/api/trash/empty").json() == {"deleted": 0, "bytes": 0}

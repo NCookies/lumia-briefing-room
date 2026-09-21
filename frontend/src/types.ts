@@ -17,6 +17,7 @@ export interface MatchResult {
   nickname: string | null
   character?: string | null
   characterRaw?: string | null
+  teammates?: { nickname: string; character: string | null }[] | null
   imagePath?: string | null
   tk?: number | null
   kills?: number | null

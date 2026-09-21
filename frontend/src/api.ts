@@ -67,6 +67,11 @@ export function videoUrl(id: string, version?: number): string {
   return `${BASE}/clips/${id}/video${version === undefined ? '' : `?v=${version}`}`
 }
 
+export async function emptyTrash(): Promise<{ deleted: number; bytes: number }> {
+  const res = await checkOk(await fetch(`${BASE}/trash/empty`, { method: 'POST' }), '휴지통 비우기')
+  return res.json()
+}
+
 export function resultImageUrl(id: string): string {
   return `${BASE}/clips/${id}/result-image`
 }

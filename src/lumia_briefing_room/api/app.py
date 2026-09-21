@@ -267,6 +267,23 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             raise HTTPException(500, f"자르기에 실패했습니다: {e}")
         return _serialize(find_clip(_clips_dir(app), clip_id))
 
+    @app.post("/api/trash/empty")
+    @locked
+    def empty_trash():
+        clips_dir = _clips_dir(app)
+        trash_dir = clips_dir / ".trash"
+        deleted = freed = 0
+        for clip in scan_clips(trash_dir):
+            freed += clip.size_bytes
+            for f in [clip.meta_path.with_suffix(".mp4"), clip.meta_path]:
+                _unlink(f)
+            thumb = clip.meta.get("thumbnailPath")
+            if thumb:
+                _unlink(Path(thumb))
+            deleted += 1
+        remove_orphan_result_images(clips_dir, trash_dir)
+        return {"deleted": deleted, "bytes": freed}
+
     @app.post("/api/cleanup")
     @locked
     def cleanup(body: dict):

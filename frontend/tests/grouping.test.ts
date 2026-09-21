@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { formatAgo, formatKda, formatMatchResult, groupByGame, totalSize, withResultImage } from '../src/grouping.ts'
+import { formatAgo, formatKda, formatMatchResult, formatTeammates, groupByGame, totalSize, withResultImage } from '../src/grouping.ts'
 
 const c = (id: string, matchStartUtc: string, sessionDir = 's1', pvpScore: number | null = null) => ({
   id,
@@ -140,4 +140,15 @@ test('withResultImage keeps only games that have a saved result screenshot, in t
   )
 
   assert.deepEqual(withResultImage(groups).map((g) => g.clips[0].id), ['c', 'a'])
+})
+
+test('formatTeammates lists teammate characters and falls back to the nickname when unknown', () => {
+  const teammates = [
+    { nickname: '팀원가', character: '루치아' },
+    { nickname: 'TeamMateB', character: null },
+  ]
+  assert.equal(formatTeammates(result({ teammates })), '루치아, TeamMateB')
+  assert.equal(formatTeammates(result({ teammates: [] })), null)
+  assert.equal(formatTeammates(result()), null)
+  assert.equal(formatTeammates(null), null)
 })

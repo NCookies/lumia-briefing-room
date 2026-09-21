@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { deleteClipForever, listClips, patchClip, restoreClip, trashClip, trimClip } from './api'
+import { deleteClipForever, emptyTrash, listClips, patchClip, restoreClip, trashClip, trimClip } from './api'
 import { useConfirm } from './confirmContext'
 import { getConfirmDelete, setConfirmDelete } from './exportApi'
 import { ClipCard } from './components/ClipCard'
@@ -119,6 +119,15 @@ export default function App() {
 
   const handleRestoreGame = (group: GameGroup<Clip>) => runAndReload(() => runAll(group.clips, restoreClip))
 
+  const handleEmptyTrash = async () => {
+    const result = await ask({
+      message: `휴지통의 클립 ${clips.length}개(${formatBytes(totalSize(clips))})를 모두 완전히 삭제합니다. 계속하시겠습니까?`,
+      confirmLabel: '휴지통 비우기',
+      danger: true,
+    })
+    if (result.ok) await runAndReload(() => emptyTrash())
+  }
+
   const handleDeleteGameForever = async (group: GameGroup<Clip>) => {
     const result = await ask({
       message: `${gameLabel(group)}의 클립을 완전히 삭제합니다. 계속하시겠습니까?`,
@@ -207,6 +216,15 @@ export default function App() {
             >
               모두 접기
             </button>
+            {filter.trashed && (
+              <button
+                type="button"
+                className="ml-auto rounded border border-rose-500/60 px-3 py-0.5 text-rose-300 hover:bg-rose-500/20"
+                onClick={handleEmptyTrash}
+              >
+                휴지통 비우기 ({clips.length}개 · {formatBytes(totalSize(clips))})
+              </button>
+            )}
           </div>
         )}
 
@@ -256,6 +274,7 @@ export default function App() {
           onIndexChange={(i) => setPlayingId(ordered[i]?.id ?? null)}
           onLabel={handleLabel}
           onExport={setExportTarget}
+          onRename={handleRename}
           onTrim={async (clip, start, end) => {
             await trimClip(clip.id, start, end)
             reload()
