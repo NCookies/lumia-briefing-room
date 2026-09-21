@@ -23,6 +23,16 @@ def test_apply_match_result_adds_camel_dict_without_touching_other_fields():
     assert "matchResult" not in meta
 
 
+def test_apply_match_result_fills_my_character_only_when_empty():
+    with_char = ResultScreen(
+        placement=1, total=8, match_type="rank", match_label="랭크", outcome="최종 생존",
+        nickname="나", character="마커스", character_raw="MARKU",
+    )
+
+    assert apply_match_result({"myCharacter": None}, with_char)["myCharacter"] == "마커스"
+    assert apply_match_result({"myCharacter": "직접"}, with_char)["myCharacter"] == "직접"
+
+
 def test_group_by_match_groups_clips_of_one_game_and_tracks_last_segment():
     metas = {
         "a": {"sessionDir": "s1", "matchStartUtc": "t1", "segmentEnd": 10},

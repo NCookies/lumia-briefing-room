@@ -83,3 +83,19 @@ test('formatMatchResult writes type, placement and outcome', () => {
   )
   assert.equal(formatMatchResult(null), null)
 })
+
+test('formatMatchResult omits the game type when it could not be read', () => {
+  assert.equal(
+    formatMatchResult({ matchType: 'unknown', matchLabel: '', placement: 2, total: 8, outcome: '실험 종료', nickname: null }),
+    '2위 / 8팀 · 실험 종료',
+  )
+})
+
+test('formatMatchResult leads with the character name when known', () => {
+  assert.equal(
+    formatMatchResult({
+      matchType: 'rank', matchLabel: '랭크', placement: 1, total: 8, outcome: '최종 생존', nickname: null, character: '마커스',
+    }),
+    '마커스 · 랭크 · 1위 / 8팀 · 최종 생존',
+  )
+})

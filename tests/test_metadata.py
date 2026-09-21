@@ -172,6 +172,26 @@ def test_metadata_starts_without_a_label_source():
     assert meta.label_conflict is False
 
 
+def test_build_metadata_uses_result_character_as_my_character():
+    from lumia_briefing_room.detect.result import ResultScreen
+
+    result = ResultScreen(
+        placement=1, total=8, match_type="rank", match_label="랭크", outcome="최종 생존",
+        nickname="나", character="마커스", character_raw="MARKU",
+    )
+    meta = build_metadata(
+        title="t", session=_FakeSession(),
+        match_start_utc=datetime(2026, 9, 19, 15, 22, 20, tzinfo=timezone.utc),
+        game_mode="battle_royale", interval=_interval(),
+        clip_range=ClipRange(start=0.0, end=10.0, preroll_source="combat"),
+        cut_result=CutResult(segment_start=1, segment_end=2, duration_sec=9.0, source_incomplete=False),
+        thumbnail_path=None, match_result=result,
+    )
+
+    assert meta.my_character == "마커스"
+    assert meta.match_result["characterRaw"] == "MARKU"
+
+
 def test_build_metadata_stores_match_result_as_camel_dict_and_defaults_to_none():
     from lumia_briefing_room.detect.result import ResultScreen
 
@@ -190,5 +210,5 @@ def test_build_metadata_stores_match_result_as_camel_dict_and_defaults_to_none()
     assert build_metadata(**kwargs).match_result is None
     assert build_metadata(**kwargs, match_result=result).match_result == {
         "matchType": "rank", "matchLabel": "랭크", "placement": 4, "total": 7,
-        "outcome": "실험 종료", "nickname": "나",
+        "outcome": "실험 종료", "nickname": "나", "character": None, "characterRaw": None,
     }

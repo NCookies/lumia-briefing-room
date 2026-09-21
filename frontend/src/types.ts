@@ -9,12 +9,14 @@ export type ClipTag =
 export type UserLabel = 'pvp' | 'pve' | null
 
 export interface MatchResult {
-  matchType: 'rank' | 'normal'
+  matchType: 'rank' | 'normal' | 'unknown'
   matchLabel: string
   placement: number
   total: number
   outcome: string | null
   nickname: string | null
+  character?: string | null
+  characterRaw?: string | null
 }
 
 export interface Clip {

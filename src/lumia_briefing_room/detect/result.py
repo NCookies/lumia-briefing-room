@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
+from lumia_briefing_room.detect.character import load_characters, read_character_raw, resolve_character
 from lumia_briefing_room.detect.ocr import TextLine, TextReader
 from lumia_briefing_room.profiles.models import ResolutionProfile
 from lumia_briefing_room.video.frames import crop_roi
@@ -31,6 +32,8 @@ class ResultScreen:
     match_label: str
     outcome: str | None
     nickname: str | None
+    character: str | None = None
+    character_raw: str | None = None
 
 
 @dataclass(frozen=True)
@@ -102,7 +105,18 @@ def read_nickname(panel: np.ndarray, line: TextLine, reader: TextReader) -> str 
     return best[1] if best else clean_nickname(line.text) or None
 
 
-def read_result_screen(frame: np.ndarray, profile: ResolutionProfile, reader: TextReader) -> ResultScreen | None:
+def _match_type(chip_text: str) -> str:
+    if not chip_text:
+        return "unknown"
+    return "rank" if "랭크" in chip_text else "normal"
+
+
+def read_result_screen(
+    frame: np.ndarray,
+    profile: ResolutionProfile,
+    reader: TextReader,
+    characters: dict[str, str] | None = None,
+) -> ResultScreen | None:
     panel = crop_roi(frame, profile.rois["result_panel"])
     parsed = parse_panel(reader.read(panel))
     if parsed is None:
@@ -111,12 +125,16 @@ def read_result_screen(frame: np.ndarray, profile: ResolutionProfile, reader: Te
     chip_lines = reader.read(_binarize_dark_on_light(crop_roi(frame, profile.rois["result_chip"])))
     chip_text = " ".join(l.text.strip() for l in chip_lines if l.score >= 0.8)
     nickname = read_nickname(panel, parsed.nickname_line, reader) if parsed.nickname_line else None
+    character_raw = read_character_raw(crop_roi(frame, profile.rois["result_character"]), reader)
+    table = characters if characters is not None else load_characters()
 
     return ResultScreen(
         placement=parsed.placement,
         total=parsed.total,
-        match_type="rank" if "랭크" in chip_text else "normal",
+        match_type=_match_type(chip_text),
         match_label=chip_text,
         outcome=parsed.outcome,
         nickname=nickname,
+        character=resolve_character(character_raw, table),
+        character_raw=character_raw,
     )

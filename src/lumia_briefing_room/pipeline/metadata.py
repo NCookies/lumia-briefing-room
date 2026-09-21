@@ -83,6 +83,8 @@ def match_result_dict(result: ResultScreen | None) -> dict | None:
         "total": result.total,
         "outcome": result.outcome,
         "nickname": result.nickname,
+        "character": result.character,
+        "characterRaw": result.character_raw,
     }
 
 
@@ -142,7 +144,7 @@ def build_metadata(
         day_night=day_night,
         phase_index=phase,
         revive_cost=revive_cost(phase) if phase is not None else None,
-        my_character=my_character,
+        my_character=my_character or (match_result.character if match_result else None),
         team_characters=team_characters or [],
         pinned=False,
         deleted_at=None,

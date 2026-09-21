@@ -32,7 +32,10 @@ class MatchGroup:
 
 
 def apply_match_result(meta: dict, result: ResultScreen) -> dict:
-    return {**meta, "matchResult": match_result_dict(result)}
+    new = {**meta, "matchResult": match_result_dict(result)}
+    if result.character and not new.get("myCharacter"):
+        new["myCharacter"] = result.character
+    return new
 
 
 def group_by_match(metas: dict[str, dict]) -> dict[tuple[str, str], MatchGroup]:

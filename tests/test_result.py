@@ -110,6 +110,34 @@ def test_read_result_screen_treats_other_chip_as_normal_game():
     assert result.match_label == "일반"
 
 
+def test_read_result_screen_marks_type_unknown_when_chip_is_unreadable():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+
+    result = read_result_screen(blank_frame(profile), profile, FakeReader(PANEL, []))
+
+    assert result.match_type == "unknown"
+    assert result.placement == 4
+
+
+def test_read_result_screen_resolves_clipped_character_name_from_table():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    calls = {"n": 0}
+
+    class Reader(FakeReader):
+        def read(self, rgb, *, lang="korean"):
+            calls["n"] += 1
+            if calls["n"] > 3:
+                return [line("MARKU", 0, 0.97)]
+            return super().read(rgb, lang=lang)
+
+    result = read_result_screen(
+        blank_frame(profile), profile, Reader(PANEL, [line("랭크", 5)]), {"MARKUS": "마커스"}
+    )
+
+    assert result.character == "마커스"
+    assert result.character_raw == "MARKU"
+
+
 def test_read_result_screen_returns_none_when_not_a_result_screen():
     profile = ResolutionProfile.for_resolution(2560, 1440)
 

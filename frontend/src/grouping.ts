@@ -54,7 +54,9 @@ export function groupByGame<T extends Groupable>(clips: T[], sort: ClipSort): Ga
 
 export function formatMatchResult(result: MatchResult | null | undefined): string | null {
   if (!result) return null
-  const parts = [result.matchType === 'rank' ? '랭크' : '일반', `${result.placement}위 / ${result.total}팀`]
+  const parts = [`${result.placement}위 / ${result.total}팀`]
+  if (result.matchType !== 'unknown') parts.unshift(result.matchType === 'rank' ? '랭크' : '일반')
   if (result.outcome) parts.push(result.outcome)
+  if (result.character) parts.unshift(result.character)
   return parts.join(' · ')
 }
