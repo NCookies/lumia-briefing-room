@@ -63,14 +63,32 @@ export async function deleteClipForever(id: string): Promise<void> {
   await checkOk(await fetch(`${BASE}/clips/${id}`, { method: 'DELETE' }), '영구 삭제')
 }
 
-export function videoUrl(id: string): string {
-  return `${BASE}/clips/${id}/video`
+export function videoUrl(id: string, version?: number): string {
+  return `${BASE}/clips/${id}/video${version === undefined ? '' : `?v=${version}`}`
 }
 
 export function resultImageUrl(id: string): string {
   return `${BASE}/clips/${id}/result-image`
 }
 
-export function thumbnailUrl(id: string): string {
-  return `${BASE}/clips/${id}/thumbnail`
+export function thumbnailUrl(id: string, version?: number): string {
+  return `${BASE}/clips/${id}/thumbnail${version === undefined ? '' : `?v=${version}`}`
+}
+
+export async function trimClip(id: string, start: number, end: number): Promise<Clip> {
+  const res = await fetch(`${BASE}/clips/${id}/trim`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ start, end }),
+  })
+  if (!res.ok) {
+    let detail = ''
+    try {
+      detail = (await res.json()).detail ?? ''
+    } catch {
+      // 본문이 JSON 이 아니면 상태 코드만 보여준다
+    }
+    throw new Error(`자르기 실패 (${res.status})${detail ? `: ${detail}` : ''}`)
+  }
+  return res.json()
 }

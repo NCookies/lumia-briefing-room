@@ -68,5 +68,7 @@ export interface Clip {
   matchTeamKills: number | null
   detectorConfidence: number
   sizeBytes?: number
+  trimmed?: boolean
+  originalDurationSec?: number
   matchResult?: MatchResult | null
 }

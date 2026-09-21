@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { deleteClipForever, listClips, patchClip, restoreClip, trashClip } from './api'
+import { deleteClipForever, listClips, patchClip, restoreClip, trashClip, trimClip } from './api'
 import { ClipCard } from './components/ClipCard'
 import { DEFAULT_FILTER, FilterBar, type FilterState } from './components/FilterBar'
 import { ExportDialog } from './components/ExportDialog'
@@ -207,6 +207,10 @@ export default function App() {
           onIndexChange={(i) => setPlayingId(ordered[i]?.id ?? null)}
           onLabel={handleLabel}
           onExport={setExportTarget}
+          onTrim={async (clip, start, end) => {
+            await trimClip(clip.id, start, end)
+            reload()
+          }}
           paused={exportTarget !== null}
           onTrash={(clip) => {
             const next = ordered[playingIndex + 1] ?? ordered[playingIndex - 1]

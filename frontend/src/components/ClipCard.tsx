@@ -66,7 +66,7 @@ export function ClipCard({
       >
         {clip.thumbnailPath ? (
           <img
-            src={thumbnailUrl(clip.id)}
+            src={thumbnailUrl(clip.id, clip.durationSec)}
             alt={clip.title}
             className="h-full w-full object-cover transition-transform group-hover:scale-105"
           />

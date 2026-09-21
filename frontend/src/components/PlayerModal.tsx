@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { videoUrl } from '../api'
 import { SIGNAL_LABELS } from '../labels'
 import { applyLabel, labelForKey, nextUnlabeledIndex, progress } from '../labeling'
@@ -7,6 +7,7 @@ import { loadVolume, saveVolume } from '../volume'
 import { LabelButtons } from './LabelButtons'
 import { ScoreChip } from './ScoreChip'
 import { TagBadge } from './TagBadge'
+import { TrimPanel } from './TrimPanel'
 
 interface Props {
   clips: Clip[]
@@ -15,18 +16,36 @@ interface Props {
   onLabel: (clip: Clip, label: UserLabel) => void
   onTrash: (clip: Clip) => void
   onExport: (clip: Clip) => void
+  onTrim: (clip: Clip, start: number, end: number) => Promise<void>
   paused: boolean
   onClose: () => void
 }
 
-export function PlayerModal({ clips, index, onIndexChange, onLabel, onTrash, onExport, paused, onClose }: Props) {
+export function PlayerModal({
+  clips,
+  index,
+  onIndexChange,
+  onLabel,
+  onTrash,
+  onExport,
+  onTrim,
+  paused,
+  onClose,
+}: Props) {
   const clip = clips[index]
   const volumeRef = useRef(loadVolume())
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const [trimming, setTrimming] = useState(false)
+  const [trimBusy, setTrimBusy] = useState(false)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (paused) return
       if (e.target instanceof HTMLInputElement) return
+      if (trimming) {
+        if (e.key === 'Escape') setTrimming(false)
+        return
+      }
       if (e.key === 'Escape') return onClose()
       if (e.key === 'ArrowRight') return onIndexChange(Math.min(index + 1, clips.length - 1))
       if (e.key === 'ArrowLeft') return onIndexChange(Math.max(index - 1, 0))
@@ -40,7 +59,7 @@ export function PlayerModal({ clips, index, onIndexChange, onLabel, onTrash, onE
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [clips, clip, index, paused, onClose, onIndexChange, onLabel])
+  }, [clips, clip, index, paused, trimming, onClose, onIndexChange, onLabel])
 
   const { labeled, total } = progress(clips)
   const hasPrev = index > 0
@@ -100,6 +119,9 @@ export function PlayerModal({ clips, index, onIndexChange, onLabel, onTrash, onE
                 {clip.region}
               </span>
             )}
+            {clip.trimmed && (
+              <span className="rounded border border-amber-500/50 px-1.5 py-0.5 text-xs text-amber-300">잘라냄</span>
+            )}
             {clip.tags.map((t) => (
               <TagBadge key={t} tag={t} />
             ))}
@@ -114,8 +136,9 @@ export function PlayerModal({ clips, index, onIndexChange, onLabel, onTrash, onE
         </div>
 
         <video
-          key={clip.id}
+          key={`${clip.id}-${clip.durationSec}`}
           ref={(el) => {
+            videoRef.current = el
             if (!el) return
             el.volume = volumeRef.current.volume
             el.muted = volumeRef.current.muted
@@ -125,11 +148,32 @@ export function PlayerModal({ clips, index, onIndexChange, onLabel, onTrash, onE
             volumeRef.current = { volume: v.volume, muted: v.muted }
             saveVolume(volumeRef.current)
           }}
-          src={videoUrl(clip.id)}
+          src={videoUrl(clip.id, clip.durationSec)}
           controls
           autoPlay
           className="aspect-video w-full rounded bg-black object-contain"
         />
+
+        {trimming && (
+          <TrimPanel
+            key={`${clip.id}-${clip.durationSec}`}
+            duration={clip.durationSec}
+            getVideo={() => videoRef.current}
+            busy={trimBusy}
+            onCancel={() => setTrimming(false)}
+            onApply={async (start, end) => {
+              setTrimBusy(true)
+              try {
+                await onTrim(clip, start, end)
+                setTrimming(false)
+              } catch (e) {
+                alert((e as Error).message)
+              } finally {
+                setTrimBusy(false)
+              }
+            }}
+          />
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-zinc-300">
           <div className="flex items-center gap-4">
@@ -152,6 +196,17 @@ export function PlayerModal({ clips, index, onIndexChange, onLabel, onTrash, onE
             </span>
           </div>
           <div className="flex items-center gap-4 text-xs text-zinc-400">
+            <button
+              type="button"
+              className={`rounded border px-3 py-1 text-sm ${
+                trimming
+                  ? 'border-amber-400 bg-amber-400/20 text-amber-200'
+                  : 'border-amber-500/50 text-amber-300 hover:bg-amber-500/20'
+              }`}
+              onClick={() => setTrimming((t) => !t)}
+            >
+              ✂ 자르기
+            </button>
             <button
               type="button"
               className="rounded border border-sky-500/50 px-3 py-1 text-sm text-sky-300 hover:bg-sky-500/20"
