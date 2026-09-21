@@ -1,3 +1,5 @@
+import type { CleanupResult, RetentionSettings } from './retention'
+
 const BASE = '/api'
 
 export interface DirListing {
@@ -49,6 +51,19 @@ export async function getNickname(): Promise<string> {
 
 export async function setNickname(nickname: string): Promise<void> {
   await jsonOrThrow(await postJson(`${BASE}/config`, { player: { nickname } }, 'PUT'), '설정 저장')
+}
+
+export async function getRetention(): Promise<RetentionSettings> {
+  const cfg = await jsonOrThrow<{ retention: RetentionSettings }>(await fetch(`${BASE}/config`), '설정 조회')
+  return cfg.retention
+}
+
+export async function setRetention(retention: RetentionSettings): Promise<void> {
+  await jsonOrThrow(await postJson(`${BASE}/config`, { retention }, 'PUT'), '설정 저장')
+}
+
+export async function runCleanup(dryRun: boolean): Promise<CleanupResult> {
+  return jsonOrThrow(await postJson(`${BASE}/cleanup`, { dryRun }), '자동 정리')
 }
 
 export async function setExportDefault(dir: string): Promise<void> {
