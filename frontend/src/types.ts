@@ -8,6 +8,15 @@ export type ClipTag =
 
 export type UserLabel = 'pvp' | 'pve' | null
 
+export interface MatchResult {
+  matchType: 'rank' | 'normal'
+  matchLabel: string
+  placement: number
+  total: number
+  outcome: string | null
+  nickname: string | null
+}
+
 export interface Clip {
   id: string
   title: string
@@ -51,4 +60,5 @@ export interface Clip {
   matchAssists: number | null
   matchTeamKills: number | null
   detectorConfidence: number
+  matchResult?: MatchResult | null
 }

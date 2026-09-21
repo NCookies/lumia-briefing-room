@@ -4,7 +4,7 @@ import { ClipCard } from './components/ClipCard'
 import { DEFAULT_FILTER, FilterBar, type FilterState } from './components/FilterBar'
 import { ExportDialog } from './components/ExportDialog'
 import { PlayerModal } from './components/PlayerModal'
-import { groupByGame } from './grouping'
+import { formatMatchResult, groupByGame } from './grouping'
 import { applyLabel, progress } from './labeling'
 import { SettingsModal } from './components/SettingsModal'
 import type { Clip, UserLabel } from './types'
@@ -132,6 +132,15 @@ export default function App() {
                 className={`flex items-baseline gap-3 px-4 py-2 text-base font-semibold ${GAME_COLORS[(group.number - 1) % GAME_COLORS.length].header}`}
               >
                 <span>게임 {group.number}</span>
+                {group.result && (
+                  <span
+                    className={`rounded px-2 py-0.5 text-sm ${
+                      group.result.placement === 1 ? 'bg-amber-400/90 text-zinc-900' : 'bg-black/30'
+                    }`}
+                  >
+                    {formatMatchResult(group.result)}
+                  </span>
+                )}
                 <span className="text-xs font-normal opacity-80">
                   {formatGameStart(group.matchStartUtc)} · 클립 {group.clips.length}개
                 </span>

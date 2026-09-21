@@ -42,6 +42,15 @@ export async function getExportDefault(): Promise<string> {
   return cfg.paths?.exportDefault ?? ''
 }
 
+export async function getNickname(): Promise<string> {
+  const cfg = await jsonOrThrow<{ player?: { nickname?: string } }>(await fetch(`${BASE}/config`), '설정 조회')
+  return cfg.player?.nickname ?? ''
+}
+
+export async function setNickname(nickname: string): Promise<void> {
+  await jsonOrThrow(await postJson(`${BASE}/config`, { player: { nickname } }, 'PUT'), '설정 저장')
+}
+
 export async function setExportDefault(dir: string): Promise<void> {
   await jsonOrThrow(await postJson(`${BASE}/config`, { paths: { exportDefault: dir } }, 'PUT'), '설정 저장')
 }

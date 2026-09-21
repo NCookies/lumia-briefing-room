@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { groupByGame } from '../src/grouping.ts'
+import { formatMatchResult, groupByGame } from '../src/grouping.ts'
 
 const c = (id: string, matchStartUtc: string, sessionDir = 's1', pvpScore: number | null = null) => ({
   id,
@@ -58,4 +58,28 @@ test('groupByGame pvp keeps games in time order and ranks clips by score', () =>
 test('groupByGame numbers games from the oldest regardless of direction', () => {
   const groups = groupByGame(clips, 'desc')
   assert.deepEqual(groups.map((g) => g.number), [2, 1])
+})
+
+test('groupByGame exposes the first known match result of the game', () => {
+  const result = { matchType: 'rank', matchLabel: '랭크', placement: 4, total: 7, outcome: '실험 종료', nickname: 'a' }
+  const groups = groupByGame(
+    [
+      { ...c('a', 't', 's'), matchResult: null },
+      { ...c('b', 't', 's'), matchResult: result },
+    ],
+    'asc',
+  )
+  assert.deepEqual(groups[0].result, result)
+})
+
+test('formatMatchResult writes type, placement and outcome', () => {
+  assert.equal(
+    formatMatchResult({ matchType: 'rank', matchLabel: '랭크', placement: 4, total: 7, outcome: '실험 종료', nickname: null }),
+    '랭크 · 4위 / 7팀 · 실험 종료',
+  )
+  assert.equal(
+    formatMatchResult({ matchType: 'normal', matchLabel: '', placement: 1, total: 8, outcome: null, nickname: null }),
+    '일반 · 1위 / 8팀',
+  )
+  assert.equal(formatMatchResult(null), null)
 })

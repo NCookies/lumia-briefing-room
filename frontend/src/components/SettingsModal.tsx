@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getExportDefault, setExportDefault } from '../exportApi'
+import { getExportDefault, getNickname, setExportDefault, setNickname } from '../exportApi'
 import { FolderPicker } from './FolderPicker'
 
 interface Props {
@@ -7,6 +7,8 @@ interface Props {
 }
 
 export function SettingsModal({ onClose }: Props) {
+  const [nickname, setNicknameDraft] = useState('')
+  const [nickStatus, setNickStatus] = useState<string | null>(null)
   const [dir, setDir] = useState('')
   const [ready, setReady] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
@@ -17,6 +19,21 @@ export function SettingsModal({ onClose }: Props) {
       .catch((e: Error) => setStatus(e.message))
       .finally(() => setReady(true))
   }, [])
+
+  useEffect(() => {
+    getNickname()
+      .then(setNicknameDraft)
+      .catch((e: Error) => setNickStatus(e.message))
+  }, [])
+
+  const saveNickname = async () => {
+    try {
+      await setNickname(nickname.trim())
+      setNickStatus('저장했다')
+    } catch (e) {
+      setNickStatus((e as Error).message)
+    }
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -47,6 +64,30 @@ export function SettingsModal({ onClose }: Props) {
             닫기 ✕
           </button>
         </div>
+
+        <section className="flex flex-col gap-2">
+          <h3 className="text-sm font-medium text-zinc-200">내 닉네임</h3>
+          <p className="text-xs text-zinc-500">
+            첫 경기 결과 화면에서 자동으로 읽어 채워진다. 잘못 읽었으면 여기서 고친다(한글·영문·일본어·한자 모두 가능).
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              className="flex-1 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm"
+              placeholder="아직 인식된 닉네임 없음"
+              value={nickname}
+              onChange={(e) => setNicknameDraft(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && saveNickname()}
+            />
+            <button
+              type="button"
+              className="rounded bg-sky-600 px-4 py-1.5 text-sm hover:bg-sky-500"
+              onClick={saveNickname}
+            >
+              저장
+            </button>
+          </div>
+          {nickStatus && <span className="text-xs text-zinc-400">{nickStatus}</span>}
+        </section>
 
         <section className="flex flex-col gap-2">
           <h3 className="text-sm font-medium text-zinc-200">영상 저장 기본 폴더</h3>

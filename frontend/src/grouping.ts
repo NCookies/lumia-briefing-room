@@ -1,3 +1,5 @@
+import type { MatchResult } from './types'
+
 export type ClipSort = 'asc' | 'desc' | 'pvp'
 
 interface Groupable {
@@ -5,12 +7,14 @@ interface Groupable {
   matchStartUtc: string
   sessionDir: string
   pvpScore: number | null
+  matchResult?: MatchResult | null
 }
 
 export interface GameGroup<T> {
   key: string
   number: number
   matchStartUtc: string
+  result: MatchResult | null
   clips: T[]
 }
 
@@ -21,8 +25,18 @@ export function groupByGame<T extends Groupable>(clips: T[], sort: ClipSort): Ga
   for (const clip of clips) {
     const key = `${clip.sessionDir}|${clip.matchStartUtc}`
     const group = map.get(key)
-    if (group) group.clips.push(clip)
-    else map.set(key, { key, number: 0, matchStartUtc: clip.matchStartUtc, clips: [clip] })
+    if (group) {
+      group.clips.push(clip)
+      group.result ??= clip.matchResult ?? null
+    } else {
+      map.set(key, {
+        key,
+        number: 0,
+        matchStartUtc: clip.matchStartUtc,
+        result: clip.matchResult ?? null,
+        clips: [clip],
+      })
+    }
   }
 
   const games = [...map.values()].sort((a, b) =>
@@ -36,4 +50,11 @@ export function groupByGame<T extends Groupable>(clips: T[], sort: ClipSort): Ga
   })
   if (sort === 'desc') games.reverse()
   return games
+}
+
+export function formatMatchResult(result: MatchResult | null | undefined): string | null {
+  if (!result) return null
+  const parts = [result.matchType === 'rank' ? '랭크' : '일반', `${result.placement}위 / ${result.total}팀`]
+  if (result.outcome) parts.push(result.outcome)
+  return parts.join(' · ')
 }
