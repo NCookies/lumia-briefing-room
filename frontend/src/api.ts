@@ -15,7 +15,7 @@ export interface ClipQuery {
 
 async function checkOk(res: Response, action: string): Promise<Response> {
   if (!res.ok) {
-    throw new Error(`${action} 실패 (${res.status})`)
+    throw new Error(`${action}에 실패했습니다 (${res.status})`)
   }
   return res
 }
@@ -88,7 +88,7 @@ export async function trimClip(id: string, start: number, end: number): Promise<
     } catch {
       // 본문이 JSON 이 아니면 상태 코드만 보여준다
     }
-    throw new Error(`자르기 실패 (${res.status})${detail ? `: ${detail}` : ''}`)
+    throw new Error(`자르기에 실패했습니다 (${res.status})${detail ? `: ${detail}` : ''}`)
   }
   return res.json()
 }

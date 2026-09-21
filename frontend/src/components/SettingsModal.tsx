@@ -28,7 +28,7 @@ function GeneralPanel() {
   const save = async () => {
     try {
       await setNickname(nickname.trim())
-      setStatus('저장했다')
+      setStatus('저장했습니다')
     } catch (e) {
       setStatus((e as Error).message)
     }
@@ -38,12 +38,12 @@ function GeneralPanel() {
     <section className="flex flex-col gap-2">
       <h3 className="text-sm font-medium text-zinc-200">내 닉네임</h3>
       <p className="text-xs text-zinc-500">
-        첫 경기 결과 화면에서 자동으로 읽어 채워진다. 잘못 읽었으면 여기서 고친다(한글·영문·일본어·한자 모두 가능).
+        첫 경기의 결과 화면에서 자동으로 인식해 채워집니다. 잘못 인식되었다면 여기서 수정하세요. (한글, 영문, 일본어, 한자를 모두 사용할 수 있습니다.)
       </p>
       <div className="flex items-center gap-2">
         <input
           className="flex-1 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm"
-          placeholder="아직 인식된 닉네임 없음"
+          placeholder="아직 인식된 닉네임이 없습니다"
           value={nickname}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && save()}
@@ -72,7 +72,7 @@ function ExportPanel() {
   const save = async () => {
     try {
       await setExportDefault(dir)
-      setStatus('저장했다')
+      setStatus('저장했습니다')
     } catch (e) {
       setStatus((e as Error).message)
     }
@@ -82,7 +82,7 @@ function ExportPanel() {
     <section className="flex flex-col gap-2">
       <h3 className="text-sm font-medium text-zinc-200">영상 저장 기본 폴더</h3>
       <p className="text-xs text-zinc-500">
-        저장 창을 열면 이 폴더에서 시작한다. 영상을 저장할 때마다 마지막에 고른 폴더로 자동 갱신된다.
+        저장 창을 열면 이 폴더에서 시작합니다. 영상을 저장할 때마다 마지막으로 선택한 폴더로 자동 변경됩니다.
       </p>
       {ready && <FolderPicker value={dir} onChange={setDir} />}
       <div className="flex items-center justify-end gap-3">
@@ -93,7 +93,7 @@ function ExportPanel() {
           disabled={dir === ''}
           onClick={save}
         >
-          기본 폴더로 저장
+          기본 폴더로 지정
         </button>
       </div>
     </section>

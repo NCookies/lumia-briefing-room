@@ -106,12 +106,12 @@ export function PlayerModal({
             <ScoreChip score={clip.pvpScore} signals={clip.pvpSignals ?? []} />
             {clip.audioStatus && clip.audioStatus !== 'full' && (
               <span className="rounded border border-amber-500/50 px-1.5 py-0.5 text-xs text-amber-300">
-                {clip.audioStatus === 'none' ? '소리 없음 (원본에 오디오가 없다)' : '소리 일부 (원본 오디오 일부 소실)'}
+                {clip.audioStatus === 'none' ? '소리 없음 (원본에 오디오가 없습니다)' : '소리 일부 (원본 오디오가 일부 유실되었습니다)'}
               </span>
             )}
             {clip.labelConflict && (
               <span className="rounded border border-sky-500/50 px-1.5 py-0.5 text-xs text-sky-300">
-                이관된 라벨 · 확인 필요
+                옮겨 온 라벨 · 확인 필요
               </span>
             )}
             {clip.region && (
@@ -120,7 +120,7 @@ export function PlayerModal({
               </span>
             )}
             {clip.trimmed && (
-              <span className="rounded border border-amber-500/50 px-1.5 py-0.5 text-xs text-amber-300">잘라냄</span>
+              <span className="rounded border border-amber-500/50 px-1.5 py-0.5 text-xs text-amber-300">편집됨</span>
             )}
             {clip.tags.map((t) => (
               <TagBadge key={t} tag={t} />

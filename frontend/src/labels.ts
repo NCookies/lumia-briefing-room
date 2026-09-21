@@ -11,7 +11,7 @@ export const TAG_LABELS: Record<ClipTag, string> = {
 
 export const SIGNAL_LABELS: Record<string, string> = {
   kill_delta: '킬 증가',
-  assist_delta: '어시 증가',
+  assist_delta: '어시스트 증가',
   death: '내 사망',
   teammate_death: '팀원 사망',
   enemy_rings: '미니맵 적',

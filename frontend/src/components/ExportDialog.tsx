@@ -71,7 +71,7 @@ export function ExportDialog({ clip, onClose }: Props) {
         {ready && <FolderPicker value={dir} onChange={setDir} />}
 
         {error && <p className="text-sm text-rose-400">{error}</p>}
-        {savedPath && <p className="break-all text-sm text-emerald-400">저장했다: {savedPath}</p>}
+        {savedPath && <p className="break-all text-sm text-emerald-400">저장했습니다: {savedPath}</p>}
 
         <div className="flex justify-end gap-2">
           <button type="button" className="rounded px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700" onClick={onClose}>

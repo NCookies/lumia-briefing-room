@@ -21,7 +21,7 @@ export const DEFAULT_FILTER: FilterState = {
   gameMode: '',
   pinnedOnly: false,
   trashed: false,
-  sort: 'asc',
+  sort: 'desc',
   label: '',
   minPvpScore: 0,
 }
@@ -46,8 +46,8 @@ export function FilterBar({ value, onChange }: Props) {
         value={value.sort}
         onChange={(e) => onChange({ ...value, sort: e.target.value as FilterState['sort'] })}
       >
-        <option value="asc">오래된 순 (asc)</option>
-        <option value="desc">최신 순 (desc)</option>
+        <option value="desc">최신 순</option>
+        <option value="asc">오래된 순</option>
         <option value="pvp">교전 가능성순</option>
       </select>
 
@@ -57,14 +57,14 @@ export function FilterBar({ value, onChange }: Props) {
         onChange={(e) => onChange({ ...value, label: e.target.value as FilterState['label'] })}
       >
         <option value="">라벨 전체</option>
-        <option value="unlabeled">라벨 안 한 것</option>
-        <option value="conflict">이관됐지만 확인 필요</option>
-        <option value="pvp">교전으로 라벨</option>
-        <option value="pve">사냥으로 라벨</option>
+        <option value="unlabeled">라벨 없음</option>
+        <option value="conflict">옮겨 온 라벨 (확인 필요)</option>
+        <option value="pvp">교전 라벨</option>
+        <option value="pve">사냥 라벨</option>
       </select>
 
       <label className="flex items-center gap-2 text-sm text-zinc-300">
-        점수 ≥ {Math.round(value.minPvpScore * 100)}%
+        교전 점수 {Math.round(value.minPvpScore * 100)}% 이상
         <input
           type="range"
           min={0}
@@ -118,7 +118,7 @@ export function FilterBar({ value, onChange }: Props) {
           checked={value.pinnedOnly}
           onChange={(e) => onChange({ ...value, pinnedOnly: e.target.checked })}
         />
-        고정만
+        고정한 클립만
       </label>
 
       <div className="ml-auto flex rounded border border-zinc-600 text-sm">

@@ -16,7 +16,7 @@ async function jsonOrThrow<T>(res: Response, action: string): Promise<T> {
     } catch {
       // 본문이 JSON 이 아니면 상태 코드만 보여준다
     }
-    throw new Error(`${action} 실패 (${res.status})${detail ? `: ${detail}` : ''}`)
+    throw new Error(`${action}에 실패했습니다 (${res.status})${detail ? `: ${detail}` : ''}`)
   }
   return res.json()
 }

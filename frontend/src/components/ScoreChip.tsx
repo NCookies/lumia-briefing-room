@@ -18,7 +18,7 @@ export function ScoreChip({ score, signals }: Props) {
   return (
     <span
       className={`rounded border px-1.5 py-0.5 text-xs font-semibold tabular-nums ${TONES[scoreTone(score)]}`}
-      title={`교전일 가능성 근거: ${reason}`}
+      title={`교전 가능성 근거: ${reason}`}
     >
       교전 {scorePercent(score)}
     </span>

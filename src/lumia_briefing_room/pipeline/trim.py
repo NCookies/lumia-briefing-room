@@ -20,11 +20,11 @@ END_TOLERANCE_SEC = 0.05
 
 def validate_range(start: float, end: float, duration: float) -> None:
     if start < 0 or end <= start:
-        raise ValueError("구간이 올바르지 않다")
+        raise ValueError("구간이 올바르지 않습니다")
     if end > duration + END_TOLERANCE_SEC:
-        raise ValueError("끝 시각이 클립 길이를 넘는다")
+        raise ValueError("끝 시각이 클립 길이를 넘을 수 없습니다")
     if end - start < MIN_LENGTH_SEC:
-        raise ValueError(f"구간이 너무 짧다(최소 {MIN_LENGTH_SEC:g}초)")
+        raise ValueError(f"구간이 너무 짧습니다 (최소 {MIN_LENGTH_SEC:g}초)")
 
 
 def trim_clip(

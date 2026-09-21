@@ -87,7 +87,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     def get_clip(clip_id: str):
         clip = find_clip(_clips_dir(app), clip_id) or find_clip(_clips_dir(app) / ".trash", clip_id)
         if clip is None:
-            raise HTTPException(404, "클립을 찾을 수 없다")
+            raise HTTPException(404, "클립을 찾을 수 없습니다")
         return _serialize(clip)
 
     @app.patch("/api/clips/{clip_id}")
@@ -95,9 +95,9 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         clips_dir = _clips_dir(app)
         clip = find_clip(clips_dir, clip_id)
         if clip is None:
-            raise HTTPException(404, "클립을 찾을 수 없다")
+            raise HTTPException(404, "클립을 찾을 수 없습니다")
         if "userLabel" in body and body["userLabel"] not in (None, "pvp", "pve"):
-            raise HTTPException(400, "userLabel 은 pvp / pve / null 만 가능하다")
+            raise HTTPException(400, "라벨은 교전(pvp), 사냥(pve), 해제(null)만 지정할 수 있습니다")
         meta = {**clip.meta, **{k: v for k, v in body.items() if k in ("title", "pinned", "userLabel")}}
         if "userLabel" in body:
             meta["labelSource"] = "user" if body["userLabel"] is not None else None
@@ -109,7 +109,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     def trash(clip_id: str):
         clip = find_clip(_clips_dir(app), clip_id)
         if clip is None:
-            raise HTTPException(404, "클립을 찾을 수 없다")
+            raise HTTPException(404, "클립을 찾을 수 없습니다")
         trash_dir = _clips_dir(app) / ".trash"
         trash_clip(clip.meta_path, trash_dir)
         return {"id": clip_id, "trashed": True}
@@ -119,7 +119,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         clips_dir = _clips_dir(app)
         clip = find_clip(clips_dir / ".trash", clip_id)
         if clip is None:
-            raise HTTPException(404, "휴지통에 없다")
+            raise HTTPException(404, "휴지통에 없는 클립입니다")
         restore_clip(clip.meta_path, clips_dir)
         return {"id": clip_id, "trashed": False}
 
@@ -128,7 +128,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         clips_dir = _clips_dir(app)
         clip = find_clip(clips_dir / ".trash", clip_id)
         if clip is None:
-            raise HTTPException(400, "휴지통에 있는 클립만 완전히 지울 수 있다")
+            raise HTTPException(400, "휴지통에 있는 클립만 완전히 삭제할 수 있습니다")
         for f in [clip.meta_path.with_suffix(".mp4"), clip.meta_path]:
             f.unlink(missing_ok=True)
         thumb = clip.meta.get("thumbnailPath")
@@ -141,27 +141,27 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     def video(clip_id: str, request: Request):
         clip = find_clip(_clips_dir(app), clip_id)
         if clip is None:
-            raise HTTPException(404, "클립을 찾을 수 없다")
+            raise HTTPException(404, "클립을 찾을 수 없습니다")
         return _serve_range(clip.meta_path.with_suffix(".mp4"), request, media_type="video/mp4")
 
     @app.get("/api/clips/{clip_id}/thumbnail")
     def thumbnail(clip_id: str):
         clip = find_clip(_clips_dir(app), clip_id)
         if clip is None:
-            raise HTTPException(404, "클립을 찾을 수 없다")
+            raise HTTPException(404, "클립을 찾을 수 없습니다")
         thumb = clip.meta.get("thumbnailPath")
         if not thumb or not Path(thumb).exists():
-            raise HTTPException(404, "썸네일이 없다")
+            raise HTTPException(404, "썸네일이 없습니다")
         return FileResponse(thumb, media_type="image/jpeg")
 
     @app.get("/api/clips/{clip_id}/result-image")
     def result_image(clip_id: str):
         clip = find_clip(_clips_dir(app), clip_id) or find_clip(_clips_dir(app) / ".trash", clip_id)
         if clip is None:
-            raise HTTPException(404, "클립을 찾을 수 없다")
+            raise HTTPException(404, "클립을 찾을 수 없습니다")
         path = (clip.meta.get("matchResult") or {}).get("imagePath")
         if not path or not Path(path).exists():
-            raise HTTPException(404, "결과 화면 이미지가 없다")
+            raise HTTPException(404, "결과 화면 이미지가 없습니다")
         return FileResponse(path, media_type="image/jpeg")
 
     @app.get("/api/fs/dirs")
@@ -170,11 +170,11 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             return {"path": "", "parent": None, "dirs": list_roots()}
         target = Path(path)
         if not target.is_dir():
-            raise HTTPException(404, "폴더를 찾을 수 없다")
+            raise HTTPException(404, "폴더를 찾을 수 없습니다")
         try:
             dirs = list_subdirs(target)
         except OSError as e:
-            raise HTTPException(403, f"폴더를 열 수 없다: {e}")
+            raise HTTPException(403, f"폴더를 열 수 없습니다: {e}")
         return {"path": str(target), "parent": parent_of(target), "dirs": dirs}
 
     @app.post("/api/fs/mkdir")
@@ -182,9 +182,9 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         base = Path(str(body.get("path", "")))
         name = str(body.get("name", ""))
         if not is_valid_folder_name(name):
-            raise HTTPException(400, "폴더 이름이 올바르지 않다")
+            raise HTTPException(400, "폴더 이름이 올바르지 않습니다")
         if not base.is_dir():
-            raise HTTPException(404, "폴더를 찾을 수 없다")
+            raise HTTPException(404, "폴더를 찾을 수 없습니다")
         created = base / name
         created.mkdir(exist_ok=True)
         return {"path": str(created)}
@@ -193,10 +193,10 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     def export_clip(clip_id: str, body: dict):
         clip = find_clip(_clips_dir(app), clip_id)
         if clip is None:
-            raise HTTPException(404, "클립을 찾을 수 없다")
+            raise HTTPException(404, "클립을 찾을 수 없습니다")
         directory = Path(str(body.get("dir", "")))
         if not directory.is_dir():
-            raise HTTPException(404, "저장할 폴더를 찾을 수 없다")
+            raise HTTPException(404, "저장할 폴더를 찾을 수 없습니다")
         stem = str(body.get("filename") or clip.meta.get("title") or clip_id)
         if stem.lower().endswith(".mp4"):
             stem = stem[:-4]
@@ -215,19 +215,21 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     def trim(clip_id: str, body: dict):
         clip = find_clip(_clips_dir(app), clip_id)
         if clip is None:
-            raise HTTPException(404, "클립을 찾을 수 없다")
+            raise HTTPException(404, "클립을 찾을 수 없습니다")
         try:
             start, end = float(body["start"]), float(body["end"])
             validate_range(start, end, float(clip.meta.get("durationSec", 0.0)))
-        except (KeyError, TypeError, ValueError) as e:
-            raise HTTPException(400, f"구간이 올바르지 않다: {e}")
+        except (KeyError, TypeError):
+            raise HTTPException(400, "시작과 끝 시각을 숫자로 지정해야 합니다")
+        except ValueError as e:
+            raise HTTPException(400, str(e))
         ffmpeg = discover_ffmpeg()
         if ffmpeg is None:
-            raise HTTPException(503, "ffmpeg 를 찾을 수 없다")
+            raise HTTPException(503, "ffmpeg를 찾을 수 없습니다")
         try:
             trim_clip(clip.meta_path, start, end, ffmpeg_path=ffmpeg, thumbnail=current_config().encode.thumbnail)
         except (OSError, subprocess.CalledProcessError) as e:
-            raise HTTPException(500, f"자르기 실패: {e}")
+            raise HTTPException(500, f"자르기에 실패했습니다: {e}")
         return _serialize(find_clip(_clips_dir(app), clip_id))
 
     @app.post("/api/cleanup")

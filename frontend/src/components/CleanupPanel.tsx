@@ -51,7 +51,7 @@ export function CleanupPanel() {
       .catch((e: Error) => setStatus(e.message))
   }, [])
 
-  if (!draft) return <p className="text-sm text-zinc-400">{status ?? '불러오는 중...'}</p>
+  if (!draft) return <p className="text-sm text-zinc-400">{status ?? '불러오는 중입니다...'}</p>
 
   const patch = (change: Partial<Draft>) => {
     setDraft({ ...draft, ...change })
@@ -68,7 +68,7 @@ export function CleanupPanel() {
 
   const save = async () => {
     await setRetention(toSettings(draft))
-    setStatus('저장했다')
+    setStatus('저장했습니다')
   }
 
   const check = async () => {
@@ -81,12 +81,12 @@ export function CleanupPanel() {
   }
 
   const runNow = async () => {
-    if (!confirm('지금 정리를 실행한다. 계속할까?')) return
+    if (!confirm('지금 정리를 실행합니다. 계속하시겠습니까?')) return
     try {
       await save()
       const result = await runCleanup(false)
       setPreview(null)
-      setStatus(`실행했다: ${describeCleanup(result)}`)
+      setStatus(`정리를 실행했습니다: ${describeCleanup(result)}`)
     } catch (e) {
       setStatus((e as Error).message)
     }
@@ -104,14 +104,14 @@ export function CleanupPanel() {
           자동 정리 켜기
         </label>
         <p className="text-xs text-zinc-500">
-          켜면 앱이 1시간마다 아래 한도를 넘은 클립을 정리한다. 꺼져 있으면 클립도 휴지통도 자동으로 지워지지 않는다.
+          켜면 1시간마다 아래 기준을 넘은 클립을 자동으로 정리합니다. 끄면 클립과 휴지통이 자동으로 삭제되지 않습니다.
         </p>
       </section>
 
       <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium text-zinc-200">정리 한도 (비우면 제한 없음)</h3>
+        <h3 className="text-sm font-medium text-zinc-200">정리 기준 (비워 두면 제한하지 않습니다)</h3>
         <label className="flex items-center gap-2 text-sm text-zinc-300">
-          경기한 지
+          경기 후
           <input
             className={INPUT}
             inputMode="decimal"
@@ -121,14 +121,14 @@ export function CleanupPanel() {
           일이 지난 클립
         </label>
         <label className="flex items-center gap-2 text-sm text-zinc-300">
-          클립이
+          클립 수가
           <input
             className={INPUT}
             inputMode="numeric"
             value={draft.maxCount}
             onChange={(e) => patch({ maxCount: e.target.value })}
           />
-          개를 넘으면 오래된 것부터
+          개를 넘으면 오래된 클립부터 정리
         </label>
         <label className="flex items-center gap-2 text-sm text-zinc-300">
           총 용량이
@@ -138,18 +138,18 @@ export function CleanupPanel() {
             value={draft.maxTotalGb}
             onChange={(e) => patch({ maxTotalGb: e.target.value })}
           />
-          GB 를 넘으면 오래된 것부터
+          GB를 넘으면 오래된 클립부터 정리
         </label>
       </section>
 
       <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium text-zinc-200">지우는 방식</h3>
+        <h3 className="text-sm font-medium text-zinc-200">삭제 방식</h3>
         <select
           className="w-64 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm"
           value={draft.deleteMode}
           onChange={(e) => patch({ deleteMode: e.target.value as Draft['deleteMode'] })}
         >
-          <option value="trash">휴지통으로 이동 (되돌릴 수 있음)</option>
+          <option value="trash">휴지통으로 이동 (복구 가능)</option>
           <option value="permanent">즉시 영구 삭제</option>
         </select>
         <label className="flex items-center gap-2 text-sm text-zinc-300">
@@ -190,7 +190,7 @@ export function CleanupPanel() {
             </button>
           ))}
         </div>
-        <p className="text-xs text-zinc-500">선택한 태그가 붙은 클립은 정리되지 않는다.</p>
+        <p className="text-xs text-zinc-500">선택한 태그가 붙은 클립은 정리하지 않습니다.</p>
       </section>
 
       <section className="flex flex-wrap items-center gap-3 border-t border-zinc-700 pt-3">
@@ -206,7 +206,7 @@ export function CleanupPanel() {
           className="rounded border border-zinc-600 px-3 py-1.5 text-sm hover:bg-zinc-700"
           onClick={check}
         >
-          저장하고 정리될 항목 확인
+          저장 후 정리 대상 확인
         </button>
         <button
           type="button"

@@ -65,7 +65,7 @@ export default function App() {
   }
 
   const handleDeleteForever = async (clip: Clip) => {
-    if (!confirm(`"${clip.title}" 를 되돌릴 수 없게 완전히 삭제한다. 계속할까?`)) return
+    if (!confirm(`"${clip.title}" 클립을 완전히 삭제합니다. 계속하시겠습니까?`)) return
     await deleteClipForever(clip.id)
     reload()
   }
@@ -74,7 +74,7 @@ export default function App() {
     `게임 ${group.number}(${group.clips.length}개, ${formatBytes(totalSize(group.clips))})`
 
   const handleTrashGame = async (group: GameGroup<Clip>) => {
-    if (!confirm(`${gameLabel(group)}의 클립을 모두 휴지통으로 보낸다. 계속할까?`)) return
+    if (!confirm(`${gameLabel(group)}의 클립을 모두 휴지통으로 이동합니다. 계속하시겠습니까?`)) return
     await Promise.all(group.clips.map((c) => trashClip(c.id)))
     reload()
   }
@@ -85,7 +85,7 @@ export default function App() {
   }
 
   const handleDeleteGameForever = async (group: GameGroup<Clip>) => {
-    if (!confirm(`${gameLabel(group)}의 클립을 되돌릴 수 없게 완전히 삭제한다. 계속할까?`)) return
+    if (!confirm(`${gameLabel(group)}의 클립을 완전히 삭제합니다. 계속하시겠습니까?`)) return
     await Promise.all(group.clips.map((c) => deleteClipForever(c.id)))
     reload()
   }
@@ -93,7 +93,7 @@ export default function App() {
   const handleLabel = (clip: Clip, label: UserLabel) => {
     setClips((prev) => applyLabel(prev, clip.id, label))
     patchClip(clip.id, { userLabel: label }).catch((e: Error) => {
-      setError(`라벨 저장 실패: ${e.message}`)
+      setError(`라벨을 저장하지 못했습니다: ${e.message}`)
       reload()
     })
   }
@@ -133,11 +133,11 @@ export default function App() {
       <FilterBar value={filter} onChange={setFilter} />
 
       <main className="flex-1 p-4">
-        {loading && <p className="text-zinc-400">불러오는 중...</p>}
-        {error && <p className="text-rose-400">오류: {error}</p>}
+        {loading && <p className="text-zinc-400">불러오는 중입니다...</p>}
+        {error && <p className="text-rose-400">오류가 발생했습니다: {error}</p>}
         {!loading && !error && clips.length === 0 && (
           <p className="text-zinc-500">
-            {filter.trashed ? '휴지통이 비어 있다' : '조건에 맞는 클립이 없다'}
+            {filter.trashed ? '휴지통이 비어 있습니다' : '조건에 맞는 클립이 없습니다'}
           </p>
         )}
 

@@ -60,7 +60,7 @@ export function FolderPicker({ value, onChange }: Props) {
           ↑
         </button>
         <div className="flex-1 truncate rounded bg-zinc-900 px-2 py-1 text-sm text-zinc-200" title={value}>
-          {value || '내 컴퓨터 (드라이브 선택)'}
+          {value || '내 컴퓨터 (드라이브를 선택하세요)'}
         </div>
         <button
           type="button"
@@ -91,7 +91,7 @@ export function FolderPicker({ value, onChange }: Props) {
       {error && <p className="text-xs text-rose-400">{error}</p>}
 
       <ul className="h-56 overflow-y-auto rounded border border-zinc-700 bg-zinc-900/60">
-        {listing?.dirs.length === 0 && <li className="px-3 py-2 text-sm text-zinc-500">하위 폴더 없음</li>}
+        {listing?.dirs.length === 0 && <li className="px-3 py-2 text-sm text-zinc-500">하위 폴더가 없습니다</li>}
         {listing?.dirs.map((name) => (
           <li key={name}>
             <button

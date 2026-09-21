@@ -56,7 +56,7 @@ export function TrimPanel({ duration, getVideo, busy, onApply, onCancel }: Props
   const pct = (t: number) => `${(t / duration) * 100}%`
 
   const apply = () => {
-    if (!confirm(`${formatTime(range.start)} ~ ${formatTime(range.end)} 만 남기고 나머지 ${removed.toFixed(1)}초는 삭제한다. 되돌릴 수 없다. 계속할까?`)) return
+    if (!confirm(`${formatTime(range.start)} ~ ${formatTime(range.end)} 구간만 남기고 나머지 ${removed.toFixed(1)}초는 삭제합니다. 삭제한 부분은 복구할 수 없습니다. 계속하시겠습니까?`)) return
     onApply(range.start, range.end)
   }
 
@@ -95,7 +95,7 @@ export function TrimPanel({ duration, getVideo, busy, onApply, onCancel }: Props
           {formatTime(range.start)} ~ {formatTime(range.end)}
         </span>
         <span className="text-zinc-400">
-          남는 길이 {kept.toFixed(1)}초 · 삭제 {removed.toFixed(1)}초 (최소 {MIN_LENGTH}초)
+          남는 길이 {kept.toFixed(1)}초 · 삭제 {removed.toFixed(1)}초 (최소 {MIN_LENGTH}초 이상)
         </span>
         <button type="button" className="rounded border border-zinc-600 px-2 py-1 hover:bg-zinc-700" onClick={() => fromPlayhead('start')}>
           현재 위치를 시작으로

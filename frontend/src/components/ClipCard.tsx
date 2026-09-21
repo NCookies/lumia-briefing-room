@@ -82,9 +82,9 @@ export function ClipCard({
         {clip.labelConflict && (
           <span
             className="absolute bottom-6 left-1 rounded bg-sky-600/90 px-1 text-xs"
-            title="옛 클립의 교전/사냥 라벨이 섞여 있어 자동으로 옮긴 라벨이다. 맞으면 같은 버튼을 다시 눌러 확정한다."
+            title="이전 버전에서 교전/사냥 라벨이 섞여 있어 자동으로 옮겨 온 라벨입니다. 맞다면 같은 버튼을 한 번 더 눌러 확정하세요."
           >
-            이관 · 확인 필요
+            옮겨 온 라벨 · 확인 필요
           </span>
         )}
         {clip.audioStatus && clip.audioStatus !== 'full' && (
@@ -117,7 +117,7 @@ export function ClipCard({
           <button
             type="button"
             className="truncate text-left text-sm font-medium text-zinc-100 hover:underline"
-            title="더블클릭해서 제목 수정"
+            title="더블클릭하여 제목을 수정할 수 있습니다"
             onDoubleClick={() => setEditing(true)}
           >
             {clip.title}
