@@ -1,5 +1,7 @@
 from dataclasses import replace
 
+from lumia_briefing_room.video.segments import SegmentRange
+
 import numpy as np
 
 from lumia_briefing_room.detect.result import ResultScreen
@@ -162,3 +164,13 @@ def test_contiguous_segments_stops_at_a_gap_and_at_the_next_game_start():
     assert contiguous_segments([3, 4, 5, 9, 10], after=2, before=None) == [3, 4, 5]
     assert contiguous_segments([3, 4, 5, 6, 7], after=2, before=6) == [3, 4, 5]
     assert contiguous_segments([], after=2, before=None) == []
+
+
+def test_scan_window_reaches_past_the_logged_match_end_but_never_before_the_first_segment():
+    from lumia_briefing_room.pipeline.result_scan import MAX_SCAN_FRAMES, RESULT_TAIL_SEGMENTS, scan_window
+
+    first, last = scan_window(SegmentRange(first=10, last=974))
+
+    assert last == 974 + RESULT_TAIL_SEGMENTS
+    assert first == last - MAX_SCAN_FRAMES + 1
+    assert scan_window(SegmentRange(first=10, last=20))[0] == 10

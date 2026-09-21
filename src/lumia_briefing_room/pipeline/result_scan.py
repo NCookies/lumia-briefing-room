@@ -24,6 +24,7 @@ from lumia_briefing_room.video.session import RecordingSession
 log = logging.getLogger(__name__)
 
 MAX_SCAN_FRAMES = 40
+RESULT_TAIL_SEGMENTS = 8
 FORWARD_BATCH = 20
 FORWARD_MAX_BATCHES = 60
 FORWARD_MAX_OCR = 600
@@ -131,6 +132,16 @@ def _roster() -> list[str]:
     return sorted(set(load_characters().values()))
 
 
+def scan_window(seg_range: SegmentRange) -> tuple[int, int]:
+    """결과 화면·순위표를 찾을 세그먼트 범위.
+
+    로그의 로비 복귀 시각은 결과 화면이 뜬 직후(실측: 결과 화면이 종료 세그먼트와 같거나 1칸 뒤, 순위표 탭은 5칸 뒤까지)라서
+    종료 시각에서 끝내면 그 화면들을 놓친다. 종료 뒤 RESULT_TAIL_SEGMENTS 칸까지 본다(아직 없는 세그먼트는 건너뛴다).
+    """
+    last = seg_range.last + RESULT_TAIL_SEGMENTS
+    return max(seg_range.first, last - MAX_SCAN_FRAMES + 1), last
+
+
 def find_result_screen(
     session: RecordingSession,
     seg_range: SegmentRange,
@@ -144,8 +155,8 @@ def find_result_screen(
     reader = reader or get_reader()
     day_templates = load_region_templates(profile.day_templates) if profile.day_templates else None
 
-    tail_first = max(seg_range.first, seg_range.last - MAX_SCAN_FRAMES + 1)
-    numbers = existing_segment_numbers(session, 0, tail_first, seg_range.last)
+    tail_first, tail_last = scan_window(seg_range)
+    numbers = existing_segment_numbers(session, 0, tail_first, tail_last)
     frames = extract_keyframe_frames(
         session, stream=0, segment_numbers=numbers, ffmpeg_path=ffmpeg_path, hwaccel=hwaccel
     )
