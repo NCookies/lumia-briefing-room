@@ -652,3 +652,30 @@ def test_reprocess_rejects_unknown_clip_and_missing_setup(client, reprocess_env,
 
     monkeypatch.setattr(reprocess_env, "discover_ffmpeg", lambda: None)
     assert client.post("/api/games/reprocess", json={"clipId": "a"}).status_code == 503
+
+
+def test_deleting_a_labeled_clip_forever_keeps_its_label_and_evidence(client):
+    clips = client.app.state.clips_dir_for_test
+    _write_clip(clips, "a", userLabel="pvp", pvpSignals=["kill_delta"])
+    _write_clip(clips, "b")
+    client.post("/api/clips/a/trash")
+    client.post("/api/clips/b/trash")
+
+    client.delete("/api/clips/a")
+    client.delete("/api/clips/b")
+
+    kept = json.loads((clips / ".labels" / "a.json").read_text(encoding="utf-8"))
+    assert kept["userLabel"] == "pvp" and kept["pvpSignals"] == ["kill_delta"]
+    assert not (clips / ".labels" / "b.json").exists()
+
+
+def test_emptying_the_trash_keeps_only_the_labeled_clips_evidence(client):
+    clips = client.app.state.clips_dir_for_test
+    _write_clip(clips, "a", userLabel="pve")
+    _write_clip(clips, "b")
+    client.post("/api/clips/a/trash")
+    client.post("/api/clips/b/trash")
+
+    client.post("/api/trash/empty")
+
+    assert sorted(p.name for p in (clips / ".labels").glob("*.json")) == ["a.json"]

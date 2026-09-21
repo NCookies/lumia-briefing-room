@@ -79,3 +79,13 @@ def test_ring_auc_is_half_when_the_signal_does_not_separate_and_one_when_it_does
 
 def test_ring_auc_is_none_without_both_classes():
     assert evaluate_labels([m("pvp", 0.0, 0.4)])["ring_auc"] is None
+
+
+def test_load_clips_also_reads_the_label_archive_but_a_live_clip_with_the_same_id_wins(tmp_path):
+    (tmp_path / "live.json").write_text(json.dumps({"userLabel": "pve", "src": "live"}), encoding="utf-8")
+    archive = tmp_path / ".labels"
+    archive.mkdir()
+    (archive / "live.json").write_text(json.dumps({"userLabel": "pvp", "src": "old"}), encoding="utf-8")
+    (archive / "gone.json").write_text(json.dumps({"userLabel": "pvp", "src": "archive"}), encoding="utf-8")
+
+    assert sorted(c["src"] for c in load_clips(tmp_path)) == ["archive", "live"]

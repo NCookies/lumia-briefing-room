@@ -1265,6 +1265,8 @@ eplay\<캐릭터>` 처럼 폴더를 나눠 보관한다.
 | `export.mode` | `copy` | `copy`(복사) / `move`(이동) |
 | `export.nameTemplate` | `{date}_{title}` | 내보낼 파일명 규칙 |
 
+**라벨 보관소.** 영구 삭제(수동 완전 삭제·휴지통 비우기·유예 만료·`permanent` 자동 삭제) 직전에 `userLabel` 이 pvp/pve 인 클립은 메타데이터에서 `thumbnailPath`·`deletedAt`·결과 이미지 경로를 뺀 사본을 `clips/.labels/<클립ID>.json` 에 남긴다(`pipeline/label_archive.py`). 라벨 없는 클립은 남기지 않는다. 영상이 아니라 근거·라벨이 평가(§2.12, `tools/eval_pvp.py`)의 자료이기 때문이다. 목록·복구 대상이 아니다(`scan_clips` 는 서브폴더를 보지 않는다).
+
 UI에서 제공할 동작:
 
 - **삭제 / 복구** — 다중 선택, 되돌리기(undo) 지원

@@ -28,6 +28,7 @@ from lumia_briefing_room.config import (
     resolve_paths,
     save_config,
 )
+from lumia_briefing_room.pipeline.label_archive import archive_dir_for, archive_if_labeled
 from lumia_briefing_room.pipeline.cleanup import plan_cleanup, remove_orphan_result_images, run_cleanup
 from lumia_briefing_room.pipeline.retention import restore_clip, trash_clip
 from lumia_briefing_room.pipeline.reprocess import GameRef, ReprocessError, reprocess_game
@@ -176,6 +177,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         clip = find_clip(clips_dir / ".trash", clip_id)
         if clip is None:
             raise HTTPException(400, "휴지통에 있는 클립만 완전히 삭제할 수 있습니다")
+        archive_if_labeled(clip.meta_path, archive_dir_for(clips_dir))
         for f in [clip.meta_path.with_suffix(".mp4"), clip.meta_path]:
             _unlink(f)
         thumb = clip.meta.get("thumbnailPath")
@@ -291,6 +293,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         deleted = freed = 0
         for clip in scan_clips(trash_dir):
             freed += clip.size_bytes
+            archive_if_labeled(clip.meta_path, archive_dir_for(clips_dir))
             for f in [clip.meta_path.with_suffix(".mp4"), clip.meta_path]:
                 _unlink(f)
             thumb = clip.meta.get("thumbnailPath")

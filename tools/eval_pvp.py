@@ -29,7 +29,14 @@ def auc(positive: list[float], negative: list[float]) -> float | None:
 
 
 def load_clips(clips_dir: Path) -> list[dict]:
-    return [json.loads(p.read_text(encoding="utf-8")) for p in sorted(clips_dir.glob("*.json"))]
+    """지금 있는 클립 + 영상을 지운 뒤 남긴 라벨 보관소(`.labels`). 같은 ID 는 지금 있는 클립이 이긴다."""
+    live = {p.stem: json.loads(p.read_text(encoding="utf-8")) for p in sorted(clips_dir.glob("*.json"))}
+    archive = clips_dir / ".labels"
+    kept = {
+        p.stem: json.loads(p.read_text(encoding="utf-8"))
+        for p in sorted(archive.glob("*.json")) if p.stem not in live
+    } if archive.exists() else {}
+    return list(live.values()) + list(kept.values())
 
 
 def _ring_stats(values: list[float]) -> dict:

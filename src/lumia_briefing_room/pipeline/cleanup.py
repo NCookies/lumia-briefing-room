@@ -16,6 +16,7 @@ from pathlib import Path
 
 from lumia_briefing_room.api.clips import scan_clips, to_summary_dict
 from lumia_briefing_room.config import RetentionConfig, load_config, resolve_paths
+from lumia_briefing_room.pipeline.label_archive import archive_dir_for, archive_if_labeled
 from lumia_briefing_room.pipeline.retention import (
     _clip_files,
     list_expired,
@@ -73,7 +74,8 @@ def plan_cleanup(
     return CleanupPlan(to_trash, to_purge, freed)
 
 
-def _delete_clip_permanently(meta_path: Path) -> None:
+def _delete_clip_permanently(meta_path: Path, archive_dir: Path | None = None) -> None:
+    archive_if_labeled(meta_path, archive_dir)
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
     for f in _clip_files(meta_path, meta):
         f.unlink(missing_ok=True)
@@ -108,10 +110,10 @@ def run_cleanup(
 
     for meta_path in plan.to_trash:
         if cfg.delete_mode == "permanent":
-            _delete_clip_permanently(meta_path)
+            _delete_clip_permanently(meta_path, archive_dir_for(clips_dir))
         else:
             trash_clip(meta_path, trash_dir, now=lambda: now)
-    purge_expired(trash_dir, trash_days=cfg.trash_days, now=lambda: now)
+    purge_expired(trash_dir, trash_days=cfg.trash_days, now=lambda: now, archive_dir=archive_dir_for(clips_dir))
     remove_orphan_result_images(clips_dir, trash_dir)
     return plan
 
