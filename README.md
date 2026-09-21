@@ -8,7 +8,7 @@
 - [docs/plan-pipeline.md](docs/plan-pipeline.md) — 파이프라인 자동화(SPEC 2단계) 구현 계획 및 진행 상태
 - [docs/plan-ui.md](docs/plan-ui.md) — 열람 UI(SPEC 3단계) 구현 계획 및 진행 상태
 - [docs/plan-pvp.md](docs/plan-pvp.md) — PvP 판별(SPEC 4단계) 구현 계획 및 진행 상태
-- [docs/plan-vod.md](docs/plan-vod.md) — 다시보기(VOD) 클립(SPEC 5단계) 설계 및 진행 상태. 백엔드(분석·클립 생성)와 명령줄(아래 "실행 방법 8")까지 구현됐고, API·UI 탭은 아직이다
+- [docs/plan-vod.md](docs/plan-vod.md) — 다시보기(VOD) 클립(SPEC 5단계) 설계 및 진행 상태. 분석·클립 생성, API, UI 탭("다시보기")까지 구현됐다(아래 "실행 방법 8")
 
 ## 개발 환경
 
@@ -168,7 +168,9 @@ python tools/rescore_clips.py     # 가중치를 고친 뒤 점수를 다시 계
 
 받아 둔 다시보기 영상(mp4)에서 게임을 화면으로 나누고, 게임마다 교전 클립·썸네일·결과(순위·캐릭터·K/A)를 만든다.
 클립은 스팀 클립과 **다른 폴더**(`paths.vodClips`, 기본 `%USERPROFILE%\Videos\LumiaBriefingRoom\vod`)에 생기고 원본 영상은 읽기만 한다.
-아직 UI 탭·API 는 없어서 명령줄로만 돌린다(UI 는 plan-vod.md V4·V5).
+**화면에서 쓰는 법**: 열람 UI 헤더의 **`다시보기` 탭** → 옵션(⚙) → "다시보기" 에서 영상 파일이나 폴더를 추가 → 영상 행의 **분석 시작**. 진행 막대가 보이고 취소하면 다음에 이어서 한다. 끝나면 영상 섹션 안에 게임별 행과 클립이 나오고 라벨·플레이어·자르기·저장은 "내 녹화" 와 같다. 스트리머 이름은 영상 행에서 바로 고친다. 프론트를 고쳤으면 `cd frontend && npm run build`.
+
+**명령줄로 돌리려면**:
 
 ```bash
 python -m lumia_briefing_room.cli.analyze_vod "<영상.mp4>" \
