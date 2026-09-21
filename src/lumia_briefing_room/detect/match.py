@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 
 from lumia_briefing_room.detect.badge import read_badge
+from lumia_briefing_room.detect.clock import read_clock_zero
 from lumia_briefing_room.detect.color import channel_stats
 from lumia_briefing_room.detect.counter import (
     final_confirmed_value,
@@ -35,6 +36,7 @@ DEATH_LINK_SEC = 8.0
 UNEXPLAINED_DEATH_LOOKBACK_SEC = 12.0
 UNCOVERED_EVENT_LOOKBACK_SEC = 12.0
 MIN_SPECTATOR_SAMPLES = 2
+MIN_WAITING_SAMPLES = 5
 TEAM_COMBAT_SATURATION = 0.6
 MIN_TEAM_COMBAT_SAMPLES = 20
 
@@ -120,6 +122,7 @@ def analyze_frame(
         face_sat = float(face_stats.s.mean())
 
     day_night = read_day_night(profile.crop(frame, "day_night"))
+    clock_zero = read_clock_zero(profile.crop(frame, "timer")) if "timer" in profile.rois else None
 
     region = None
     if region_templates and spectating is False:
@@ -152,6 +155,7 @@ def analyze_frame(
         ally_rings=ally_rings,
         game_day=game_day,
         team_combat=team_combat,
+        clock_zero=clock_zero,
     )
 
 
@@ -245,12 +249,20 @@ def finalize_match(
     def _spectating(t: float) -> bool:
         return any(a <= t <= b for a, b in spectator_ranges)
 
+    waiting_ranges = to_intervals(
+        [(s.t, s.clock_zero) for s in states],
+        gap_fill_samples=1, min_combat_samples=MIN_WAITING_SAMPLES,
+    )
+
+    def _waiting(t: float) -> bool:
+        return any(a <= t <= b for a, b in waiting_ranges)
+
     def _fighting(s: FrameState) -> bool | None:
         """내 배지 OR 팀원 전투. 배지는 구도를 잡거나 거리를 벌리는 동안 꺼지지만 팀원 링은 켜져 있다.
 
         브리핑 룸은 본게임 전 대기방이라 교전이 아니다.
         """
-        if _spectating(s.t) or s.region in WAITING_ROOM_REGIONS:
+        if _spectating(s.t) or s.region in WAITING_ROOM_REGIONS or _waiting(s.t):
             return False
         if s.combat is True or (use_team_combat and s.team_combat is True):
             return True

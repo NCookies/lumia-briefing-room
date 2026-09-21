@@ -47,6 +47,7 @@ from lumia_briefing_room.video.vod import VodFileSource, find_ffprobe, probe_vid
 
 log = logging.getLogger(__name__)
 
+ANALYSIS_VERSION = 2
 CHECKPOINT_FRAMES = 120
 PROGRESS_EVERY_FRAMES = 30
 DECODE_SHARE = 0.70
@@ -154,15 +155,20 @@ def analyze_vod(
     index = load_index(root, vod) or {}
     if index.get("status") == "done" and not force and not rebuild:
         return index
+    stale = bool(index) and index.get("analysisVersion", 1) != ANALYSIS_VERSION
     if force:
         cache.clear()
         index = {}
+    elif stale:
+        cache.clear()
+        index = {**index, "decodeDone": False, "analyzedSec": 0.0}
     index = {
         **index,
         "id": vod, "path": str(video_path), "size": video_path.stat().st_size,
         "durationSec": info.duration_sec, "width": info.width, "height": info.height,
         "fps": info.fps, "streamer": streamer, "status": "analyzing", "error": None,
-        "decodeDone": bool(index.get("decodeDone")) and not force,
+        "decodeDone": bool(index.get("decodeDone")) and not force and not stale,
+        "analysisVersion": ANALYSIS_VERSION,
         "updatedAt": _now_iso(),
     }
     save_index(root, index)

@@ -25,6 +25,7 @@ class FrameState:
     game_day: int | None = None
     team_combat: bool | None = None
     ally_rings: int | None = None
+    clock_zero: bool | None = None
 
 
 @dataclass(frozen=True)

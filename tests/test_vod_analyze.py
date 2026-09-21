@@ -248,3 +248,81 @@ def test_result_failure_does_not_stop_clip_creation(vod_file, tmp_path):
 
     assert index["status"] == "done" and index["clips"]
     assert index["games"][0]["result"] is None
+
+
+@requires_ffmpeg
+def test_index_records_the_analysis_version(vod_file, tmp_path):
+    from lumia_briefing_room.pipeline.vod_analyze import ANALYSIS_VERSION
+
+    index, _ = run(tmp_path, vod_file)
+
+    assert index["analysisVersion"] == ANALYSIS_VERSION
+
+
+@requires_ffmpeg
+def test_rebuild_redecodes_when_the_cache_comes_from_an_older_reader(vod_file, tmp_path):
+    first, cfg = run(tmp_path, vod_file)
+    stale = load_index(cfg.paths.vod_clips, vod_id(vod_file))
+    stale["analysisVersion"] = 1
+    from lumia_briefing_room.pipeline.vod_store import save_index
+
+    save_index(cfg.paths.vod_clips, stale)
+    calls = []
+
+    def spy(frame, t):
+        calls.append(t)
+        return scripted_state(round(t))
+
+    analyze_vod(vod_file, cfg, ffmpeg_path=FFMPEG_PATH, read_frame=spy, find_result=no_result, rebuild=True)
+
+    assert len(calls) >= DURATION - 2 and min(calls) < 1
+
+
+@requires_ffmpeg
+def test_done_vod_with_an_older_reader_is_left_alone_without_rebuild(vod_file, tmp_path):
+    _, cfg = run(tmp_path, vod_file)
+    stale = load_index(cfg.paths.vod_clips, vod_id(vod_file))
+    stale["analysisVersion"] = 1
+    from lumia_briefing_room.pipeline.vod_store import save_index
+
+    save_index(cfg.paths.vod_clips, stale)
+    calls = []
+
+    def spy(frame, t):
+        calls.append(t)
+        return scripted_state(round(t))
+
+    analyze_vod(vod_file, cfg, ffmpeg_path=FFMPEG_PATH, read_frame=spy, find_result=no_result)
+
+    assert calls == []
+
+
+@requires_ffmpeg
+def test_partial_cache_from_an_older_reader_is_discarded_on_resume(vod_file, tmp_path):
+    from lumia_briefing_room.pipeline.vod_store import save_index
+
+    cfg = make_cfg(tmp_path)
+    cancel = threading.Event()
+    seen = []
+
+    def cancelling(frame, t):
+        seen.append(t)
+        if len(seen) == 20:
+            cancel.set()
+        return scripted_state(round(t))
+
+    with pytest.raises(VodCancelled):
+        analyze_vod(vod_file, cfg, ffmpeg_path=FFMPEG_PATH, read_frame=cancelling,
+                    find_result=no_result, cancel=cancel)
+    partial = load_index(cfg.paths.vod_clips, vod_id(vod_file))
+    partial["analysisVersion"] = 1
+    save_index(cfg.paths.vod_clips, partial)
+    resumed = []
+
+    def counting(frame, t):
+        resumed.append(t)
+        return scripted_state(round(t))
+
+    analyze_vod(vod_file, cfg, ffmpeg_path=FFMPEG_PATH, read_frame=counting, find_result=no_result)
+
+    assert min(resumed) < 1
