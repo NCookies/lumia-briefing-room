@@ -1,7 +1,7 @@
 import numpy as np
 
 from lumia_briefing_room.detect.result import ResultScreen
-from lumia_briefing_room.pipeline.result_scan import scan_for_result
+from lumia_briefing_room.pipeline.result_scan import scan_for_result, scan_forward_for_result
 
 RESULT = ResultScreen(placement=4, total=7, match_type="rank", match_label="랭크", outcome="실험 종료", nickname="나")
 
@@ -47,3 +47,34 @@ def test_scan_gives_up_after_max_frames():
 
 def test_scan_returns_none_when_no_frame_matches():
     assert scan_for_result(frames(1, 2), make_read([]), is_ingame=lambda f: False) is None
+
+
+def batches(*groups):
+    return iter([frames(*g) for g in groups])
+
+
+def test_scan_forward_reads_batches_lazily_and_stops_at_first_hit():
+    calls = []
+    consumed = []
+
+    def source():
+        for group in [(1, 1), (1, 9), (2, 2)]:
+            consumed.append(group)
+            yield frames(*group)
+
+    result = scan_forward_for_result(source(), make_read(calls), is_ingame=lambda f: int(f[0, 0, 0]) == 1)
+
+    assert result == RESULT
+    assert calls == [9]
+    assert consumed == [(1, 1), (1, 9)]
+
+
+def test_scan_forward_gives_up_after_max_ocr_attempts():
+    calls = []
+
+    result = scan_forward_for_result(
+        batches((2, 2), (2, 2)), make_read(calls), is_ingame=lambda f: False, max_ocr=3
+    )
+
+    assert result is None
+    assert len(calls) == 3

@@ -57,7 +57,8 @@ def _is_outcome(line: TextLine) -> bool:
 def parse_panel(lines: list[TextLine]) -> PanelParse | None:
     """결과 화면 좌측 패널의 OCR 줄들에서 순위·결과 문구·닉네임 줄을 골라낸다.
 
-    글자 위치가 아니라 순서로 찾는다: 순위(`N/M`) 다음의 한글 줄이 결과 문구, 그 다음 막대(`|`)로 시작하는 줄이 닉네임이다.
+    글자 위치가 아니라 순서로 찾는다: 순위(`N/M`) 뒤 막대(`|`)로 시작하는 줄이 닉네임이고, 그 바로 위 한글 줄이 결과 문구다.
+    모드 칩(`랭크 대전`)이 패널 OCR 에 읽히는 프레임이 있어 문구는 닉네임에 가장 가까운 줄로 잡는다.
     """
     ordered = sorted(lines, key=lambda l: (l.y, l.x))
     for i, ln in enumerate(ordered):
@@ -69,9 +70,10 @@ def parse_panel(lines: list[TextLine]) -> PanelParse | None:
             return None
 
         rest = ordered[i + 1 :]
-        outcome_line = next((l for l in rest if _is_outcome(l)), None)
-        after = rest[rest.index(outcome_line) + 1 :] if outcome_line else rest
-        nickname_line = next((l for l in after if _BAR_PREFIX.match(l.text)), None)
+        nickname_line = next((l for l in rest if _BAR_PREFIX.match(l.text)), None)
+        above = rest[: rest.index(nickname_line)] if nickname_line else rest
+        candidates = [l for l in above if _is_outcome(l)]
+        outcome_line = candidates[-1] if nickname_line else (candidates[0] if candidates else None)
         return PanelParse(placement, total, outcome_line.text.strip() if outcome_line else None, nickname_line)
     return None
 

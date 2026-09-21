@@ -45,6 +45,14 @@ def test_parse_panel_skips_low_confidence_noise_between_placement_and_outcome():
     assert parsed.outcome == "실험 종료"
 
 
+def test_parse_panel_prefers_line_right_above_nickname_over_chip_text():
+    parsed = parse_panel(
+        [line("7/7", 40), line("랭크 대전", 182), line("실험 종료", 225), line("|내테스트닉", 372)]
+    )
+
+    assert parsed.outcome == "실험 종료"
+
+
 def test_parse_panel_returns_none_without_placement():
     assert parse_panel([line("TK", 10), line("13", 40)]) is None
 
