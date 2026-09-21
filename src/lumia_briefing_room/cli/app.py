@@ -14,6 +14,7 @@ from lumia_briefing_room import autostart
 from lumia_briefing_room.cli import serve as serve_cli
 from lumia_briefing_room.cli.watch import build_parser, run
 from lumia_briefing_room.config import load_config
+from lumia_briefing_room.pipeline.cleanup import cleanup_loop, make_cleanup_runner
 from lumia_briefing_room.tray import build_icon
 
 log = logging.getLogger("lumia_briefing_room.app")
@@ -119,6 +120,9 @@ def main(argv: list[str] | None = None) -> None:
     apply_autostart_setting(cfg)
 
     on_toggle_watch, watch_enabled = make_watch_controller(args)
+    threading.Thread(
+        target=cleanup_loop, args=(make_cleanup_runner(args.config), threading.Event()), daemon=True
+    ).start()
 
     on_open = make_on_open(
         host="127.0.0.1", port=resolve_port(cfg.ui.port), config_path=args.config

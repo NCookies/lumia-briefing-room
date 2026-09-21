@@ -391,3 +391,51 @@ def test_result_image_is_404_without_image(client):
     assert client.get("/api/clips/a/result-image").status_code == 404
     assert client.get("/api/clips/b/result-image").status_code == 404
     assert client.get("/api/clips/zzz/result-image").status_code == 404
+
+
+def _enable_cleanup(client, **retention):
+    client.put("/api/config", json={"retention": {"autoCleanEnabled": True, **retention}})
+
+
+def test_cleanup_preview_counts_without_touching_files(client):
+    clips = client.app.state.clips_dir_for_test
+    _write_clip(clips, "old", matchStartUtc="2020-01-01T00:00:00Z")
+    _write_clip(clips, "new", matchStartUtc="2999-01-01T00:00:00Z")
+    _enable_cleanup(client, maxAgeDays=30)
+
+    resp = client.post("/api/cleanup", json={"dryRun": True})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["toTrash"] == 1 and body["toPurge"] == 0 and body["applied"] is False
+    assert (clips / "old.json").exists()
+
+
+def test_cleanup_run_moves_old_clips_to_trash(client):
+    clips = client.app.state.clips_dir_for_test
+    _write_clip(clips, "old", matchStartUtc="2020-01-01T00:00:00Z")
+    _enable_cleanup(client, maxAgeDays=30)
+
+    body = client.post("/api/cleanup", json={}).json()
+
+    assert body["toTrash"] == 1 and body["applied"] is True
+    assert not (clips / "old.json").exists() and (clips / ".trash" / "old.json").exists()
+
+
+def test_cleanup_does_nothing_when_disabled(client):
+    clips = client.app.state.clips_dir_for_test
+    _write_clip(clips, "old", matchStartUtc="2020-01-01T00:00:00Z")
+    client.put("/api/config", json={"retention": {"maxAgeDays": 30}})
+
+    body = client.post("/api/cleanup", json={}).json()
+
+    assert body["toTrash"] == 0
+    assert (clips / "old.json").exists()
+
+
+def test_retention_limits_can_be_cleared_with_null(client):
+    client.put("/api/config", json={"retention": {"maxAgeDays": 30}})
+
+    resp = client.put("/api/config", json={"retention": {"maxAgeDays": None}})
+
+    assert resp.json()["retention"]["maxAgeDays"] is None

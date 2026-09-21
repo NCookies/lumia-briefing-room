@@ -23,6 +23,7 @@ from lumia_briefing_room.config import (
     resolve_paths,
     save_config,
 )
+from lumia_briefing_room.pipeline.cleanup import plan_cleanup, run_cleanup
 from lumia_briefing_room.pipeline.retention import restore_clip, trash_clip
 
 
@@ -204,6 +205,20 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         if path is not None and path.exists():
             app.state.config = load_config(path)
         return app.state.config
+
+    @app.post("/api/cleanup")
+    def cleanup(body: dict):
+        cfg = current_config()
+        resolved = resolve_paths(cfg.paths)
+        dry_run = bool(body.get("dryRun"))
+        step = plan_cleanup if dry_run else run_cleanup
+        plan = step(resolved.clips, resolved.trash, cfg.retention)
+        return {
+            "toTrash": len(plan.to_trash),
+            "toPurge": len(plan.to_purge),
+            "bytesToFree": plan.bytes_to_free,
+            "applied": not dry_run and cfg.retention.auto_clean_enabled,
+        }
 
     @app.get("/api/config")
     def get_config():

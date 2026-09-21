@@ -95,29 +95,31 @@ def restore_clip(trashed_meta_path: Path, clips_dir: Path) -> Path:
     return moved_path
 
 
+def list_expired(
+    trash_dir: Path, *, trash_days: int, now: Callable[[], datetime] = _default_now
+) -> list[Path]:
+    """휴지통에서 유예 기간이 지난 클립의 메타데이터 경로 목록."""
+    if not trash_dir.exists():
+        return []
+
+    cutoff = now() - timedelta(days=trash_days)
+    expired: list[Path] = []
+    for meta_path in sorted(trash_dir.glob("*.json")):
+        deleted_at = _read_meta(meta_path).get("deletedAt")
+        if deleted_at and datetime.fromisoformat(deleted_at.replace("Z", "+00:00")) <= cutoff:
+            expired.append(meta_path)
+    return expired
+
+
 def purge_expired(
     trash_dir: Path, *, trash_days: int, now: Callable[[], datetime] = _default_now
 ) -> list[Path]:
     """유예 기간이 지난 클립을 실제로(되돌릴 수 없게) 지운다. 지운 메타데이터 경로 목록."""
-    if not trash_dir.exists():
-        return []
-
-    purged: list[Path] = []
-    cutoff = now() - timedelta(days=trash_days)
-
-    for meta_path in trash_dir.glob("*.json"):
-        meta = _read_meta(meta_path)
-        deleted_at = meta.get("deletedAt")
-        if not deleted_at:
-            continue
-        if datetime.fromisoformat(deleted_at) > cutoff:
-            continue
-
-        for f in _clip_files(meta_path, meta):
+    purged = list_expired(trash_dir, trash_days=trash_days, now=now)
+    for meta_path in purged:
+        for f in _clip_files(meta_path, _read_meta(meta_path)):
             f.unlink(missing_ok=True)
         meta_path.unlink()
-        purged.append(meta_path)
-
     return purged
 
 
