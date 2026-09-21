@@ -76,3 +76,22 @@ def test_read_badge_handles_noisy_background_mixed_with_orange():
     frame[:13, :] = (255, 150, 20)   # 260px orange: ORANGE_MIN, PRESENT_MIN 모두 충족
     frame[13:, :] = (40, 90, 120)    # 배경 노이즈, vivid 조건 불충족
     assert read_badge(frame) is True
+
+
+def test_classify_badge_counts_green_for_normal_level_badge():
+    frame = _solid((90, 220, 60))
+    counts = classify_badge(frame)
+    assert counts.green == 400
+    assert counts.orange == 0
+    assert counts.yellow == 0
+    assert counts.blue == 0
+
+
+def test_read_badge_false_when_green_badge_normal():
+    frame = _solid((90, 220, 60))
+    assert read_badge(frame) is False
+
+
+def test_orange_is_not_counted_as_green():
+    assert classify_badge(_solid((255, 150, 20))).green == 0
+    assert classify_badge(_solid((255, 220, 20))).green == 0

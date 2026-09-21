@@ -17,6 +17,7 @@ class BadgeColorCounts:
     orange: int
     yellow: int
     blue: int
+    green: int = 0
 
 
 def classify_badge(rgb: np.ndarray) -> BadgeColorCounts:
@@ -25,6 +26,7 @@ def classify_badge(rgb: np.ndarray) -> BadgeColorCounts:
     주황 = V≥90 AND S≥60 AND R>B+60 AND R≥G AND G<R*0.80  (교전 중)
     노랑 = V≥90 AND S≥60 AND R>B+60 AND G≥R*0.80          (평상시, 노랑 배지)
     파랑 = V≥90 AND S≥60 AND B>R+40                        (평상시, 파랑 배지)
+    초록 = V≥90 AND S≥60 AND G>R+40 AND G>B+20              (평상시, 레벨 숫자 원. 다시보기 방송에서 확인)
     """
     stats = channel_stats(rgb)
     vivid = vivid_mask(stats, v_min=V_MIN, s_min=S_MIN)
@@ -32,13 +34,16 @@ def classify_badge(rgb: np.ndarray) -> BadgeColorCounts:
     orange = warm & (stats.r >= stats.g) & (stats.g < stats.r * 0.80)
     yellow = warm & (stats.g >= stats.r * 0.80)
     blue = vivid & (stats.b > stats.r + 40)
-    return BadgeColorCounts(orange=count(orange), yellow=count(yellow), blue=count(blue))
+    green = vivid & (stats.g > stats.r + 40) & (stats.g > stats.b + 20)
+    return BadgeColorCounts(
+        orange=count(orange), yellow=count(yellow), blue=count(blue), green=count(green)
+    )
 
 
 def read_badge(rgb: np.ndarray) -> bool | None:
     """교전 중이면 True, 평상시면 False, 배지가 안 보이면(로비/암전) None."""
     counts = classify_badge(rgb)
-    total = counts.orange + counts.yellow + counts.blue
+    total = counts.orange + counts.yellow + counts.blue + counts.green
     if total < PRESENT_MIN:
         return None
     return counts.orange >= ORANGE_MIN
