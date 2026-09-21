@@ -29,11 +29,12 @@ export const DEFAULT_FILTER: FilterState = {
 interface Props {
   value: FilterState
   onChange: (next: FilterState) => void
+  variant?: 'steam' | 'vod'
 }
 
 const SELECT = 'rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm'
 
-export function FilterBar({ value, onChange }: Props) {
+export function FilterBar({ value, onChange, variant = 'steam' }: Props) {
   const toggleTag = (tag: ClipTag) => {
     const has = value.tags.includes(tag)
     onChange({ ...value, tags: has ? value.tags.filter((t) => t !== tag) : [...value.tags, tag] })
@@ -46,8 +47,17 @@ export function FilterBar({ value, onChange }: Props) {
         value={value.sort}
         onChange={(e) => onChange({ ...value, sort: e.target.value as FilterState['sort'] })}
       >
-        <option value="desc">최신 순</option>
-        <option value="asc">오래된 순</option>
+        {variant === 'vod' ? (
+          <>
+            <option value="asc">영상 시간순</option>
+            <option value="desc">영상 역순</option>
+          </>
+        ) : (
+          <>
+            <option value="desc">최신 순</option>
+            <option value="asc">오래된 순</option>
+          </>
+        )}
         <option value="pvp">교전 가능성순</option>
       </select>
 

@@ -380,7 +380,7 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
 
   return (
     <div className="flex flex-1 flex-col">
-      <FilterBar value={filter} onChange={setFilter} />
+      <FilterBar value={filter} onChange={setFilter} variant={source} />
 
       <main className="flex-1 p-4">
         {!filter.trashed && total > 0 && (
