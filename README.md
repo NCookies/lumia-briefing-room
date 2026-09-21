@@ -8,7 +8,7 @@
 - [docs/plan-pipeline.md](docs/plan-pipeline.md) — 파이프라인 자동화(SPEC 2단계) 구현 계획 및 진행 상태
 - [docs/plan-ui.md](docs/plan-ui.md) — 열람 UI(SPEC 3단계) 구현 계획 및 진행 상태
 - [docs/plan-pvp.md](docs/plan-pvp.md) — PvP 판별(SPEC 4단계) 구현 계획 및 진행 상태
-- [docs/plan-vod.md](docs/plan-vod.md) — 다시보기(VOD) 클립(SPEC 5단계) 설계. **설계만 있고 아직 구현되지 않았다** — 아래 "실행 방법"에는 아직 해당 기능이 없다
+- [docs/plan-vod.md](docs/plan-vod.md) — 다시보기(VOD) 클립(SPEC 5단계) 설계 및 진행 상태. 백엔드(분석·클립 생성)와 명령줄(아래 "실행 방법 8")까지 구현됐고, API·UI 탭은 아직이다
 
 ## 개발 환경
 
@@ -163,6 +163,24 @@ python -m lumia_briefing_room.cli.detect_match \
 python tools/eval_pvp.py          # 라벨로 점수를 평가: 오탐, 적 링 분포, 임계별 정밀도/재현율
 python tools/rescore_clips.py     # 가중치를 고친 뒤 점수를 다시 계산 (사용자 라벨은 보존)
 ```
+
+### 8. 다시보기(VOD) 영상 분석 — 스트리머 방송에서 교전 클립 뽑기
+
+받아 둔 다시보기 영상(mp4)에서 게임을 화면으로 나누고, 게임마다 교전 클립·썸네일·결과(순위·캐릭터·K/A)를 만든다.
+클립은 스팀 클립과 **다른 폴더**(`paths.vodClips`, 기본 `%USERPROFILE%\Videos\LumiaBriefingRoom\vod`)에 생기고 원본 영상은 읽기만 한다.
+아직 UI 탭·API 는 없어서 명령줄로만 돌린다(UI 는 plan-vod.md V4·V5).
+
+```bash
+python -m lumia_briefing_room.cli.analyze_vod "<영상.mp4>" \
+  [--config PATH] [--ffmpeg PATH] [--clips-dir PATH] [--streamer 이름] [--hwaccel d3d11va] \
+  [--force] [--rebuild]
+```
+
+- 진행률이 단계(`decode`/`games`/`cut`)별로 출력된다. 8시간 영상은 디코딩·판독에 수십 분이 걸린다(3시간 18분 영상 기준 실측은 plan-vod.md).
+- **Ctrl+C 로 멈춰도 된다.** 판독은 120프레임마다 `<클립폴더>/.vods/<영상id>.states.jsonl.gz` 에 저장되고, 같은 명령을 다시 실행하면 저장된 시각부터 이어간다. 영상 id 는 파일 내용(크기 + 앞뒤 1MiB)이라 파일을 옮겨도 이어진다.
+- 이미 끝난 영상은 아무것도 안 한다. `--rebuild` 는 저장된 판독으로 클립만 다시 만들고(설정의 `clip.*`·`filter.*` 를 바꾼 뒤), `--force` 는 판독까지 처음부터 다시 한다. 다시 만들 때 기존 클립은 `.trash` 로 옮겨진다.
+- 스트리머 이름은 `--streamer` 또는 설정 `vod.streamers` 에 영상 id 로 넣는다. `vod.gameGapSec`(게임 안 끊김 허용, 기본 30초)·`vod.minGameSec`(기본 60초)로 게임 분할을 조절한다.
+- 결과 화면(순위 등)에는 RapidOCR 가 필요하다(위 "개발 환경" 참고). 없거나 실패해도 클립은 만들어진다.
 
 ## 개발 도구 (tools/)
 
