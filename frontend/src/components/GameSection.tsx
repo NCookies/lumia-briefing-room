@@ -1,11 +1,16 @@
 import type { ReactNode } from 'react'
-import { formatAgo, formatKda, type GameGroup } from '../grouping'
+import { formatAgo, formatKda, totalSize, type GameGroup } from '../grouping'
+import { formatBytes } from '../retention'
 import type { Clip } from '../types'
 
 interface Props {
   group: GameGroup<Clip>
   expanded: boolean
+  trashed: boolean
   onToggle: () => void
+  onTrashGame: () => void
+  onRestoreGame: () => void
+  onDeleteGameForever: () => void
   children: ReactNode
 }
 
@@ -22,7 +27,16 @@ function barColor(placement: number | undefined): string {
   return 'bg-zinc-500'
 }
 
-export function GameSection({ group, expanded, onToggle, children }: Props) {
+export function GameSection({
+  group,
+  expanded,
+  trashed,
+  onToggle,
+  onTrashGame,
+  onRestoreGame,
+  onDeleteGameForever,
+  children,
+}: Props) {
   const result = group.result
   const kda = formatKda(result)
 
@@ -71,8 +85,27 @@ export function GameSection({ group, expanded, onToggle, children }: Props) {
             )}
           </div>
 
-          <div className="ml-auto text-sm text-zinc-400">클립 {group.clips.length}개</div>
+          <div className="ml-auto text-right text-sm text-zinc-400">
+            <div>클립 {group.clips.length}개</div>
+            <div className="text-xs text-zinc-500">{formatBytes(totalSize(group.clips))}</div>
+          </div>
         </button>
+        <div className="flex shrink-0 items-center gap-3 px-3 text-xs">
+          {trashed ? (
+            <>
+              <button type="button" className="text-sky-400 hover:underline" onClick={onRestoreGame}>
+                게임 복구
+              </button>
+              <button type="button" className="text-rose-400 hover:underline" onClick={onDeleteGameForever}>
+                게임 완전 삭제
+              </button>
+            </>
+          ) : (
+            <button type="button" className="text-zinc-400 hover:text-rose-400" onClick={onTrashGame}>
+              게임 삭제
+            </button>
+          )}
+        </div>
         <button
           type="button"
           className="w-14 shrink-0 border-l border-zinc-700 text-lg text-zinc-400 hover:bg-zinc-700/40 hover:text-zinc-100"

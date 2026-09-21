@@ -23,7 +23,7 @@ from lumia_briefing_room.config import (
     resolve_paths,
     save_config,
 )
-from lumia_briefing_room.pipeline.cleanup import plan_cleanup, run_cleanup
+from lumia_briefing_room.pipeline.cleanup import plan_cleanup, remove_orphan_result_images, run_cleanup
 from lumia_briefing_room.pipeline.retention import restore_clip, trash_clip
 
 
@@ -41,6 +41,7 @@ def _deep_merge(base: dict, overrides: dict) -> dict:
 def _serialize(clip_summary) -> dict:
     meta = dict(clip_summary.meta)
     meta["id"] = clip_summary.id
+    meta["sizeBytes"] = clip_summary.size_bytes
     return meta
 
 
@@ -130,6 +131,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         thumb = clip.meta.get("thumbnailPath")
         if thumb:
             Path(thumb).unlink(missing_ok=True)
+        remove_orphan_result_images(clips_dir, clips_dir / ".trash")
         return {"id": clip_id, "deleted": True}
 
     @app.get("/api/clips/{clip_id}/video")

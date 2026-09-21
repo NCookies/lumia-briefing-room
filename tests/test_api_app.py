@@ -439,3 +439,26 @@ def test_retention_limits_can_be_cleared_with_null(client):
     resp = client.put("/api/config", json={"retention": {"maxAgeDays": None}})
 
     assert resp.json()["retention"]["maxAgeDays"] is None
+
+
+def test_list_clips_includes_size_bytes(client):
+    _write_clip(client.app.state.clips_dir_for_test, "a", video=b"x" * 1234)
+
+    assert client.get("/api/clips").json()[0]["sizeBytes"] == 1234
+
+
+def test_permanently_deleting_the_last_clip_of_a_game_removes_its_result_image(client, tmp_path):
+    clips = client.app.state.clips_dir_for_test
+    image = clips / ".thumbs" / "20260920_100000_result.jpg"
+    image.parent.mkdir(parents=True, exist_ok=True)
+    image.write_bytes(b"j")
+    _write_clip(clips, "a", matchResult={"imagePath": str(image)})
+    _write_clip(clips, "b", matchResult={"imagePath": str(image)})
+    client.post("/api/clips/a/trash")
+    client.post("/api/clips/b/trash")
+
+    client.delete("/api/clips/a")
+    assert image.exists()
+
+    client.delete("/api/clips/b")
+    assert not image.exists()

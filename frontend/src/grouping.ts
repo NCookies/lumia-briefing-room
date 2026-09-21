@@ -78,3 +78,7 @@ export function formatAgo(iso: string, now: Date = new Date()): string {
   if (minutes < 60 * 24) return `${Math.floor(minutes / 60)}시간 전`
   return `${Math.floor(minutes / 60 / 24)}일 전`
 }
+
+export function totalSize(clips: { sizeBytes?: number }[]): number {
+  return clips.reduce((sum, c) => sum + (c.sizeBytes ?? 0), 0)
+}

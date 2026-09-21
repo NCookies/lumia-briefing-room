@@ -6,9 +6,10 @@ import { ExportDialog } from './components/ExportDialog'
 import { GameSection } from './components/GameSection'
 import { PlayerModal } from './components/PlayerModal'
 import { ResultCard, ResultViewer } from './components/ResultCard'
-import { groupByGame } from './grouping'
+import { groupByGame, totalSize, type GameGroup } from './grouping'
 import { applyLabel, progress } from './labeling'
 import { SettingsModal } from './components/SettingsModal'
+import { formatBytes } from './retention'
 import type { Clip, UserLabel } from './types'
 
 export default function App() {
@@ -66,6 +67,26 @@ export default function App() {
   const handleDeleteForever = async (clip: Clip) => {
     if (!confirm(`"${clip.title}" 를 되돌릴 수 없게 완전히 삭제한다. 계속할까?`)) return
     await deleteClipForever(clip.id)
+    reload()
+  }
+
+  const gameLabel = (group: GameGroup<Clip>) =>
+    `게임 ${group.number}(${group.clips.length}개, ${formatBytes(totalSize(group.clips))})`
+
+  const handleTrashGame = async (group: GameGroup<Clip>) => {
+    if (!confirm(`${gameLabel(group)}의 클립을 모두 휴지통으로 보낸다. 계속할까?`)) return
+    await Promise.all(group.clips.map((c) => trashClip(c.id)))
+    reload()
+  }
+
+  const handleRestoreGame = async (group: GameGroup<Clip>) => {
+    await Promise.all(group.clips.map((c) => restoreClip(c.id)))
+    reload()
+  }
+
+  const handleDeleteGameForever = async (group: GameGroup<Clip>) => {
+    if (!confirm(`${gameLabel(group)}의 클립을 되돌릴 수 없게 완전히 삭제한다. 계속할까?`)) return
+    await Promise.all(group.clips.map((c) => deleteClipForever(c.id)))
     reload()
   }
 
@@ -146,7 +167,11 @@ export default function App() {
               key={group.key}
               group={group}
               expanded={expandedKeys.has(group.key)}
+              trashed={filter.trashed}
               onToggle={() => toggleGame(group.key)}
+              onTrashGame={() => handleTrashGame(group)}
+              onRestoreGame={() => handleRestoreGame(group)}
+              onDeleteGameForever={() => handleDeleteGameForever(group)}
             >
               {group.result?.imagePath && (
                 <ResultCard

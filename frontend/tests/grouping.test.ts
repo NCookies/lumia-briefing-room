@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { formatAgo, formatKda, formatMatchResult, groupByGame } from '../src/grouping.ts'
+import { formatAgo, formatKda, formatMatchResult, groupByGame, totalSize } from '../src/grouping.ts'
 
 const c = (id: string, matchStartUtc: string, sessionDir = 's1', pvpScore: number | null = null) => ({
   id,
@@ -121,4 +121,9 @@ test('formatAgo picks minutes, hours or days', () => {
   assert.equal(formatAgo('2026-09-19T12:00:00Z', now), '2일 전')
   assert.equal(formatAgo('2026-09-21T11:59:40Z', now), '방금 전')
   assert.equal(formatAgo('not a date', now), '')
+})
+
+test('totalSize adds clip sizes and treats a missing size as zero', () => {
+  assert.equal(totalSize([{ sizeBytes: 100 }, { sizeBytes: 250 }, {}]), 350)
+  assert.equal(totalSize([]), 0)
 })

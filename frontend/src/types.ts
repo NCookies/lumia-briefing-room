@@ -67,5 +67,6 @@ export interface Clip {
   matchAssists: number | null
   matchTeamKills: number | null
   detectorConfidence: number
+  sizeBytes?: number
   matchResult?: MatchResult | null
 }
