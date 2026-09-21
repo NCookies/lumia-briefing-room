@@ -572,3 +572,83 @@ def test_empty_trash_removes_result_images_no_clip_uses_anymore(client):
 
 def test_empty_trash_when_already_empty_is_a_no_op(client):
     assert client.post("/api/trash/empty").json() == {"deleted": 0, "bytes": 0}
+
+
+def _wait_for_job(client, key, *, tries=100):
+    import time
+
+    for _ in range(tries):
+        body = client.get(f"/api/games/reprocess/{key}").json()
+        if body["state"] != "running":
+            return body
+        time.sleep(0.02)
+    raise AssertionError("작업이 끝나지 않았다")
+
+
+@pytest.fixture
+def reprocess_env(client, monkeypatch, tmp_path):
+    from lumia_briefing_room.api import app as app_module
+
+    root = tmp_path / "recordings"
+    root.mkdir()
+    client.put("/api/config", json={"paths": {"steamRecording": str(root)}})
+    monkeypatch.setattr(app_module, "discover_ffmpeg", lambda: Path("ffmpeg"))
+    monkeypatch.setattr(app_module, "read_boundaries", lambda cfg: [])
+    _write_clip(client.app.state.clips_dir_for_test, "a", sessionDir="bg_1_20260921_105357",
+                matchStartUtc="2026-09-21T10:58:21Z")
+    return app_module
+
+
+def test_reprocess_runs_in_the_background_and_reports_the_new_clip_count(client, reprocess_env, monkeypatch):
+    seen = {}
+
+    def fake(**kw):
+        seen.update(kw)
+        return [Path("x.json"), Path("y.json")]
+
+    monkeypatch.setattr(reprocess_env, "reprocess_game", fake)
+
+    resp = client.post("/api/games/reprocess", json={"clipId": "a"})
+
+    assert resp.status_code == 202
+    status = _wait_for_job(client, resp.json()["key"])
+    assert status == {"state": "done", "message": "", "clips": 2}
+    assert seen["ref"].session_name == "bg_1_20260921_105357"
+    assert seen["ref"].match_start == "2026-09-21T10:58:21Z"
+
+
+def test_reprocess_shows_the_reason_when_the_original_recording_is_gone(client, reprocess_env, monkeypatch):
+    from lumia_briefing_room.pipeline.reprocess import ReprocessError
+
+    def fake(**kw):
+        raise ReprocessError("원본 녹화가 이미 삭제되어 다시 분석할 수 없습니다")
+
+    monkeypatch.setattr(reprocess_env, "reprocess_game", fake)
+
+    key = client.post("/api/games/reprocess", json={"clipId": "a"}).json()["key"]
+
+    assert _wait_for_job(client, key) == {
+        "state": "error", "message": "원본 녹화가 이미 삭제되어 다시 분석할 수 없습니다", "clips": 0,
+    }
+
+
+def test_reprocess_allows_only_one_running_job_at_a_time(client, reprocess_env, monkeypatch):
+    import threading
+
+    release = threading.Event()
+    monkeypatch.setattr(reprocess_env, "reprocess_game", lambda **kw: release.wait(5) and [])
+    first = client.post("/api/games/reprocess", json={"clipId": "a"})
+
+    second = client.post("/api/games/reprocess", json={"clipId": "a"})
+
+    assert first.status_code == 202 and second.status_code == 409
+    release.set()
+    _wait_for_job(client, first.json()["key"])
+
+
+def test_reprocess_rejects_unknown_clip_and_missing_setup(client, reprocess_env, monkeypatch):
+    assert client.post("/api/games/reprocess", json={"clipId": "zzz"}).status_code == 404
+    assert client.post("/api/games/reprocess", json={}).status_code == 400
+
+    monkeypatch.setattr(reprocess_env, "discover_ffmpeg", lambda: None)
+    assert client.post("/api/games/reprocess", json={"clipId": "a"}).status_code == 503

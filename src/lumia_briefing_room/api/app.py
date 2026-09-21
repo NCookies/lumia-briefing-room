@@ -30,7 +30,9 @@ from lumia_briefing_room.config import (
 )
 from lumia_briefing_room.pipeline.cleanup import plan_cleanup, remove_orphan_result_images, run_cleanup
 from lumia_briefing_room.pipeline.retention import restore_clip, trash_clip
+from lumia_briefing_room.pipeline.reprocess import GameRef, ReprocessError, reprocess_game
 from lumia_briefing_room.pipeline.trim import trim_clip, validate_range
+from lumia_briefing_room.steam_paths import discover_recording_root
 
 
 def _deep_merge(base: dict, overrides: dict) -> dict:
@@ -49,6 +51,19 @@ def _serialize(clip_summary) -> dict:
     meta["id"] = clip_summary.id
     meta["sizeBytes"] = clip_summary.size_bytes
     return meta
+
+
+def read_boundaries(cfg: Config):
+    """Player.log 에서 경기 시작/종료 시각 목록을 읽는다(다시 분석할 게임의 종료 시각을 찾는 데 쓴다)."""
+    from datetime import datetime
+
+    from lumia_briefing_room.cli.watch import default_player_log_dir
+    from lumia_briefing_room.pipeline.watcher import discover_backlog
+
+    log_dir = cfg.watch.player_log or default_player_log_dir()
+    return discover_backlog(
+        log_dir / "Player.log", log_dir / "Player-prev.log", local_tz=datetime.now().astimezone().tzinfo
+    )
 
 
 def _unlink(path: Path, *, attempts: int = 5) -> None:
@@ -72,6 +87,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     app.state.config = cfg
     app.state.config_path = config_path
     lock = threading.RLock()
+    jobs: dict[str, dict] = {}
 
     def locked(fn):
         """클립 파일을 읽거나 옮기거나 지우는 요청은 한 번에 하나씩 처리한다. 동시에 지우는 요청끼리 부딪혀 500 이 나던 문제를 막는다."""
@@ -283,6 +299,51 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             deleted += 1
         remove_orphan_result_images(clips_dir, trash_dir)
         return {"deleted": deleted, "bytes": freed}
+
+    @app.post("/api/games/reprocess", status_code=202)
+    def start_reprocess(body: dict):
+        clip_id = body.get("clipId")
+        if not clip_id:
+            raise HTTPException(400, "다시 분석할 게임의 클립을 지정해야 합니다")
+        clip = find_clip(_clips_dir(app), clip_id)
+        if clip is None:
+            raise HTTPException(404, "클립을 찾을 수 없습니다")
+        if any(j["state"] == "running" for j in jobs.values()):
+            raise HTTPException(409, "다른 게임을 분석하는 중입니다. 끝난 뒤 다시 시도하세요")
+        ffmpeg = discover_ffmpeg()
+        if ffmpeg is None:
+            raise HTTPException(503, "ffmpeg를 찾을 수 없습니다")
+        cfg = current_config()
+        recording_root = cfg.paths.steam_recording or discover_recording_root()
+        if recording_root is None:
+            raise HTTPException(503, "스팀 녹화 폴더를 찾을 수 없습니다")
+
+        ref = GameRef(session_name=clip.meta["sessionDir"], match_start=clip.meta["matchStartUtc"])
+        key = f"{ref.session_name}|{ref.match_start}"
+        job = {"state": "running", "message": "", "clips": 0}
+        jobs[key] = job
+        clips_dir = _clips_dir(app)
+
+        def run() -> None:
+            try:
+                written = reprocess_game(
+                    clips_dir=clips_dir, trash_dir=clips_dir / ".trash", ref=ref, recording_root=recording_root,
+                    boundaries=read_boundaries(cfg), cfg=cfg, ffmpeg_path=ffmpeg, guard=lock,
+                )
+                job.update(state="done", clips=len(written))
+            except ReprocessError as e:
+                job.update(state="error", message=str(e))
+            except Exception as e:
+                job.update(state="error", message=f"다시 분석에 실패했습니다: {e}")
+
+        threading.Thread(target=run, daemon=True).start()
+        return {"key": key}
+
+    @app.get("/api/games/reprocess/{key:path}")
+    def reprocess_status(key: str):
+        if key not in jobs:
+            raise HTTPException(404, "분석 작업을 찾을 수 없습니다")
+        return jobs[key]
 
     @app.post("/api/cleanup")
     @locked

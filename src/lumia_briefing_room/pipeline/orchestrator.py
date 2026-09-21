@@ -219,6 +219,7 @@ def process_match(
             match_assists=detection.a_final,
             match_result=result,
             result_image_path=result_image_path,
+            match_end_utc=match_end,
         )
         meta_path = clip_path.with_suffix(".json")
         write_metadata(meta, meta_path)

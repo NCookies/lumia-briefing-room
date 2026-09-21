@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { deleteClipForever, emptyTrash, listClips, patchClip, restoreClip, trashClip, trimClip } from './api'
+import {
+  deleteClipForever,
+  emptyTrash,
+  getReprocessStatus,
+  listClips,
+  patchClip,
+  restoreClip,
+  startReprocess,
+  trashClip,
+  trimClip,
+} from './api'
 import { useConfirm } from './confirmContext'
 import { getConfirmDelete, setConfirmDelete } from './exportApi'
 import { ClipCard } from './components/ClipCard'
@@ -26,6 +36,9 @@ export default function App() {
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDeleteState] = useState(true)
+  const [reprocessKey, setReprocessKey] = useState<string | null>(null)
+  const [reprocessGame, setReprocessGame] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const ask = useConfirm()
 
   const reload = useCallback(() => {
@@ -119,6 +132,44 @@ export default function App() {
 
   const handleRestoreGame = (group: GameGroup<Clip>) => runAndReload(() => runAll(group.clips, restoreClip))
 
+  useEffect(() => {
+    if (reprocessKey === null) return
+    const timer = setInterval(() => {
+      getReprocessStatus(reprocessKey)
+        .then((status) => {
+          if (status.state === 'running') return
+          setReprocessKey(null)
+          setReprocessGame(null)
+          if (status.state === 'done') setNotice(`다시 분석했습니다. 새 클립 ${status.clips}개를 만들었습니다.`)
+          else setActionError(status.message)
+          reload()
+        })
+        .catch((e: Error) => {
+          setReprocessKey(null)
+          setReprocessGame(null)
+          setActionError(e.message)
+        })
+    }, 3000)
+    return () => clearInterval(timer)
+  }, [reprocessKey, reload])
+
+  const handleReprocess = async (group: GameGroup<Clip>) => {
+    const result = await ask({
+      message: `${gameLabel(group)}를 원본 녹화에서 다시 분석합니다.\n기존 클립은 라벨과 편집 내용을 포함해 휴지통으로 이동하고 새로 만듭니다.\n분석에는 몇 분이 걸릴 수 있습니다. 계속하시겠습니까?`,
+      confirmLabel: '다시 분석',
+    })
+    if (!result.ok) return
+    setActionError(null)
+    setNotice(null)
+    try {
+      const key = await startReprocess(group.clips[0].id)
+      setReprocessKey(key)
+      setReprocessGame(group.key)
+    } catch (e) {
+      setActionError((e as Error).message)
+    }
+  }
+
   const handleEmptyTrash = async () => {
     const result = await ask({
       message: `휴지통의 클립 ${clips.length}개(${formatBytes(totalSize(clips))})를 모두 완전히 삭제합니다. 계속하시겠습니까?`,
@@ -193,6 +244,10 @@ export default function App() {
         {loading && <p className="text-zinc-400">불러오는 중입니다...</p>}
         {error && <p className="text-rose-400">오류가 발생했습니다: {error}</p>}
         {actionError && <p className="mb-2 text-rose-400">{actionError}</p>}
+        {reprocessKey !== null && (
+          <p className="mb-2 text-sky-300">게임을 다시 분석하는 중입니다. 몇 분 걸릴 수 있으며, 끝나면 목록이 자동으로 갱신됩니다.</p>
+        )}
+        {notice && <p className="mb-2 text-emerald-400">{notice}</p>}
         {!loading && !error && clips.length === 0 && (
           <p className="text-zinc-500">
             {filter.trashed ? '휴지통이 비어 있습니다' : '조건에 맞는 클립이 없습니다'}
@@ -239,6 +294,9 @@ export default function App() {
               onTrashGame={() => handleTrashGame(group)}
               onRestoreGame={() => handleRestoreGame(group)}
               onDeleteGameForever={() => handleDeleteGameForever(group)}
+              onReprocess={() => handleReprocess(group)}
+              reprocessing={reprocessGame === group.key}
+              reprocessBusy={reprocessKey !== null}
             >
               {group.result?.imagePath && (
                 <ResultCard

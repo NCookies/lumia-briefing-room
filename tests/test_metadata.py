@@ -248,3 +248,19 @@ def test_build_metadata_takes_team_characters_from_the_scoreboard_teammates():
     assert with_result.match_result["teammates"] == result.teammates
     assert build_metadata(**kwargs, team_characters=["직접"]).team_characters == ["직접"]
     assert build_metadata(**kwargs).team_characters == []
+
+
+def test_build_metadata_records_the_match_end_so_the_game_can_be_reanalyzed_later():
+    kwargs = dict(
+        title="t", session=_FakeSession(),
+        match_start_utc=datetime(2026, 9, 19, 15, 22, 20, tzinfo=timezone.utc),
+        game_mode="battle_royale", interval=_interval(),
+        clip_range=ClipRange(start=0.0, end=10.0, preroll_source="combat"),
+        cut_result=CutResult(segment_start=1, segment_end=2, duration_sec=9.0, source_incomplete=False),
+        thumbnail_path=None,
+    )
+
+    with_end = build_metadata(**kwargs, match_end_utc=datetime(2026, 9, 19, 15, 40, 1, tzinfo=timezone.utc))
+
+    assert with_end.match_end_utc == "2026-09-19T15:40:01Z"
+    assert build_metadata(**kwargs).match_end_utc is None

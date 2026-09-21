@@ -11,6 +11,9 @@ interface Props {
   onTrashGame: () => void
   onRestoreGame: () => void
   onDeleteGameForever: () => void
+  onReprocess: () => void
+  reprocessing: boolean
+  reprocessBusy: boolean
   children: ReactNode
 }
 
@@ -35,6 +38,9 @@ export function GameSection({
   onTrashGame,
   onRestoreGame,
   onDeleteGameForever,
+  onReprocess,
+  reprocessing,
+  reprocessBusy,
   children,
 }: Props) {
   const result = group.result
@@ -104,9 +110,20 @@ export function GameSection({
               </button>
             </>
           ) : (
-            <button type="button" className="text-zinc-400 hover:text-rose-400" onClick={onTrashGame}>
-              게임 삭제
-            </button>
+            <>
+              <button
+                type="button"
+                className="text-zinc-400 hover:text-sky-300 disabled:opacity-50 disabled:hover:text-zinc-400"
+                disabled={reprocessBusy}
+                title="원본 녹화에서 이 게임을 처음부터 다시 분석합니다"
+                onClick={onReprocess}
+              >
+                {reprocessing ? '분석 중...' : '다시 분석'}
+              </button>
+              <button type="button" className="text-zinc-400 hover:text-rose-400" onClick={onTrashGame}>
+                게임 삭제
+              </button>
+            </>
           )}
         </div>
         <button

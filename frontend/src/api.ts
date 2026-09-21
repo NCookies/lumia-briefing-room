@@ -72,6 +72,35 @@ export async function emptyTrash(): Promise<{ deleted: number; bytes: number }> 
   return res.json()
 }
 
+export interface ReprocessStatus {
+  state: 'running' | 'done' | 'error'
+  message: string
+  clips: number
+}
+
+export async function startReprocess(clipId: string): Promise<string> {
+  const res = await fetch(`${BASE}/games/reprocess`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clipId }),
+  })
+  if (!res.ok) {
+    let detail = ''
+    try {
+      detail = (await res.json()).detail ?? ''
+    } catch {
+      // 본문이 JSON 이 아니면 상태 코드만 보여준다
+    }
+    throw new Error(detail || `다시 분석을 시작하지 못했습니다 (${res.status})`)
+  }
+  return (await res.json()).key
+}
+
+export async function getReprocessStatus(key: string): Promise<ReprocessStatus> {
+  const res = await checkOk(await fetch(`${BASE}/games/reprocess/${key}`), '분석 상태 조회')
+  return res.json()
+}
+
 export function resultImageUrl(id: string): string {
   return `${BASE}/clips/${id}/result-image`
 }
