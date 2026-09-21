@@ -224,3 +224,27 @@ def test_match_result_dict_includes_image_path_only_when_given():
 
     assert "imagePath" not in match_result_dict(result)
     assert match_result_dict(result, image_path="x/r.jpg")["imagePath"] == "x/r.jpg"
+
+
+def test_build_metadata_takes_team_characters_from_the_scoreboard_teammates():
+    from lumia_briefing_room.detect.result import ResultScreen
+
+    result = ResultScreen(
+        placement=1, total=8, match_type="rank", match_label="랭크", outcome="최종 생존", nickname="나",
+        teammates=[{"nickname": "a", "character": "루치아"}, {"nickname": "b", "character": None}],
+    )
+    kwargs = dict(
+        title="t", session=_FakeSession(),
+        match_start_utc=datetime(2026, 9, 19, 15, 22, 20, tzinfo=timezone.utc),
+        game_mode="battle_royale", interval=_interval(),
+        clip_range=ClipRange(start=0.0, end=10.0, preroll_source="combat"),
+        cut_result=CutResult(segment_start=1, segment_end=2, duration_sec=9.0, source_incomplete=False),
+        thumbnail_path=None,
+    )
+
+    with_result = build_metadata(**kwargs, match_result=result)
+
+    assert with_result.team_characters == ["루치아"]
+    assert with_result.match_result["teammates"] == result.teammates
+    assert build_metadata(**kwargs, team_characters=["직접"]).team_characters == ["직접"]
+    assert build_metadata(**kwargs).team_characters == []

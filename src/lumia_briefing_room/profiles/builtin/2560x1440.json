@@ -23,6 +23,9 @@
     "hp_strip": [860, 1300, 1300, 1440],
     "result_panel": [300, 450, 1000, 1080],
     "result_chip": [335, 625, 600, 675],
-    "result_character": [1470, 420, 1600, 830]
+    "result_character": [1470, 420, 1600, 830],
+    "scoreboard_panel": [40, 100, 520, 700],
+    "scoreboard_names": [800, 200, 1300, 1260],
+    "scoreboard_ranks": [480, 200, 640, 1260]
   }
 }

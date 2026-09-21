@@ -23,7 +23,12 @@ log = logging.getLogger(__name__)
 _DAY_NIGHT_KR = {"day": "낮", "night": "밤"}
 
 
-def default_title(day_night: str | None, region: str | None = None, game_day: int | None = None) -> str:
+def default_title(
+    day_night: str | None,
+    region: str | None = None,
+    game_day: int | None = None,
+    characters: list[str] | None = None,
+) -> str:
     """SPEC §7.7 titleTemplate 의 축소판.
 
     일차/캐릭터 인식이 아직 없어(plan.md §8-5, v2 후보) 낮/밤과 지역만 반영한다.
@@ -35,7 +40,8 @@ def default_title(day_night: str | None, region: str | None = None, game_day: in
     if region:
         parts.append(region)
     parts.append("교전")
-    return " ".join(parts)
+    title = " ".join(parts)
+    return f"{title} · {', '.join(characters)}" if characters else title
 
 
 def _mean_of_known(values: list[float | None]) -> float | None:
@@ -120,6 +126,13 @@ def _read_result(session, seg_range, ffmpeg_path: Path, hwaccel: str | None) -> 
         return None
 
 
+def _characters(result: ResultScreen | None) -> list[str]:
+    if result is None:
+        return []
+    mates = [t["character"] for t in result.teammates or [] if t.get("character")]
+    return [name for name in [result.character, *mates] if name]
+
+
 def _save_result_image(result: ResultScreen | None, path: Path) -> str | None:
     if result is None or result.image is None:
         return None
@@ -195,7 +208,7 @@ def process_match(
             thumbnail_rel = str(thumb_path)
 
         meta = build_metadata(
-            title=default_title(aggregated.day_night, aggregated.region, aggregated.game_day),
+            title=default_title(aggregated.day_night, aggregated.region, aggregated.game_day, _characters(result)),
             game_day=aggregated.game_day,
             pvp=score_interval(aggregated, cfg.filter.pvp_weights),
             session=session,

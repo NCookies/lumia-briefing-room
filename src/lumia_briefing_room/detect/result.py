@@ -39,6 +39,7 @@ class ResultScreen:
     character: str | None = None
     character_raw: str | None = None
     stats: dict | None = None
+    teammates: list[dict] | None = None
     image: np.ndarray | None = field(default=None, compare=False, repr=False)
 
 

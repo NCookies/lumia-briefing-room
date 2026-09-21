@@ -87,9 +87,17 @@ def match_result_dict(result: ResultScreen | None, image_path: str | None = None
         "characterRaw": result.character_raw,
     }
     data.update(result.stats or {})
+    if result.teammates is not None:
+        data["teammates"] = result.teammates
     if image_path:
         data["imagePath"] = image_path
     return data
+
+
+def _teammate_names(result: ResultScreen | None) -> list[str]:
+    if result is None:
+        return []
+    return [t["character"] for t in result.teammates or [] if t.get("character")]
 
 
 def build_metadata(
@@ -150,7 +158,7 @@ def build_metadata(
         phase_index=phase,
         revive_cost=revive_cost(phase) if phase is not None else None,
         my_character=my_character or (match_result.character if match_result else None),
-        team_characters=team_characters or [],
+        team_characters=team_characters or _teammate_names(match_result),
         pinned=False,
         deleted_at=None,
         match_kills=match_kills,

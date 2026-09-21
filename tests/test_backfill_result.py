@@ -45,3 +45,27 @@ def test_group_by_match_groups_clips_of_one_game_and_tracks_last_segment():
     assert set(groups[("s1", "t1")].ids) == {"a", "b"}
     assert groups[("s1", "t1")].last_segment == 30
     assert groups[("s1", "t2")].last_segment == 50
+
+
+def test_apply_match_result_fills_team_characters_and_retitles_an_auto_title():
+    result = ResultScreen(
+        placement=1, total=8, match_type="rank", match_label="랭크", outcome="최종 생존", nickname="나",
+        character="마커스", character_raw="MARKU",
+        teammates=[{"nickname": "a", "character": "루치아"}, {"nickname": "b", "character": None}],
+    )
+    meta = {"title": "5일차 낮 경찰서 교전", "dayNight": "day", "region": "경찰서", "gameDay": 5, "myCharacter": None}
+
+    new = apply_match_result(meta, result)
+
+    assert new["teamCharacters"] == ["루치아"]
+    assert new["title"] == "5일차 낮 경찰서 교전 · 마커스, 루치아"
+    assert new["matchResult"]["teammates"] == result.teammates
+
+
+def test_apply_match_result_keeps_a_custom_title():
+    result = ResultScreen(
+        placement=1, total=8, match_type="rank", match_label="랭크", outcome="최종 생존", nickname="나",
+        character="마커스",
+    )
+
+    assert apply_match_result({"title": "내가 붙인 제목", "dayNight": "day"}, result)["title"] == "내가 붙인 제목"
