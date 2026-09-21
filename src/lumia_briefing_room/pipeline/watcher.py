@@ -1,30 +1,28 @@
 """실시간 Player.log 감시 + 백로그 복구. (SPEC §7.2, §7.2.1)
 
-`run_once`/`run_forever` 는 실제 I/O(ffmpeg 호출, 파일 시스템 감시)를 직접 하지
+`run_polling` 은 실제 I/O(ffmpeg 호출, 파일 시스템 감시)를 직접 하지
 않는다 — `process` 콜백과 `now`/`sleep` 을 주입받는다. 그래야 무한루프·실시간
-지연 없이 테스트할 수 있다. 진짜 배선(실제 tail_follow, 실제 process_match 호출)은
+지연 없이 테스트할 수 있다. 진짜 배선(실제 Player.log 읽기, 실제 process_match 호출)은
 `cli/watch.py` 가 맡는다.
 """
 
 import json
+import logging
 import re
 import shutil
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone, tzinfo
+from datetime import datetime, timedelta, timezone, tzinfo
 from pathlib import Path
 
 from lumia_briefing_room.config import Config
-from lumia_briefing_room.pipeline.playerlog import (
-    LogEventType,
-    MatchBoundary,
-    extract_matches,
-    parse_line,
-)
+from lumia_briefing_room.pipeline.playerlog import MatchBoundary, extract_matches
 from lumia_briefing_room.steam_paths import find_steam_install_path, read_buffer_minutes_override
 from lumia_briefing_room.video.segments import SegmentRange
 from lumia_briefing_room.video.session import RecordingSession, SessionParseError
+
+log = logging.getLogger(__name__)
 
 _BG_FOLDER_APPID_RE = re.compile(r"^bg_(\d+)_")
 
@@ -189,82 +187,58 @@ def rescue_copy(
 ProcessCallback = Callable[[Path, MatchBoundary, bool], None]
 
 
-def run_once(
-    matches: list[MatchBoundary],
+def run_polling(
+    *,
+    read_matches: Callable[[], list[MatchBoundary]],
     state: ProcessedState,
-    *,
-    recording_root: Path,
-    now: Callable[[], datetime],
-    rescue_threshold_min: float,
-    buffer_minutes: float,
-    process: ProcessCallback,
     state_path: Path,
-) -> ProcessedState:
-    """SPEC §7.2.1 백로그 복구: 처리 안 된 매치를 오래된 것부터 처리한다.
-
-    세션을 못 찾으면(소실) 건너뛰고 처리 이력에도 남기지 않는다 — 나중에
-    세션이 나타날 리는 없지만, 최소한 "처리했다고 잘못 기록"하지는 않는다.
-    """
-    for m in unprocessed_matches(matches, state):
-        session_dir = find_session_for_time(recording_root, m.start_utc)
-        if session_dir is None:
-            continue
-
-        margin = remaining_margin_minutes(m.start_utc, now(), buffer_minutes)
-        process(session_dir, m, should_rescue(margin, rescue_threshold_min))
-
-        state = state.with_added(match_key(m))
-        state.save(state_path)
-
-    return state
-
-
-def run_forever(
-    lines: Iterable[str],
-    *,
-    local_tz: tzinfo,
     recording_root: Path,
     now: Callable[[], datetime],
     delay_sec: float,
     rescue_threshold_min: float,
     buffer_minutes: float,
     process: ProcessCallback,
+    poll_interval_sec: float,
+    should_stop: Callable[[], bool] = lambda: False,
     sleep: Callable[[float], None] = time.sleep,
-    initial_start_utc: datetime | None = None,
-) -> None:
-    """실시간 로그 라인 스트림을 소비하며 매치 종료마다 process 를 호출한다.
+    max_failures: int = 3,
+    once: bool = False,
+) -> ProcessedState:
+    """로그를 주기적으로 통째로 다시 읽어, 끝난 지 `delay_sec` 이 지난 처리 안 된 매치를 오래된 것부터 처리한다.
 
-    `lines` 로 실제 `tail_follow()` (끝나지 않는 제너레이터) 를 넘기면 계속 돈다.
-    `initial_start_utc` 는 부팅 시점에 이미 진행 중이던 매치의 시작 시각이다 —
-    `discover_backlog()` 결과의 마지막 항목이 end_utc=None 이면 그게 이거다.
-    (앱이 매치 도중에 시작돼 그 MATCH_START 줄을 못 본 경우를 위함. 앱이 매치
-    종료 후에 재시작되면 그 매치는 이미 run_once() 의 백로그 복구가 처리한다.)
+    줄 단위로 실시간 감시하지 않는다: 분석이 몇 분씩 걸리는 동안 시작하고 끝난 경기, 게임 재실행으로 바뀐 로그, 앱을 켜기
+    전 경기를 전부 같은 경로로 잡는다. 처리 이력(`state`)이 중복을 막는다. 세션이 없는 매치는 다시 시도하지 않고(원본이 없다),
+    처리가 예외로 실패한 매치는 `max_failures` 번까지만 다시 시도한다(감시가 죽지 않게 한다). `once` 면 처리할 게 없어지는 즉시 돌려준다.
     """
-    last_start_utc = initial_start_utc
+    failures: dict[str, int] = {}
+    no_session: set[str] = set()
+    delay = timedelta(seconds=delay_sec)
 
-    for line in lines:
-        event = parse_line(line)
-        if event is None:
+    while True:
+        ran = False
+        due = [
+            m for m in unprocessed_matches(read_matches(), state)
+            if match_key(m) not in no_session and failures.get(match_key(m), 0) < max_failures and now() - m.end_utc >= delay
+        ]
+        for m in due:
+            key = match_key(m)
+            session_dir = find_session_for_time(recording_root, m.start_utc)
+            if session_dir is None:
+                no_session.add(key)
+                continue
+            margin = remaining_margin_minutes(m.start_utc, now(), buffer_minutes)
+            try:
+                process(session_dir, m, should_rescue(margin, rescue_threshold_min))
+            except Exception:
+                failures[key] = failures.get(key, 0) + 1
+                log.exception("매치 %s 처리 실패 (%d/%d)", key, failures[key], max_failures)
+            else:
+                state = state.with_added(key)
+                state.save(state_path)
+            ran = True
+            break
+        if ran:
             continue
-
-        if event.type is LogEventType.MATCH_START:
-            last_start_utc = event.local_time.replace(tzinfo=local_tz).astimezone(timezone.utc)
-            continue
-
-        # MATCH_END
-        if last_start_utc is None:
-            continue  # 시작을 모르는 매치 — extract_matches() 와 동일하게 무시
-
-        end_utc = event.local_time.replace(tzinfo=local_tz).astimezone(timezone.utc)
-        sleep(delay_sec)  # 마지막 세그먼트가 .tmp 에서 확정되길 대기 (SPEC §7.2)
-
-        session_dir = find_session_for_time(recording_root, last_start_utc)
-        if session_dir is not None:
-            margin = remaining_margin_minutes(last_start_utc, now(), buffer_minutes)
-            process(
-                session_dir,
-                MatchBoundary(start_utc=last_start_utc, end_utc=end_utc),
-                should_rescue(margin, rescue_threshold_min),
-            )
-
-        last_start_utc = None
+        if once or should_stop():
+            return state
+        sleep(poll_interval_sec)

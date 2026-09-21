@@ -1,6 +1,6 @@
 """Player.log 를 실시간으로 감시하며 매치가 끝날 때마다 자동으로 클립을 뽑는다.
 
-SPEC §3/§7.2 의 실제 배선: 부팅 시 백로그 복구(run_once) -> 실시간 감시(run_forever).
+SPEC §3/§7.2 의 실제 배선: Player.log 를 주기적으로 훑어 끝난 경기를 처리한다(run_polling; 부팅 시 백로그도 같은 경로).
 Ctrl+C 로 멈출 때까지 끝나지 않는다.
 
 usage:
@@ -27,15 +27,14 @@ from lumia_briefing_room.detect.counter import load_templates
 from lumia_briefing_room.pipeline.clip import ClipCutError
 from lumia_briefing_room.pipeline.nickname import learn_nickname
 from lumia_briefing_room.pipeline.orchestrator import process_match
-from lumia_briefing_room.pipeline.playerlog import MatchBoundary, tail_follow
+from lumia_briefing_room.pipeline.playerlog import MatchBoundary
 from lumia_briefing_room.pipeline.watcher import (
     ProcessCallback,
     ProcessedState,
     discover_backlog,
     resolve_buffer_minutes,
     rescue_copy,
-    run_forever,
-    run_once,
+    run_polling,
 )
 from lumia_briefing_room.steam_paths import discover_recording_root
 from lumia_briefing_room.video.segments import segment_time_range
@@ -137,38 +136,21 @@ def run(
     state_path = resolved.temp / "processed_matches.json"
     buffer_minutes = resolve_buffer_minutes(cfg, recording_root)
 
-    matches = discover_backlog(player_log, player_prev_log, local_tz=local_tz)
-    log.info("백로그 매치 %d개 발견", len(matches))
+    def read_matches():
+        return discover_backlog(player_log, player_prev_log, local_tz=local_tz)
 
     state = ProcessedState.load(state_path)
-    run_once(
-        matches, state,
+    log.info("Player.log 감시 시작(%.1f초마다 훑는다): %s", cfg.watch.poll_interval_ms / 1000, player_log)
+    run_polling(
+        read_matches=read_matches, state=state, state_path=state_path,
         recording_root=recording_root, now=now,
-        rescue_threshold_min=cfg.watch.rescue_threshold_min,
-        buffer_minutes=buffer_minutes,
-        process=process, state_path=state_path,
-    )
-
-    if args.once:
-        log.info("백로그 처리 완료 - --once 라서 종료한다")
-        return
-
-    # 부팅 시점에 이미 진행 중이던 매치(끝나지 않은 채로 로그 끝에 남음)를
-    # 실시간 감시가 이어서 잡을 수 있게 시드한다 (watcher.run_forever 문서 참고).
-    initial_start = matches[-1].start_utc if matches and matches[-1].end_utc is None else None
-
-    log.info("Player.log 감시 시작: %s", player_log)
-    run_forever(
-        tail_follow(
-            player_log,
-            poll_interval_sec=cfg.watch.poll_interval_ms / 1000,
-            should_stop=should_stop,
-        ),
-        local_tz=local_tz, recording_root=recording_root, now=now,
         delay_sec=cfg.watch.delay_sec,
         rescue_threshold_min=cfg.watch.rescue_threshold_min,
         buffer_minutes=buffer_minutes,
-        process=process, initial_start_utc=initial_start,
+        process=process,
+        poll_interval_sec=cfg.watch.poll_interval_ms / 1000,
+        should_stop=should_stop,
+        once=args.once,
     )
 
 

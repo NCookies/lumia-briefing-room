@@ -13,8 +13,6 @@ from lumia_briefing_room.pipeline.watcher import (
     remaining_margin_minutes,
     rescue_copy,
     resolve_buffer_minutes,
-    run_forever,
-    run_once,
     should_rescue,
     unprocessed_matches,
 )
@@ -267,174 +265,6 @@ def test_rescue_copy_result_is_loadable_as_a_session(tmp_path):
     assert reloaded.start_utc == session.start_utc
 
 
-def test_run_once_processes_unprocessed_matches_in_order(tmp_path):
-    session_dir = _make_session_dir(tmp_path, 1049590, datetime(2026, 1, 1, tzinfo=UTC))
-    m1 = MatchBoundary(
-        start_utc=datetime(2026, 1, 1, 0, 5, tzinfo=UTC),
-        end_utc=datetime(2026, 1, 1, 0, 20, tzinfo=UTC),
-    )
-    m2 = MatchBoundary(
-        start_utc=datetime(2026, 1, 1, 0, 30, tzinfo=UTC),
-        end_utc=datetime(2026, 1, 1, 0, 45, tzinfo=UTC),
-    )
-    calls = []
-
-    state = run_once(
-        [m1, m2],
-        ProcessedState(frozenset()),
-        recording_root=tmp_path,
-        now=lambda: datetime(2026, 1, 1, 1, 0, tzinfo=UTC),
-        rescue_threshold_min=20.0,
-        buffer_minutes=120.0,
-        process=lambda session_dir_, match, rescue: calls.append((session_dir_, match, rescue)),
-        state_path=tmp_path / "state.json",
-    )
-
-    assert [c[1] for c in calls] == [m1, m2]
-    assert state.processed_keys == {match_key(m1), match_key(m2)}
-    assert ProcessedState.load(tmp_path / "state.json").processed_keys == state.processed_keys
-
-
-def test_run_once_skips_already_processed():
-    m1 = MatchBoundary(
-        start_utc=datetime(2026, 1, 1, 0, 5, tzinfo=UTC),
-        end_utc=datetime(2026, 1, 1, 0, 20, tzinfo=UTC),
-    )
-    calls = []
-    run_once(
-        [m1],
-        ProcessedState(frozenset({match_key(m1)})),
-        recording_root=Path("."),
-        now=lambda: datetime(2026, 1, 1, 1, 0, tzinfo=UTC),
-        rescue_threshold_min=20.0,
-        buffer_minutes=120.0,
-        process=lambda *a: calls.append(a),
-        state_path=Path("/dev/null/unused"),
-    )
-    assert calls == []
-
-
-def test_run_once_skips_when_session_not_found(tmp_path):
-    m1 = MatchBoundary(
-        start_utc=datetime(2026, 1, 1, 0, 5, tzinfo=UTC),
-        end_utc=datetime(2026, 1, 1, 0, 20, tzinfo=UTC),
-    )
-    calls = []
-    state = run_once(
-        [m1],
-        ProcessedState(frozenset()),
-        recording_root=tmp_path,  # 세션 폴더가 하나도 없음
-        now=lambda: datetime(2026, 1, 1, 1, 0, tzinfo=UTC),
-        rescue_threshold_min=20.0,
-        buffer_minutes=120.0,
-        process=lambda *a: calls.append(a),
-        state_path=tmp_path / "state.json",
-    )
-    assert calls == []
-    assert state.processed_keys == frozenset()  # 처리 못 했으니 이력에도 안 남는다
-
-
-def test_run_once_passes_rescue_flag_based_on_margin(tmp_path):
-    session_dir = _make_session_dir(tmp_path, 1049590, datetime(2026, 1, 1, tzinfo=UTC))
-    m1 = MatchBoundary(
-        start_utc=datetime(2026, 1, 1, 0, 5, tzinfo=UTC),
-        end_utc=datetime(2026, 1, 1, 0, 20, tzinfo=UTC),
-    )
-    calls = []
-    run_once(
-        [m1],
-        ProcessedState(frozenset()),
-        recording_root=tmp_path,
-        now=lambda: datetime(2026, 1, 1, 2, 3, tzinfo=UTC),  # margin = 120 - 118 = 2 <= 20
-        rescue_threshold_min=20.0,
-        buffer_minutes=120.0,
-        process=lambda session_dir_, match, rescue: calls.append(rescue),
-        state_path=tmp_path / "state.json",
-    )
-    assert calls == [True]
-
-
-def test_run_forever_dispatches_match_on_end_event(tmp_path):
-    session_dir = _make_session_dir(tmp_path, 1049590, datetime(2026, 9, 19, 13, 0, 0, tzinfo=UTC))
-    lines = [GAME_START, LOBBY_RETURN]
-    calls = []
-    sleeps = []
-
-    run_forever(
-        lines,
-        local_tz=KST,
-        recording_root=tmp_path,
-        now=lambda: datetime(2026, 9, 19, 13, 30, 0, tzinfo=UTC),
-        delay_sec=5.0,
-        rescue_threshold_min=20.0,
-        buffer_minutes=120.0,
-        process=lambda session_dir_, match, rescue: calls.append((session_dir_, match, rescue)),
-        sleep=lambda s: sleeps.append(s),
-    )
-
-    assert len(calls) == 1
-    assert calls[0][0] == session_dir
-    assert sleeps == [5.0]
-
-
-def test_run_forever_ignores_end_without_prior_start(tmp_path):
-    calls = []
-    run_forever(
-        [LOBBY_RETURN],
-        local_tz=KST,
-        recording_root=tmp_path,
-        now=lambda: datetime(2026, 9, 19, 13, 30, 0, tzinfo=UTC),
-        delay_sec=5.0,
-        rescue_threshold_min=20.0,
-        buffer_minutes=120.0,
-        process=lambda *a: calls.append(a),
-        sleep=lambda s: None,
-    )
-    assert calls == []
-
-
-def test_run_forever_handles_multiple_matches_in_stream(tmp_path):
-    session_dir = _make_session_dir(tmp_path, 1049590, datetime(2026, 9, 19, 13, 0, 0, tzinfo=UTC))
-    lines = [GAME_START, LOBBY_RETURN, GAME_START_2, LOBBY_RETURN_2]
-    calls = []
-
-    run_forever(
-        lines,
-        local_tz=KST,
-        recording_root=tmp_path,
-        now=lambda: datetime(2026, 9, 19, 14, 0, 0, tzinfo=UTC),
-        delay_sec=0.0,
-        rescue_threshold_min=20.0,
-        buffer_minutes=120.0,
-        process=lambda session_dir_, match, rescue: calls.append(match),
-        sleep=lambda s: None,
-    )
-
-    assert len(calls) == 2
-
-
-def test_run_forever_seeds_last_start_from_initial_param(tmp_path):
-    session_dir = _make_session_dir(tmp_path, 1049590, datetime(2026, 9, 19, 13, 0, 0, tzinfo=UTC))
-    initial_start = datetime(2026, 9, 19, 13, 5, 0, tzinfo=UTC)
-    calls = []
-
-    run_forever(
-        [LOBBY_RETURN],
-        local_tz=KST,
-        recording_root=tmp_path,
-        now=lambda: datetime(2026, 9, 19, 13, 30, 0, tzinfo=UTC),
-        delay_sec=0.0,
-        rescue_threshold_min=20.0,
-        buffer_minutes=120.0,
-        process=lambda session_dir_, match, rescue: calls.append(match),
-        sleep=lambda s: None,
-        initial_start_utc=initial_start,
-    )
-
-    assert len(calls) == 1
-    assert calls[0].start_utc == initial_start
-
-
 def test_resolve_buffer_minutes_uses_explicit_config_value(tmp_path):
     cfg = Config(watch=WatchConfig(buffer_minutes=90.0))
     assert resolve_buffer_minutes(cfg, tmp_path) == 90.0
@@ -484,3 +314,128 @@ def test_resolve_buffer_minutes_falls_back_to_default_when_appid_unknown(tmp_pat
     cfg = Config(watch=WatchConfig(buffer_minutes="auto"))
     # recording_root 가 비어있어(bg_ 폴더가 하나도 없음) appid 를 못 뽑으므로 vdf 를 못 쓴다.
     assert resolve_buffer_minutes(cfg, tmp_path, steam_path=steam_path) == 120.0
+
+
+def _polling(tmp_path, read_matches, *, process, now, state=None, stops=1, failures=3, sleeps=None):
+    from lumia_briefing_room.pipeline.watcher import run_polling
+
+    calls = {"n": 0}
+
+    def should_stop():
+        calls["n"] += 1
+        return calls["n"] > stops
+
+    return run_polling(
+        read_matches=read_matches, state=state or ProcessedState(frozenset()), state_path=tmp_path / "state.json",
+        recording_root=tmp_path, now=now, delay_sec=5.0, rescue_threshold_min=20.0, buffer_minutes=120.0,
+        process=process, poll_interval_sec=1.0, should_stop=should_stop,
+        sleep=(sleeps.append if sleeps is not None else (lambda s: None)), max_failures=failures,
+    )
+
+
+def _match(start_min, end_min):
+    base = datetime(2026, 9, 19, 13, 0, tzinfo=UTC)
+    return MatchBoundary(base + timedelta(minutes=start_min), base + timedelta(minutes=end_min) if end_min else None)
+
+
+def test_run_polling_processes_an_ended_match_and_remembers_it(tmp_path):
+    _make_session_dir(tmp_path, 1049590, datetime(2026, 9, 19, 12, 0, tzinfo=UTC))
+    calls = []
+    state = _polling(
+        tmp_path, lambda: [_match(5, 25)], process=lambda d, m, r: calls.append(m),
+        now=lambda: datetime(2026, 9, 19, 13, 30, tzinfo=UTC), stops=2,
+    )
+
+    assert len(calls) == 1
+    assert match_key(_match(5, 25)) in state.processed_keys
+    assert ProcessedState.load(tmp_path / "state.json").processed_keys == state.processed_keys
+
+
+def test_run_polling_picks_up_a_match_that_started_and_ended_while_another_was_processing(tmp_path):
+    _make_session_dir(tmp_path, 1049590, datetime(2026, 9, 19, 12, 0, tzinfo=UTC))
+    log = [[_match(5, 25)]]
+    calls = []
+
+    def process(d, m, r):
+        calls.append(m)
+        if len(calls) == 1:
+            log[0] = [_match(5, 25), _match(30, 50)]
+
+    _polling(
+        tmp_path, lambda: list(log[0]), process=process,
+        now=lambda: datetime(2026, 9, 19, 14, 0, tzinfo=UTC), stops=3,
+    )
+
+    assert [c.start_utc.minute for c in calls] == [5, 30]
+
+
+def test_run_polling_waits_for_the_delay_after_the_end_and_ignores_matches_in_progress(tmp_path):
+    _make_session_dir(tmp_path, 1049590, datetime(2026, 9, 19, 12, 0, tzinfo=UTC))
+    calls = []
+    sleeps = []
+    end = _match(5, 25).end_utc
+
+    _polling(
+        tmp_path, lambda: [_match(5, 25), _match(30, None)], process=lambda d, m, r: calls.append(m),
+        now=lambda: end + timedelta(seconds=2), stops=2, sleeps=sleeps,
+    )
+
+    assert calls == [] and sleeps == [1.0, 1.0]
+
+
+def test_run_polling_keeps_going_after_a_failure_and_gives_up_on_that_match_after_a_few_tries(tmp_path):
+    _make_session_dir(tmp_path, 1049590, datetime(2026, 9, 19, 12, 0, tzinfo=UTC))
+    tries = []
+
+    def process(d, m, r):
+        tries.append(m.start_utc.minute)
+        if m.start_utc.minute == 5:
+            raise RuntimeError("실패")
+
+    state = _polling(
+        tmp_path, lambda: [_match(5, 25), _match(30, 50)], process=process,
+        now=lambda: datetime(2026, 9, 19, 14, 0, tzinfo=UTC), stops=8, failures=2,
+    )
+
+    assert tries.count(5) == 2 and tries.count(30) == 1
+    assert match_key(_match(30, 50)) in state.processed_keys and match_key(_match(5, 25)) not in state.processed_keys
+
+
+def test_run_polling_skips_matches_without_a_session_and_does_not_mark_them(tmp_path):
+    calls = []
+    state = _polling(
+        tmp_path, lambda: [_match(5, 25)], process=lambda *a: calls.append(a),
+        now=lambda: datetime(2026, 9, 19, 14, 0, tzinfo=UTC), stops=2,
+    )
+
+    assert calls == [] and state.processed_keys == frozenset()
+
+
+def test_run_polling_skips_matches_already_processed(tmp_path):
+    _make_session_dir(tmp_path, 1049590, datetime(2026, 9, 19, 12, 0, tzinfo=UTC))
+    calls = []
+
+    _polling(
+        tmp_path, lambda: [_match(5, 25)], process=lambda *a: calls.append(a),
+        now=lambda: datetime(2026, 9, 19, 14, 0, tzinfo=UTC), stops=1,
+        state=ProcessedState(frozenset({match_key(_match(5, 25))})),
+    )
+
+    assert calls == []
+
+
+def test_run_polling_with_once_stops_as_soon_as_nothing_is_left_to_process(tmp_path):
+    from lumia_briefing_room.pipeline.watcher import run_polling
+
+    _make_session_dir(tmp_path, 1049590, datetime(2026, 9, 19, 12, 0, tzinfo=UTC))
+    calls = []
+
+    run_polling(
+        read_matches=lambda: [_match(5, 25), _match(30, 50)], state=ProcessedState(frozenset()),
+        state_path=tmp_path / "state.json", recording_root=tmp_path, now=lambda: datetime(2026, 9, 19, 14, 0, tzinfo=UTC),
+        delay_sec=0.0, rescue_threshold_min=20.0, buffer_minutes=120.0,
+        process=lambda d, m, r: calls.append(m), poll_interval_sec=1.0, sleep=lambda s: (_ for _ in ()).throw(AssertionError("기다리면 안 된다")),
+        once=True,
+    )
+
+    assert len(calls) == 2

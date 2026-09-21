@@ -71,9 +71,9 @@ def apply_autostart_setting(cfg, *, app_name: str | None = None) -> None:
 def make_watch_controller(args, *, auto_start: bool = True):
     """트레이 "감시 중" 토글의 실제 시작/정지 배선. (plan-pipeline.md §3-5 해결)
 
-    `run()` 이 `should_stop` 으로 넘겨받는 `stop_event.is_set` 을 `tail_follow()` 가
-    유휴 폴링마다 확인하므로, 정지 요청은 다음 폴링 주기 안에 반영된다. 재개는
-    새 스레드로 `run()` 을 처음부터 다시 부르는 것과 같다 — 백로그 복구(run_once)는
+    `run()` 이 `should_stop` 으로 넘겨받는 `stop_event.is_set` 을 `run_polling()` 이
+    폴링마다 확인하므로, 정지 요청은 다음 폴링 주기 안에 반영된다. 재개는
+    새 스레드로 `run()` 을 처음부터 다시 부르는 것과 같다 — 이미 끝난 경기는
     `ProcessedState` 로 이미 처리한 매치를 다시 건드리지 않으니 안전하다.
     """
     state = {"thread": None, "stop_event": threading.Event(), "running": False}
