@@ -177,14 +177,9 @@ def register_vod_routes(
     def patch_vod(vid: str, body: dict):
         require(vid)
         if "streamer" in body:
-            streamers = dict(current_config().vod.streamers)
             name = str(body["streamer"] or "").strip()
-            if name:
-                streamers[vid] = name
-            else:
-                streamers.pop(vid, None)
-            put_config({"vod": {"streamers": streamers}})
-        return {"id": vid, "streamer": current_config().vod.streamers.get(vid)}
+            put_config({"vod": {"streamers": {vid: name}}})
+        return {"id": vid, "streamer": current_config().vod.streamers.get(vid) or None}
 
     @app.post("/api/vods/{vid}/analyze", status_code=202)
     def start_analysis(vid: str, body: dict | None = None):

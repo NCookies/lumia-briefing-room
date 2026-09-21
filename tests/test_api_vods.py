@@ -134,6 +134,17 @@ def test_streamer_name_is_saved_in_the_config_and_shown(env):
     assert client.patch("/api/vods/nope", json={"streamer": "x"}).status_code == 404
 
 
+def test_clearing_the_streamer_name_removes_it(env):
+    client, a, *_ = env
+    vid = vod_id(a)
+    client.patch(f"/api/vods/{vid}", json={"streamer": "이름"})
+
+    resp = client.patch(f"/api/vods/{vid}", json={"streamer": "  "})
+
+    assert resp.json()["streamer"] is None
+    assert by_id(client.get("/api/vods"))[vid]["streamer"] is None
+
+
 class FakeAnalyze:
     def __init__(self, *, fail: Exception | None = None):
         self.release = threading.Event()
