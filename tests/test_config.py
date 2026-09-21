@@ -115,3 +115,47 @@ def test_resolve_paths_respects_explicit_temp_dir():
     cfg = PathsConfig(temp=Path("D:/fast_scratch"))
     resolved = resolve_paths(cfg)
     assert resolved.temp == Path("D:/fast_scratch")
+
+
+def test_vod_clips_path_defaults_next_to_steam_clips_and_can_be_overridden(monkeypatch, tmp_path):
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+
+    default = resolve_paths(PathsConfig())
+    custom = resolve_paths(PathsConfig(vod_clips=Path("D:/vod-out")))
+
+    assert default.vod_clips == tmp_path / "Videos" / "LumiaBriefingRoom" / "vod"
+    assert default.vod_clips != default.clips
+    assert custom.vod_clips == Path("D:/vod-out")
+
+
+def test_vod_config_defaults_are_safe():
+    from lumia_briefing_room.config import VodConfig
+
+    vod = Config().vod
+    assert isinstance(vod, VodConfig)
+    assert vod.sources == []
+    assert vod.recursive is False
+    assert vod.auto_analyze is False
+    assert vod.game_gap_sec == 30.0
+    assert vod.min_game_sec == 60.0
+    assert vod.hwaccel is None
+    assert vod.streamers == {}
+
+
+def test_vod_config_round_trips_through_camel_json(tmp_path):
+    cfg = Config()
+    cfg.vod.sources = ["H:/vod", "H:/other.mp4"]
+    cfg.vod.streamers = {"3fa91c02b7de": "○○○"}
+    cfg.paths.vod_clips = Path("D:/vod-out")
+    path = tmp_path / "config.json"
+
+    save_config(cfg, path)
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    loaded = load_config(path)
+
+    assert raw["vod"]["sources"] == ["H:/vod", "H:/other.mp4"]
+    assert raw["vod"]["gameGapSec"] == 30.0
+    assert Path(raw["paths"]["vodClips"]) == Path("D:/vod-out")
+    assert loaded.vod.sources == ["H:/vod", "H:/other.mp4"]
+    assert loaded.vod.streamers == {"3fa91c02b7de": "○○○"}
+    assert loaded.paths.vod_clips == Path("D:/vod-out")

@@ -50,6 +50,7 @@ class PathsConfig:
     trash: Path | None = None
     export_default: Path | None = None
     steam_recording: Path | None = None
+    vod_clips: Path | None = None
     min_free_gb: float = 20.0
 
 
@@ -61,6 +62,7 @@ class ResolvedPaths:
     proxies: Path
     trash: Path
     export_default: Path
+    vod_clips: Path
 
 
 def _default_local_appdata() -> Path:
@@ -85,6 +87,7 @@ def resolve_paths(cfg: PathsConfig) -> ResolvedPaths:
         proxies=cfg.proxies or (clips / ".proxy"),
         trash=cfg.trash or (clips / ".trash"),
         export_default=cfg.export_default or (_default_userprofile() / "Videos"),
+        vod_clips=cfg.vod_clips or (_default_userprofile() / "Videos" / "LumiaBriefingRoom" / "vod"),
     )
 
 
@@ -196,6 +199,17 @@ class PlayerConfig:
 
 
 @dataclass
+class VodConfig:
+    sources: list[str] = field(default_factory=list)
+    recursive: bool = False
+    auto_analyze: bool = False
+    game_gap_sec: float = 30.0
+    min_game_sec: float = 60.0
+    hwaccel: str | None = None
+    streamers: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
 class Config:
     paths: PathsConfig = field(default_factory=PathsConfig)
     watch: WatchConfig = field(default_factory=WatchConfig)
@@ -206,6 +220,7 @@ class Config:
     export: ExportConfig = field(default_factory=ExportConfig)
     ui: UiConfig = field(default_factory=UiConfig)
     player: PlayerConfig = field(default_factory=PlayerConfig)
+    vod: VodConfig = field(default_factory=VodConfig)
 
 
 DEFAULT_CONFIG_PATH = _default_appdata() / "LumiaBriefingRoom" / "config.json"
