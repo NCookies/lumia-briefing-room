@@ -16,6 +16,8 @@ export interface GameGroup<T> {
   matchStartUtc: string
   result: MatchResult | null
   clips: T[]
+  startSec?: number
+  endSec?: number
 }
 
 const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)

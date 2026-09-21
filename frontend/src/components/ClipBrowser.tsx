@@ -17,10 +17,23 @@ import { ExportDialog } from './ExportDialog'
 import { GameSection } from './GameSection'
 import { PlayerModal } from './PlayerModal'
 import { ResultCard, ResultViewer } from './ResultCard'
+import { VodSection } from './VodSection'
 import { formatMatchResult, groupByGame, totalSize, withResultImage, type GameGroup } from '../grouping'
 import { applyLabel, progress } from '../labeling'
 import { formatBytes } from '../retention'
 import type { Clip, UserLabel } from '../types'
+import {
+  cancelAnalysis,
+  deleteVodClipsForever,
+  getAnalysis,
+  listVods,
+  restoreVodClips,
+  setStreamer,
+  startAnalysis,
+  trashVodClips,
+  type AnalysisJob,
+} from '../vodApi'
+import { formatDuration, formatGameRange, groupByVod, type Vod } from '../vodGrouping'
 
 export type ClipSource = 'steam' | 'vod'
 
@@ -39,6 +52,9 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
   const [exportTarget, setExportTarget] = useState<Clip | null>(null)
   const [resultViewKey, setResultViewKey] = useState<string | null>(null)
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
+  const [vods, setVods] = useState<Vod[]>([])
+  const [job, setJob] = useState<AnalysisJob | null>(null)
+  const [collapsedVods, setCollapsedVods] = useState<Set<string>>(new Set())
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [reprocessKey, setReprocessKey] = useState<string | null>(null)
@@ -67,6 +83,37 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
   useEffect(() => {
     if (active) reload()
   }, [active, reload])
+
+  const reloadVods = useCallback(() => {
+    if (source !== 'vod') return
+    listVods()
+      .then(setVods)
+      .catch((e: Error) => setError(e.message))
+  }, [source])
+
+  useEffect(() => {
+    if (active) reloadVods()
+  }, [active, reloadVods])
+
+  const runningVodId = vods.find((v) => v.status === 'analyzing')?.id ?? null
+
+  useEffect(() => {
+    if (!active || source !== 'vod' || runningVodId === null) return
+    const timer = setInterval(async () => {
+      try {
+        const status = await getAnalysis(runningVodId)
+        setJob(status)
+        setVods(await listVods())
+        if (status.state === 'running') return
+        if (status.state === 'error') setActionError(status.message ?? '분석에 실패했습니다')
+        if (status.state === 'done') setNotice('분석을 마쳤습니다.')
+        reload()
+      } catch (e) {
+        setActionError((e as Error).message)
+      }
+    }, 2000)
+    return () => clearInterval(timer)
+  }, [active, source, runningVodId, reload])
 
   const runAndReload = async (action: () => Promise<unknown>) => {
     setActionError(null)
@@ -167,6 +214,62 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
     }
   }
 
+  const handleAnalyze = async (vod: Vod, options: { force?: boolean; rebuild?: boolean }) => {
+    const message = options.force
+      ? `"${vod.name}" 을 처음부터 다시 분석합니다.\n기존 클립은 라벨과 편집 내용을 포함해 휴지통으로 옮기고 새로 만듭니다.\n영상 길이에 따라 수십 분이 걸릴 수 있습니다. 계속하시겠습니까?`
+      : options.rebuild
+        ? `"${vod.name}" 의 클립을 저장된 판독으로 다시 만듭니다.\n기존 클립은 휴지통으로 옮기고 새로 만듭니다. 계속하시겠습니까?`
+        : `"${vod.name}" 을 분석합니다.\n영상 길이에 따라 수십 분이 걸릴 수 있으며, 도중에 취소해도 다음에 이어서 할 수 있습니다. 계속하시겠습니까?`
+    const result = await ask({
+      message,
+      confirmLabel: options.force ? '다시 분석' : options.rebuild ? '다시 만들기' : '분석 시작',
+    })
+    if (!result.ok) return
+    setActionError(null)
+    setNotice(null)
+    try {
+      await startAnalysis(vod.id, options)
+      reloadVods()
+    } catch (e) {
+      setActionError((e as Error).message)
+    }
+  }
+
+  const handleCancelAnalysis = (vod: Vod) =>
+    cancelAnalysis(vod.id)
+      .then(reloadVods)
+      .catch((e: Error) => setActionError(e.message))
+
+  const handleRenameStreamer = (vod: Vod, name: string) =>
+    setStreamer(vod.id, name)
+      .then(reloadVods)
+      .catch((e: Error) => setActionError(e.message))
+
+  const vodAction = (action: () => Promise<unknown>) =>
+    runAndReload(async () => {
+      await action()
+      reloadVods()
+    })
+
+  const handleTrashVod = async (id: string, name: string, count: number) => {
+    if (
+      await confirmTrash(
+        `"${name}" 의 클립 ${count}개를 모두 삭제하시겠습니까?\n삭제한 클립은 휴지통에서 복구할 수 있습니다. 영상 파일은 지우지 않습니다.`,
+      )
+    ) {
+      await vodAction(() => trashVodClips(id))
+    }
+  }
+
+  const handleDeleteVodForever = async (id: string, name: string) => {
+    const result = await ask({
+      message: `"${name}" 의 휴지통 클립을 완전히 삭제합니다. 영상 파일은 지우지 않습니다. 계속하시겠습니까?`,
+      confirmLabel: '완전 삭제',
+      danger: true,
+    })
+    if (result.ok) await vodAction(() => deleteVodClipsForever(id))
+  }
+
   const handleEmptyTrash = async () => {
     const result = await ask({
       message: `휴지통의 클립 ${clips.length}개(${formatBytes(totalSize(clips))})를 모두 완전히 삭제합니다. 계속하시겠습니까?`,
@@ -193,7 +296,18 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
     })
   }
 
-  const groups = useMemo(() => groupByGame(clips, filter.sort), [clips, filter.sort])
+  const steamGroups = useMemo(
+    () => (source === 'steam' ? groupByGame(clips, filter.sort) : []),
+    [source, clips, filter.sort],
+  )
+  const vodGroups = useMemo(
+    () => (source === 'vod' ? groupByVod(clips, vods, filter.sort, !filter.trashed) : []),
+    [source, clips, vods, filter.sort, filter.trashed],
+  )
+  const groups = useMemo(
+    () => (source === 'steam' ? steamGroups : vodGroups.flatMap((v) => v.games)),
+    [source, steamGroups, vodGroups],
+  )
   const ordered = useMemo(() => groups.flatMap((g) => g.clips), [groups])
   const resultGames = useMemo(
     () =>
@@ -214,6 +328,55 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
     })
 
   const { labeled, total } = progress(ordered)
+
+  const renderGame = (group: GameGroup<Clip>) => (
+    <GameSection
+      key={group.key}
+              group={group}
+              expanded={expandedKeys.has(group.key)}
+              trashed={filter.trashed}
+              onToggle={() => toggleGame(group.key)}
+              onTrashGame={() => handleTrashGame(group)}
+              onRestoreGame={() => handleRestoreGame(group)}
+              onDeleteGameForever={() => handleDeleteGameForever(group)}
+              onReprocess={() => handleReprocess(group)}
+              reprocessing={reprocessGame === group.key}
+              reprocessBusy={reprocessKey !== null}
+              hideReprocess={source === 'vod'}
+              timeLabel={
+                source === 'vod' && group.startSec !== undefined
+                  ? {
+                      main: formatGameRange(group.startSec, group.endSec ?? group.startSec),
+                      sub: group.endSec !== undefined ? formatDuration(group.endSec - group.startSec) : undefined,
+                    }
+                  : undefined
+              }
+            >
+              {group.result?.imagePath && (
+                <ResultCard
+                  clipId={group.clips[0].id}
+                  result={group.result}
+                  onOpen={() => setResultViewKey(group.key)}
+                />
+              )}
+              {group.clips.map((clip) => (
+                <ClipCard
+                  key={clip.id}
+                  clip={clip}
+                  trashed={filter.trashed}
+                  onPlay={() => setPlayingId(clip.id)}
+                  onTogglePin={handleTogglePin}
+                  onRename={handleRename}
+                  onTrash={handleTrash}
+                  onRestore={handleRestore}
+                  onDeleteForever={handleDeleteForever}
+                  onLabel={handleLabel}
+                  onExport={setExportTarget}
+                />
+              ))}
+            </GameSection>
+  )
+
 
   return (
     <div className="flex flex-1 flex-col">
@@ -268,44 +431,43 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
         )}
 
         <div className="flex flex-col gap-3">
-          {groups.map((group) => (
-            <GameSection
-              key={group.key}
-              group={group}
-              expanded={expandedKeys.has(group.key)}
-              trashed={filter.trashed}
-              onToggle={() => toggleGame(group.key)}
-              onTrashGame={() => handleTrashGame(group)}
-              onRestoreGame={() => handleRestoreGame(group)}
-              onDeleteGameForever={() => handleDeleteGameForever(group)}
-              onReprocess={() => handleReprocess(group)}
-              reprocessing={reprocessGame === group.key}
-              reprocessBusy={reprocessKey !== null}
-            >
-              {group.result?.imagePath && (
-                <ResultCard
-                  clipId={group.clips[0].id}
-                  result={group.result}
-                  onOpen={() => setResultViewKey(group.key)}
-                />
-              )}
-              {group.clips.map((clip) => (
-                <ClipCard
-                  key={clip.id}
-                  clip={clip}
-                  trashed={filter.trashed}
-                  onPlay={() => setPlayingId(clip.id)}
-                  onTogglePin={handleTogglePin}
-                  onRename={handleRename}
-                  onTrash={handleTrash}
-                  onRestore={handleRestore}
-                  onDeleteForever={handleDeleteForever}
-                  onLabel={handleLabel}
-                  onExport={setExportTarget}
-                />
-              ))}
-            </GameSection>
-          ))}
+          {source === 'steam' && groups.map((group) => renderGame(group))}
+          {source === 'vod' &&
+            vodGroups.map((vg) => {
+              const visible = vg.games.reduce((n, g) => n + g.clips.length, 0)
+              const visibleBytes = vg.games.reduce((n, g) => n + totalSize(g.clips), 0)
+              const trashedView = filter.trashed
+              return (
+                <VodSection
+                  key={vg.vodId}
+                  name={vg.name}
+                  vod={vg.vod}
+                  job={job?.id === vg.vodId ? job : null}
+                  expanded={!collapsedVods.has(vg.vodId)}
+                  trashed={trashedView}
+                  gameCount={trashedView ? vg.games.length : (vg.vod?.games.length ?? vg.games.length)}
+                  clipCount={trashedView ? visible : (vg.vod?.clipCount ?? visible)}
+                  visibleClipCount={visible}
+                  clipBytes={trashedView ? visibleBytes : (vg.vod?.clipBytes ?? visibleBytes)}
+                  analysisBusy={runningVodId !== null}
+                  onToggle={() =>
+                    setCollapsedVods((prev) => {
+                      const next = new Set(prev)
+                      if (!next.delete(vg.vodId)) next.add(vg.vodId)
+                      return next
+                    })
+                  }
+                  onAnalyze={(options) => vg.vod && handleAnalyze(vg.vod, options)}
+                  onCancel={() => vg.vod && handleCancelAnalysis(vg.vod)}
+                  onRenameStreamer={(name) => vg.vod && handleRenameStreamer(vg.vod, name)}
+                  onTrashClips={() => handleTrashVod(vg.vodId, vg.name, vg.vod?.clipCount ?? visible)}
+                  onRestoreClips={() => vodAction(() => restoreVodClips(vg.vodId))}
+                  onDeleteClipsForever={() => handleDeleteVodForever(vg.vodId, vg.name)}
+                >
+                  {vg.games.map((group) => renderGame(group))}
+                </VodSection>
+              )
+            })}
         </div>
       </main>
 

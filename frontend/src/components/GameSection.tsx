@@ -14,6 +14,8 @@ interface Props {
   onReprocess: () => void
   reprocessing: boolean
   reprocessBusy: boolean
+  timeLabel?: { main: string; sub?: string }
+  hideReprocess?: boolean
   children: ReactNode
 }
 
@@ -41,6 +43,8 @@ export function GameSection({
   onReprocess,
   reprocessing,
   reprocessBusy,
+  timeLabel,
+  hideReprocess,
   children,
 }: Props) {
   const result = group.result
@@ -75,9 +79,9 @@ export function GameSection({
             )}
           </div>
 
-          <div className="w-28 text-sm">
-            <div className="text-zinc-200">{formatStart(group.matchStartUtc)}</div>
-            <div className="text-xs text-zinc-500">{formatAgo(group.matchStartUtc)}</div>
+          <div className={timeLabel ? 'w-44 text-sm' : 'w-28 text-sm'}>
+            <div className="text-zinc-200">{timeLabel ? timeLabel.main : formatStart(group.matchStartUtc)}</div>
+            <div className="text-xs text-zinc-500">{timeLabel ? timeLabel.sub : formatAgo(group.matchStartUtc)}</div>
           </div>
 
           <div className="w-40 text-sm text-zinc-200">
@@ -111,15 +115,17 @@ export function GameSection({
             </>
           ) : (
             <>
-              <button
-                type="button"
-                className="text-zinc-400 hover:text-sky-300 disabled:opacity-50 disabled:hover:text-zinc-400"
-                disabled={reprocessBusy}
-                title="원본 녹화에서 이 게임을 처음부터 다시 분석합니다"
-                onClick={onReprocess}
-              >
-                {reprocessing ? '분석 중...' : '다시 분석'}
-              </button>
+              {!hideReprocess && (
+                <button
+                  type="button"
+                  className="text-zinc-400 hover:text-sky-300 disabled:opacity-50 disabled:hover:text-zinc-400"
+                  disabled={reprocessBusy}
+                  title="원본 녹화에서 이 게임을 처음부터 다시 분석합니다"
+                  onClick={onReprocess}
+                >
+                  {reprocessing ? '분석 중...' : '다시 분석'}
+                </button>
+              )}
               <button type="button" className="text-zinc-400 hover:text-rose-400" onClick={onTrashGame}>
                 게임 삭제
               </button>
