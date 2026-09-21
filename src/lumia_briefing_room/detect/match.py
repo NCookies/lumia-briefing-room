@@ -32,6 +32,7 @@ TAG_TOLERANCE_SEC = 3.0
 WAITING_ROOM_REGIONS = frozenset({"브리핑 룸"})
 DEATH_LINK_SEC = 8.0
 UNEXPLAINED_DEATH_LOOKBACK_SEC = 12.0
+UNCOVERED_EVENT_LOOKBACK_SEC = 12.0
 MIN_SPECTATOR_SAMPLES = 2
 TEAM_COMBAT_SATURATION = 0.6
 MIN_TEAM_COMBAT_SAMPLES = 20
@@ -185,6 +186,16 @@ def _intervals_overlap(a_start: float, a_end: float, b_start: float, b_end: floa
     return a_start <= b_end and a_end >= b_start
 
 
+def _merge_ranges(ranges: list[tuple[float, float]], gap: float) -> list[tuple[float, float]]:
+    merged: list[tuple[float, float]] = []
+    for start, end in sorted(ranges):
+        if merged and start <= merged[-1][1] + gap:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    return merged
+
+
 def _mode(values: list[str]) -> str | None:
     if not values:
         return None
@@ -254,7 +265,15 @@ def finalize_match(
             end = sp_start - states_step(states)
             if start <= end:
                 combat_ranges.append((start, end))
-    combat_ranges.sort()
+
+    k_events = to_events([(s.t, s.k) for s in states], "K")
+    a_events = to_events([(s.t, s.a) for s in states], "A")
+    step = states_step(states)
+    first = states[0].t
+    for event in k_events + a_events:
+        if event.delta > 0 and not any(_overlaps(a, b, event.t, tag_tolerance) for a, b in combat_ranges):
+            combat_ranges.append((max(first, event.t - UNCOVERED_EVENT_LOOKBACK_SEC), event.t))
+    combat_ranges = _merge_ranges(combat_ranges, step)
 
     face_stats = [
         FaceStat(t=s.t, value=s.face_value, sat=s.face_sat)
@@ -266,9 +285,6 @@ def finalize_match(
     teammate_deaths = new_deaths(
         [(s.t, list(s.dead_teammates)) for s in states if s.dead_teammates is not None]
     )
-
-    k_events = to_events([(s.t, s.k) for s in states], "K")
-    a_events = to_events([(s.t, s.a) for s in states], "A")
 
     intervals: list[CombatInterval] = []
     for start, end in combat_ranges:

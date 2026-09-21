@@ -690,3 +690,40 @@ def test_finalize_match_short_sequences_are_never_judged_saturated():
     states = [_tc_state(3.0 * i, False, True) for i in range(6)]
 
     assert len(finalize_match(states).intervals) == 1
+
+
+def test_finalize_match_turns_a_kill_outside_the_badge_into_a_combat_interval():
+    times = list(range(0, 90, 3))
+    combat_on = {30, 33, 36}
+    k_values = {t: (1 if t >= 60 else 0) for t in times}
+    states = [fs(t, t in combat_on, k=k_values[t]) for t in times]
+
+    result = finalize_match(states)
+
+    kill = [i for i in result.intervals if "kill" in i.tags]
+    assert len(kill) == 1
+    assert kill[0].k_delta == 1
+    assert kill[0].start <= 60 - 9 and kill[0].end >= 60
+
+
+def test_finalize_match_merges_a_kill_interval_that_touches_a_badge_interval():
+    times = list(range(0, 60, 3))
+    combat_on = {18, 21, 24}
+    k_values = {t: (1 if t >= 33 else 0) for t in times}
+    states = [fs(t, t in combat_on, k=k_values[t]) for t in times]
+
+    result = finalize_match(states)
+
+    assert len(result.intervals) == 1
+    assert result.intervals[0].start == 18
+    assert result.intervals[0].tags == frozenset({"kill"})
+
+
+def test_finalize_match_turns_an_assist_outside_the_badge_into_a_combat_interval():
+    times = list(range(0, 60, 3))
+    a_values = {t: (1 if t >= 30 else 0) for t in times}
+    states = [fs(t, False, a=a_values[t]) for t in times]
+
+    result = finalize_match(states)
+
+    assert [i.tags for i in result.intervals] == [frozenset({"assist"})]

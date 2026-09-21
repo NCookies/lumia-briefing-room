@@ -8,7 +8,7 @@ import numpy as np
 from lumia_briefing_room.detect.glyph import similarity
 
 MIN_SCORE = 0.5
-MIN_MARGIN = 0.07
+MIN_MARGIN = 0.05
 NMS_RADIUS = 8
 CONFIRM_SAMPLES = 2
 
