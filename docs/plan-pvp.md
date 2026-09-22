@@ -397,7 +397,14 @@ def r_cooldown_entered(prev_frame, frame) -> int | None
     - `pipeline/metadata.py` / `tools/rescore_clips.py` — `ultimateDelta` 를 메타데이터에 쓰고 읽는다.
     - `frontend/src/types.ts`, `frontend/src/labels.ts` — `ultimateDelta` 필드, `ultimate_used` → "궁극기 사용" 라벨.
     - TDD: `tests/test_ultimate.py`(신규), `tests/test_match.py`·`tests/test_pvp.py`·`tests/test_orchestrator.py`·`tests/test_rescore_clips.py`(추가). 전체 785개 통과.
-  - **아직 안 한 것**: R 쿨타임 숫자 자체를 읽어 "얼마나 긴 궁인지"로 가중치를 세분화하는 것(§2.8-b 원안 — 지금은 델타 크기만 보고 이진 판정). **2026-09-22 이전 클립은 `ultimateDelta` 필드가 없어 재검출해야 소급 반영된다** — `rescore_clips.py`로는 못 살린다.
+  - **아직 안 한 것**: R 쿨타임 숫자 자체를 읽어 "얼마나 긴 궁인지"로 가중치를 세분화하는 것(§2.8-b 원안 — 지금은 델타 크기만 보고 이진 판정).
+
+**★ 기존 클립 110개에 소급 반영 완료 (2026-09-22, `tools/backfill_ultimate.py`).** `rescore_clips.py`는 저장된 값만 재계산해 이 신호를 못 살린다고 적었는데, `backfill_day.py`와 같은 방식(클립 영상 자체의 키프레임만 다시 읽음, 원본 녹화 불필요)으로 소급 적용하는 도구를 만들었다.
+
+- 클립 전체에서 최솟값 대비 최댓값 델타를 재는 방식이라 **운영 파이프라인(구간 앞뒤 12초)보다 오히려 원래 검증(AUC 0.914, 클립 전체 기준)에 더 가깝다.**
+- `userLabel`/`labelSource`/`pinned`/`title` 등은 전혀 건드리지 않는다 — `rescore_meta()`를 재사용해 `ultimateDelta`만 더하고 `pvpScore`/`pvpSignals`만 다시 계산한다.
+- **실행 결과**: 110개 전부 갱신(`ultimate_r` ROI 없어서 못 읽은 것 0개). 검증: userLabel·labelSource·pinned·title 불일치 0개(백업과 대조), `pvpScore`가 바뀐 클립 25개 — 대부분 증거가 없거나(0.0) 1~2일차 `teammateDeathSplit` 할인(0.5)만 있던 구간이 궁 사용 증거(0.6)로 올라간 경우다.
+- TDD: `tests/test_backfill_ultimate.py` 신규(순수 로직만 - ffmpeg 디코딩 자체는 `backfill_day.py`처럼 테스트 안 함). 전체 790개 통과.
 
 **실제 클립 파일로 엔드투엔드 확인 (2026-09-22, `VodFileSource` + `detect_source`).** 단위 테스트는 합성 프레임이라, 실제 재인코딩된 클립(`20260920_134809_01.mp4`)에 통째로 돌려봤다.
 
