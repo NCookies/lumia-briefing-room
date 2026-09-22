@@ -326,3 +326,35 @@ def test_partial_cache_from_an_older_reader_is_discarded_on_resume(vod_file, tmp
     analyze_vod(vod_file, cfg, ffmpeg_path=FFMPEG_PATH, read_frame=counting, find_result=no_result)
 
     assert min(resumed) < 1
+
+
+@requires_ffmpeg
+def test_rebuild_carries_user_labels_over_to_the_overlapping_new_clips(vod_file, tmp_path):
+    first, cfg = run(tmp_path, vod_file)
+    root = cfg.paths.vod_clips
+    old_id = first["clips"][0]
+    meta_path = root / f"{old_id}.json"
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    meta.update(userLabel="pvp", labelSource="user")
+    meta_path.write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+
+    cfg.clip.postroll_sec = 6
+    again = analyze_vod(vod_file, cfg, ffmpeg_path=FFMPEG_PATH, read_frame=read_frame,
+                        find_result=no_result, rebuild=True)
+
+    new_meta = json.loads((root / f"{again['clips'][0]}.json").read_text(encoding="utf-8"))
+    assert new_meta["userLabel"] == "pvp" and new_meta["labelSource"] == "migrated"
+    assert new_meta["labelConflict"] is False
+    assert again["labelsMigrated"] == 1
+
+
+@requires_ffmpeg
+def test_labels_are_not_migrated_across_a_different_vod_or_when_nothing_was_labeled(vod_file, tmp_path):
+    first, cfg = run(tmp_path, vod_file)
+
+    again = analyze_vod(vod_file, cfg, ffmpeg_path=FFMPEG_PATH, read_frame=read_frame,
+                        find_result=no_result, rebuild=True)
+
+    assert again["labelsMigrated"] == 0
+    new_meta = json.loads((cfg.paths.vod_clips / f"{again['clips'][0]}.json").read_text(encoding="utf-8"))
+    assert new_meta["userLabel"] is None

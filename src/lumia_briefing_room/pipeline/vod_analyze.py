@@ -22,6 +22,7 @@ from lumia_briefing_room.detect.result import ResultScreen
 from lumia_briefing_room.detect.types import FrameState
 from lumia_briefing_room.pipeline.clip import ClipRange, make_thumbnail
 from lumia_briefing_room.pipeline.filters import apply_filter
+from lumia_briefing_room.pipeline.label_migrate import load_metas, migrate_labels
 from lumia_briefing_room.pipeline.metadata import match_result_dict
 from lumia_briefing_room.pipeline.orchestrator import (
     _aggregate_interval,
@@ -111,9 +112,13 @@ def _safe_result(find: FindResult, video: Path, span: GameSpan, next_start: floa
         return None
 
 
-def _trash_existing_clips(root: Path, vod: str) -> None:
-    for meta_path in sorted(root.glob(f"vod_{vod}_*.json")):
+def _trash_existing_clips(root: Path, vod: str) -> list[dict]:
+    """기존 클립을 휴지통으로 옮기고, 라벨을 새 클립으로 옮길 수 있게 옛 메타데이터를 돌려준다."""
+    paths = sorted(root.glob(f"vod_{vod}_*.json"))
+    olds = load_metas(paths)
+    for meta_path in paths:
         trash_clip(meta_path, root / ".trash")
+    return olds
 
 
 def analyze_vod(
@@ -271,7 +276,7 @@ def _make_clips(
         states, max_gap_sec=cfg.vod.game_gap_sec, min_game_sec=cfg.vod.min_game_sec
     )
     detections = detect_games(states, spans)
-    _trash_existing_clips(root, vod)
+    olds = _trash_existing_clips(root, vod)
     thumbs = root / ".thumbs"
     games: list[dict] = []
     clip_ids: list[str] = []
@@ -340,4 +345,8 @@ def _make_clips(
             "result": match_result_dict(result, result_image), "clipIds": game_clip_ids,
         })
 
-    index.update(games=games, clips=clip_ids)
+    report_labels = migrate_labels(olds, [root / f"{cid}.json" for cid in clip_ids])
+    index.update(
+        games=games, clips=clip_ids,
+        labelsMigrated=report_labels["migrated"], labelConflicts=report_labels["conflicts"],
+    )

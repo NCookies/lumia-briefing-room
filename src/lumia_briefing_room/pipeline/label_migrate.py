@@ -1,7 +1,7 @@
 """옛 클립에 찍은 교전/사냥 라벨을, 시간이 겹치는 새 클립으로 옮긴다.
 
 클립 경계가 바뀌면(검출기 수정 후 다시 분석 등) 클립 ID·구간이 달라져 라벨이 어긋난다.
-새 클립이 옛 클립과 (같은 녹화 세션에서) 겹치면 라벨을 옮긴다:
+새 클립이 옛 클립과 (같은 녹화 세션 또는 같은 다시보기 영상에서) 겹치면 라벨을 옮긴다:
   - 겹치는 라벨된 옛 클립 중 하나라도 pvp 면 pvp (기준: 클립에 교전이 *포함*되면 교전)
   - 전부 pve 면 pve
   - pvp 와 pve 가 섞이면 pvp 로 옮기되 labelConflict=True 로 표시해 사용자가 확인하게 한다
@@ -22,10 +22,16 @@ def _overlap(a: dict, b: dict) -> float:
     return max(0.0, min(a1, b1) - max(a0, b0))
 
 
+def _origin(meta: dict) -> str | None:
+    """같은 원본인지 가리는 열쇠. 스팀 클립은 녹화 세션, 다시보기 클립은 영상 id 다."""
+    return meta.get("sessionDir") or meta.get("vodId")
+
+
 def migrate_label(new: dict, olds: list[dict]) -> tuple[str | None, bool, list[str]]:
+    origin = _origin(new)
     hits = [
         o for o in olds
-        if o.get("userLabel") and o["sessionDir"] == new["sessionDir"] and _overlap(new, o) >= MIN_OVERLAP_SEC
+        if o.get("userLabel") and origin is not None and _origin(o) == origin and _overlap(new, o) >= MIN_OVERLAP_SEC
     ]
     if not hits:
         return None, False, []

@@ -20,7 +20,7 @@ def test_main_passes_options_and_prints_a_summary(tmp_path, monkeypatch, capsys)
         seen.update(kw, path=path)
         kw["on_progress"](VodProgress("decode", 0.5, 1, 2, "절반"))
         return {
-            "status": "done", "clips": ["c1", "c2"],
+            "status": "done", "clips": ["c1", "c2"], "labelsMigrated": 5, "labelConflicts": 1,
             "games": [{"index": 1, "startSec": 10.0, "endSec": 900.0, "kFinal": 6, "aFinal": 4,
                        "clipIds": ["c1", "c2"], "result": {"placement": 2, "total": 7}}],
         }
@@ -35,6 +35,7 @@ def test_main_passes_options_and_prints_a_summary(tmp_path, monkeypatch, capsys)
     assert seen["clips_dir"] == tmp_path / "out"
     assert "50.0%" in out and "게임 1판, 클립 2개 (done)" in out
     assert "2/7위" in out and "K 6 A 4" in out
+    assert "라벨 5개를 새 클립으로 옮겼다" in out and "확인이 필요한 것 1개" in out
 
 
 def test_main_reports_a_missing_video(tmp_path, monkeypatch):

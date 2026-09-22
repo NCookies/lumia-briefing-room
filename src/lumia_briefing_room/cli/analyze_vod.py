@@ -59,6 +59,9 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit("중단했다. 같은 명령을 다시 실행하면 이어서 한다.")
 
     print(f"게임 {len(index['games'])}판, 클립 {len(index['clips'])}개 ({index['status']})")
+    if index.get("labelsMigrated"):
+        conflicts = index.get("labelConflicts", 0)
+        print(f"옛 클립의 라벨 {index['labelsMigrated']}개를 새 클립으로 옮겼다" + (f" (교전·사냥이 섞여 확인이 필요한 것 {conflicts}개)" if conflicts else ""))
     for game in index["games"]:
         result = game.get("result") or {}
         placement = f"{result.get('placement')}/{result.get('total')}위" if result.get("placement") else "결과 미확인"

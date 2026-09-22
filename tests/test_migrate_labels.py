@@ -82,3 +82,18 @@ def test_migrate_folder_counts_new_clips_with_nothing_to_carry(tmp_path):
     _write(tmp_path / "new", "n1", sessionDir=SESSION, videoOffsetSec=0, durationSec=30, userLabel=None)
 
     assert migrate_folder(tmp_path / "old", tmp_path / "new")["unlabeled"] == 1
+
+
+def test_vod_clips_are_matched_by_vod_id_and_never_across_vods():
+    def vclip(cid, start, dur, label=None, vod="aaa"):
+        return {"id": cid, "vodId": vod, "videoOffsetSec": start, "durationSec": dur, "userLabel": label}
+
+    assert migrate_label(vclip("n", 100, 50), [vclip("o", 90, 30, "pvp")]) == ("pvp", False, ["o"])
+    assert migrate_label(vclip("n", 100, 50), [vclip("o", 90, 30, "pvp", vod="bbb")]) == (None, False, [])
+
+
+def test_a_steam_clip_never_matches_a_vod_clip():
+    steam = clip("s", 100, 50, "pvp")
+    vod = {"id": "v", "vodId": "aaa", "videoOffsetSec": 100, "durationSec": 50, "userLabel": None}
+
+    assert migrate_label(vod, [steam]) == (None, False, [])
