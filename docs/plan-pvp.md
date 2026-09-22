@@ -23,7 +23,8 @@
 - [x] **팀원 전투 신호 포화 보호 (2026-09-21 실사용)** — 한 경기(10:58)에서 팀원 링 판독이 94% 프레임에서 켜져(정상 11~15%) 경기 전체가 거대한 교전 구간 하나가 됐다. 킬·어시스트가 그 구간에 통째로 붙고 클립은 구간 앞 93초만 잘려 '증가하지 않은 곳에 근거가 붙고, 킬이 늘어난 교전은 클립에 없는' 현상이 났다. `finalize_match` 가 팀원 신호가 60% 초과(20샘플 이상)로 켜져 있으면 신호를 버리고 내 배지만 쓴다. 같은 원본에서 킬 +4 구간(870~936초)이 정상 구간·클립으로 잡히고 최종 K6/A6 도 HUD 와 맞는다
 - [ ] **다음**: 새 경계로 재처리 + 라벨 이관 (사용자 확인 후 — 백로그 매치는 2시간 링버퍼 안에서만 가능)
 - [ ] 그다음: 라벨 없는 새 클립 12개와 '확인 필요' 1개를 사용자가 확인, 증거 없는 교전(5개)을 찾을 새 신호
-- [ ] **신규 후보 신호 검증 (2026-09-22 제안)** — 활성 효과 아이콘 개수, 궁극기(R) 사용. SPEC §2.12 #9~#11, 아래 §2.8
+- [x] **궁극기(R) 사용 신호 배선 완료 (2026-09-22)** — 라벨 110개로 검증(AUC 0.914) 후 `detect/ultimate.py`·`detect/match.py`·`detect/pvp.py`에 실제 채점 반영. 아래 §2.8-b 결과 참고
+- [ ] 활성 효과 아이콘 개수는 미완성(§2.8-a) — 아이콘별 밑줄 폭이 달라 단순 규칙으로 안 됨, 다음 시도 방향만 기록
 - [ ] 후순위: 전멸 배너, 내 HP 급락, 네임플레이트(색 자동 인식 옵션과 함께 — §5-3), 캐릭터별 발동 특성(§2.8-c)
 
 ## 1. 순서를 지켜야 하는 이유
@@ -387,7 +388,16 @@ def r_cooldown_entered(prev_frame, frame) -> int | None
   - **고쳐서 클립 자체의 최솟값을 그 클립의 "준비" 기준선으로 잡고, 최댓값과의 차이(delta ≥ 0.15)로 재계산**하니 훨씬 견고해졌다: pvp 73개 중 66개(90%) 검출, pve 37개 중 10개(27%) 검출, **AUC(delta) = 0.914**.
   - 미니맵(§2.4-b, AUC 0.53)·네임플레이트(§5-3, AUC 0.62)보다 훨씬 강하고, 확정 증거(킬/어시 1.0) 다음가는 수준이다. §3-4("이겼지만 킬이 없는 교전")를 메울 유력한 후보다.
   - 놓친 pvp(10%)는 킬/사망 태그가 있어도 실제로 궁을 안 쓴 경우로 보인다(`20260921_163314_05` 는 kill 태그인데 delta 0.000). 걸린 pve(27%)는 실제 보스·야생동물 전투에서 궁을 쓴 경우이거나 `teammate_death` 처럼 애매한 클립이 섞여 있다.
-  - **아직 안 한 것**: ROI 정밀 측정, `filter.pvpWeights` 실배선(가중치 결정 + `detect/pvp.py` 반영 + TDD), R 쿨타임 숫자 자체를 읽어 "얼마나 긴 궁인지"로 가중치를 세분화하는 것(§2.8-b 원안).
+  - **★ 배선 완료 (2026-09-22).** ROI 를 그리드 오버레이로 정밀 재측정해 `ultimate_r = 1100,1298,1160,1358` 로 `profiles/builtin/2560x1440.json` 에 확정했다. 구현:
+    - `detect/ultimate.py::blue_tint_ratio()` — 파란기 비율만 반환(절대 임계 아님, 위 함정 그대로 docstring에 남김).
+    - `detect/match.py::analyze_frame()` — `"ultimate_r" in profile.rois and spectating is False` 일 때만 읽는다(다른 선택 ROI들과 같은 패턴). `FrameState.ultimate_blue`.
+    - `detect/match.py::finalize_match()` — 구간 `[start, end]` 뿐 아니라 앞뒤 `ULTIMATE_LOOKAROUND_SEC=12초`까지 보고 최댓값-최솟값 델타를 잰다(짧은 교전 구간 안에는 "준비" 기준선이 없을 수 있어서 — 실제 검증은 preroll/postroll 이 붙은 전체 클립으로 했으므로 그 폭을 맞췄다). `CombatInterval.ultimate_delta`.
+    - `pipeline/orchestrator.py::_aggregate_interval()` — 여러 구간이 한 클립으로 합쳐질 때 델타는 최댓값을 취한다(`_max_of_known`).
+    - `detect/pvp.py::score_interval()` — `ultimate_delta >= ULTIMATE_DELTA_THRESHOLD(0.15)` 면 `ultimate_used` 신호 + `ultimateUsed` 가중치(기본 **0.6** — 사망 0.9·팀원 사망 0.8보다 낮게, 미니맵 0보다 훨씬 높게. 확정 증거는 아니지만(pve 27% 도 걸림) 지금까지 나온 추정 증거 중 가장 세다).
+    - `pipeline/metadata.py` / `tools/rescore_clips.py` — `ultimateDelta` 를 메타데이터에 쓰고 읽는다.
+    - `frontend/src/types.ts`, `frontend/src/labels.ts` — `ultimateDelta` 필드, `ultimate_used` → "궁극기 사용" 라벨.
+    - TDD: `tests/test_ultimate.py`(신규), `tests/test_match.py`·`tests/test_pvp.py`·`tests/test_orchestrator.py`·`tests/test_rescore_clips.py`(추가). 전체 785개 통과.
+  - **아직 안 한 것**: R 쿨타임 숫자 자체를 읽어 "얼마나 긴 궁인지"로 가중치를 세분화하는 것(§2.8-b 원안 — 지금은 델타 크기만 보고 이진 판정). **2026-09-22 이전 클립은 `ultimateDelta` 필드가 없어 재검출해야 소급 반영된다** — `rescore_clips.py`로는 못 살린다.
 
 #### 2.8-c 캐릭터별 발동 특성 — 후순위
 

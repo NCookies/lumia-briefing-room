@@ -3,8 +3,11 @@
 usage:
     python tools/rescore_clips.py [clips_dir]
 
-가중치를 바꿨거나 점수 규칙을 고쳤을 때 쓴다. 검출 결과(killDelta, died, 태그, enemyRingMean)는
-메타데이터에 이미 있으므로 영상을 다시 분석하지 않는다. 사용자 라벨은 건드리지 않는다.
+가중치를 바꿨거나 점수 규칙을 고쳤을 때 쓴다. 검출 결과(killDelta, died, 태그, enemyRingMean,
+ultimateDelta)는 메타데이터에 이미 있으므로 영상을 다시 분석하지 않는다. 사용자 라벨은 건드리지 않는다.
+
+★ ultimateDelta 는 2026-09-22 이후 재처리한 클립에만 있다. 그 전 클립은 필드 자체가 없어
+None 으로 읽히고, ultimateUsed 신호는 그냥 안 걸린다 - 재검출 없이는 소급 적용이 안 된다.
 """
 
 from __future__ import annotations
@@ -32,6 +35,7 @@ def rescore_meta(meta: dict, weights: dict[str, float]) -> dict:
         died=bool(meta.get("died")), day_night=meta.get("dayNight"), confidence=1.0,
         teammate_deaths=1 if "teammate_death" in tags else 0,
         enemy_ring_mean=meta.get("enemyRingMean"), game_day=meta.get("gameDay"),
+        ultimate_delta=meta.get("ultimateDelta"),
     )
     result = score_interval(interval, weights)
     return {**meta, "tags": tags, "pvpScore": result.score, "pvpSignals": result.signals}

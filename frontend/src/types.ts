@@ -59,6 +59,7 @@ export interface Clip {
   pvpSignals: string[]
   teamWipe: string | null
   enemyRingMean: number | null
+  ultimateDelta: number | null
   region: string | null
   userLabel: UserLabel
   labelSource?: 'user' | 'migrated' | null

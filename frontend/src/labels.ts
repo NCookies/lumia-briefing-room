@@ -15,4 +15,5 @@ export const SIGNAL_LABELS: Record<string, string> = {
   death: '내 사망',
   teammate_death: '팀원 사망',
   enemy_rings: '미니맵 적',
+  ultimate_used: '궁극기 사용',
 }

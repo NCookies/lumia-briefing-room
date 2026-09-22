@@ -54,6 +54,7 @@ class ClipMetadata:
     pvp_signals: list[str]
     team_wipe: str | None
     enemy_ring_mean: float | None
+    ultimate_delta: float | None
     region: str | None
     user_label: str | None
     label_source: str | None
@@ -151,6 +152,7 @@ def build_metadata(
         pvp_signals=list(pvp.signals) if pvp else [],
         team_wipe=None,
         enemy_ring_mean=interval.enemy_ring_mean,
+        ultimate_delta=interval.ultimate_delta,
         region=interval.region,
         user_label=None,
         label_source=None,

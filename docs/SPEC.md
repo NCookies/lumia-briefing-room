@@ -516,7 +516,9 @@ Player.log            →  로컬 타임존
 >
 > **AUC(delta) = 0.914** — 미니맵(0.53)·네임플레이트(0.62)보다 훨씬 강하고, 확정 증거(킬/어시 1.0) 다음가는 수준이다. 놓친 pvp 10%는 킬/사망 태그가 있어도 궁을 안 쓴 진짜 사례로 보이고(예: `20260921_163314_05` 는 kill 태그인데 delta 0), 걸린 pve 27%는 실제로 궁을 쓴 사냥(야생동물·보스전)이거나 `teammate_death` 처럼 애매한 클립이 섞여 있다.
 >
-> **다음 단계 — 아직 안 함**: ROI(`1110..1170, 1290..1360`)는 여전히 눈대중이라 정밀 측정이 필요하고, `filter.pvpWeights`에 실제로 배선(가중치 결정 + `detect/pvp.py` 반영 + 회귀 테스트)하는 건 별도 작업으로 남겨뒀다.
+> **★ 배선 완료 (2026-09-22).** ROI 를 그리드 오버레이로 정밀 재측정해 `1100,1298,1160,1358` 로 확정하고(`profiles/builtin/2560x1440.json` 의 `ultimate_r`), `detect/ultimate.py`(파란기 비율) + `detect/match.py`(구간 앞뒤 12초를 보고 최댓값-최솟값 델타 계산, `CombatInterval.ultimate_delta`) + `detect/pvp.py`(`ultimateUsed` 가중치 0.6, 델타 임계 0.15)로 실제 채점에 들어간다. TDD 로 `tests/test_ultimate.py`·`tests/test_match.py`·`tests/test_pvp.py`·`tests/test_orchestrator.py`·`tests/test_rescore_clips.py`에 회귀 테스트를 추가했다(전체 785개 통과). 구현 세부는 [plan-pvp.md §2.8-b](plan-pvp.md) 참고.
+>
+> ⚠ **2026-09-22 이전에 만든 클립은 `ultimateDelta` 필드 자체가 없다** — 재검출해야 소급 반영된다(`tools/rescore_clips.py`는 저장된 값만 재계산하므로 이 신호는 못 살린다).
 
 #### 10. 활성 효과 아이콘 개수 — 제안, 미검증 (2026-09-22)
 
@@ -1249,7 +1251,7 @@ eplay\<캐릭터>` 처럼 폴더를 나눠 보관한다.
 | `filter.dayNight` | `any` | `any` / `day` / `night` |
 | `filter.reviveCost` | `any` | `any` / `free`(phaseIndex ≤ 3) / `credit`(≥ 4) — §2.0의 부활 규칙 |
 | `filter.minPvpScore` | `0.0` | **§2.12.** 이 점수 미만은 클립을 안 만든다. 기본 0 = 전부 통과 |
-| `filter.pvpWeights` | `{enemyRings: 0.7, death: 0.9, teammateDeath: 0.8}` | 증거별 가중치. 킬/어시는 항상 1.0. **라벨로 튜닝하기 전까지는 임시값** — 고친 뒤 `tools/rescore_clips.py` 로 재계산 |
+| `filter.pvpWeights` | `{enemyRings: 0, death: 0.9, teammateDeath: 0.8, teammateDeathSplit: 0.5, ultimateUsed: 0.6}` | 증거별 가중치. 킬/어시는 항상 1.0. **라벨로 튜닝하기 전까지는 임시값** — 고친 뒤 `tools/rescore_clips.py` 로 재계산. `ultimateUsed` 는 2026-09-22 라벨 110개로 검증(AUC 0.914, §2.12 #9) 후 추가 |
 | `filter.minDurationSec` | 4 | 이보다 짧은 교전은 버린다 (몬스터 한 대 때린 것 등). **단 킬·어시·사망 태그가 있는 구간은 길이와 상관없이 남긴다** — 배지가 1~3초만 켜진 채 킬이 난 교전을 버려 클립이 교전 한복판에서 끊기던 실사용 문제(2026-09-22, 다시보기)로 고쳤다. §1 의 재현율 우선 원칙 |
 | `filter.maxDurationSec` | `null` | 상한 |
 | `filter.gameMode` | `any` | `any` / `battle_royale` / `cobalt` |

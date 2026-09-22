@@ -32,6 +32,14 @@ def test_rescore_uses_the_ring_mean_when_no_other_evidence():
     assert result["pvpSignals"] == ["enemy_rings"]
 
 
+def test_rescore_uses_the_ultimate_delta_when_no_other_evidence():
+    weights = {**WEIGHTS, "ultimateUsed": 0.6}
+    result = rescore_meta(meta(ultimateDelta=0.48), weights)
+
+    assert result["pvpScore"] == 0.6
+    assert result["pvpSignals"] == ["ultimate_used"]
+
+
 def test_rescore_drops_no_result_when_another_tag_is_present():
     result = rescore_meta(meta(tags=["assist", "no_result"], assistDelta=1), WEIGHTS)
 

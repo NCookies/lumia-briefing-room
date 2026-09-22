@@ -448,6 +448,52 @@ def test_finalize_match_enemy_ring_mean_is_none_when_never_read():
     assert finalize_match(states).intervals[0].enemy_ring_mean is None
 
 
+def _ultimate_state(t, combat, ultimate_blue, spectating=False):
+    return FrameState(
+        t=t, combat=combat, face_value=111.0, face_sat=26.0, k=0, a=0,
+        day_night="day", spectating=spectating, ultimate_blue=ultimate_blue,
+    )
+
+
+def test_finalize_match_ultimate_delta_is_the_spread_seen_around_the_interval():
+    # 실측(134809_01): 준비 0.0 -> 쿨타임 진입 0.48 -> 되돌아옴. 교전 구간 자체는
+    # 짧아도 앞뒤(UNCOVERED_EVENT_LOOKBACK_SEC)를 같이 봐서 델타를 놓치지 않는다.
+    states = [
+        _ultimate_state(0.0, False, 0.0),
+        _ultimate_state(3.0, True, 0.40),
+        _ultimate_state(6.0, True, 0.48),
+        _ultimate_state(9.0, False, 0.30),
+    ]
+
+    interval = finalize_match(states).intervals[0]
+
+    assert interval.ultimate_delta == 0.48
+
+
+def test_finalize_match_ultimate_delta_skips_unread_samples():
+    states = [
+        _ultimate_state(0.0, False, 0.10),
+        _ultimate_state(3.0, True, None),
+        _ultimate_state(6.0, True, None),
+        _ultimate_state(9.0, False, 0.20),
+    ]
+
+    interval = finalize_match(states).intervals[0]
+
+    assert interval.ultimate_delta == pytest.approx(0.10)
+
+
+def test_finalize_match_ultimate_delta_is_none_when_never_read():
+    states = [
+        _ultimate_state(0.0, False, None),
+        _ultimate_state(3.0, True, None),
+        _ultimate_state(6.0, True, None),
+        _ultimate_state(9.0, False, None),
+    ]
+
+    assert finalize_match(states).intervals[0].ultimate_delta is None
+
+
 def test_analyze_frame_counts_enemy_rings_on_the_minimap_while_alive():
     import cv2
 
@@ -466,6 +512,38 @@ def test_analyze_frame_skips_minimap_while_spectating():
     profile = ResolutionProfile.for_resolution(2560, 1440)
 
     assert analyze_frame(_frame_with_minimap(profile), profile, t=0.0).enemy_rings is None
+
+
+def _paint_ultimate(frame, profile, rgb):
+    roi = profile.rois["ultimate_r"]
+    frame[roi.y0 : roi.y1, roi.x0 : roi.x1] = rgb
+
+
+def test_analyze_frame_reads_ultimate_blue_tint_when_alive():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    frame = _frame_with_minimap(profile, alive=True)
+    _paint_ultimate(frame, profile, (40, 90, 180))  # 쿨타임 오버레이 색
+
+    assert analyze_frame(frame, profile, t=0.0).ultimate_blue == 1.0
+
+
+def test_analyze_frame_ultimate_blue_is_none_while_spectating():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    frame = _frame_with_minimap(profile)  # alive=False -> 관전
+    _paint_ultimate(frame, profile, (40, 90, 180))
+
+    state = analyze_frame(frame, profile, t=0.0)
+    assert state.spectating is True
+    assert state.ultimate_blue is None
+
+
+def test_analyze_frame_ultimate_blue_is_none_without_the_roi():
+    # 1920x1080 프로필은 아직 ultimate_r ROI 가 없다(2026-09-22 기준) - 우아하게 건너뛴다.
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    assert "ultimate_r" not in profile.rois
+    frame = np.full((1080, 1920, 3), 20, np.uint8)
+
+    assert analyze_frame(frame, profile, t=0.0).ultimate_blue is None
 
 
 def _day_templates(profile):

@@ -24,6 +24,7 @@ from lumia_briefing_room.detect.minimap import count_rings
 from lumia_briefing_room.detect.region import load_region_templates, read_region, region_score
 from lumia_briefing_room.detect.spectator import read_spectating
 from lumia_briefing_room.detect.teammate import combat_slots, dead_slots, new_deaths
+from lumia_briefing_room.detect.ultimate import blue_tint_ratio
 from lumia_briefing_room.detect.types import CombatInterval, FrameState, MatchDetection
 from lumia_briefing_room.profiles.models import ResolutionProfile
 from lumia_briefing_room.video.segments import SegmentRange
@@ -35,6 +36,10 @@ WAITING_ROOM_REGIONS = frozenset({"브리핑 룸"})
 DEATH_LINK_SEC = 8.0
 UNEXPLAINED_DEATH_LOOKBACK_SEC = 12.0
 UNCOVERED_EVENT_LOOKBACK_SEC = 12.0
+# 궁극기 델타(detect/ultimate.py)는 짧은 교전 구간 안에서 "준비" 기준선을 못 볼 수 있어
+# 앞뒤를 더 넓게 본다 - 실측(scripts/probe/eval_ultimate_signal.py)은 preroll/postroll 이
+# 붙은 전체 클립으로 쟀으므로, 여기서도 그 폭에 맞춰 구간 앞뒤를 본다.
+ULTIMATE_LOOKAROUND_SEC = 12.0
 MIN_SPECTATOR_SAMPLES = 2
 MIN_WAITING_SAMPLES = 5
 TEAM_COMBAT_SATURATION = 0.6
@@ -124,6 +129,10 @@ def analyze_frame(
     day_night = read_day_night(profile.crop(frame, "day_night"))
     clock_zero = read_clock_zero(profile.crop(frame, "timer")) if "timer" in profile.rois else None
 
+    ultimate_blue = None
+    if "ultimate_r" in profile.rois and spectating is False:
+        ultimate_blue = blue_tint_ratio(profile.crop(frame, "ultimate_r"))
+
     region = None
     if region_templates and spectating is False:
         region = read_region(
@@ -156,6 +165,7 @@ def analyze_frame(
         game_day=game_day,
         team_combat=team_combat,
         clock_zero=clock_zero,
+        ultimate_blue=ultimate_blue,
     )
 
 
@@ -315,6 +325,13 @@ def finalize_match(
         rings = [s.enemy_rings for s in in_range if s.enemy_rings is not None]
         enemy_ring_mean = sum(rings) / len(rings) if rings else None
         game_day = _mode([str(s.game_day) for s in in_range if s.game_day is not None])
+
+        around = [
+            s for s in states
+            if start - ULTIMATE_LOOKAROUND_SEC <= s.t <= end + ULTIMATE_LOOKAROUND_SEC and not _spectating(s.t)
+        ]
+        ultimate_values = [s.ultimate_blue for s in around if s.ultimate_blue is not None]
+        ultimate_delta = max(ultimate_values) - min(ultimate_values) if ultimate_values else None
         day_night = _mode([s.day_night for s in in_range if s.day_night])
         solid = sum(1 for s in in_range if s.combat is True)
         confidence = solid / len(in_range) if in_range else 0.0
@@ -339,6 +356,7 @@ def finalize_match(
                 teammate_deaths=team_deaths, region=region,
                 enemy_ring_mean=enemy_ring_mean,
                 game_day=int(game_day) if game_day is not None else None,
+                ultimate_delta=ultimate_delta,
             )
         )
 

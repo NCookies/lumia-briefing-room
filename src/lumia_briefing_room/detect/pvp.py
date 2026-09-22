@@ -6,11 +6,19 @@ from lumia_briefing_room.detect.types import CombatInterval
 
 ENEMY_RINGS_FULL_AT = 1.5
 
+# 궁극기(R) 쿨타임 진입 델타(detect/ultimate.py) 임계. 이 이상이면 "궁을 썼다"로 본다.
+ULTIMATE_DELTA_THRESHOLD = 0.15
+
 # enemyRings 는 0: 라벨 57개로 재보니 증거 없는 교전(8)과 사냥(21)을 못 가른다(AUC 0.53).
 # teammateDeathSplit: 1~2일차는 무료 부활이라 팀원이 흩어져 사냥하다 혼자 죽는다(스플릿). 그 날의 팀원 사망은 덜 믿는다.
-# 신호 자체와 enemyRingMean 은 계속 기록하고, 가중치만 뺐다.
+# ultimateUsed: 라벨 110개(pvp 73/pve 37)로 재보니 AUC(delta) 0.914 로 강하게 갈린다(pvp 90%/pve 27% 검출,
+# scripts/probe/eval_ultimate_signal.py). 사망(0.9)·팀원 사망(0.8)보다는 낮게, 미니맵(0)보다는 훨씬 높게 잡았다 -
+# 야생동물·보스전에도 궁을 쓸 수 있어(pve 27%) 확정 증거는 아니지만, 지금까지의 어떤 추정 증거보다 세다.
+# 신호 자체는 계속 기록하고, 임계·가중치는 다음 라벨 라운드에서 더 조정한다.
 FREE_REVIVE_LAST_DAY = 2
-DEFAULT_WEIGHTS = {"enemyRings": 0.0, "death": 0.9, "teammateDeath": 0.8, "teammateDeathSplit": 0.5}
+DEFAULT_WEIGHTS = {
+    "enemyRings": 0.0, "death": 0.9, "teammateDeath": 0.8, "teammateDeathSplit": 0.5, "ultimateUsed": 0.6,
+}
 
 
 @dataclass(frozen=True)
@@ -51,5 +59,9 @@ def score_interval(interval: CombatInterval, weights: dict[str, float]) -> PvpSc
     if mean and mean > 0 and ring_weight > 0:
         signals.append("enemy_rings")
         candidates.append(ring_weight * min(mean / ENEMY_RINGS_FULL_AT, 1.0))
+
+    if interval.ultimate_delta is not None and interval.ultimate_delta >= ULTIMATE_DELTA_THRESHOLD:
+        signals.append("ultimate_used")
+        candidates.append(weights.get("ultimateUsed", 0.0))
 
     return PvpScore(score=round(max(candidates, default=0.0), 4), signals=signals)

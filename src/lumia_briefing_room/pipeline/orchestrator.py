@@ -49,6 +49,11 @@ def _mean_of_known(values: list[float | None]) -> float | None:
     return sum(known) / len(known) if known else None
 
 
+def _max_of_known(values: list[float | None]) -> float | None:
+    known = [v for v in values if v is not None]
+    return max(known) if known else None
+
+
 def _aggregate_interval(intervals: list[CombatInterval]) -> CombatInterval:
     """겹치거나 가까워 한 클립으로 합쳐진 교전들의 태그/수치를 하나로 모은다."""
     tags: frozenset[str] = frozenset()
@@ -69,6 +74,7 @@ def _aggregate_interval(intervals: list[CombatInterval]) -> CombatInterval:
         region=next((iv.region for iv in intervals if iv.region), None),
         game_day=next((iv.game_day for iv in intervals if iv.game_day is not None), None),
         enemy_ring_mean=_mean_of_known([iv.enemy_ring_mean for iv in intervals]),
+        ultimate_delta=_max_of_known([iv.ultimate_delta for iv in intervals]),
     )
 
 
