@@ -159,3 +159,10 @@ def test_vod_config_round_trips_through_camel_json(tmp_path):
     assert loaded.vod.sources == ["H:/vod", "H:/other.mp4"]
     assert loaded.vod.streamers == {"3fa91c02b7de": "○○○"}
     assert loaded.paths.vod_clips == Path("D:/vod-out")
+
+
+def test_resolve_config_path_falls_back_to_the_default_file(tmp_path):
+    from lumia_briefing_room.config import DEFAULT_CONFIG_PATH, resolve_config_path
+
+    assert resolve_config_path(None) == DEFAULT_CONFIG_PATH
+    assert resolve_config_path(tmp_path / "x.json") == tmp_path / "x.json"

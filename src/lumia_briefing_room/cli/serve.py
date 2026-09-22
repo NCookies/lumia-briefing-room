@@ -16,7 +16,7 @@ import uvicorn
 
 from lumia_briefing_room.api.app import create_app
 from lumia_briefing_room.api.static import find_frontend_dist, mount_static
-from lumia_briefing_room.config import Config, load_config
+from lumia_briefing_room.config import Config, load_config, resolve_config_path
 
 log = logging.getLogger("lumia_briefing_room.serve")
 
@@ -82,8 +82,9 @@ def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     args = build_parser().parse_args(argv)
 
-    cfg = load_config(args.config)
-    app = build_app(cfg, config_path=args.config)
+    config_path = resolve_config_path(args.config)
+    cfg = load_config(config_path)
+    app = build_app(cfg, config_path=config_path)
     server, thread = run_server_in_thread(app, host=args.host, port=args.port)
 
     if not wait_until_started(server):

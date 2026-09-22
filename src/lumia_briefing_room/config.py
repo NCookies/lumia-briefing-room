@@ -281,6 +281,11 @@ def dataclass_from_camel_dict(cls, data: dict):
     return cls(**kwargs)
 
 
+def resolve_config_path(path: Path | None) -> Path:
+    """설정 파일 경로. 지정하지 않으면 기본 파일이다. 읽을 때만이 아니라 저장할 때도 같은 파일이어야 한다."""
+    return path or DEFAULT_CONFIG_PATH
+
+
 def load_config(path: Path | None = None) -> Config:
     path = path or DEFAULT_CONFIG_PATH
     if not path.exists():

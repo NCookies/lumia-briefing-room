@@ -13,7 +13,7 @@ import webbrowser
 from lumia_briefing_room import autostart
 from lumia_briefing_room.cli import serve as serve_cli
 from lumia_briefing_room.cli.watch import build_parser, run
-from lumia_briefing_room.config import load_config
+from lumia_briefing_room.config import load_config, resolve_config_path
 from lumia_briefing_room.pipeline.cleanup import cleanup_loop, make_cleanup_runner
 from lumia_briefing_room.tray import build_icon
 
@@ -125,7 +125,7 @@ def main(argv: list[str] | None = None) -> None:
     ).start()
 
     on_open = make_on_open(
-        host="127.0.0.1", port=resolve_port(cfg.ui.port), config_path=args.config
+        host="127.0.0.1", port=resolve_port(cfg.ui.port), config_path=resolve_config_path(args.config)
     )
 
     if should_open_ui_on_start(cfg, open_ui=args.open_ui):
