@@ -50,3 +50,6 @@ review.html
 
 # Playwright MCP 산출물
 .playwright-mcp/
+
+# 배포용 번들 바이너리 (tools/fetch_ffmpeg.py 가 받는다 — 커밋하지 않는다)
+vendor/

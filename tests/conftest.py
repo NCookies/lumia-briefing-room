@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import shutil
 import struct
 import subprocess
 from datetime import datetime, timezone
@@ -10,6 +12,27 @@ import numpy as np
 import pytest
 
 from lumia_briefing_room.config import discover_ffmpeg
+
+
+def _prefer_full_ffmpeg_for_tests() -> None:
+    """테스트는 libx264 가 있는 개발용 ffmpeg 를 쓴다.
+
+    배포용으로 받아 둔 `vendor/ffmpeg` 는 LGPL 빌드라 libx264 가 없는데, 합성 녹화를 만드는
+    픽스처가 그것을 쓴다(실제 스팀 녹화를 흉내내려면 GOP 를 지정한 H.264 가 필요하다).
+    `discover_ffmpeg()` 가 번들을 먼저 고르므로, PATH 의 전체 빌드를 LUMIA_FFMPEG 로 지정해
+    테스트에서만 그쪽을 보게 한다. 제품 코드의 탐색 순서는 그대로다.
+    """
+    if os.environ.get("LUMIA_FFMPEG"):
+        return
+    found = shutil.which("ffmpeg")
+    if not found:
+        return
+    encoders = subprocess.run([found, "-hide_banner", "-encoders"], capture_output=True, text=True).stdout
+    if "libx264" in encoders:
+        os.environ["LUMIA_FFMPEG"] = found
+
+
+_prefer_full_ffmpeg_for_tests()
 
 FFMPEG_PATH = discover_ffmpeg()
 
