@@ -12,6 +12,24 @@ def test_resolve_port_fixed_value_is_used_as_is():
     assert resolve_port("8123") == 8123
 
 
+def test_resolve_port_falls_back_to_next_free_port_when_busy():
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as busy:
+        busy.bind(("127.0.0.1", 0))
+        busy.listen()
+        taken = busy.getsockname()[1]
+        port = resolve_port(taken)
+    assert port != taken
+    assert taken < port <= taken + 20
+
+
+def test_default_ui_port_is_fixed():
+    from lumia_briefing_room.config import UiConfig
+
+    assert UiConfig().port == 8765
+
+
 def test_make_on_open_starts_server_once_and_opens_browser(monkeypatch):
     started = []
     opened = []

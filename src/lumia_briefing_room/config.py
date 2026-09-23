@@ -185,7 +185,7 @@ class ExportConfig:
 @dataclass
 class UiConfig:
     shell: str = "webview"
-    port: str | int = "auto"
+    port: str | int = 8765
     default_view: str = "timeline"
     title_template: str = "{day}일차 {dayNight} {myChar}, {teamChars}"
     language: str = "ko"

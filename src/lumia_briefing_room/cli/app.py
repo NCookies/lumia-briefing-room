@@ -20,13 +20,33 @@ from lumia_briefing_room.tray import build_icon
 log = logging.getLogger("lumia_briefing_room.app")
 
 
-def resolve_port(port_setting) -> int:
-    """SPEC §7.7 ui.port: "auto" 면 빈 포트를 하나 골라온다."""
+def _is_free(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind(("127.0.0.1", port))
+        except OSError:
+            return False
+        return True
+
+
+def _free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def resolve_port(port_setting, *, fallback_range: int = 20) -> int:
+    """SPEC §7.7 ui.port: 고정 포트가 점유 중이면 다음 빈 포트로 폴백한다. "auto" 면 임의의 빈 포트.
+
+    포트가 바뀌면 브라우저 origin 이 달라져 localStorage 가 초기화되므로 기본은 고정 포트다.
+    """
     if port_setting == "auto":
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.bind(("127.0.0.1", 0))
-            return s.getsockname()[1]
-    return int(port_setting)
+        return _free_port()
+    base = int(port_setting)
+    for port in range(base, base + fallback_range + 1):
+        if _is_free(port):
+            return port
+    return _free_port()
 
 
 def make_on_open(*, host="127.0.0.1", port=8000, config_path=None, open_browser=webbrowser.open):

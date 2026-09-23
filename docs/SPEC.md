@@ -1355,7 +1355,7 @@ UI에서 제공할 동작:
 | 키 | 기본값 | 설명 |
 |---|---|---|
 | `ui.shell` | `webview` | `webview`(pywebview 창) / `browser`(기본 브라우저) |
-| `ui.port` | `auto` | 로컬 서버 포트. `127.0.0.1` 에만 바인드. ⚠ `auto` 는 실행마다 포트가 바뀌어 브라우저 origin 이 달라지므로 localStorage(볼륨·선택 탭 등)가 초기화된다 — 고정 포트 기본값으로 바꾸는 안을 검토 중([plan-ui.md §0](plan-ui.md)) |
+| `ui.port` | `8765` | 로컬 서버 포트. `127.0.0.1` 에만 바인드. 고정해 두는 이유: 포트가 바뀌면 브라우저 origin 이 달라져 localStorage(볼륨·선택 탭 등)가 초기화된다. 점유 중이면 다음 빈 포트(최대 +20)로 폴백하고, `auto` 면 실행마다 임의의 빈 포트 |
 | `ui.defaultView` | `timeline` | `timeline` / `grid` |
 | `ui.titleTemplate` | `{day}일차 {dayNight} {myChar}, {teamChars}` | 클립 제목 규칙 |
 | `ui.language` | `ko` | |
