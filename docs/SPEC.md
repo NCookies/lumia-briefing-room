@@ -1330,12 +1330,15 @@ eplay\<캐릭터>` 처럼 폴더를 나눠 보관한다.
 | `retention.maxCount` | `null` | 클립 개수 상한 |
 | `retention.protectPinned` | `true` | 고정한 클립은 자동 정리에서 제외 |
 | `retention.protectTags` | `["death"]` | 이 태그가 붙은 클립은 자동 정리에서 제외 |
+| `retention.keepGameRecords` | `true` | 클립이 다 지워진 경기의 요약(순위·모드·캐릭터·TK/K/A·결과표 이미지)을 `clips/.games/` 에 남겨 게임 목록에 "클립 삭제됨" 행으로 계속 보여준다. `false` 면 요약·결과표 이미지도 지운다 |
 | `export.copyMetadata` | `true` | 내보낼 때 JSON 사이드카도 함께 |
 | `export.copyThumbnail` | `true` | 썸네일도 함께 |
 | `export.mode` | `copy` | `copy`(복사) / `move`(이동) |
 | `export.nameTemplate` | `{date}_{title}` | 내보낼 파일명 규칙 |
 
 **라벨 보관소.** 영구 삭제(수동 완전 삭제·휴지통 비우기·유예 만료·`permanent` 자동 삭제) 직전에 `userLabel` 이 pvp/pve 인 클립은 메타데이터에서 `thumbnailPath`·`deletedAt`·결과 이미지 경로를 뺀 사본을 `clips/.labels/<클립ID>.json` 에 남긴다(`pipeline/label_archive.py`). 라벨 없는 클립은 남기지 않는다. 영상이 아니라 근거·라벨이 평가(§2.12, `tools/eval_pvp.py`)의 자료이기 때문이다. 목록·복구 대상이 아니다(`scan_clips` 는 서브폴더를 보지 않는다).
+
+**게임 기록 보관 (설계 결정, 미구현).** 영상 정리와 전적 기록은 분리한다. 용량을 차지하는 건 영상(클립당 60~80MB)이고 경기 요약은 몇 KB 라, 자동 정리로 클립이 다 사라져도 요약을 `clips/.games/<경기키>.json` 에 남기고 결과표 이미지(약 100~200KB)도 유지한다(`retention.keepGameRecords`, 기본 켬). 적용 지점은 라벨 보관소와 같은 네 삭제 경로다. 게임 단위 삭제는 기록까지 지운다. 상세는 [plan-ui.md §0](plan-ui.md).
 
 UI에서 제공할 동작:
 

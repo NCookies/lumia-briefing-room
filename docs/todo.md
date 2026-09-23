@@ -20,3 +20,4 @@
 - [x] 설치 및 배포 간편화 → plan-ui.md §7, SPEC §6 v2 이후 후보
 - [x] 호스팅 공유 시 자체 추출 클립 구분 → plan-ui.md §7, SPEC §6 v2 이후 후보
 - [x] 개발과 배포 모드 분리 → plan-ui.md §7, SPEC §6 v2 이후 후보
+- [x] 자동 정리 후 게임 기록 유지 (대화 중 추가) → plan-ui.md §0, SPEC §7.6 `retention.keepGameRecords`
