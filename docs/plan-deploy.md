@@ -12,7 +12,7 @@
 - [x] **D2. 개발/배포 모드 분리** — `appmode.resolve_mode`, 설정 `app.mode`, `/api/app-info` 의 `mode`, 프론트 `useTuningUi()` 로 클립 ID·점수 칩·점수 슬라이더 숨김. 2026-09-24 완료
 - [x] **D3. 첫 실행 화면(스팀 녹화 폴더·해상도 확인), 옵션 "정보·진단" 탭, 진단 정보 내보내기, 중복 실행 방지** — 2026-09-24 완료. 전송·업데이트 항목과 그 토글은 D9·D10 에서 같은 화면/탭에 추가하며 `consent.py` 의 항목 `since` 를 올린다. 탭 이름은 토글이 없는 지금은 "개인정보·업데이트" 대신 "정보·진단"
 - [x] **D4. ffmpeg 번들 경로 + HEVC 재생 폴백(H.264 프록시)** — 2026-09-24 완료(코드·테스트·이 PC 실측). 탐색 순서 `LUMIA_FFMPEG` → 번들(`vendor/ffmpeg`) → PATH 와 ffprobe 번들 탐색, `procs.py`(콘솔 창 숨김·우선순위·작업 개체), `pipeline/proxy.py`(h264_mf→libx264), `ClipVideo`(자동 폴백). **exe 를 실제로 포함하는 것은 D5.** 남은 확인은 §7-2·§7-5·§7-14
-- [ ] **D5. PyInstaller `--onedir` 빌드 — 콘솔 없는 실행 대비, 깨끗한 환경(Windows 샌드박스)에서 실행 확인**
+- [x] **D5. PyInstaller `--onedir` 빌드** — 2026-09-24 완료(이 PC 실측). `tools/build_release.py`+`build.bat`, `tools/fetch_ffmpeg.py`(LGPL 검증), `startup.py`(콘솔 없는 로깅·예외 훅), `selftest.py`+`--selftest`, `icon.py`. 빌드본으로 트레이·UI·첫 실행 화면·프록시 생성·중복 실행·자동 시작 값까지 확인했다. **깨끗한 환경(Windows 샌드박스) 확인은 남았다 → [§10](#10-windows-샌드박스-확인-절차-사용자가-직접)**
 - [ ] **D6. Inno Setup 설치기 + 동봉 고지문(THIRD_PARTY_NOTICES)**
 - [ ] **D7. 공개 저장소 정리(게임 화면 이미지·git 이력, LICENSE, 사용자용 README)** — 친구 배포(D8)에는 필요 없고 공개 전까지 하면 된다
 - [ ] **D8. 친구 배포 → 해상도·환경 피드백 수집** ([§6](#6-친구-배포--해상도-검증))

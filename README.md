@@ -206,6 +206,33 @@ python -m lumia_briefing_room.cli.analyze_vod "<영상.mp4>" \
 
 자동 정리·완전 삭제로 클립이 다 사라져도 그 경기의 순위·전적·결과표는 `clips/.games/` 에 남아 목록에 "클립 삭제됨" 행으로 보인다(`retention.keepGameRecords`, 옵션 > 자동 정리의 "게임 기록은 유지"). 게임 행의 "기록 삭제"·게임 "완전 삭제"로 지운다. 프론트를 고쳤으면 `npm run build`.
 
+### 10. 배포본 빌드 (`build.bat`)
+
+친구 PC(파이썬·node·ffmpeg 없음)에서 돌아가는 배포본을 만든다. 순서가 중요해서 한 스크립트로 묶었다 —
+`npm run build` → PyInstaller `--onedir --windowed` → 번들 ffmpeg 복사 → 리소스 검증 → zip.
+
+```bash
+python tools/fetch_ffmpeg.py      # 최초 1회: LGPL ffmpeg 를 vendor/ffmpeg 로 (약 150MB, git 에 안 들어간다)
+.\build.bat                       # = python tools/build_release.py
+```
+
+- 결과: `dist\LumiaBriefingRoom\`(약 400MB)와 `dist\LumiaBriefingRoom-<버전>-win64.zip`(약 180MB).
+- 옵션: `--skip-frontend`(프론트를 다시 안 빌드), `--skip-zip`, `--skip-checks`.
+- **ffmpeg 는 반드시 LGPL 빌드**만 동봉한다. `fetch_ffmpeg.py` 가 받은 빌드의 `configuration` 에
+  `--enable-gpl`/`--enable-nonfree` 가 없는지, H.264 프록시 인코더가 있는지 실행해서 확인한 뒤에만 자리를 잡는다.
+  개발 PC 에 winget 으로 깔린 ffmpeg 는 GPL 풀 빌드라 그대로 쓰면 안 된다.
+- 버전은 `lumia_briefing_room.__version__` 하나에서 나온다(폴더 이름·zip 이름·`GET /api/app-info`).
+- `vendor/ffmpeg` 가 생기면 **개발 환경의 `discover_ffmpeg()` 도 그 LGPL 빌드를 먼저 고른다.**
+  테스트만은 `tests/conftest.py` 가 PATH 의 전체 빌드를 쓰도록 되돌린다(합성 녹화 픽스처에 libx264 가 필요하다).
+
+**빌드본 점검**: 빌드가 끝나면 아래로 번들이 제대로 묶였는지 확인한다(본보기 npz·characters.json·프론트 dist·
+ffmpeg/ffprobe·H.264 인코더·OCR 엔진 로드). 콘솔이 없는 빌드라 보고서는
+`%LOCALAPPDATA%\LumiaBriefingRoom\logs\selftest.txt` 에 남고 자동으로 열린다(`--quiet` 면 안 연다).
+
+```bash
+dist\LumiaBriefingRoom\LumiaBriefingRoom.exe --selftest
+```
+
 ### 9. 브라우저 디버깅 (개발용)
 
 - **클라이언트 오류 로그**: 프론트가 `window.onerror` / `unhandledrejection` / `console.error` 를 `POST /api/client-log` 로 보내고, 서버가 `[client]` 접두로 로그 파일에 남긴다. 로그 파일은 `%LOCALAPPDATA%\LumiaBriefingRoom\logs\app.log` (서버 로그와 같은 파일, 2MB 회전). Claude Code 에 "브라우저 오류 봐줘" 라고 하면 이 파일을 읽는다. 프론트를 고쳤으면 `npm run build`.
