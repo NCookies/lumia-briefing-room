@@ -1,3 +1,4 @@
+import { useTuningUi } from '../appInfo'
 import { TAG_LABELS } from '../labels'
 import type { ClipSort } from '../grouping'
 import type { ClipTag } from '../types'
@@ -35,6 +36,7 @@ interface Props {
 const SELECT = 'rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm'
 
 export function FilterBar({ value, onChange, variant = 'steam' }: Props) {
+  const tuning = useTuningUi()
   const toggleTag = (tag: ClipTag) => {
     const has = value.tags.includes(tag)
     onChange({ ...value, tags: has ? value.tags.filter((t) => t !== tag) : [...value.tags, tag] })
@@ -73,17 +75,19 @@ export function FilterBar({ value, onChange, variant = 'steam' }: Props) {
         <option value="pve">사냥 라벨</option>
       </select>
 
-      <label className="flex items-center gap-2 text-sm text-zinc-300">
-        교전 점수 {Math.round(value.minPvpScore * 100)}% 이상
-        <input
-          type="range"
-          min={0}
-          max={100}
-          step={5}
-          value={Math.round(value.minPvpScore * 100)}
-          onChange={(e) => onChange({ ...value, minPvpScore: Number(e.target.value) / 100 })}
-        />
-      </label>
+      {tuning && (
+        <label className="flex items-center gap-2 text-sm text-zinc-300">
+          교전 점수 {Math.round(value.minPvpScore * 100)}% 이상
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={Math.round(value.minPvpScore * 100)}
+            onChange={(e) => onChange({ ...value, minPvpScore: Number(e.target.value) / 100 })}
+          />
+        </label>
+      )}
 
       <div className="flex gap-1">
         {ALL_TAGS.map((tag) => (

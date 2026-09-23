@@ -1,4 +1,7 @@
+import { useTuningUi } from '../appInfo'
+
 export function ClipId({ id }: { id: string }) {
+  if (!useTuningUi()) return null
   return (
     <button
       type="button"

@@ -1,3 +1,4 @@
+import { useTuningUi } from '../appInfo'
 import { SIGNAL_LABELS } from '../labels'
 import { scorePercent, scoreTone, type ScoreTone } from '../labeling'
 
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export function ScoreChip({ score, signals }: Props) {
+  if (!useTuningUi()) return null
   const reason = signals.length ? signals.map((s) => SIGNAL_LABELS[s] ?? s).join(' · ') : '근거 없음'
   return (
     <span
