@@ -12,9 +12,14 @@ def test_port_candidates_try_80_then_configured_port_then_next_20():
     assert port_candidates("8765") == port_candidates(8765)
 
 
-def test_port_candidates_do_not_repeat_80_and_auto_has_none():
+def test_port_candidates_do_not_repeat_80_and_auto_is_the_default():
     assert port_candidates(80) == list(range(80, 101))
-    assert port_candidates("auto") == []
+    assert port_candidates("auto") == port_candidates(8765)
+
+
+def test_resolve_port_auto_is_not_random_when_80_is_free():
+    assert resolve_port("auto", is_free=lambda p: True) == 80
+    assert resolve_port("auto", is_free=lambda p: p != 80) == 8765
 
 
 def test_resolve_port_prefers_80_when_free():

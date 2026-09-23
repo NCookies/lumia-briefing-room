@@ -38,16 +38,17 @@ def _free_port() -> int:
 
 HOSTNAME = "lumia-briefingroom.localhost"
 HTTP_PORT = 80
+DEFAULT_PORT = 8765
 
 
 def port_candidates(port_setting, *, fallback_range: int = 20) -> list[int]:
-    """SPEC §7.7 ui.port: 80번(주소에서 포트 생략) → 설정 포트 → 그 뒤 +20 순. "auto" 면 후보 없이 임의의 빈 포트.
+    """SPEC §7.7 ui.port: 80번(주소에서 포트 생략) → 설정 포트 → 그 뒤 +20 순.
+
+    "auto" 는 예전 기본값이라 설정 파일에 남아 있을 수 있어, 기본 포트(8765)와 같은 뜻으로 취급한다.
 
     순서를 고정해 두는 이유: 포트가 바뀌면 브라우저 origin 이 달라져 localStorage 가 초기화된다.
     """
-    if port_setting == "auto":
-        return []
-    base = int(port_setting)
+    base = DEFAULT_PORT if port_setting == "auto" else int(port_setting)
     ports = [HTTP_PORT, *range(base, base + fallback_range + 1)]
     return list(dict.fromkeys(ports))
 
