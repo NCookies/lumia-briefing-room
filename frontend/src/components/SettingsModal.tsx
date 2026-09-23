@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getAutoStart, getExportDefault, getNickname, setAutoStart, setExportDefault, setNickname } from '../exportApi'
 import { AboutPanel } from './AboutPanel'
 import { CleanupPanel } from './CleanupPanel'
+import { ClipsDirSection } from './ClipsDirSection'
 import { FolderPicker } from './FolderPicker'
 import { VodSettingsPanel } from './VodSettingsPanel'
 
@@ -19,14 +20,17 @@ interface Props {
   confirmDelete: boolean
   onConfirmDeleteChange: (value: boolean) => void
   onClose: () => void
+  onClipsDirChanged: () => void
 }
 
 function GeneralPanel({
   confirmDelete,
   onConfirmDeleteChange,
+  onClipsDirChanged,
 }: {
   confirmDelete: boolean
   onConfirmDeleteChange: (value: boolean) => void
+  onClipsDirChanged: () => void
 }) {
   const [nickname, setDraft] = useState('')
   const [status, setStatus] = useState<string | null>(null)
@@ -77,6 +81,12 @@ function GeneralPanel({
       </p>
       {autoStartError && <p className="text-xs text-rose-300">{autoStartError}</p>}
     </section>
+    <ClipsDirSection
+      source="steam"
+      title="내 녹화 클립 저장 폴더"
+      description="경기가 끝날 때마다 만드는 클립이 저장되는 폴더입니다. 비워 두면 기본 위치(내 비디오 폴더의 LumiaBriefingRoom)를 씁니다."
+      onChanged={onClipsDirChanged}
+    />
     <section className="flex flex-col gap-2">
       <h3 className="text-sm font-medium text-zinc-200">삭제</h3>
       <label className="flex items-center gap-2 text-sm text-zinc-300">
@@ -153,7 +163,7 @@ function ExportPanel() {
   )
 }
 
-export function SettingsModal({ confirmDelete, onConfirmDeleteChange, onClose }: Props) {
+export function SettingsModal({ confirmDelete, onConfirmDeleteChange, onClose, onClipsDirChanged }: Props) {
   const [tab, setTab] = useState<Tab>('general')
 
   useEffect(() => {
@@ -193,10 +203,14 @@ export function SettingsModal({ confirmDelete, onConfirmDeleteChange, onClose }:
           </nav>
           <div className="min-w-0 flex-1 overflow-y-auto p-4">
             {tab === 'general' && (
-              <GeneralPanel confirmDelete={confirmDelete} onConfirmDeleteChange={onConfirmDeleteChange} />
+              <GeneralPanel
+                confirmDelete={confirmDelete}
+                onConfirmDeleteChange={onConfirmDeleteChange}
+                onClipsDirChanged={onClipsDirChanged}
+              />
             )}
             {tab === 'export' && <ExportPanel />}
-            {tab === 'vod' && <VodSettingsPanel />}
+            {tab === 'vod' && <VodSettingsPanel onClipsDirChanged={onClipsDirChanged} />}
             {tab === 'cleanup' && <CleanupPanel />}
             {tab === 'about' && <AboutPanel />}
           </div>

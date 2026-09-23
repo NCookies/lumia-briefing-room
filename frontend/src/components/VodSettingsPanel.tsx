@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { formatBytes } from '../retention'
 import { getVodSettings, listVideos, saveVodSettings, type VideoListing } from '../vodApi'
-import { FolderPicker } from './FolderPicker'
+import { ClipsDirSection } from './ClipsDirSection'
 
 function join(base: string, name: string): string {
   return base === '' || /[\\/]$/.test(base) ? `${base}${name}` : `${base}\\${name}`
@@ -94,12 +94,9 @@ function VideoPathPicker({ onAdd, onClose }: { onAdd: (path: string) => void; on
   )
 }
 
-export function VodSettingsPanel() {
+export function VodSettingsPanel({ onClipsDirChanged }: { onClipsDirChanged: () => void }) {
   const [sources, setSources] = useState<string[]>([])
   const [recursive, setRecursive] = useState(false)
-  const [clipsDir, setClipsDir] = useState('')
-  const [clipsDraft, setClipsDraft] = useState('')
-  const [editingClips, setEditingClips] = useState(false)
   const [picking, setPicking] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
 
@@ -108,7 +105,6 @@ export function VodSettingsPanel() {
       .then((s) => {
         setSources(s.sources)
         setRecursive(s.recursive)
-        setClipsDir(s.vodClips)
       })
       .catch((e: Error) => setStatus(e.message))
   }, [])
@@ -138,17 +134,6 @@ export function VodSettingsPanel() {
     try {
       await saveVodSettings({ vod: { recursive: value } })
       setRecursive(value)
-    } catch (e) {
-      setStatus((e as Error).message)
-    }
-  }
-
-  const saveClipsDir = async () => {
-    try {
-      await saveVodSettings({ paths: { vodClips: clipsDraft } })
-      setClipsDir(clipsDraft)
-      setEditingClips(false)
-      setStatus('저장했습니다. 이미 만든 클립은 옮겨지지 않습니다.')
     } catch (e) {
       setStatus((e as Error).message)
     }
@@ -195,46 +180,12 @@ export function VodSettingsPanel() {
         </label>
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium text-zinc-200">다시보기 클립 저장 폴더</h3>
-        <p className="text-xs text-zinc-500">
-          내 녹화 클립과 섞이지 않게 따로 저장합니다. 비워 두면 기본 위치(내 비디오 폴더의 LumiaBriefingRoom)를 씁니다.
-        </p>
-        {editingClips ? (
-          <>
-            <FolderPicker value={clipsDraft} onChange={setClipsDraft} />
-            <div className="flex justify-end gap-2">
-              <button type="button" className="text-sm text-zinc-400 hover:text-zinc-100" onClick={() => setEditingClips(false)}>
-                취소
-              </button>
-              <button
-                type="button"
-                className="rounded bg-sky-600 px-4 py-1.5 text-sm hover:bg-sky-500 disabled:opacity-40"
-                disabled={clipsDraft === ''}
-                onClick={saveClipsDir}
-              >
-                이 폴더로 지정
-              </button>
-            </div>
-          </>
-        ) : (
-          <div className="flex items-center gap-2">
-            <div className="flex-1 truncate rounded bg-zinc-900 px-3 py-1.5 text-sm text-zinc-200" title={clipsDir}>
-              {clipsDir || '기본 위치'}
-            </div>
-            <button
-              type="button"
-              className="rounded border border-zinc-600 px-3 py-1 text-sm hover:bg-zinc-700"
-              onClick={() => {
-                setClipsDraft(clipsDir)
-                setEditingClips(true)
-              }}
-            >
-              바꾸기
-            </button>
-          </div>
-        )}
-      </section>
+      <ClipsDirSection
+        source="vod"
+        title="다시보기 클립 저장 폴더"
+        description="내 녹화 클립과 섞이지 않게 따로 저장합니다. 비워 두면 기본 위치(내 비디오 폴더의 LumiaBriefingRoom)를 씁니다."
+        onChanged={onClipsDirChanged}
+      />
 
       {status && <p className="text-xs text-zinc-400">{status}</p>}
     </div>

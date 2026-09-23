@@ -22,6 +22,7 @@ function loadTab(): ClipSource {
 export default function App() {
   const [tab, setTab] = useState<ClipSource>(loadTab)
   const [showSettings, setShowSettings] = useState(false)
+  const [browserKey, setBrowserKey] = useState(0)
   const [confirmDelete, setConfirmDeleteState] = useState(true)
   const [firstRun, setFirstRun] = useState(false)
 
@@ -86,7 +87,7 @@ export default function App() {
       </header>
 
       {TABS.map((t) => (
-        <div key={t.id} className={tab === t.id ? 'flex flex-1 flex-col' : 'hidden'}>
+        <div key={`${t.id}-${browserKey}`} className={tab === t.id ? 'flex flex-1 flex-col' : 'hidden'}>
           <ClipBrowser
             source={t.id}
             active={tab === t.id}
@@ -101,6 +102,7 @@ export default function App() {
           confirmDelete={confirmDelete}
           onConfirmDeleteChange={changeConfirmDelete}
           onClose={() => setShowSettings(false)}
+          onClipsDirChanged={() => setBrowserKey((k) => k + 1)}
         />
       )}
     </div>

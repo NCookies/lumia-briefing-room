@@ -231,6 +231,9 @@ def select_for_auto_clean(metas: list[dict], cfg: RetentionConfig, *, now=...) -
 - 클립 하나는 `<id>.json` + `<id>.mp4` + (있으면) `.thumbs/<id>.jpg` 세 파일이다.
   `trash_clip`/`restore_clip` 은 메타데이터의 `thumbnailPath` 를 보고 같이 옮기며,
   clips_dir 기준 상대 경로 구조(`.thumbs/...`)를 휴지통 안에서도 그대로 유지한다.
+  `thumbnailPath`·`matchResult.imagePath` 는 클립 폴더 기준 상대경로(`.thumbs/<id>.jpg`)로 저장하고
+  `pipeline/clip_assets.py` 가 메타데이터 위치 기준으로 다시 찾는다(예전 절대경로도 그 폴더의 `.thumbs` 에서 파일 이름으로 찾는다).
+  그래서 클립 폴더를 통째로 옮겨도 썸네일이 깨지지 않는다. 옵션에서 폴더를 바꿀 때 기존 클립을 옮기는 것은 `pipeline/move_clips.py`.
 - `select_for_auto_clean` 은 실제 파일 스캔을 하지 않는다 — 호출 규약으로
   `meta["_created_at"]`(datetime), `meta["_size_bytes"]`(int) 를 요구한다.
   **실제 클립 목록을 스캔해서 이 두 필드를 채우는 계층은 아직 없다** — UI/CLI
