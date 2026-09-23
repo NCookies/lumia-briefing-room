@@ -1,6 +1,6 @@
 [project]
 name = "lumia-briefing-room"
-version = "0.1.0"
+dynamic = ["version"]
 description = "이터널 리턴 교전 클립 자동 추출기"
 requires-python = ">=3.10"
 dependencies = [
@@ -21,6 +21,9 @@ dependencies = [
     "pyyaml",
     "six",
 ]
+
+[tool.setuptools.dynamic]
+version = {attr = "lumia_briefing_room.__version__"}
 
 [project.optional-dependencies]
 dev = [
