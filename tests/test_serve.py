@@ -59,3 +59,31 @@ def test_wait_until_started_times_out():
         )
         is False
     )
+
+
+def test_server_starts_when_there_is_no_console(tmp_path: Path, monkeypatch):
+    """--noconsole 빌드에서는 sys.stdout 이 None 이라 uvicorn 의 기본 로깅 설정이 터진다.
+
+    실측(빌드본 로그): ColourizedFormatter 가 sys.stdout.isatty() 를 불러
+    AttributeError → ValueError: Unable to configure formatter 'default' 로 서버가 아예 안 떴다.
+    """
+    import socket
+    import sys
+
+    from lumia_briefing_room.cli.serve import run_server_in_thread
+    from lumia_briefing_room.config import Config, PathsConfig
+
+    monkeypatch.setattr(sys, "stdout", None)
+    monkeypatch.setattr(sys, "stderr", None)
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+
+    cfg = Config(paths=PathsConfig(clips=tmp_path / "clips", temp=tmp_path / "tmp"))
+    server, thread = run_server_in_thread(build_app(cfg), port=port)
+    try:
+        assert wait_until_started(server, timeout=10) is True
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10)

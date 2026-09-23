@@ -177,7 +177,7 @@ def run_selftest_command(args) -> bool:
 
     if startup.console_logging_wanted():
         print(report)
-    elif sys.platform == "win32":
+    elif sys.platform == "win32" and not getattr(args, "quiet", False):
         os.startfile(path)
     return ok
 
@@ -188,6 +188,7 @@ def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
     parser.add_argument("--open-ui", action="store_true", help="시작하자마자 열람 UI 를 연다")
     parser.add_argument("--selftest", action="store_true", help="번들 리소스를 점검하고 보고서를 남긴다")
+    parser.add_argument("--quiet", action="store_true", help="--selftest 보고서를 자동으로 열지 않는다")
     args = parser.parse_args(argv)
 
     if args.selftest:

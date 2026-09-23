@@ -50,7 +50,9 @@ def wait_until_started(
 def run_server_in_thread(
     app, *, host: str = "127.0.0.1", port: int = 8000
 ) -> tuple[uvicorn.Server, threading.Thread]:
-    config = uvicorn.Config(app, host=host, port=port, log_level="warning")
+    # log_config=None: 콘솔 없는 빌드(sys.stdout 이 None)에서 uvicorn 의 기본 로깅 설정이
+    # ColourizedFormatter → sys.stdout.isatty() 로 터져 서버가 아예 안 뜬다. 로그는 logsetup 이 파일로 받는다.
+    config = uvicorn.Config(app, host=host, port=port, log_level="warning", log_config=None)
     server = uvicorn.Server(config)
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
