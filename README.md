@@ -8,6 +8,7 @@
 - [docs/plan-pipeline.md](docs/plan-pipeline.md) — 파이프라인 자동화(SPEC 2단계) 구현 계획 및 진행 상태
 - [docs/plan-ui.md](docs/plan-ui.md) — 열람 UI(SPEC 3단계) 구현 계획 및 진행 상태
 - [docs/plan-pvp.md](docs/plan-pvp.md) — PvP 판별(SPEC 4단계) 구현 계획 및 진행 상태
+- [docs/plan-deploy.md](docs/plan-deploy.md) — 공개 배포(설치기·ffmpeg 번들·자동 업데이트) 계획. 아직 구현 전이다
 - [docs/plan-vod.md](docs/plan-vod.md) — 다시보기(VOD) 클립(SPEC 5단계) 설계 및 진행 상태. 분석·클립 생성, API, UI 탭("다시보기")까지 구현됐다(아래 "실행 방법 8")
 
 ## 개발 환경
@@ -199,7 +200,7 @@ python -m lumia_briefing_room.cli.analyze_vod "<영상.mp4>" \
 
 ### 9. 브라우저 디버깅 (개발용)
 
-- **클라이언트 오류 로그**: 프론트가 `window.onerror` / `unhandledrejection` / `console.error` 를 `POST /api/client-log` 로 보내고, 서버가 `[client]` 접두로 로그 파일에 남긴다. 로그 파일은 `%LOCALAPPDATA%\LumiaBriefingRoom\logspp.log` (서버 로그와 같은 파일, 2MB 회전). Claude Code 에 "브라우저 오류 봐줘" 라고 하면 이 파일을 읽는다. 프론트를 고쳤으면 `npm run build`.
+- **클라이언트 오류 로그**: 프론트가 `window.onerror` / `unhandledrejection` / `console.error` 를 `POST /api/client-log` 로 보내고, 서버가 `[client]` 접두로 로그 파일에 남긴다. 로그 파일은 `%LOCALAPPDATA%\LumiaBriefingRoom\logs\app.log` (서버 로그와 같은 파일, 2MB 회전). Claude Code 에 "브라우저 오류 봐줘" 라고 하면 이 파일을 읽는다. 프론트를 고쳤으면 `npm run build`.
 - **브라우저 자동 조작(Playwright MCP)**: 저장소 루트 `.mcp.json` 에 시스템 Chrome(`--browser chrome`)으로 붙는 설정이 들어 있다. Claude Code 를 이 폴더에서 다시 열면 프로젝트 MCP 승인을 물어본다. 대상은 `python -m lumia_briefing_room.cli.serve --port 8000` 로 띄운 `http://127.0.0.1:8000/`. (Chrome 재생·콘솔 읽기 실측은 아직 안 했다 — [plan-ui.md §6](docs/plan-ui.md))
 
 ## 개발 도구 (tools/)

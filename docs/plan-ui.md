@@ -281,7 +281,7 @@ Chromium 번들(headless-shell)에서만 안 되는 것이지, 실제 배포 환
 
 **작업 단계**
 
-- [x] `POST /api/client-log` + 로그 파일 기록 (`logsetup.py`, `%LOCALAPPDATA%\LumiaBriefingRoom\logspp.log`)(테스트: 요청 → 로그 파일에 `[client]` 줄)
+- [x] `POST /api/client-log` + 로그 파일 기록 (`logsetup.py`, `%LOCALAPPDATA%\LumiaBriefingRoom\logs\app.log`)(테스트: 요청 → 로그 파일에 `[client]` 줄)
 - [x] 프론트 전역 오류 핸들러 (`clientLog.ts`)(중복 억제·재전송 없음) + `npm run build`
 - [~] Playwright MCP 연결 및 실측(Chrome, HEVC 재생, 콘솔 읽기) — 연결·페이지 열기·콘솔 읽기·`canPlayType` 은 확인(§4-3). 실제 클립 `<video>` 의 `videoWidth>0` 재생 확인은 남음
 - [x] README "실행 방법"에 §9 브라우저 디버깅(로그 파일 위치, MCP 연결 명령) 추가 — 구현과 같은 커밋에서
