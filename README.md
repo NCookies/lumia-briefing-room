@@ -8,7 +8,7 @@
 - [docs/plan-pipeline.md](docs/plan-pipeline.md) — 파이프라인 자동화(SPEC 2단계) 구현 계획 및 진행 상태
 - [docs/plan-ui.md](docs/plan-ui.md) — 열람 UI(SPEC 3단계) 구현 계획 및 진행 상태
 - [docs/plan-pvp.md](docs/plan-pvp.md) — PvP 판별(SPEC 4단계) 구현 계획 및 진행 상태
-- [docs/plan-deploy.md](docs/plan-deploy.md) — 공개 배포(설치기·ffmpeg 번들·자동 업데이트) 계획. 아직 구현 전이다
+- [docs/plan-deploy.md](docs/plan-deploy.md) — 공개 배포(설치기·ffmpeg 번들·자동 업데이트) 계획. D1~D4(경로·모드·첫 실행 화면·프록시)까지 구현, 빌드·설치기는 아직
 - [docs/plan-vod.md](docs/plan-vod.md) — 다시보기(VOD) 클립(SPEC 5단계) 설계 및 진행 상태. 분석·클립 생성, API, UI 탭("다시보기")까지 구현됐다(아래 "실행 방법 8")
 
 ## 개발 환경
