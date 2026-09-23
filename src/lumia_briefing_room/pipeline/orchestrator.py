@@ -75,6 +75,7 @@ def _aggregate_interval(intervals: list[CombatInterval]) -> CombatInterval:
         game_day=next((iv.game_day for iv in intervals if iv.game_day is not None), None),
         enemy_ring_mean=_mean_of_known([iv.enemy_ring_mean for iv in intervals]),
         ultimate_delta=_max_of_known([iv.ultimate_delta for iv in intervals]),
+        team_combat_unreliable=any(iv.team_combat_unreliable for iv in intervals),
     )
 
 

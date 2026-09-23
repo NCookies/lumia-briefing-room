@@ -16,6 +16,7 @@ from lumia_briefing_room.detect.match import (
     resolve_day_templates,
     resolve_region_templates,
     resolve_templates,
+    resolve_tk_templates,
 )
 from lumia_briefing_room.detect.pvp import score_interval
 from lumia_briefing_room.detect.result import ResultScreen
@@ -48,7 +49,9 @@ from lumia_briefing_room.video.vod import VodFileSource, find_ffprobe, probe_vid
 
 log = logging.getLogger(__name__)
 
-ANALYSIS_VERSION = 2
+# 3: TK 판독 추가 + 배지 꺼진 뒤 트레일링 킬로 구간 끝 늘리기(2026-09-23) - 캐시된
+# FrameState 에는 tk 가 없어 이 로직이 못 살아나므로 캐시를 무효화해야 한다.
+ANALYSIS_VERSION = 3
 CHECKPOINT_FRAMES = 120
 PROGRESS_EVERY_FRAMES = 30
 DECODE_SHARE = 0.70
@@ -80,12 +83,13 @@ def _now_iso() -> str:
 def _default_reader(width: int, height: int) -> ReadFrame:
     profile = ResolutionProfile.for_resolution(width, height)
     k, a = resolve_templates(profile, None, None)
+    tk = resolve_tk_templates(profile, k)
     regions = resolve_region_templates(profile)
     days = resolve_day_templates(profile)
 
     def read(frame: np.ndarray, t: float) -> FrameState:
         return analyze_frame(
-            frame, profile, t=t, k_templates=k, a_templates=a,
+            frame, profile, t=t, k_templates=k, a_templates=a, tk_templates=tk,
             region_templates=regions, day_templates=days,
         )
 

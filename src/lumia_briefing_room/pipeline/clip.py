@@ -23,12 +23,22 @@ class ClipRange:
 
 
 def resolve_clip_range(interval: CombatInterval, cfg: ClipConfig) -> ClipRange:
-    """SPEC §3 클립 구간: 교전 시작 -preroll ~ 교전 종료 +postroll, 상한 적용."""
-    start = max(0.0, interval.start - cfg.preroll_sec)
+    """SPEC §3 클립 구간: 교전 시작 -preroll ~ 교전 종료 +postroll, 상한 적용.
+
+    team_combat_unreliable(팀원 링 판독이 매치 내내 포화돼 배지만으로 구간을 나눈 경우,
+    detect/match.py::_team_combat_saturated)이면 preroll 을 fixed_preroll_sec 으로 넓힌다.
+    배지는 "방금 맞거나 쳤다"에만 켜져 구도를 잡는 동안의 교전 전 상황을 놓치는데, 평소엔
+    팀원 전투 신호가 그 구멍을 메워준다(§2.7) - 그 신호 자체가 못 쓰게 된 상태라 놓칠 폭이
+    더 크다(2026-09-23 실사용: 팀원의 커스텀 프로필 사진에 있는 빨간 요소가 "전투 중" 링
+    판정을 매치 내내 오탐시켜, 80초 넘게 이어진 마지막 교전의 도입부가 통째로 잘렸다).
+    """
+    preroll = cfg.fixed_preroll_sec if interval.team_combat_unreliable else cfg.preroll_sec
+    source = "fixed" if interval.team_combat_unreliable else "combat"
+    start = max(0.0, interval.start - preroll)
     end = interval.end + cfg.postroll_sec
     if end - start > cfg.max_duration_sec:
         end = start + cfg.max_duration_sec
-    return ClipRange(start=start, end=end, preroll_source="combat")
+    return ClipRange(start=start, end=end, preroll_source=source)
 
 
 def merge_overlapping(ranges: list[ClipRange], gap: float) -> list[ClipRange]:

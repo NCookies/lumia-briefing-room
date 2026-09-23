@@ -32,7 +32,7 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from lumia_briefing_room.config import FilterConfig, discover_ffmpeg  # noqa: E402
-from lumia_briefing_room.detect.ultimate import blue_tint_ratio  # noqa: E402
+from lumia_briefing_room.detect.ultimate import blue_tint_ratio, is_locked, max_rise  # noqa: E402
 from lumia_briefing_room.profiles.models import ResolutionProfile  # noqa: E402
 
 from backfill_day import padded_crop  # noqa: E402
@@ -46,6 +46,7 @@ def apply_ultimate_delta(meta: dict, delta: float | None, weights: dict[str, flo
 
 
 def read_clip_ultimate_delta(clip_mp4: Path, profile: ResolutionProfile, ffmpeg: Path) -> float | None:
+    """잠김(스킬 미투자, 빨간 X) 프레임은 기준선 계산에서 뺀다 - 2026-09-23, is_locked 참고."""
     crop, rows, cols = padded_crop(profile.rois["ultimate_r"])
     with tempfile.TemporaryDirectory() as td:
         subprocess.run(
@@ -53,13 +54,11 @@ def read_clip_ultimate_delta(clip_mp4: Path, profile: ResolutionProfile, ffmpeg:
              "-vf", crop, "-pix_fmt", "rgb24", "-fps_mode", "passthrough", "-y", str(Path(td) / "c_%03d.png")],
             check=True,
         )
-        ratios = [
-            blue_tint_ratio(np.asarray(Image.open(p).convert("RGB"))[rows, cols])
-            for p in sorted(Path(td).glob("c_*.png"))
-        ]
+        crops = [np.asarray(Image.open(p).convert("RGB"))[rows, cols] for p in sorted(Path(td).glob("c_*.png"))]
+        ratios = [blue_tint_ratio(c) for c in crops if not is_locked(c)]
     if len(ratios) < 2:
         return None
-    return max(ratios) - min(ratios)
+    return max_rise(ratios)
 
 
 def main() -> None:

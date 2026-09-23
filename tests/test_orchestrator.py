@@ -176,6 +176,20 @@ def test_aggregate_interval_ultimate_delta_is_none_when_never_read():
     assert _aggregate_interval([iv(0, 5), iv(8, 12)]).ultimate_delta is None
 
 
+def test_aggregate_interval_team_combat_unreliable_if_any_sub_interval_is():
+    from lumia_briefing_room.detect.types import CombatInterval
+    from lumia_briefing_room.pipeline.orchestrator import _aggregate_interval
+
+    def iv(start, end, unreliable):
+        return CombatInterval(
+            start=start, end=end, tags=frozenset({"no_result"}), k_delta=0, a_delta=0,
+            died=False, day_night="day", confidence=1.0, team_combat_unreliable=unreliable,
+        )
+
+    assert _aggregate_interval([iv(0, 5, False), iv(8, 12, True)]).team_combat_unreliable is True
+    assert _aggregate_interval([iv(0, 5, False), iv(8, 12, False)]).team_combat_unreliable is False
+
+
 def test_default_title_includes_region_when_known():
     from lumia_briefing_room.pipeline.orchestrator import default_title
 

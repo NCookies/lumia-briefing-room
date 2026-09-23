@@ -24,7 +24,7 @@ from lumia_briefing_room.detect.minimap import count_rings
 from lumia_briefing_room.detect.region import load_region_templates, read_region, region_score
 from lumia_briefing_room.detect.spectator import read_spectating
 from lumia_briefing_room.detect.teammate import combat_slots, dead_slots, new_deaths
-from lumia_briefing_room.detect.ultimate import blue_tint_ratio
+from lumia_briefing_room.detect.ultimate import blue_tint_ratio, is_locked, max_rise
 from lumia_briefing_room.detect.types import CombatInterval, FrameState, MatchDetection
 from lumia_briefing_room.profiles.models import ResolutionProfile
 from lumia_briefing_room.video.segments import SegmentRange
@@ -37,9 +37,16 @@ DEATH_LINK_SEC = 8.0
 UNEXPLAINED_DEATH_LOOKBACK_SEC = 12.0
 UNCOVERED_EVENT_LOOKBACK_SEC = 12.0
 # 궁극기 델타(detect/ultimate.py)는 짧은 교전 구간 안에서 "준비" 기준선을 못 볼 수 있어
-# 앞뒤를 더 넓게 본다 - 실측(scripts/probe/eval_ultimate_signal.py)은 preroll/postroll 이
-# 붙은 전체 클립으로 쟀으므로, 여기서도 그 폭에 맞춰 구간 앞뒤를 본다.
-ULTIMATE_LOOKAROUND_SEC = 12.0
+# 앞뒤를 더 넓게 본다. ClipConfig 기본값(preroll_sec=5, postroll_sec=8)을 넘기면 안 된다 -
+# 넘기면 메타데이터의 "궁극기 사용" 근거가 실제 컷 클립 밖(안 보이는 구간)에서 읽힌 값이
+# 되어 사용자가 클립을 봐도 그 장면이 없는 버그가 난다(2026-09-23 실사용 보고로 발견).
+ULTIMATE_LOOKBACK_SEC = 5.0
+ULTIMATE_LOOKFORWARD_SEC = 8.0
+# 배지가 꺼진 뒤 곧 결착(킬/어시/팀킬)이 나면 구간 끝을 그 시점까지 늘린다(2026-09-23
+# 실사용 보고: VOD 1일차 낮 교전 · 마르티나, 배지 꺼지고 2초 뒤 팀원이 막타). TK 를
+# 여기 쓰는 건 UNCOVERED_EVENT_LOOKBACK_SEC 과 달리 안전하다 - 이미 있는 구간의 끝만
+# 늘릴 뿐 새 구간을 만들지 않는다.
+TRAILING_KILL_EXTEND_SEC = 12.0
 MIN_SPECTATOR_SAMPLES = 2
 MIN_WAITING_SAMPLES = 5
 TEAM_COMBAT_SATURATION = 0.6
@@ -68,6 +75,34 @@ def resolve_templates(
     )
 
 
+def resolve_tk_templates(
+    profile: ResolutionProfile,
+    k_templates: dict[int, np.ndarray] | None,
+) -> dict[int, np.ndarray] | None:
+    """TK(팀 킬) 칸은 K/A 와 같은 폰트·같은 검정 HUD 배경이지만 필드 폭이 좁다(2026-09-23 실측).
+
+    R 아이콘 쿨타임 숫자와 달리 배경이 균일해 새 표본 없이 K 템플릿을 필드 크기로
+    리사이즈하는 것만으로 재사용된다(실측: 신뢰도 0.6대로 정확히 읽힘).
+
+    크기는 `profile.rois`(이 프로필 자체의 실측값)가 아니라 `profile.crop()`이 실제로
+    내놓는 크기를 써야 한다 - 정규화 프로필은 `crop()`이 기준 해상도 ROI 크기로 자동
+    확대하므로(profiles/models.py), 템플릿도 그 기준 크기에 맞춰야 한다. 안 맞추면
+    `read_field`가 크기 불일치로 조용히 None 만 낸다(2026-09-23 VOD 실측으로 발견).
+    """
+    if not k_templates or "tk_value" not in profile.rois:
+        return None
+    roi = (profile.reference_rois or profile.rois).get("tk_value")
+    if roi is None:
+        return None
+    import cv2
+
+    resized = {
+        d: cv2.resize(t, (roi.width, roi.height), interpolation=cv2.INTER_LINEAR)
+        for d, t in k_templates.items()
+    }
+    return with_two_digit_templates(resized)
+
+
 def analyze_frame(
     frame: np.ndarray,
     profile: ResolutionProfile,
@@ -75,6 +110,7 @@ def analyze_frame(
     t: float,
     k_templates: dict[int, np.ndarray] | None = None,
     a_templates: dict[int, np.ndarray] | None = None,
+    tk_templates: dict[int, np.ndarray] | None = None,
     region_templates: dict[str, np.ndarray] | None = None,
     day_templates: dict[str, np.ndarray] | None = None,
 ) -> FrameState:
@@ -117,7 +153,12 @@ def analyze_frame(
         counts = count_rings(profile.crop(frame, "minimap"))
         enemy_rings, ally_rings = counts.enemy, counts.ally
 
-    if spectating:
+    if spectating is not False:
+        # spectating 이 None 이면 미니맵조차 안 보인다는 뜻 - 관전(True)뿐 아니라 로딩·
+        # 캐릭터 선택·로비 화면도 여기 해당한다(§2.12, read_spectating 참고). 이런 화면엔
+        # 캐릭터 UI 자체가 없어 초상화 ROI 를 읽어도 의미가 없는데, 로딩 화면의 암전 전환이
+        # 사망 램프와 비슷하게 보여 죽음으로 오판되는 사고가 있었다(2026-09-23, 캐릭터 선택
+        # 화면이 "알 수 없음 교전"으로 잘못 뽑힌 사례). combat=False(확인됨)일 때만 읽는다.
         combat = None
         face_value = face_sat = None
     else:
@@ -130,8 +171,11 @@ def analyze_frame(
     clock_zero = read_clock_zero(profile.crop(frame, "timer")) if "timer" in profile.rois else None
 
     ultimate_blue = None
+    ultimate_locked = None
     if "ultimate_r" in profile.rois and spectating is False:
-        ultimate_blue = blue_tint_ratio(profile.crop(frame, "ultimate_r"))
+        ultimate_crop = profile.crop(frame, "ultimate_r")
+        ultimate_blue = blue_tint_ratio(ultimate_crop)
+        ultimate_locked = is_locked(ultimate_crop)
 
     region = None
     if region_templates and spectating is False:
@@ -149,6 +193,11 @@ def analyze_frame(
         a_crop = profile.crop(frame, "a_value")
         a_value = read_field(text_score(a_crop), a_templates).value
 
+    tk_value = None
+    if tk_templates and "tk_value" in profile.rois:
+        tk_crop = profile.crop(frame, "tk_value")
+        tk_value = read_field(text_score(tk_crop), tk_templates).value
+
     return FrameState(
         t=t,
         combat=combat,
@@ -156,6 +205,7 @@ def analyze_frame(
         face_sat=face_sat,
         k=k_value,
         a=a_value,
+        tk=tk_value,
         day_night=day_night,
         spectating=spectating,
         dead_teammates=dead_teammates,
@@ -166,6 +216,7 @@ def analyze_frame(
         team_combat=team_combat,
         clock_zero=clock_zero,
         ultimate_blue=ultimate_blue,
+        ultimate_locked=ultimate_locked,
     )
 
 
@@ -238,7 +289,8 @@ def finalize_match(
 ) -> MatchDetection:
     """프레임별 판독을 교전 구간 + 태그로 합친다. (plan.md §3, §5.3~5.6)"""
     gaps = gaps or []
-    if use_team_combat and _team_combat_saturated(states):
+    team_combat_unreliable = use_team_combat and _team_combat_saturated(states)
+    if team_combat_unreliable:
         log.warning("팀원 전투 신호가 경기 내내 켜져 있어 신뢰할 수 없다 - 내 배지만으로 교전을 나눈다")
         use_team_combat = False
 
@@ -291,11 +343,28 @@ def finalize_match(
 
     k_events = to_events([(s.t, s.k) for s in states], "K")
     a_events = to_events([(s.t, s.a) for s in states], "A")
+    tk_events = to_events([(s.t, s.tk) for s in states], "TK")
     step = states_step(states)
     first = states[0].t
+    # TK 는 여기(구간을 새로 만드는 쪽)에 안 넣는다 - 팀 전체 킬이라 내가 없는 곳의
+    # 팀원 킬까지 새 구간을 만들면 코발트 프로토콜처럼 TK 가 빨리 오르는 모드에서
+    # 가짜 클립이 쏟아진다(SPEC §2.8). TK 는 아래에서 "이미 있는 구간의 끝만" 늘리는
+    # 용도로만 쓴다.
     for event in k_events + a_events:
         if event.delta > 0 and not any(_overlaps(a, b, event.t, tag_tolerance) for a, b in combat_ranges):
             combat_ranges.append((max(first, event.t - UNCOVERED_EVENT_LOOKBACK_SEC), event.t))
+    combat_ranges = _merge_ranges(combat_ranges, step)
+
+    # 내 배지(또는 팀원 전투 링)가 꺼진 뒤에도 곧 결착이 나는 경우가 있다(2026-09-23
+    # 실사용 보고: 배지 꺼지고 2초 뒤 팀원이 막타). 새 구간은 안 만들고, 이미 있는
+    # 구간의 끝만 가까운 킬 이벤트까지 늘린다.
+    combat_ranges = [
+        (
+            start,
+            max([end] + [e.t for e in k_events + a_events + tk_events if e.delta > 0 and end < e.t <= end + TRAILING_KILL_EXTEND_SEC]),
+        )
+        for start, end in combat_ranges
+    ]
     combat_ranges = _merge_ranges(combat_ranges, step)
 
     face_stats = [
@@ -328,10 +397,13 @@ def finalize_match(
 
         around = [
             s for s in states
-            if start - ULTIMATE_LOOKAROUND_SEC <= s.t <= end + ULTIMATE_LOOKAROUND_SEC and not _spectating(s.t)
+            if start - ULTIMATE_LOOKBACK_SEC <= s.t <= end + ULTIMATE_LOOKFORWARD_SEC and not _spectating(s.t)
         ]
-        ultimate_values = [s.ultimate_blue for s in around if s.ultimate_blue is not None]
-        ultimate_delta = max(ultimate_values) - min(ultimate_values) if ultimate_values else None
+        ultimate_values = [
+            s.ultimate_blue for s in around
+            if s.ultimate_blue is not None and not s.ultimate_locked
+        ]
+        ultimate_delta = max_rise(ultimate_values) if ultimate_values else None
         day_night = _mode([s.day_night for s in in_range if s.day_night])
         solid = sum(1 for s in in_range if s.combat is True)
         confidence = solid / len(in_range) if in_range else 0.0
@@ -357,6 +429,7 @@ def finalize_match(
                 enemy_ring_mean=enemy_ring_mean,
                 game_day=int(game_day) if game_day is not None else None,
                 ultimate_delta=ultimate_delta,
+                team_combat_unreliable=team_combat_unreliable,
             )
         )
 
@@ -377,13 +450,14 @@ def detect_source(
     """프레임 공급자 하나를 통째로 검출한다. 스팀 세그먼트든 영상 파일이든 같은 시계열 처리를 쓴다."""
     profile = profile or ResolutionProfile.for_resolution(source.width, source.height)
     k_templates, a_templates = resolve_templates(profile, k_templates, a_templates)
+    tk_templates = resolve_tk_templates(profile, k_templates)
     region_templates = resolve_region_templates(profile)
     day_templates = resolve_day_templates(profile)
 
     states = [
         analyze_frame(
             frame, profile, t=t, k_templates=k_templates, a_templates=a_templates,
-            region_templates=region_templates, day_templates=day_templates,
+            tk_templates=tk_templates, region_templates=region_templates, day_templates=day_templates,
         )
         for t, frame in source.frames()
     ]

@@ -27,6 +27,8 @@ class FrameState:
     ally_rings: int | None = None
     clock_zero: bool | None = None
     ultimate_blue: float | None = None
+    ultimate_locked: bool | None = None
+    tk: int | None = None
 
 
 @dataclass(frozen=True)
@@ -44,6 +46,7 @@ class CombatInterval:
     enemy_ring_mean: float | None = None
     game_day: int | None = None
     ultimate_delta: float | None = None
+    team_combat_unreliable: bool = False
 
 
 @dataclass(frozen=True)

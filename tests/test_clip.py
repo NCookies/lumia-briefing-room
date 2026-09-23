@@ -18,10 +18,11 @@ FFMPEG_PATH = discover_ffmpeg()
 requires_ffmpeg = pytest.mark.skipif(FFMPEG_PATH is None, reason="ffmpeg를 찾을 수 없다")
 
 
-def ci(start, end):
+def ci(start, end, *, team_combat_unreliable=False):
     return CombatInterval(
         start=start, end=end, tags=frozenset({"kill"}),
         k_delta=1, a_delta=0, died=False, day_night="day", confidence=1.0,
+        team_combat_unreliable=team_combat_unreliable,
     )
 
 
@@ -44,6 +45,27 @@ def test_resolve_clip_range_caps_at_max_duration():
     r = resolve_clip_range(ci(100, 200), cfg)
     assert r.end - r.start == 30
     assert r.start == 95
+
+
+def test_resolve_clip_range_widens_preroll_when_team_combat_was_unreliable():
+    # 2026-09-23: 팀원 링 오탐으로 배지만으로 잘린 매치는 구도 잡는 구간을 놓치기 쉽다
+    # (pipeline/clip.py resolve_clip_range 주석 참고). fixed_preroll_sec 로 더 넉넉히 준다.
+    cfg = ClipConfig(preroll_sec=5, postroll_sec=8, fixed_preroll_sec=30, max_duration_sec=200)
+
+    r = resolve_clip_range(ci(100, 120, team_combat_unreliable=True), cfg)
+
+    assert r.start == 70
+    assert r.end == 128
+    assert r.preroll_source == "fixed"
+
+
+def test_resolve_clip_range_keeps_the_normal_preroll_when_team_combat_was_reliable():
+    cfg = ClipConfig(preroll_sec=5, postroll_sec=8, fixed_preroll_sec=30, max_duration_sec=200)
+
+    r = resolve_clip_range(ci(100, 120, team_combat_unreliable=False), cfg)
+
+    assert r.start == 95
+    assert r.preroll_source == "combat"
 
 
 def test_merge_overlapping_merges_close_ranges():
