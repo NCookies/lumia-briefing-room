@@ -74,6 +74,28 @@ def test_slot_in_combat_when_the_ring_is_red():
     assert slot_in_combat(_ring((230, 40, 40))) is True
 
 
+def test_slot_not_in_combat_when_only_the_portrait_art_is_red():
+    # 2026-09-23: 데비&마를렌(빨간 머리) 초상화가 얼굴 안쪽 빨강 때문에 매치 내내 "전투 중"으로 잡혔다.
+    # 전투 링은 원 테두리 바깥으로 번지는 붉은 후광이고, 얼굴 안쪽 빨강은 세지 않는다.
+    from lumia_briefing_room.detect.teammate import slot_in_combat
+
+    a = np.full((60, 80, 3), (60, 60, 90), np.uint8)
+    a[15:50, 25:57] = (230, 40, 40)
+
+    assert slot_in_combat(a) is False
+
+
+def test_slot_in_combat_when_the_red_halo_is_on_the_rim_of_the_portrait():
+    from lumia_briefing_room.detect.teammate import slot_in_combat
+
+    a = np.full((60, 80, 3), (60, 60, 90), np.uint8)
+    yy, xx = np.mgrid[0:60, 0:80]
+    dist = np.hypot(xx - 41, yy - 32)
+    a[(dist >= 36) & (dist < 42)] = (230, 40, 40)
+
+    assert slot_in_combat(a) is True
+
+
 def test_slot_not_in_combat_with_pink_purple_or_blank_rings():
     from lumia_briefing_room.detect.teammate import slot_in_combat
 

@@ -19,16 +19,26 @@ def slot_is_dead(bar_rgb: np.ndarray) -> bool:
     return orange >= ORANGE_MIN_PCT and green < GREEN_MAX_PCT
 
 
+def _rim_mask(shape: tuple[int, int]) -> np.ndarray:
+    """초상화 원의 바깥 띠(테두리와 그 바깥으로 번지는 후광). ROI 80x60 에서 중심 (41,32), 반지름 35 이상."""
+    h, w = shape
+    yy, xx = np.mgrid[0:h, 0:w]
+    return np.hypot((xx - 0.5125 * w) / w, (yy - 0.5333 * h) / w) >= 0.4375
+
+
 def slot_in_combat(ring_rgb: np.ndarray) -> bool:
     """SPEC §2.12: 팀원이 전투 중이면 초상화 둘레 링이 빨갛게 변한다(내 배지와 같은 상태).
 
     평상시 링은 분홍/보라라 파랑 성분이 남는다. b < 0.45r 로 빨강만 센다.
+    **원 바깥 띠만 본다** - 얼굴 안쪽은 캐릭터 원화라 빨간 머리(데비&마를렌 등)가 전투와 무관하게
+    계속 걸렸다(2026-09-23, 한 매치 32샘플 전부 True). 실측: 띠만 보면 평상시 0%, 전투 3% 이상.
     사망한 팀원의 얼굴도 빨갛게 덮이므로 combat_slots() 가 체력바로 따로 걸러낸다.
     """
     f = ring_rgb.astype(np.float32)
     r, g, b = f[..., 0], f[..., 1], f[..., 2]
     red = (r > 110) & (g < 0.45 * r) & (b < 0.45 * r)
-    return float(red.mean() * 100) >= IN_COMBAT_RED_MIN_PCT
+    rim = _rim_mask(red.shape)
+    return float(red[rim].mean() * 100) >= IN_COMBAT_RED_MIN_PCT
 
 
 def combat_slots(rings: list[np.ndarray], bars: list[np.ndarray]) -> list[int]:
