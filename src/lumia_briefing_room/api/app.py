@@ -13,7 +13,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from lumia_briefing_room import __version__, paths
+from lumia_briefing_room import __version__, autostart, paths
 from lumia_briefing_room.appmode import resolve_mode
 from lumia_briefing_room.api.clips import find_clip, scan_clips, to_summary_dict
 from lumia_briefing_room.api.export import (
@@ -537,6 +537,9 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         app.state.config = new_cfg
         if app.state.config_path is not None:
             save_config(new_cfg, app.state.config_path)
+        if "autoStart" in (body.get("ui") or {}):
+            # 설정 파일만 고치면 다음 실행 때까지 레지스트리가 그대로라, 옵션에서 끈 뒤에도 한 번 더 자동 실행된다.
+            autostart.apply_setting(new_cfg)
         return dataclass_to_camel_dict(new_cfg)
 
     @app.post("/api/client-log", status_code=204)

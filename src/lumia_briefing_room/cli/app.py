@@ -94,29 +94,6 @@ def make_on_open(*, host="127.0.0.1", port=8000, config_path=None, open_browser=
     return on_open
 
 
-def build_autostart_command(*, frozen: bool, executable: str) -> str:
-    """빌드본에서 sys.executable 은 앱 exe 라 `-m` 인자가 의미 없다."""
-    if frozen:
-        return f'"{executable}"'
-    return f'"{executable}" -m lumia_briefing_room.cli.app'
-
-
-def autostart_command() -> str:
-    """레지스트리에 등록할 명령. 시작할 때마다 덮어쓰므로 개발 PC 에서 등록한 옛 명령도 바뀐다."""
-    return build_autostart_command(frozen=paths.is_frozen(), executable=sys.executable)
-
-
-def apply_autostart_setting(cfg, *, app_name: str | None = None) -> None:
-    """SPEC §7.7 ui.autoStart 를 실제 레지스트리 상태에 반영한다."""
-    if not autostart.is_supported():
-        return
-    name = app_name or autostart.APP_NAME
-    if cfg.ui.auto_start:
-        autostart.enable(autostart_command(), app_name=name)
-    else:
-        autostart.disable(app_name=name)
-
-
 def make_watch_controller(args, *, auto_start: bool = True):
     """트레이 "감시 중" 토글의 실제 시작/정지 배선. (plan-pipeline.md §3-5 해결)
 
@@ -214,7 +191,7 @@ def _run_app(args, instance: SingleInstance) -> None:
     procs.kill_children_on_exit()
     if cfg.app.low_priority:
         procs.lower_current_process_priority()
-    apply_autostart_setting(cfg)
+    autostart.apply_setting(cfg)
 
     on_toggle_watch, watch_enabled = make_watch_controller(args)
     threading.Thread(

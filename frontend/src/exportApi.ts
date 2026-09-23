@@ -78,3 +78,12 @@ export async function setConfirmDelete(confirmDelete: boolean): Promise<void> {
 export async function setExportDefault(dir: string): Promise<void> {
   await jsonOrThrow(await postJson(`${BASE}/config`, { paths: { exportDefault: dir } }, 'PUT'), '설정 저장')
 }
+
+export async function getAutoStart(): Promise<boolean> {
+  const cfg = await jsonOrThrow<{ ui?: { autoStart?: boolean } }>(await fetch(`${BASE}/config`), '설정 조회')
+  return cfg.ui?.autoStart ?? true
+}
+
+export async function setAutoStart(autoStart: boolean): Promise<void> {
+  await jsonOrThrow(await postJson(`${BASE}/config`, { ui: { autoStart } }, 'PUT'), '설정 저장')
+}

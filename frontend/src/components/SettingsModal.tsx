@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getExportDefault, getNickname, setExportDefault, setNickname } from '../exportApi'
+import { getAutoStart, getExportDefault, getNickname, setAutoStart, setExportDefault, setNickname } from '../exportApi'
 import { AboutPanel } from './AboutPanel'
 import { CleanupPanel } from './CleanupPanel'
 import { FolderPicker } from './FolderPicker'
@@ -30,12 +30,29 @@ function GeneralPanel({
 }) {
   const [nickname, setDraft] = useState('')
   const [status, setStatus] = useState<string | null>(null)
+  const [autoStart, setAutoStartState] = useState(true)
+  const [autoStartError, setAutoStartError] = useState<string | null>(null)
 
   useEffect(() => {
     getNickname()
       .then(setDraft)
       .catch((e: Error) => setStatus(e.message))
+    getAutoStart()
+      .then(setAutoStartState)
+      .catch(() => {})
   }, [])
+
+  const changeAutoStart = async (value: boolean) => {
+    const previous = autoStart
+    setAutoStartState(value)
+    setAutoStartError(null)
+    try {
+      await setAutoStart(value)
+    } catch (e) {
+      setAutoStartState(previous)
+      setAutoStartError((e as Error).message)
+    }
+  }
 
   const save = async () => {
     try {
@@ -48,6 +65,18 @@ function GeneralPanel({
 
   return (
     <div className="flex flex-col gap-6">
+    <section className="flex flex-col gap-2">
+      <h3 className="text-sm font-medium text-zinc-200">시작</h3>
+      <label className="flex items-center gap-2 text-sm text-zinc-300">
+        <input type="checkbox" checked={autoStart} onChange={(e) => void changeAutoStart(e.target.checked)} />
+        윈도우에 로그인할 때 자동으로 실행
+      </label>
+      <p className="text-xs text-zinc-500">
+        켜 두면 로그인할 때 트레이에 조용히 떠서 경기가 끝날 때마다 클립을 만듭니다.
+        꺼도 이미 만든 클립은 그대로 남고, 직접 실행하면 그때부터 다시 감시합니다.
+      </p>
+      {autoStartError && <p className="text-xs text-rose-300">{autoStartError}</p>}
+    </section>
     <section className="flex flex-col gap-2">
       <h3 className="text-sm font-medium text-zinc-200">삭제</h3>
       <label className="flex items-center gap-2 text-sm text-zinc-300">
