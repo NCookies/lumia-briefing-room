@@ -260,15 +260,15 @@ Chromium 번들(headless-shell)에서만 안 되는 것이지, 실제 배포 환
 
 **2) 브라우저 자동 디버깅 (MCP)**
 
-- 선택: **Playwright MCP 를 시스템 Edge(`--browser msedge`)로 띄운다.** 근거: 이 앱의 클립은 HEVC 라 Playwright 번들 Chromium 은 화면이 검게 나오고([§4-2](#4-2-대용량-hevc-클립의-브라우저-재생-research-410-의-연장--해결됨)), 설치된 Edge 는 정상 재생된다. Chrome DevTools MCP / Claude in Chrome 확장은 사용자의 실제 Chrome 을 쓰기 때문에 이 프로젝트에서는 후순위(Chrome 도 HEVC 는 하드웨어 의존).
-- 연결 명령(프로젝트 범위, `.mcp.json` 로 저장): `claude mcp add --scope project playwright -- npx @playwright/mcp@latest --browser msedge`. 대상 주소는 `python -m lumia_briefing_room.cli.serve --port 8000` 로 띄운 `http://127.0.0.1:8000/`(프론트 dist 서빙) 또는 dev 서버 `http://127.0.0.1:5173/`.
+- 선택: **Playwright MCP 를 시스템 Chrome(`--browser chrome`)으로 띄운다(사용자가 실제로 쓰는 브라우저와 맞춘다; 처음엔 Edge 로 잡았다가 변경).** 근거: 이 앱의 클립은 HEVC 라 Playwright 번들 Chromium 은 화면이 검게 나오고([§4-2](#4-2-대용량-hevc-클립의-브라우저-재생-research-410-의-연장--해결됨)), 설치된 Edge 는 정상 재생된다. Chrome DevTools MCP / Claude in Chrome 확장은 사용자의 실제 Chrome 을 쓰기 때문에 이 프로젝트에서는 후순위(Chrome 도 HEVC 는 하드웨어 의존).
+- 연결 명령(프로젝트 범위, `.mcp.json` 로 저장): `claude mcp add --scope project playwright -- npx @playwright/mcp@latest --browser chrome`. 대상 주소는 `python -m lumia_briefing_room.cli.serve --port 8000` 로 띄운 `http://127.0.0.1:8000/`(프론트 dist 서빙) 또는 dev 서버 `http://127.0.0.1:5173/`.
 - 확인 필요: 실제로 Edge 로 붙어 `<video>` 가 `videoWidth>0` 으로 재생되는지, 콘솔 로그·스냅샷을 Claude 가 읽을 수 있는지 실측하고 결과를 여기에 적는다.
 
 **작업 단계**
 
 - [x] `POST /api/client-log` + 로그 파일 기록 (`logsetup.py`, `%LOCALAPPDATA%\LumiaBriefingRoom\logspp.log`)(테스트: 요청 → 로그 파일에 `[client]` 줄)
 - [x] 프론트 전역 오류 핸들러 (`clientLog.ts`)(중복 억제·재전송 없음) + `npm run build`
-- [ ] Playwright MCP 연결 및 실측(Edge, HEVC 재생, 콘솔 읽기) — `.mcp.json` 은 추가했고 실측은 Claude Code 재시작 후 MCP 승인이 필요해 남겨둠
+- [ ] Playwright MCP 연결 및 실측(Chrome, HEVC 재생, 콘솔 읽기) — `.mcp.json` 은 추가했고 실측은 Claude Code 재시작 후 MCP 승인이 필요해 남겨둠
 - [x] README "실행 방법"에 §9 브라우저 디버깅(로그 파일 위치, MCP 연결 명령) 추가 — 구현과 같은 커밋에서
 
 ## 7. 추후 구현 (아직 만들지 않는다)
