@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react'
 import { getExportDefault, getNickname, setExportDefault, setNickname } from '../exportApi'
+import { AboutPanel } from './AboutPanel'
 import { CleanupPanel } from './CleanupPanel'
 import { FolderPicker } from './FolderPicker'
 import { VodSettingsPanel } from './VodSettingsPanel'
 
-type Tab = 'general' | 'export' | 'vod' | 'cleanup'
+type Tab = 'general' | 'export' | 'vod' | 'cleanup' | 'about'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'general', label: '일반' },
   { id: 'export', label: '영상 저장' },
   { id: 'vod', label: '다시보기' },
   { id: 'cleanup', label: '자동 정리' },
+  { id: 'about', label: '정보·진단' },
 ]
 
 interface Props {
@@ -167,6 +169,7 @@ export function SettingsModal({ confirmDelete, onConfirmDeleteChange, onClose }:
             {tab === 'export' && <ExportPanel />}
             {tab === 'vod' && <VodSettingsPanel />}
             {tab === 'cleanup' && <CleanupPanel />}
+            {tab === 'about' && <AboutPanel />}
           </div>
         </div>
       </div>

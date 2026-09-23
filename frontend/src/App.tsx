@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { ClipBrowser, type ClipSource } from './components/ClipBrowser'
+import { FirstRunScreen } from './components/FirstRunScreen'
 import { SettingsModal } from './components/SettingsModal'
 import { getConfirmDelete, setConfirmDelete } from './exportApi'
+import { getFirstRun } from './onboardingApi'
 
 const TABS: { id: ClipSource; label: string }[] = [
   { id: 'steam', label: '내 녹화' },
@@ -21,6 +23,13 @@ export default function App() {
   const [tab, setTab] = useState<ClipSource>(loadTab)
   const [showSettings, setShowSettings] = useState(false)
   const [confirmDelete, setConfirmDeleteState] = useState(true)
+  const [firstRun, setFirstRun] = useState(false)
+
+  useEffect(() => {
+    getFirstRun()
+      .then((info) => setFirstRun(info.needed))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     getConfirmDelete()
@@ -44,6 +53,7 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen flex-col bg-zinc-900 text-zinc-100">
+      {firstRun && <FirstRunScreen onDone={() => setFirstRun(false)} />}
       <header className="flex items-end justify-between border-b border-zinc-700 px-4 pt-3">
         <div className="flex items-end gap-6">
           <h1 className="pb-2 text-xl font-semibold">루미아 브리핑룸</h1>
