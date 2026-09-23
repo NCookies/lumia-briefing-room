@@ -14,6 +14,7 @@ from lumia_briefing_room.detect.types import CombatInterval
 from lumia_briefing_room.pipeline.clip import ClipRange, cut_clip, make_thumbnail, resolve_clip_range
 from lumia_briefing_room.pipeline.filters import apply_filter
 from lumia_briefing_room.pipeline.metadata import build_metadata, write_metadata
+from lumia_briefing_room.pipeline.clip_assets import stored_asset_path
 from lumia_briefing_room.pipeline.result_scan import find_result_screen, result_image_name, save_result_image
 from lumia_briefing_room.video.segments import segment_time_range
 from lumia_briefing_room.video.session import RecordingSession
@@ -137,7 +138,7 @@ def _characters(result: ResultScreen | None) -> list[str]:
     return [result.character] if result is not None and result.character else []
 
 
-def _save_result_image(result: ResultScreen | None, path: Path) -> str | None:
+def _save_result_image(result: ResultScreen | None, path: Path, clips_root: Path) -> str | None:
     if result is None or result.image is None:
         return None
     try:
@@ -145,7 +146,7 @@ def _save_result_image(result: ResultScreen | None, path: Path) -> str | None:
     except OSError:
         log.exception("결과 화면 이미지 저장 실패")
         return None
-    return str(path)
+    return stored_asset_path(path, clips_root)
 
 
 def process_match(
@@ -185,7 +186,7 @@ def process_match(
     result = _read_result(session, seg_range, ffmpeg_path, hwaccel)
     if result is not None and on_result is not None:
         on_result(result)
-    result_image_path = _save_result_image(result, thumbnails_root / result_image_name(match_start))
+    result_image_path = _save_result_image(result, thumbnails_root / result_image_name(match_start), clips_root)
 
     written: list[Path] = []
     for i, plan in enumerate(plans, start=1):
@@ -209,7 +210,7 @@ def process_match(
                 width=cfg.encode.thumbnail.width,
                 ffmpeg_path=ffmpeg_path,
             )
-            thumbnail_rel = str(thumb_path)
+            thumbnail_rel = stored_asset_path(thumb_path, clips_root)
 
         meta = build_metadata(
             title=default_title(aggregated.day_night, aggregated.region, aggregated.game_day, _characters(result)),

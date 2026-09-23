@@ -12,6 +12,7 @@ from pathlib import Path
 
 from lumia_briefing_room.config import ThumbnailConfig
 from lumia_briefing_room.pipeline.clip import make_thumbnail
+from lumia_briefing_room.pipeline.clip_assets import resolve_thumbnail
 from lumia_briefing_room.procs import run_hidden
 
 MIN_LENGTH_SEC = 1.0
@@ -54,10 +55,10 @@ def trim_clip(
     meta["videoOffsetSec"] = round(float(meta.get("videoOffsetSec", 0.0)) + start, 3)
     meta["trimmed"] = True
 
-    thumb = meta.get("thumbnailPath")
-    if thumb:
+    thumb = resolve_thumbnail(meta_path, meta)
+    if thumb is not None:
         make_thumbnail(
-            mp4, Path(thumb), duration_sec=new_duration, offset_ratio=thumbnail.offset_ratio,
+            mp4, thumb, duration_sec=new_duration, offset_ratio=thumbnail.offset_ratio,
             width=thumbnail.width, ffmpeg_path=ffmpeg_path,
         )
 

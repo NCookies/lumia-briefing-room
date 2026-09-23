@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from lumia_briefing_room.config import Config
+from lumia_briefing_room.pipeline.clip_assets import resolve_thumbnail
 from lumia_briefing_room.pipeline.label_migrate import load_metas, migrate_labels
 from lumia_briefing_room.pipeline.orchestrator import process_match
 from lumia_briefing_room.pipeline.playerlog import MatchBoundary
@@ -62,7 +63,7 @@ def _delete_clip_files(meta_path: Path) -> None:
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         meta = {}
-    for f in (meta_path.with_suffix(".mp4"), Path(meta["thumbnailPath"]) if meta.get("thumbnailPath") else None):
+    for f in (meta_path.with_suffix(".mp4"), resolve_thumbnail(meta_path, meta)):
         if f is not None:
             f.unlink(missing_ok=True)
     meta_path.unlink(missing_ok=True)

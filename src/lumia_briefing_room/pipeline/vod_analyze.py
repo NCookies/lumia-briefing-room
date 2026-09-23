@@ -22,6 +22,7 @@ from lumia_briefing_room.detect.pvp import score_interval
 from lumia_briefing_room.detect.result import ResultScreen
 from lumia_briefing_room.detect.types import FrameState
 from lumia_briefing_room.pipeline.clip import ClipRange, make_thumbnail
+from lumia_briefing_room.pipeline.clip_assets import stored_asset_path
 from lumia_briefing_room.pipeline.filters import apply_filter
 from lumia_briefing_room.pipeline.label_migrate import load_metas, migrate_labels
 from lumia_briefing_room.pipeline.metadata import match_result_dict
@@ -294,7 +295,7 @@ def _make_clips(
         report("games", DECODE_SHARE + GAMES_SHARE * i / n, f"게임 {span.index} 결과 화면", games=len(games), clips=len(clip_ids))
         next_start = spans[i + 1].start if i + 1 < len(spans) else None
         result = _safe_result(find_result, video_path, span, next_start)
-        result_image = _save_result_image(result, thumbs / f"{vod}_g{span.index:02d}_result.jpg")
+        result_image = _save_result_image(result, thumbs / f"{vod}_g{span.index:02d}_result.jpg", root)
 
         filtered = apply_filter(det.detection.intervals, cfg.filter, game_mode="battle_royale")
         game_clip_ids: list[str] = []
@@ -322,7 +323,7 @@ def _make_clips(
                     offset_ratio=cfg.encode.thumbnail.offset_ratio,
                     width=cfg.encode.thumbnail.width, ffmpeg_path=ffmpeg_path,
                 )
-                thumb_rel = str(thumb_path)
+                thumb_rel = stored_asset_path(thumb_path, root)
             meta = build_vod_metadata(
                 title=default_title(
                     aggregated.day_night, aggregated.region, aggregated.game_day,

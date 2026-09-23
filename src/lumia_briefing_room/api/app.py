@@ -44,6 +44,7 @@ from lumia_briefing_room.pipeline.game_records import (
 )
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for, archive_if_labeled
 from lumia_briefing_room.pipeline.cleanup import plan_cleanup, remove_orphan_result_images, run_cleanup
+from lumia_briefing_room.pipeline.clip_assets import resolve_result_image, resolve_thumbnail
 from lumia_briefing_room.pipeline.retention import restore_clip, trash_clip
 from lumia_briefing_room.pipeline.proxy import create_proxy, is_proxy_fresh, proxy_path, remove_orphan_proxies
 from lumia_briefing_room.pipeline.reprocess import GameRef, ReprocessError, reprocess_game
@@ -235,9 +236,9 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         record_game(clip.meta_path, records_dir_if_kept(clips_dir))
         for f in [clip.meta_path.with_suffix(".mp4"), clip.meta_path]:
             _unlink(f)
-        thumb = clip.meta.get("thumbnailPath")
-        if thumb:
-            _unlink(Path(thumb))
+        thumb = resolve_thumbnail(clip.meta_path, clip.meta)
+        if thumb is not None:
+            _unlink(thumb)
         remove_orphan_result_images(clips_dir, clips_dir / ".trash")
         remove_orphan_proxies(clips_dir, clips_dir / ".trash")
         return {"id": clip_id, "deleted": True}
@@ -355,8 +356,8 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         clip = find_any(clip_id)
         if clip is None:
             raise HTTPException(404, "클립을 찾을 수 없습니다")
-        thumb = clip.meta.get("thumbnailPath")
-        if not thumb or not Path(thumb).exists():
+        thumb = resolve_thumbnail(clip.meta_path, clip.meta)
+        if thumb is None or not thumb.exists():
             raise HTTPException(404, "썸네일이 없습니다")
         return FileResponse(thumb, media_type="image/jpeg")
 
@@ -365,8 +366,8 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         clip = find_any(clip_id)
         if clip is None:
             raise HTTPException(404, "클립을 찾을 수 없습니다")
-        path = (clip.meta.get("matchResult") or {}).get("imagePath")
-        if not path or not Path(path).exists():
+        path = resolve_result_image(clip.meta_path, clip.meta)
+        if path is None or not path.exists():
             raise HTTPException(404, "결과 화면 이미지가 없습니다")
         return FileResponse(path, media_type="image/jpeg")
 
@@ -453,9 +454,9 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             record_game(clip.meta_path, records_dir_if_kept(clips_dir))
             for f in [clip.meta_path.with_suffix(".mp4"), clip.meta_path]:
                 _unlink(f)
-            thumb = clip.meta.get("thumbnailPath")
-            if thumb:
-                _unlink(Path(thumb))
+            thumb = resolve_thumbnail(clip.meta_path, clip.meta)
+            if thumb is not None:
+                _unlink(thumb)
             deleted += 1
         remove_orphan_result_images(clips_dir, trash_dir)
         remove_orphan_proxies(clips_dir, trash_dir)

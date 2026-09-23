@@ -15,6 +15,7 @@ from fastapi import FastAPI, HTTPException
 from lumia_briefing_room.api.clips import scan_clips
 from lumia_briefing_room.api.export import list_roots, list_subdirs, parent_of
 from lumia_briefing_room.config import Config, discover_ffmpeg, resolve_paths
+from lumia_briefing_room.pipeline.clip_assets import resolve_thumbnail
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for, archive_if_labeled
 from lumia_briefing_room.pipeline.retention import restore_clip, trash_clip
 from lumia_briefing_room.pipeline.vod_analyze import VodCancelled, VodProgress, analyze_vod
@@ -266,9 +267,9 @@ def register_vod_routes(
                 archive_if_labeled(clip.meta_path, archive_dir_for(base))
                 for f in (clip.meta_path.with_suffix(".mp4"), clip.meta_path):
                     f.unlink(missing_ok=True)
-                thumb = clip.meta.get("thumbnailPath")
-                if thumb:
-                    Path(thumb).unlink(missing_ok=True)
+                thumb = resolve_thumbnail(clip.meta_path, clip.meta)
+                if thumb is not None:
+                    thumb.unlink(missing_ok=True)
         return {"id": vid, "count": len(clips)}
 
     @app.get("/api/fs/videos")

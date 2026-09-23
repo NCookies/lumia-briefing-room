@@ -12,6 +12,8 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
+from lumia_briefing_room.pipeline.clip_assets import resolve_result_image
+
 RECORDS_DIRNAME = ".games"
 
 
@@ -34,9 +36,9 @@ def record_game(meta_path: Path, records_dir: Path | None) -> Path | None:
     key = game_key(meta.get("sessionDir"), meta["matchStartUtc"])
     records_dir.mkdir(parents=True, exist_ok=True)
     kept_result = {k: v for k, v in result.items() if k != "imagePath"}
-    source_image = result.get("imagePath")
+    source_image = resolve_result_image(meta_path, meta)
     target_image = records_dir / f"{key}.jpg"
-    if source_image and Path(source_image).exists() and Path(source_image).resolve() != target_image.resolve():
+    if source_image is not None and source_image.exists() and source_image.resolve() != target_image.resolve():
         shutil.copyfile(source_image, target_image)
     if target_image.exists():
         kept_result["imagePath"] = str(target_image)

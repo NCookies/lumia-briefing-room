@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from lumia_briefing_room.config import RetentionConfig
+from lumia_briefing_room.pipeline.clip_assets import resolve_thumbnail
 from lumia_briefing_room.pipeline.game_records import record_game
 from lumia_briefing_room.pipeline.label_archive import archive_if_labeled
 
@@ -29,9 +30,9 @@ def _write_meta(meta: dict, path: Path) -> None:
 def _clip_files(meta_path: Path, meta: dict) -> list[Path]:
     """메타데이터 하나에 딸린 파일들(mp4, 썸네일) — 메타데이터 자신은 제외."""
     files = [meta_path.with_suffix(".mp4")]
-    thumb = meta.get("thumbnailPath")
-    if thumb:
-        files.append(Path(thumb))
+    thumb = resolve_thumbnail(meta_path, meta)
+    if thumb is not None:
+        files.append(thumb)
     return [f for f in files if f.exists()]
 
 

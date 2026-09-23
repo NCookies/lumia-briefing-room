@@ -16,6 +16,7 @@ from pathlib import Path
 
 from lumia_briefing_room.api.clips import scan_clips, to_summary_dict
 from lumia_briefing_room.config import RetentionConfig, load_config, resolve_paths
+from lumia_briefing_room.pipeline.clip_assets import resolve_result_image
 from lumia_briefing_room.pipeline.game_records import clear_records, record_game, records_dir_for
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for, archive_if_labeled
 from lumia_briefing_room.pipeline.proxy import remove_orphan_proxies
@@ -91,9 +92,9 @@ def remove_orphan_result_images(clips_dir: Path, trash_dir: Path) -> list[Path]:
     referenced: set[Path] = set()
     for root in (clips_dir, trash_dir):
         for clip in scan_clips(root):
-            image = (clip.meta.get("matchResult") or {}).get("imagePath")
-            if image:
-                referenced.add(Path(image).resolve())
+            image = resolve_result_image(clip.meta_path, clip.meta)
+            if image is not None:
+                referenced.add(image.resolve())
 
     thumbs = clips_dir / ".thumbs"
     removed: list[Path] = []
