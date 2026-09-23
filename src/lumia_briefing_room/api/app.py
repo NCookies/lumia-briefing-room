@@ -2,6 +2,7 @@
 
 import functools
 import json
+import logging
 import subprocess
 import threading
 import time
@@ -9,6 +10,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel
 
 from lumia_briefing_room.api.clips import find_clip, scan_clips, to_summary_dict
 from lumia_briefing_room.api.export import (
@@ -35,6 +37,18 @@ from lumia_briefing_room.pipeline.retention import restore_clip, trash_clip
 from lumia_briefing_room.pipeline.reprocess import GameRef, ReprocessError, reprocess_game
 from lumia_briefing_room.pipeline.trim import trim_clip, validate_range
 from lumia_briefing_room.steam_paths import discover_recording_root
+
+
+client_log = logging.getLogger("lumia_briefing_room.client")
+_CLIENT_LOG_LIMIT = 4000
+
+
+class ClientLog(BaseModel):
+    message: str
+    level: str = "error"
+    stack: str | None = None
+    url: str | None = None
+    time: str | None = None
 
 
 def _deep_merge(base: dict, overrides: dict) -> dict:
@@ -406,6 +420,14 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         if app.state.config_path is not None:
             save_config(new_cfg, app.state.config_path)
         return dataclass_to_camel_dict(new_cfg)
+
+    @app.post("/api/client-log", status_code=204)
+    def post_client_log(body: ClientLog):
+        """브라우저에서 난 오류를 서버 로그 파일에 [client] 접두로 남긴다(개발용, plan-ui.md §6)."""
+        parts = [body.message, body.stack, body.url]
+        text = " | ".join(p for p in parts if p)[:_CLIENT_LOG_LIMIT]
+        client_log.warning("[client] %s %s", body.level, text)
+        return Response(status_code=204)
 
     register_vod_routes(app, lock=lock, current_config=current_config, put_config=put_config)
     return app

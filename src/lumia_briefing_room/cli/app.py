@@ -13,6 +13,7 @@ import webbrowser
 from lumia_briefing_room import autostart
 from lumia_briefing_room.cli import serve as serve_cli
 from lumia_briefing_room.cli.watch import build_parser, run
+from lumia_briefing_room.logsetup import setup_file_logging
 from lumia_briefing_room.config import load_config, resolve_config_path
 from lumia_briefing_room.pipeline.cleanup import cleanup_loop, make_cleanup_runner
 from lumia_briefing_room.tray import build_icon
@@ -132,6 +133,7 @@ def should_open_ui_on_start(cfg, *, open_ui: bool) -> bool:
 
 def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    setup_file_logging()
     parser = build_parser()
     parser.add_argument("--open-ui", action="store_true", help="시작하자마자 열람 UI 를 연다")
     args = parser.parse_args(argv)
