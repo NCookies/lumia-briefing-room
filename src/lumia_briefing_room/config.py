@@ -7,8 +7,8 @@ import typing
 from dataclasses import dataclass, field
 from pathlib import Path
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[2]
-_BUNDLED_FFMPEG = _PROJECT_ROOT / "vendor" / "ffmpeg" / "ffmpeg.exe"
+from lumia_briefing_room import paths
+
 
 FFMPEG_NOT_FOUND_MESSAGE = (
     "ffmpeg를 찾을 수 없다. 'winget install ffmpeg' 로 설치하거나, "
@@ -21,15 +21,16 @@ def discover_ffmpeg() -> Path | None:
 
     SPEC §4: ffmpeg 번들이 필수다. 우선순위:
       1) LUMIA_FFMPEG 환경변수
-      2) 번들된 위치 (vendor/ffmpeg/ffmpeg.exe)
+      2) 번들된 위치 (paths.bundled_ffmpeg_dir())
       3) PATH
     """
     env_path = os.environ.get("LUMIA_FFMPEG")
     if env_path and Path(env_path).exists():
         return Path(env_path)
 
-    if _BUNDLED_FFMPEG.exists():
-        return _BUNDLED_FFMPEG
+    bundled = paths.bundled_ffmpeg_dir() / "ffmpeg.exe"
+    if bundled.exists():
+        return bundled
 
     found = shutil.which("ffmpeg")
     return Path(found) if found else None

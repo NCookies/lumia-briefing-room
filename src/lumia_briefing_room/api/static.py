@@ -5,9 +5,14 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from lumia_briefing_room import paths
+
 
 def find_frontend_dist(start: Path | None = None) -> Path | None:
-    base = Path(start) if start is not None else Path(__file__).resolve()
+    if start is None:
+        dist = paths.frontend_dist_dir()
+        return dist if (dist / "index.html").exists() else None
+    base = Path(start)
     for parent in [base, *base.parents]:
         candidate = parent / "frontend" / "dist"
         if (candidate / "index.html").exists():

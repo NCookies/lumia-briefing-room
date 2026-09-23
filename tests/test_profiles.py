@@ -116,3 +116,19 @@ def test_crop_of_reference_profile_is_the_plain_crop():
     assert np.array_equal(
         profile.crop(frame, "k_value"), frame[roi.y0 : roi.y1, roi.x0 : roi.x1]
     )
+
+
+def test_missing_templates_are_reported_not_silent(tmp_path, monkeypatch, caplog):
+    import logging
+
+    from lumia_briefing_room import paths
+    from lumia_briefing_room.profiles.models import ResolutionProfile
+
+    monkeypatch.setenv("LUMIA_RESOURCE_DIR", str(tmp_path))
+    paths._warned.clear()
+    with caplog.at_level(logging.WARNING, logger="lumia_briefing_room.paths"):
+        profile = ResolutionProfile.builtin(2560, 1440)
+
+    assert profile.templates is None and profile.region_templates is None and profile.day_templates is None
+    messages = " ".join(r.getMessage() for r in caplog.records)
+    assert "K/A 숫자 본보기" in messages and "지역명 본보기" in messages and "일차 본보기" in messages

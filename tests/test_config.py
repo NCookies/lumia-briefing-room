@@ -166,3 +166,25 @@ def test_resolve_config_path_falls_back_to_the_default_file(tmp_path):
 
     assert resolve_config_path(None) == DEFAULT_CONFIG_PATH
     assert resolve_config_path(tmp_path / "x.json") == tmp_path / "x.json"
+
+
+def test_discover_ffmpeg_prefers_env_then_bundle_then_path(tmp_path, monkeypatch):
+    from lumia_briefing_room.config import discover_ffmpeg
+
+    resource = tmp_path / "res"
+    bundled = resource / "vendor" / "ffmpeg"
+    bundled.mkdir(parents=True)
+    (bundled / "ffmpeg.exe").write_bytes(b"")
+    env_exe = tmp_path / "env_ffmpeg.exe"
+    env_exe.write_bytes(b"")
+    monkeypatch.setenv("LUMIA_RESOURCE_DIR", str(resource))
+    monkeypatch.setattr("shutil.which", lambda name: "C:/path/ffmpeg.exe")
+
+    monkeypatch.setenv("LUMIA_FFMPEG", str(env_exe))
+    assert discover_ffmpeg() == env_exe
+
+    monkeypatch.delenv("LUMIA_FFMPEG")
+    assert discover_ffmpeg() == bundled / "ffmpeg.exe"
+
+    (bundled / "ffmpeg.exe").unlink()
+    assert discover_ffmpeg() == Path("C:/path/ffmpeg.exe")

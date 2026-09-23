@@ -54,3 +54,13 @@ def test_mount_static_serves_index_and_keeps_api_routes(tmp_path: Path):
     api = client.get("/api/clips")
     assert api.status_code == 200
     assert api.json() == []
+
+
+def test_find_frontend_dist_default_uses_resource_dir(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("LUMIA_RESOURCE_DIR", str(tmp_path))
+    assert find_frontend_dist() is None
+
+    dist = tmp_path / "frontend" / "dist"
+    dist.mkdir(parents=True)
+    (dist / "index.html").write_text("<html></html>", encoding="utf-8")
+    assert find_frontend_dist() == dist

@@ -7,6 +7,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from lumia_briefing_room import paths
 from lumia_briefing_room.detect.ocr import TextReader
 
 MIN_PREFIX_LEN = 4
@@ -14,10 +15,8 @@ MIN_TEXT_LEN = 3
 MIN_SCORE = 0.8
 SCALE = 2
 _NON_LETTERS = re.compile(r"[^A-Z]")
-_CHARACTERS_PATH = Path(__file__).resolve().parents[3] / "data" / "characters.json"
-
-
-def load_characters(path: Path = _CHARACTERS_PATH) -> dict[str, str]:
+def load_characters(path: Path | None = None) -> dict[str, str]:
+    path = path or paths.characters_path()
     data = json.loads(path.read_text(encoding="utf-8"))
     return {english.upper(): korean for english, korean in data.items()}
 

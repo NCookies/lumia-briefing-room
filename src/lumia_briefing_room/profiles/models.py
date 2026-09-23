@@ -4,11 +4,9 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from lumia_briefing_room import paths
+
 _BUILTIN_DIR = Path(__file__).parent / "builtin"
-_PROJECT_ROOT = Path(__file__).resolve().parents[3]
-_TEMPLATES_DIR = _PROJECT_ROOT / "data" / "templates" / "digits"
-_REGION_TEMPLATES_DIR = _PROJECT_ROOT / "data" / "templates" / "regions"
-_DAY_TEMPLATES_DIR = _PROJECT_ROOT / "data" / "templates" / "days"
 
 _MEASURED_RESOLUTIONS: tuple[tuple[int, int], ...] = ((2560, 1440),)
 
@@ -47,19 +45,24 @@ def _load_builtin(width: int, height: int) -> tuple[dict[str, Roi], tuple[int, i
     return rois, tuple(normalized_to) if normalized_to else None
 
 
+def _template_path(kind: str, label: str, width: int, height: int) -> Path | None:
+    path = paths.templates_dir(kind) / f"{width}x{height}.npz"
+    if path.exists():
+        return path
+    paths.warn_missing(label, path)
+    return None
+
+
 def _templates_path(width: int, height: int) -> Path | None:
-    path = _TEMPLATES_DIR / f"{width}x{height}.npz"
-    return path if path.exists() else None
+    return _template_path("digits", "K/A 숫자 본보기", width, height)
 
 
 def _region_templates_path(width: int, height: int) -> Path | None:
-    path = _REGION_TEMPLATES_DIR / f"{width}x{height}.npz"
-    return path if path.exists() else None
+    return _template_path("regions", "지역명 본보기", width, height)
 
 
 def _day_templates_path(width: int, height: int) -> Path | None:
-    path = _DAY_TEMPLATES_DIR / f"{width}x{height}.npz"
-    return path if path.exists() else None
+    return _template_path("days", "일차 본보기", width, height)
 
 
 @dataclass(frozen=True)
