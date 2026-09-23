@@ -216,6 +216,7 @@ class VodConfig:
 @dataclass
 class AppConfig:
     mode: str = "auto"
+    low_priority: bool = True
 
 
 @dataclass

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -15,6 +14,7 @@ from lumia_briefing_room.pipeline.metadata import (
     revive_cost,
 )
 from lumia_briefing_room.video.vod import find_ffprobe, probe_video
+from lumia_briefing_room.procs import run_hidden
 
 
 @dataclass(frozen=True)
@@ -45,7 +45,7 @@ def cut_vod_clip(
     if include_audio:
         cmd += ["-map", "0:a:0?"]
     cmd += ["-c", "copy", "-avoid_negative_ts", "make_zero", str(out_path)]
-    subprocess.run(cmd, check=True, capture_output=True)
+    run_hidden(cmd, check=True, capture_output=True)
 
     ffprobe_path = find_ffprobe(ffmpeg_path)
     duration = probe_video(out_path, ffprobe_path=ffprobe_path).duration_sec

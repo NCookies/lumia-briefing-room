@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 from pathlib import Path
 
 from lumia_briefing_room.config import ThumbnailConfig
 from lumia_briefing_room.pipeline.clip import make_thumbnail
+from lumia_briefing_room.procs import run_hidden
 
 MIN_LENGTH_SEC = 1.0
 END_TOLERANCE_SEC = 0.05
@@ -43,7 +43,7 @@ def trim_clip(
         "-map", "0", "-c", "copy", str(tmp),
     ]
     try:
-        subprocess.run(cmd, check=True, capture_output=True)
+        run_hidden(cmd, check=True, capture_output=True)
         os.replace(tmp, mp4)
     finally:
         tmp.unlink(missing_ok=True)

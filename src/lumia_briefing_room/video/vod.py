@@ -13,17 +13,21 @@ from pathlib import Path
 
 import numpy as np
 
+from lumia_briefing_room import paths
+from lumia_briefing_room.procs import popen_hidden, run_hidden
+
 _PTS_TIME = re.compile(r"pts_time:(-?[0-9.]+)")
 _PTS_WAIT_SEC = 30.0
 
 
 def find_ffprobe(ffmpeg_path: Path | None = None) -> Path | None:
-    """ffmpeg 와 같은 폴더의 ffprobe 를 먼저, 없으면 PATH 에서 찾는다."""
-    if ffmpeg_path is not None:
+    """ffmpeg 와 같은 폴더의 ffprobe 를 먼저, 그다음 번들 폴더, 없으면 PATH 에서 찾는다."""
+    folders = ([ffmpeg_path.parent] if ffmpeg_path is not None else []) + [paths.bundled_ffmpeg_dir()]
+    for folder in folders:
         for name in ("ffprobe.exe", "ffprobe"):
-            sibling = ffmpeg_path.parent / name
-            if sibling.exists():
-                return sibling
+            candidate = folder / name
+            if candidate.exists():
+                return candidate
     found = shutil.which("ffprobe")
     return Path(found) if found else None
 
@@ -48,7 +52,7 @@ def _parse_rate(text: str) -> float:
 def probe_video(path: Path, *, ffprobe_path: Path) -> VideoInfo:
     if not path.exists():
         raise FileNotFoundError(path)
-    proc = subprocess.run(
+    proc = run_hidden(
         [
             str(ffprobe_path), "-v", "error", "-select_streams", "v:0",
             "-show_entries", "stream=width,height,r_frame_rate,codec_name:format=duration",
@@ -113,7 +117,7 @@ class VodFileSource:
 
     def frames(self) -> Iterator[tuple[float, np.ndarray]]:
         frame_bytes = self.width * self.height * 3
-        proc = subprocess.Popen(
+        proc = popen_hidden(
             self._command(), stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
         times: queue.Queue[float | None] = queue.Queue()

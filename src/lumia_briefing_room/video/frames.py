@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import subprocess
 import tempfile
 from collections.abc import Iterator
 from pathlib import Path
@@ -9,6 +8,7 @@ import numpy as np
 
 from lumia_briefing_room.profiles.models import Roi
 from lumia_briefing_room.video.session import RecordingSession
+from lumia_briefing_room.procs import run_hidden
 
 
 def reshape_raw_frames(raw: bytes, *, width: int, height: int) -> np.ndarray:
@@ -93,7 +93,7 @@ def _decode_run(
             "rgb24",
             "pipe:1",
         ]
-        proc = subprocess.run(cmd, capture_output=True, check=True)
+        proc = run_hidden(cmd, capture_output=True, check=True)
 
     frames = reshape_raw_frames(proc.stdout, width=width, height=height)
 

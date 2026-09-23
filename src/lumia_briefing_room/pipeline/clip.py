@@ -1,4 +1,3 @@
-import subprocess
 import tempfile
 from dataclasses import dataclass
 from datetime import timedelta
@@ -9,6 +8,7 @@ from lumia_briefing_room.detect.types import CombatInterval
 from lumia_briefing_room.video.frames import write_merged_segment_file
 from lumia_briefing_room.video.segments import segment_time_range
 from lumia_briefing_room.video.session import RecordingSession
+from lumia_briefing_room.procs import run_hidden
 
 
 class ClipCutError(Exception):
@@ -135,7 +135,7 @@ def cut_clip(
 
         out_path.parent.mkdir(parents=True, exist_ok=True)
         cmd += map_args + ["-c", "copy", str(out_path)]
-        subprocess.run(cmd, check=True, capture_output=True)
+        run_hidden(cmd, check=True, capture_output=True)
 
     gaps = seg_range.gaps(used_video)
     source_incomplete = bool(gaps)
@@ -170,4 +170,4 @@ def make_thumbnail(
         "-frames:v", "1", "-vf", f"scale={width}:-1",
         str(out_path),
     ]
-    subprocess.run(cmd, check=True, capture_output=True)
+    run_hidden(cmd, check=True, capture_output=True)

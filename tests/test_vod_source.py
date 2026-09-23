@@ -99,3 +99,24 @@ def test_vod_source_raises_when_decoding_fails(tmp_path):
 
     with pytest.raises(Exception):
         list(VodFileSource(bad, ffmpeg_path=FFMPEG_PATH, ffprobe_path=FFPROBE_PATH).frames())
+
+
+def test_find_ffprobe_order_sibling_then_bundle_then_path(tmp_path, monkeypatch):
+    from lumia_briefing_room.video.vod import find_ffprobe
+
+    res = tmp_path / "res"
+    (res / "vendor" / "ffmpeg").mkdir(parents=True)
+    bundled = res / "vendor" / "ffmpeg" / "ffprobe.exe"
+    bundled.write_bytes(b"")
+    other = tmp_path / "other"
+    other.mkdir()
+    sibling = other / "ffprobe.exe"
+    sibling.write_bytes(b"")
+    monkeypatch.setenv("LUMIA_RESOURCE_DIR", str(res))
+    monkeypatch.setattr("shutil.which", lambda name: "C:/path/ffprobe.exe")
+
+    assert find_ffprobe(other / "ffmpeg.exe") == sibling
+    sibling.unlink()
+    assert find_ffprobe(other / "ffmpeg.exe") == bundled
+    bundled.unlink()
+    assert str(find_ffprobe(other / "ffmpeg.exe")).endswith("ffprobe.exe")

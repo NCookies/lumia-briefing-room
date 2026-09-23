@@ -25,9 +25,9 @@ def test_config_default_is_auto_and_roundtrips():
     cfg = Config()
     assert cfg.app.mode == "auto"
     data = dataclass_to_camel_dict(cfg)
-    assert data["app"] == {"mode": "auto"}
+    assert data["app"] == {"mode": "auto", "lowPriority": True}
     back = dataclass_from_camel_dict(Config, {"app": {"mode": "release"}})
-    assert back.app == AppConfig(mode="release")
+    assert back.app == AppConfig(mode="release", low_priority=True)
 
 
 def test_app_info_reports_mode_from_config(monkeypatch):

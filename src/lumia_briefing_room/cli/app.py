@@ -11,7 +11,7 @@ import sys
 import threading
 import webbrowser
 
-from lumia_briefing_room import autostart, paths
+from lumia_briefing_room import autostart, paths, procs
 from lumia_briefing_room.cli import serve as serve_cli
 from lumia_briefing_room.cli.watch import build_parser, run
 from lumia_briefing_room.consent import needs_first_run
@@ -186,6 +186,9 @@ def main(argv: list[str] | None = None) -> None:
 
 def _run_app(args, instance: SingleInstance) -> None:
     cfg = load_config(args.config)
+    procs.kill_children_on_exit()
+    if cfg.app.low_priority:
+        procs.lower_current_process_priority()
     apply_autostart_setting(cfg)
 
     on_toggle_watch, watch_enabled = make_watch_controller(args)

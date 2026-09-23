@@ -1365,6 +1365,7 @@ UI에서 제공할 동작:
 | `ui.autoStart` | `true` | 레지스트리 Run 키 등록 |
 | `ui.confirmDelete` | `true` | 클립·게임을 삭제(휴지통 이동)할 때 확인 창을 띄운다. 완전 삭제는 항상 확인 |
 | `app.mode` | `auto` | `auto`(빌드본이면 `release`, 소스 실행이면 `dev`) / `dev` / `release`. **(구현됨)** `release` 에서는 튜닝용 화면(클립 ID, 교전 점수 칩·슬라이더)을 숨긴다. 라벨링 UI·클라이언트 오류 로그는 두 모드 모두 유지. 값은 `GET /api/app-info` 의 `mode` 로 프론트가 읽는다 |
+| `app.lowPriority` | `true` | 앱 전체(분석·자식 ffmpeg 포함)를 보통 이하 우선순위로 돌려 게임 프레임 저하를 줄인다. **(구현됨)** 앱을 닫거나 죽으면 자식 ffmpeg 도 작업 개체(Job Object)로 함께 종료된다 |
 
 ### 7.7.1 플레이어
 
