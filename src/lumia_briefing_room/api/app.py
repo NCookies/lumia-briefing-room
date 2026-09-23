@@ -45,6 +45,7 @@ from lumia_briefing_room.pipeline.game_records import (
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for, archive_if_labeled
 from lumia_briefing_room.pipeline.cleanup import plan_cleanup, remove_orphan_result_images, run_cleanup
 from lumia_briefing_room.pipeline.retention import restore_clip, trash_clip
+from lumia_briefing_room.pipeline.proxy import create_proxy, is_proxy_fresh, proxy_path, remove_orphan_proxies
 from lumia_briefing_room.pipeline.reprocess import GameRef, ReprocessError, reprocess_game
 from lumia_briefing_room.pipeline.trim import trim_clip, validate_range
 from lumia_briefing_room.steam_paths import discover_recording_root
@@ -238,6 +239,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         if thumb:
             _unlink(Path(thumb))
         remove_orphan_result_images(clips_dir, clips_dir / ".trash")
+        remove_orphan_proxies(clips_dir, clips_dir / ".trash")
         return {"id": clip_id, "deleted": True}
 
     def records_dir_if_kept(clips_dir: Path) -> Path | None:
@@ -279,11 +281,74 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         return found[1] if found else None
 
     @app.get("/api/clips/{clip_id}/video")
-    def video(clip_id: str, request: Request):
-        clip = find_any(clip_id)
-        if clip is None:
+    def video(clip_id: str, request: Request, proxy: int = 0):
+        found = _locate(app, clip_id)
+        if found is None:
             raise HTTPException(404, "클립을 찾을 수 없습니다")
-        return _serve_range(clip.meta_path.with_suffix(".mp4"), request, media_type="video/mp4")
+        root, clip, _ = found
+        source = clip.meta_path.with_suffix(".mp4")
+        if not proxy:
+            return _serve_range(source, request, media_type="video/mp4")
+        proxied = proxy_path(root, clip_id)
+        if not is_proxy_fresh(proxied, source):
+            raise HTTPException(409, "재생용 영상이 아직 없습니다")
+        return _serve_range(proxied, request, media_type="video/mp4")
+
+    proxy_jobs: dict[str, dict] = {}
+    proxy_slot = threading.Semaphore(1)
+
+    def _proxy_files(clip_id: str):
+        found = _locate(app, clip_id)
+        if found is None:
+            raise HTTPException(404, "클립을 찾을 수 없습니다")
+        root, clip, _ = found
+        return clip, clip.meta_path.with_suffix(".mp4"), proxy_path(root, clip_id)
+
+    @app.get("/api/clips/{clip_id}/proxy")
+    def proxy_status(clip_id: str):
+        _, source, out = _proxy_files(clip_id)
+        if is_proxy_fresh(out, source):
+            return {"state": "ready", "progress": 1.0}
+        job = proxy_jobs.get(clip_id)
+        if job:
+            return {"state": job["state"], "progress": job["progress"], "message": job["message"]}
+        return {"state": "none", "progress": 0.0}
+
+    @app.post("/api/clips/{clip_id}/proxy")
+    def proxy_start(clip_id: str):
+        """HEVC 를 못 재생하는 PC 용 H.264 재생 사본을 백그라운드로 만든다. 처음 재생하려고 할 때 부른다."""
+        clip, source, out = _proxy_files(clip_id)
+        if is_proxy_fresh(out, source):
+            return JSONResponse({"state": "ready", "progress": 1.0}, status_code=200)
+        existing = proxy_jobs.get(clip_id)
+        if existing and existing["state"] == "running":
+            return JSONResponse({"state": "running", "progress": existing["progress"]}, status_code=202)
+        ffmpeg = discover_ffmpeg()
+        if ffmpeg is None:
+            raise HTTPException(503, "ffmpeg를 찾을 수 없습니다")
+        settings = current_config().encode.proxy
+        job = {"state": "running", "progress": 0.0, "message": ""}
+        proxy_jobs[clip_id] = job
+        duration = float(clip.meta.get("durationSec") or 0)
+
+        def on_progress(value: float) -> None:
+            job["progress"] = value
+
+        def run() -> None:
+            with proxy_slot:
+                try:
+                    create_proxy(
+                        ffmpeg, source, out, height=settings.height, crf=settings.crf,
+                        duration_sec=duration, on_progress=on_progress,
+                    )
+                except Exception as exc:
+                    logging.getLogger("lumia_briefing_room.proxy").exception("재생용 프록시 생성 실패: %s", clip_id)
+                    job.update(state="failed", message=str(exc) or type(exc).__name__)
+                else:
+                    proxy_jobs.pop(clip_id, None)
+
+        threading.Thread(target=run, daemon=True).start()
+        return JSONResponse({"state": "running", "progress": 0.0}, status_code=202)
 
     @app.get("/api/clips/{clip_id}/thumbnail")
     def thumbnail(clip_id: str):
@@ -393,6 +458,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
                 _unlink(Path(thumb))
             deleted += 1
         remove_orphan_result_images(clips_dir, trash_dir)
+        remove_orphan_proxies(clips_dir, trash_dir)
         return {"deleted": deleted, "bytes": freed}
 
     @app.post("/api/games/reprocess", status_code=202)

@@ -18,6 +18,7 @@ from lumia_briefing_room.api.clips import scan_clips, to_summary_dict
 from lumia_briefing_room.config import RetentionConfig, load_config, resolve_paths
 from lumia_briefing_room.pipeline.game_records import clear_records, record_game, records_dir_for
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for, archive_if_labeled
+from lumia_briefing_room.pipeline.proxy import remove_orphan_proxies
 from lumia_briefing_room.pipeline.retention import (
     _clip_files,
     list_expired,
@@ -129,6 +130,7 @@ def run_cleanup(
         records_dir=records_dir,
     )
     remove_orphan_result_images(clips_dir, trash_dir)
+    remove_orphan_proxies(clips_dir, trash_dir)
     return plan
 
 
