@@ -45,6 +45,15 @@ def _load_builtin(width: int, height: int) -> tuple[dict[str, Roi], tuple[int, i
     return rois, tuple(normalized_to) if normalized_to else None
 
 
+def measured_resolutions() -> tuple[tuple[int, int], ...]:
+    found = []
+    for path in sorted(_BUILTIN_DIR.glob("*.json")):
+        width, _, height = path.stem.partition("x")
+        if width.isdigit() and height.isdigit():
+            found.append((int(width), int(height)))
+    return tuple(found)
+
+
 def _template_path(kind: str, label: str, width: int, height: int) -> Path | None:
     path = paths.templates_dir(kind) / f"{width}x{height}.npz"
     if path.exists():

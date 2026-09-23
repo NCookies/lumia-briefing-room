@@ -23,6 +23,7 @@ from lumia_briefing_room.api.export import (
     list_subdirs,
     parent_of,
 )
+from lumia_briefing_room.api.onboarding import register_onboarding_routes
 from lumia_briefing_room.api.vods import register_vod_routes
 from lumia_briefing_room.api.filters import ClipQuery, filter_clip_summaries, sort_clip_summaries
 from lumia_briefing_room.config import (
@@ -137,6 +138,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     app = FastAPI(title="Lumia Briefing Room API")
     app.state.config = cfg
     app.state.config_path = config_path
+    app.state.log_dir = None
     lock = threading.RLock()
     jobs: dict[str, dict] = {}
 
@@ -480,6 +482,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         return Response(status_code=204)
 
     register_vod_routes(app, lock=lock, current_config=current_config, put_config=put_config)
+    register_onboarding_routes(app, current_config=current_config, put_config=put_config)
     return app
 
 
