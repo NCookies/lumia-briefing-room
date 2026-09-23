@@ -94,3 +94,17 @@ def test_build_icon_has_title_and_menu():
     )
     assert icon.title == "루미아 브리핑룸"
     assert len(list(icon.menu)) == 4  # 열기, 감시중, 구분선, 종료
+
+
+def test_menu_has_open_logs_item_before_separator_when_provided():
+    calls = []
+    menu = build_menu(
+        on_open=lambda: None, on_toggle_watch=lambda: None, watch_enabled=lambda: False,
+        on_quit=lambda: None, on_open_logs=lambda: calls.append("logs"),
+    )
+    items = list(menu)
+    logs_item = items[2]
+    assert logs_item.text == "로그 폴더 열기"
+    assert items[-1].text == "종료"
+    logs_item(None)
+    assert calls == ["logs"]

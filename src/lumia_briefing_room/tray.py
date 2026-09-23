@@ -24,18 +24,20 @@ def build_menu(
     on_toggle_watch: Callable[[], None],
     watch_enabled: Callable[[], bool],
     on_quit: Callable[[], None],
+    on_open_logs: Callable[[], None] | None = None,
 ) -> pystray.Menu:
     """SPEC §7.2.1: "트레이 아이콘에 감시 중 상태를 표시"를 체크마크로 반영한다."""
-    return pystray.Menu(
+    items = [
         pystray.MenuItem("루미아 브리핑룸 열기", lambda icon, item: on_open(), default=True),
         pystray.MenuItem(
             "감시 중",
             lambda icon, item: on_toggle_watch(),
             checked=lambda item: watch_enabled(),
         ),
-        pystray.Menu.SEPARATOR,
-        pystray.MenuItem("종료", lambda icon, item: on_quit()),
-    )
+    ]
+    if on_open_logs is not None:
+        items.append(pystray.MenuItem("로그 폴더 열기", lambda icon, item: on_open_logs()))
+    return pystray.Menu(*items, pystray.Menu.SEPARATOR, pystray.MenuItem("종료", lambda icon, item: on_quit()))
 
 
 def build_icon(
@@ -44,6 +46,7 @@ def build_icon(
     on_toggle_watch: Callable[[], None],
     watch_enabled: Callable[[], bool],
     on_quit: Callable[[], None],
+    on_open_logs: Callable[[], None] | None = None,
     title: str = "루미아 브리핑룸",
 ) -> pystray.Icon:
     return pystray.Icon(
@@ -55,5 +58,6 @@ def build_icon(
             on_toggle_watch=on_toggle_watch,
             watch_enabled=watch_enabled,
             on_quit=on_quit,
+            on_open_logs=on_open_logs,
         ),
     )

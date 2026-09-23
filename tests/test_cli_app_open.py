@@ -133,11 +133,73 @@ def test_watch_controller_auto_start_runs_immediately(monkeypatch):
 
 def test_should_open_ui_on_start_follows_flag_and_start_minimized():
     from lumia_briefing_room.cli.app import should_open_ui_on_start
-    from lumia_briefing_room.config import Config, UiConfig
+    from lumia_briefing_room.config import Config, ConsentConfig, UiConfig
+    from lumia_briefing_room.consent import CONSENT_VERSION
 
-    minimized = Config(ui=UiConfig(start_minimized=True))
-    visible = Config(ui=UiConfig(start_minimized=False))
+    answered = ConsentConfig(version=CONSENT_VERSION)
+    minimized = Config(ui=UiConfig(start_minimized=True), consent=answered)
+    visible = Config(ui=UiConfig(start_minimized=False), consent=answered)
 
     assert should_open_ui_on_start(minimized, open_ui=False) is False
     assert should_open_ui_on_start(minimized, open_ui=True) is True
     assert should_open_ui_on_start(visible, open_ui=False) is True
+
+
+def test_first_run_opens_ui_even_when_start_minimized():
+    from lumia_briefing_room.cli.app import should_open_ui_on_start
+    from lumia_briefing_room.config import Config, ConsentConfig, UiConfig
+    from lumia_briefing_room.consent import CONSENT_VERSION
+
+    fresh = Config(ui=UiConfig(start_minimized=True))
+    answered = Config(ui=UiConfig(start_minimized=True), consent=ConsentConfig(version=CONSENT_VERSION))
+
+    assert should_open_ui_on_start(fresh, open_ui=False) is True
+    assert should_open_ui_on_start(answered, open_ui=False) is False
+
+
+def test_watch_waits_and_retries_until_start_conditions_are_met():
+    import threading
+
+    from lumia_briefing_room.cli.app import _run_watch_safely
+
+    attempts = []
+
+    def flaky_run(args, should_stop):
+        attempts.append(1)
+        if len(attempts) < 3:
+            raise SystemExit("녹화 폴더를 찾을 수 없다")
+
+    _run_watch_safely(None, threading.Event(), run_fn=flaky_run, retry_sec=0)
+    assert len(attempts) == 3
+
+
+def test_watch_retry_stops_when_asked():
+    import threading
+
+    from lumia_briefing_room.cli.app import _run_watch_safely
+
+    stop = threading.Event()
+    attempts = []
+
+    def failing_run(args, should_stop):
+        attempts.append(1)
+        stop.set()
+        raise SystemExit("ffmpeg")
+
+    _run_watch_safely(None, stop, run_fn=failing_run, retry_sec=0)
+    assert len(attempts) == 1
+
+
+def test_watch_does_not_retry_unexpected_exceptions():
+    import threading
+
+    from lumia_briefing_room.cli.app import _run_watch_safely
+
+    attempts = []
+
+    def broken_run(args, should_stop):
+        attempts.append(1)
+        raise RuntimeError("boom")
+
+    _run_watch_safely(None, threading.Event(), run_fn=broken_run, retry_sec=0)
+    assert len(attempts) == 1

@@ -5,6 +5,7 @@ usage: python -m lumia_briefing_room.cli.app [watch.py 와 동일한 옵션]
 """
 
 import logging
+import os
 import socket
 import sys
 import threading
@@ -13,7 +14,9 @@ import webbrowser
 from lumia_briefing_room import autostart, paths
 from lumia_briefing_room.cli import serve as serve_cli
 from lumia_briefing_room.cli.watch import build_parser, run
-from lumia_briefing_room.logsetup import setup_file_logging
+from lumia_briefing_room.consent import needs_first_run
+from lumia_briefing_room.logsetup import default_log_path, setup_file_logging
+from lumia_briefing_room.single_instance import SingleInstance
 from lumia_briefing_room.config import load_config, resolve_config_path
 from lumia_briefing_room.pipeline.cleanup import cleanup_loop, make_cleanup_runner
 from lumia_briefing_room.tray import build_icon
@@ -75,15 +78,17 @@ def make_on_open(*, host="127.0.0.1", port=8000, config_path=None, open_browser=
     `python -m lumia_briefing_room.cli.serve` 를 독립 실행한다 (plan-ui.md §4-1).
     """
     state: dict = {}
+    start_lock = threading.Lock()
 
     def on_open() -> None:
-        if "server" not in state:
-            cfg = load_config(config_path)
-            app = serve_cli.build_app(cfg, config_path=config_path)
-            server, thread = serve_cli.run_server_in_thread(app, host=host, port=port)
-            serve_cli.wait_until_started(server)
-            state["server"] = server
-            state["thread"] = thread
+        with start_lock:
+            if "server" not in state:
+                cfg = load_config(config_path)
+                app = serve_cli.build_app(cfg, config_path=config_path)
+                server, thread = serve_cli.run_server_in_thread(app, host=host, port=port)
+                serve_cli.wait_until_started(server)
+                state["server"] = server
+                state["thread"] = thread
         open_browser(access_url(port))
 
     return on_open
@@ -151,7 +156,14 @@ def make_watch_controller(args, *, auto_start: bool = True):
 
 
 def should_open_ui_on_start(cfg, *, open_ui: bool) -> bool:
-    return open_ui or not cfg.ui.start_minimized
+    """첫 실행 화면이 필요하면 ui.startMinimized 와 무관하게 UI 를 연다(plan-deploy.md D3)."""
+    return open_ui or not cfg.ui.start_minimized or needs_first_run(cfg.consent.version)
+
+
+def open_logs_folder() -> None:
+    folder = default_log_path().parent
+    folder.mkdir(parents=True, exist_ok=True)
+    os.startfile(folder)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -161,6 +173,18 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--open-ui", action="store_true", help="시작하자마자 열람 UI 를 연다")
     args = parser.parse_args(argv)
 
+    instance = SingleInstance()
+    if not instance.acquire():
+        log.info("이미 실행 중이다 - 떠 있는 앱의 UI 를 열고 종료한다")
+        instance.signal_existing()
+        return
+    try:
+        _run_app(args, instance)
+    finally:
+        instance.close()
+
+
+def _run_app(args, instance: SingleInstance) -> None:
     cfg = load_config(args.config)
     apply_autostart_setting(cfg)
 
@@ -173,6 +197,7 @@ def main(argv: list[str] | None = None) -> None:
         host="127.0.0.1", port=resolve_port(cfg.ui.port), config_path=resolve_config_path(args.config)
     )
 
+    instance.listen(on_open)
     if should_open_ui_on_start(cfg, open_ui=args.open_ui):
         threading.Thread(target=on_open, daemon=True).start()
 
@@ -181,6 +206,7 @@ def main(argv: list[str] | None = None) -> None:
         on_toggle_watch=on_toggle_watch,
         watch_enabled=watch_enabled,
         on_quit=lambda: _on_quit(),
+        on_open_logs=open_logs_folder,
     )
     _icon_ref["icon"] = icon
     icon.run()
@@ -189,13 +215,26 @@ def main(argv: list[str] | None = None) -> None:
 _icon_ref: dict = {}
 
 
-def _run_watch_safely(args, stop_event: threading.Event) -> None:
-    try:
-        run(args, should_stop=stop_event.is_set)
-    except SystemExit as exc:
-        log.error("감시를 시작하지 못했다 - %s", exc)
-    except Exception:
-        log.exception("감시 중 처리되지 않은 예외가 발생했다")
+WATCH_RETRY_SEC = 10.0
+
+
+def _run_watch_safely(args, stop_event: threading.Event, *, run_fn=None, retry_sec: float = WATCH_RETRY_SEC) -> None:
+    """녹화 폴더가 아직 없는 첫 실행처럼 시작 조건이 안 맞으면, 첫 실행 화면에서 설정을 고칠 때까지 기다렸다 다시 시도한다."""
+    run_fn = run_fn or run
+    last_error = None
+    while not stop_event.is_set():
+        try:
+            run_fn(args, should_stop=stop_event.is_set)
+            return
+        except SystemExit as exc:
+            if str(exc) != last_error:
+                log.error("감시를 시작하지 못했다 - %s (%d초마다 다시 시도한다)", exc, retry_sec)
+                last_error = str(exc)
+            if stop_event.wait(retry_sec):
+                return
+        except Exception:
+            log.exception("감시 중 처리되지 않은 예외가 발생했다")
+            return
 
 
 def _on_quit() -> None:
