@@ -16,6 +16,7 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
+from lumia_briefing_room import startup
 from lumia_briefing_room.config import (
     FFMPEG_NOT_FOUND_MESSAGE,
     Config,
@@ -155,7 +156,8 @@ def run(
 
 
 def main(argv: list[str] | None = None) -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    startup.setup_logging()
+    startup.install_excepthooks()
     run(build_parser().parse_args(argv))
 
 

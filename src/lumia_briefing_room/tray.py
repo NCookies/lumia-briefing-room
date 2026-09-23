@@ -7,15 +7,13 @@
 from collections.abc import Callable
 
 import pystray
-from PIL import Image, ImageDraw
+from PIL import Image
+
+from lumia_briefing_room.icon import app_icon_image
 
 
 def default_icon_image(size: int = 64) -> Image.Image:
-    """앱 아이콘 리소스가 아직 없어 간단한 원 도형으로 대체한다."""
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    draw.ellipse((4, 4, size - 4, size - 4), fill=(90, 140, 255, 255))
-    return img
+    return app_icon_image(size)
 
 
 def build_menu(

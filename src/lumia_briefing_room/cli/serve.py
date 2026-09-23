@@ -16,7 +16,7 @@ import uvicorn
 
 from lumia_briefing_room.api.app import create_app
 from lumia_briefing_room.api.static import find_frontend_dist, mount_static
-from lumia_briefing_room.logsetup import setup_file_logging
+from lumia_briefing_room import startup
 from lumia_briefing_room.config import Config, load_config, resolve_config_path
 
 log = logging.getLogger("lumia_briefing_room.serve")
@@ -80,8 +80,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    setup_file_logging()
+    startup.setup_logging()
+    startup.install_excepthooks()
     args = build_parser().parse_args(argv)
 
     config_path = resolve_config_path(args.config)

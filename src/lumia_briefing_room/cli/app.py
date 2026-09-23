@@ -11,11 +11,11 @@ import sys
 import threading
 import webbrowser
 
-from lumia_briefing_room import autostart, paths, procs
+from lumia_briefing_room import autostart, paths, procs, selftest, startup
 from lumia_briefing_room.cli import serve as serve_cli
 from lumia_briefing_room.cli.watch import build_parser, run
 from lumia_briefing_room.consent import needs_first_run
-from lumia_briefing_room.logsetup import default_log_path, setup_file_logging
+from lumia_briefing_room.logsetup import default_log_path
 from lumia_briefing_room.single_instance import SingleInstance
 from lumia_briefing_room.config import load_config, resolve_config_path
 from lumia_briefing_room.pipeline.cleanup import cleanup_loop, make_cleanup_runner
@@ -166,12 +166,33 @@ def open_logs_folder() -> None:
     os.startfile(folder)
 
 
+def run_selftest_command(args) -> bool:
+    """번들 점검 보고서를 로그 폴더에 남긴다. 콘솔이 없는 빌드본에서는 파일을 열어서 보여 준다."""
+    results, ok = selftest.run_all()
+    report = selftest.format_report(results, header="루미아 브리핑룸 자체 점검")
+    path = default_log_path().parent / "selftest.txt"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(report, encoding="utf-8")
+    log.info("자체 점검 보고서를 남겼다: %s (%s)", path, "모두 통과" if ok else "실패 있음")
+
+    if startup.console_logging_wanted():
+        print(report)
+    elif sys.platform == "win32":
+        os.startfile(path)
+    return ok
+
+
 def main(argv: list[str] | None = None) -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    setup_file_logging()
+    startup.setup_logging()
+    startup.install_excepthooks()
     parser = build_parser()
     parser.add_argument("--open-ui", action="store_true", help="시작하자마자 열람 UI 를 연다")
+    parser.add_argument("--selftest", action="store_true", help="번들 리소스를 점검하고 보고서를 남긴다")
     args = parser.parse_args(argv)
+
+    if args.selftest:
+        run_selftest_command(args)
+        return
 
     instance = SingleInstance()
     if not instance.acquire():
@@ -180,6 +201,9 @@ def main(argv: list[str] | None = None) -> None:
         return
     try:
         _run_app(args, instance)
+    except Exception as exc:
+        startup.report_fatal(f"시작하지 못했습니다: {exc}")
+        raise
     finally:
         instance.close()
 
