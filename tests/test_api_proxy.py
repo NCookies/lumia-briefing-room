@@ -180,7 +180,8 @@ def test_end_to_end_with_real_ffmpeg(client):
          "testsrc=size=320x180:rate=30:duration=2", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(mp4)],
         capture_output=True,
     )
-    assert made.returncode == 0
+    if made.returncode != 0:
+        pytest.skip("이 ffmpeg 에 libx264 가 없어 원본을 만들 수 없다(LGPL 빌드)")
     _write_clip(clips, "a", video=mp4.read_bytes(), durationSec=2.0)
 
     assert client.post("/api/clips/a/proxy").status_code == 202

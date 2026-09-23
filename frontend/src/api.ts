@@ -142,3 +142,23 @@ export async function trimClip(id: string, start: number, end: number): Promise<
   }
   return res.json()
 }
+
+export function proxyVideoUrl(id: string, version?: number): string {
+  return `${BASE}/clips/${id}/video?proxy=1${version === undefined ? '' : `&v=${version}`}`
+}
+
+export interface ProxyStatus {
+  state: 'none' | 'running' | 'ready' | 'failed'
+  progress: number
+  message?: string
+}
+
+export async function startProxy(id: string): Promise<ProxyStatus> {
+  const res = await checkOk(await fetch(`${BASE}/clips/${id}/proxy`, { method: 'POST' }), '재생용 영상 만들기')
+  return res.json()
+}
+
+export async function getProxyStatus(id: string): Promise<ProxyStatus> {
+  const res = await checkOk(await fetch(`${BASE}/clips/${id}/proxy`), '재생용 영상 상태 조회')
+  return res.json()
+}

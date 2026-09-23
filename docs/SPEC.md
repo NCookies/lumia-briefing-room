@@ -1310,9 +1310,9 @@ eplay\<캐릭터>` 처럼 폴더를 나눠 보관한다.
 | 키 | 기본값 | 설명 |
 |---|---|---|
 | `encode.reencode` | `false` | `true`면 정확한 경계로 재인코딩. 느리다 |
-| `encode.proxy.enabled` | **`false`** | H.264 프록시 생성 (§4). 이 PC는 HEVC가 재생되므로 기본 꺼짐 |
-| `encode.proxy.height` | 1080 | 프록시 세로 해상도 |
-| `encode.proxy.crf` | 23 | 프록시 화질 |
+| `encode.proxy.enabled` | **`false`** | 아직 어디서도 읽지 않는다(예약). 프록시는 이 값과 무관하게, 브라우저가 HEVC 를 못 재생한다고 판별될 때(§4, plan-deploy.md D4) 클립마다 **처음 재생하려고 할 때** 만든다 |
+| `encode.proxy.height` | 1080 | 프록시 세로 해상도(원본보다 키우지 않는다). 위치는 항상 `<클립 폴더>/.proxy`(`paths.proxies` 는 쓰지 않는다) |
+| `encode.proxy.crf` | 23 | `libx264` 인코더일 때만 쓰는 화질. `h264_mf`(LGPL 빌드에서 쓰는 기본 인코더)는 CRF 가 없어 비트레이트(1080p 8000kbps, 해상도 면적에 비례, 최소 1500)로 정한다 |
 | `encode.thumbnail.enabled` | `true` | 썸네일 생성 |
 | `encode.thumbnail.offsetRatio` | 0.35 | 클립 길이의 몇 지점을 썸네일로 쓸지 |
 | `encode.thumbnail.width` | 480 | |

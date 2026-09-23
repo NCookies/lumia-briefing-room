@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ClipId } from './ClipId'
-import { videoUrl } from '../api'
+import { ClipVideo } from './ClipVideo'
 import { SIGNAL_LABELS } from '../labels'
 import { applyLabel, labelForKey, nextUnlabeledIndex, progress } from '../labeling'
 import type { Clip, UserLabel } from '../types'
@@ -191,23 +191,20 @@ export function PlayerModal({
           </button>
         </div>
 
-        <video
+        <ClipVideo
           key={`${clip.id}-${clip.durationSec}`}
-          ref={(el) => {
+          clipId={clip.id}
+          version={clip.durationSec}
+          videoRef={(el) => {
             videoRef.current = el
             if (!el) return
             el.volume = volumeRef.current.volume
             el.muted = volumeRef.current.muted
           }}
-          onVolumeChange={(e) => {
-            const v = e.currentTarget
+          onVolumeChange={(v) => {
             volumeRef.current = { volume: v.volume, muted: v.muted }
             saveVolume(volumeRef.current)
           }}
-          src={videoUrl(clip.id, clip.durationSec)}
-          controls
-          autoPlay
-          className="aspect-video w-full rounded bg-black object-contain"
         />
 
         {trimming && (
