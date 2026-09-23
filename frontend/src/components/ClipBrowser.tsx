@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   deleteClipForever,
+  deleteGameRecord,
+  gameRecordImageUrl,
+  listGameRecords,
+  resultImageUrl,
   emptyTrash,
   getReprocessStatus,
   listClips,
@@ -18,10 +22,10 @@ import { GameSection } from './GameSection'
 import { PlayerModal } from './PlayerModal'
 import { ResultCard, ResultViewer } from './ResultCard'
 import { VodSection } from './VodSection'
-import { formatMatchResult, groupByGame, totalSize, withResultImage, type GameGroup } from '../grouping'
+import { formatMatchResult, gameRecordId, groupByGame, totalSize, withResultImage, type GameGroup } from '../grouping'
 import { applyLabel, progress } from '../labeling'
 import { formatBytes } from '../retention'
-import type { Clip, UserLabel } from '../types'
+import type { Clip, GameRecord, UserLabel } from '../types'
 import {
   cancelAnalysis,
   deleteVodClipsForever,
@@ -37,6 +41,15 @@ import { formatDuration, formatGameRange, groupByVod, type Vod } from '../vodGro
 
 export type ClipSource = 'steam' | 'vod'
 
+const filterActive = (f: FilterState): boolean =>
+  f.trashed ||
+  f.pinnedOnly ||
+  f.tags.length > 0 ||
+  f.dayNight !== '' ||
+  f.gameMode !== '' ||
+  f.label !== '' ||
+  f.minPvpScore > 0
+
 interface Props {
   source: ClipSource
   active: boolean
@@ -47,6 +60,7 @@ interface Props {
 export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChange }: Props) {
   const [filter, setFilter] = useState<FilterState>(source === 'vod' ? { ...DEFAULT_FILTER, sort: 'asc' } : DEFAULT_FILTER)
   const [clips, setClips] = useState<Clip[]>([])
+  const [records, setRecords] = useState<GameRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [exportTarget, setExportTarget] = useState<Clip | null>(null)
@@ -78,6 +92,13 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
       .then(setClips)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
+    if (source === 'steam' && !filterActive(filter)) {
+      listGameRecords()
+        .then(setRecords)
+        .catch(() => setRecords([]))
+    } else {
+      setRecords([])
+    }
   }, [filter, source])
 
   useEffect(() => {
@@ -281,11 +302,26 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
 
   const handleDeleteGameForever = async (group: GameGroup<Clip>) => {
     const result = await ask({
-      message: `${gameLabel(group)}의 클립을 완전히 삭제합니다. 계속하시겠습니까?`,
+      message: `${gameLabel(group)}의 클립을 완전히 삭제합니다.${source === 'steam' ? '\n게임 기록도 함께 삭제됩니다.' : ''} 계속하시겠습니까?`,
       confirmLabel: '완전 삭제',
       danger: true,
     })
-    if (result.ok) await runAndReload(() => runAll(group.clips, deleteClipForever))
+    if (!result.ok) return
+    await runAndReload(async () => {
+      await runAll(group.clips, deleteClipForever)
+      if (source === 'steam') {
+        await deleteGameRecord(gameRecordId(group.clips[0]?.sessionDir, group.clips[0]?.matchStartUtc))
+      }
+    })
+  }
+
+  const handleDeleteRecord = async (group: GameGroup<Clip>) => {
+    const result = await ask({
+      message: `게임 ${group.number} 의 기록(순위·전적·결과표)을 삭제합니다. 되돌릴 수 없습니다. 계속하시겠습니까?`,
+      confirmLabel: '기록 삭제',
+      danger: true,
+    })
+    if (result.ok && group.recordId) await runAndReload(() => deleteGameRecord(group.recordId!))
   }
 
   const handleLabel = (clip: Clip, label: UserLabel) => {
@@ -297,8 +333,8 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
   }
 
   const steamGroups = useMemo(
-    () => (source === 'steam' ? groupByGame(clips, filter.sort) : []),
-    [source, clips, filter.sort],
+    () => (source === 'steam' ? groupByGame(clips, filter.sort, records) : []),
+    [source, clips, records, filter.sort],
   )
   const vodGroups = useMemo(
     () => (source === 'vod' ? groupByVod(clips, vods, filter.sort, !filter.trashed) : []),
@@ -313,7 +349,7 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
     () =>
       withResultImage(groups).map((g) => ({
         key: g.key,
-        clipId: g.clips[0].id,
+        imageUrl: g.recordId ? gameRecordImageUrl(g.recordId) : resultImageUrl(g.clips[0].id),
         caption: [`게임 ${g.number}`, formatMatchResult(g.result)].filter(Boolean).join(' · '),
       })),
     [groups],
@@ -340,6 +376,7 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
               onRestoreGame={() => handleRestoreGame(group)}
               onDeleteGameForever={() => handleDeleteGameForever(group)}
               onReprocess={() => handleReprocess(group)}
+              onDeleteRecord={() => handleDeleteRecord(group)}
               reprocessing={reprocessGame === group.key}
               reprocessBusy={reprocessKey !== null}
               hideReprocess={source === 'vod'}
@@ -354,7 +391,7 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
             >
               {group.result?.imagePath && (
                 <ResultCard
-                  clipId={group.clips[0].id}
+                  imageUrl={group.recordId ? gameRecordImageUrl(group.recordId) : resultImageUrl(group.clips[0].id)}
                   result={group.result}
                   onOpen={() => setResultViewKey(group.key)}
                 />
@@ -395,7 +432,7 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
           <p className="mb-2 text-sky-300">게임을 다시 분석하는 중입니다. 몇 분 걸릴 수 있으며, 끝나면 목록이 자동으로 갱신됩니다.</p>
         )}
         {notice && <p className="mb-2 text-emerald-400">{notice}</p>}
-        {!loading && !error && clips.length === 0 && (
+        {!loading && !error && clips.length === 0 && records.length === 0 && (
           <p className="text-zinc-500">
             {filter.trashed ? '휴지통이 비어 있습니다' : '조건에 맞는 클립이 없습니다'}
           </p>

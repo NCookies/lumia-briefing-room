@@ -1,4 +1,4 @@
-import type { MatchResult } from './types'
+import type { GameRecord, MatchResult } from './types'
 
 export type ClipSort = 'asc' | 'desc' | 'pvp'
 
@@ -16,13 +16,21 @@ export interface GameGroup<T> {
   matchStartUtc: string
   result: MatchResult | null
   clips: T[]
+  recordId?: string
   startSec?: number
   endSec?: number
 }
 
 const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
 
-export function groupByGame<T extends Groupable>(clips: T[], sort: ClipSort): GameGroup<T>[] {
+export const gameRecordId = (sessionDir: string | null | undefined, matchStartUtc: string | null | undefined): string =>
+  `${sessionDir ?? ''}__${matchStartUtc ?? ''}`.replace(/[^0-9A-Za-z._-]/g, '_')
+
+export function groupByGame<T extends Groupable>(
+  clips: T[],
+  sort: ClipSort,
+  records: GameRecord[] = [],
+): GameGroup<T>[] {
   const map = new Map<string, GameGroup<T>>()
   for (const clip of clips) {
     const key = `${clip.sessionDir ?? ''}|${clip.matchStartUtc ?? ''}`
@@ -41,6 +49,19 @@ export function groupByGame<T extends Groupable>(clips: T[], sort: ClipSort): Ga
     }
   }
 
+  for (const record of records) {
+    const key = `${record.sessionDir ?? ''}|${record.matchStartUtc}`
+    if (map.has(key)) continue
+    map.set(key, {
+      key,
+      number: 0,
+      matchStartUtc: record.matchStartUtc,
+      result: record.matchResult,
+      clips: [],
+      recordId: record.id,
+    })
+  }
+
   const byTime = (a: GameGroup<T>, b: GameGroup<T>) =>
     a.matchStartUtc < b.matchStartUtc ? -1 : a.matchStartUtc > b.matchStartUtc ? 1 : a.key < b.key ? -1 : 1
   const games = [...map.values()].sort(byTime)
@@ -51,7 +72,7 @@ export function groupByGame<T extends Groupable>(clips: T[], sort: ClipSort): Ga
 
   if (sort === 'desc') return games.reverse()
   if (sort === 'pvp') {
-    const best = (g: GameGroup<T>) => Math.max(...g.clips.map((c) => c.pvpScore ?? -1))
+    const best = (g: GameGroup<T>) => Math.max(-2, ...g.clips.map((c) => c.pvpScore ?? -1))
     return games.sort((a, b) => best(b) - best(a) || byTime(a, b))
   }
   return games

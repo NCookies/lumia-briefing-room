@@ -16,6 +16,7 @@ interface Props {
   reprocessBusy: boolean
   timeLabel?: { main: string; sub?: string }
   hideReprocess?: boolean
+  onDeleteRecord?: () => void
   children: ReactNode
 }
 
@@ -45,6 +46,7 @@ export function GameSection({
   reprocessBusy,
   timeLabel,
   hideReprocess,
+  onDeleteRecord,
   children,
 }: Props) {
   const result = group.result
@@ -99,12 +101,22 @@ export function GameSection({
           </div>
 
           <div className="ml-auto text-right text-sm text-zinc-400">
-            <div>클립 {group.clips.length}개</div>
-            <div className="text-xs text-zinc-500">{formatBytes(totalSize(group.clips))}</div>
+            {group.recordId ? (
+              <div className="text-zinc-500">클립 삭제됨</div>
+            ) : (
+              <>
+                <div>클립 {group.clips.length}개</div>
+                <div className="text-xs text-zinc-500">{formatBytes(totalSize(group.clips))}</div>
+              </>
+            )}
           </div>
         </button>
         <div className="flex shrink-0 items-center gap-3 px-3 text-xs">
-          {trashed ? (
+          {group.recordId ? (
+            <button type="button" className="text-zinc-400 hover:text-rose-400" onClick={onDeleteRecord}>
+              기록 삭제
+            </button>
+          ) : trashed ? (
             <>
               <button type="button" className="text-sky-400 hover:underline" onClick={onRestoreGame}>
                 게임 복구

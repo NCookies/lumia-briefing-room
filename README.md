@@ -184,6 +184,10 @@ python -m lumia_briefing_room.cli.analyze_vod "<영상.mp4>" \
 - 스트리머 이름은 `--streamer` 또는 설정 `vod.streamers` 에 영상 id 로 넣는다. `vod.gameGapSec`(게임 안 끊김 허용, 기본 30초)·`vod.minGameSec`(기본 60초)로 게임 분할을 조절한다.
 - 결과 화면(순위 등)에는 RapidOCR 가 필요하다(위 "개발 환경" 참고). 없거나 실패해도 클립은 만들어진다.
 
+### 참고. 게임 기록 보관
+
+자동 정리·완전 삭제로 클립이 다 사라져도 그 경기의 순위·전적·결과표는 `clips/.games/` 에 남아 목록에 "클립 삭제됨" 행으로 보인다(`retention.keepGameRecords`, 옵션 > 자동 정리의 "게임 기록은 유지"). 게임 행의 "기록 삭제"·게임 "완전 삭제"로 지운다. 프론트를 고쳤으면 `npm run build`.
+
 ### 9. 브라우저 디버깅 (개발용)
 
 - **클라이언트 오류 로그**: 프론트가 `window.onerror` / `unhandledrejection` / `console.error` 를 `POST /api/client-log` 로 보내고, 서버가 `[client]` 접두로 로그 파일에 남긴다. 로그 파일은 `%LOCALAPPDATA%\LumiaBriefingRoom\logspp.log` (서버 로그와 같은 파일, 2MB 회전). Claude Code 에 "브라우저 오류 봐줘" 라고 하면 이 파일을 읽는다. 프론트를 고쳤으면 `npm run build`.

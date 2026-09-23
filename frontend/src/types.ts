@@ -25,6 +25,14 @@ export interface MatchResult {
   assists?: number | null
 }
 
+export interface GameRecord {
+  id: string
+  sessionDir?: string | null
+  matchStartUtc: string
+  gameMode?: string | null
+  matchResult: MatchResult
+}
+
 export interface Clip {
   id: string
   title: string

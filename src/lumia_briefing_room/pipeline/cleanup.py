@@ -16,6 +16,7 @@ from pathlib import Path
 
 from lumia_briefing_room.api.clips import scan_clips, to_summary_dict
 from lumia_briefing_room.config import RetentionConfig, load_config, resolve_paths
+from lumia_briefing_room.pipeline.game_records import clear_records, record_game, records_dir_for
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for, archive_if_labeled
 from lumia_briefing_room.pipeline.retention import (
     _clip_files,
@@ -74,8 +75,11 @@ def plan_cleanup(
     return CleanupPlan(to_trash, to_purge, freed)
 
 
-def _delete_clip_permanently(meta_path: Path, archive_dir: Path | None = None) -> None:
+def _delete_clip_permanently(
+    meta_path: Path, archive_dir: Path | None = None, records_dir: Path | None = None
+) -> None:
     archive_if_labeled(meta_path, archive_dir)
+    record_game(meta_path, records_dir)
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
     for f in _clip_files(meta_path, meta):
         f.unlink(missing_ok=True)
@@ -105,15 +109,25 @@ def run_cleanup(
 ) -> CleanupPlan:
     now = now or datetime.now(timezone.utc)
     plan = plan_cleanup(clips_dir, trash_dir, cfg, now=now)
+    records_dir = records_dir_for(clips_dir)
+    if not cfg.keep_game_records:
+        clear_records(records_dir)
+        records_dir = None
     if not cfg.auto_clean_enabled:
         return plan
 
     for meta_path in plan.to_trash:
         if cfg.delete_mode == "permanent":
-            _delete_clip_permanently(meta_path, archive_dir_for(clips_dir))
+            _delete_clip_permanently(meta_path, archive_dir_for(clips_dir), records_dir)
         else:
             trash_clip(meta_path, trash_dir, now=lambda: now)
-    purge_expired(trash_dir, trash_days=cfg.trash_days, now=lambda: now, archive_dir=archive_dir_for(clips_dir))
+    purge_expired(
+        trash_dir,
+        trash_days=cfg.trash_days,
+        now=lambda: now,
+        archive_dir=archive_dir_for(clips_dir),
+        records_dir=records_dir,
+    )
     remove_orphan_result_images(clips_dir, trash_dir)
     return plan
 

@@ -7,6 +7,7 @@ export interface RetentionSettings {
   maxTotalGb: number | null
   protectPinned: boolean
   protectTags: string[]
+  keepGameRecords: boolean
 }
 
 export interface CleanupResult {

@@ -3,6 +3,7 @@
 import functools
 import json
 import logging
+import re
 import subprocess
 import threading
 import time
@@ -30,6 +31,13 @@ from lumia_briefing_room.config import (
     load_config,
     resolve_paths,
     save_config,
+)
+from lumia_briefing_room.pipeline.game_records import (
+    delete_record,
+    game_key,
+    load_records,
+    record_game,
+    records_dir_for,
 )
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for, archive_if_labeled
 from lumia_briefing_room.pipeline.cleanup import plan_cleanup, remove_orphan_result_images, run_cleanup
@@ -219,6 +227,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             raise HTTPException(400, "휴지통에 있는 클립만 완전히 삭제할 수 있습니다")
         clips_dir, clip, _ = found
         archive_if_labeled(clip.meta_path, archive_dir_for(clips_dir))
+        record_game(clip.meta_path, records_dir_if_kept(clips_dir))
         for f in [clip.meta_path.with_suffix(".mp4"), clip.meta_path]:
             _unlink(f)
         thumb = clip.meta.get("thumbnailPath")
@@ -226,6 +235,40 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             _unlink(Path(thumb))
         remove_orphan_result_images(clips_dir, clips_dir / ".trash")
         return {"id": clip_id, "deleted": True}
+
+    def records_dir_if_kept(clips_dir: Path) -> Path | None:
+        if clips_dir != _clips_dir(app) or not current_config().retention.keep_game_records:
+            return None
+        return records_dir_for(clips_dir)
+
+    @app.get("/api/games/records")
+    @locked
+    def list_game_records():
+        """클립이 다 지워진 경기의 기록. 살아있는 클립이 있는 경기는 그 클립이 게임 행을 그리므로 뺀다."""
+        clips_dir = _clips_dir(app)
+        live = {game_key(c.meta.get("sessionDir"), c.meta.get("matchStartUtc")) for c in scan_clips(clips_dir)}
+        return [r for r in load_records(records_dir_for(clips_dir)) if r["id"] not in live]
+
+    def _record_image(record_id: str) -> Path:
+        if not re.fullmatch(r"[0-9A-Za-z._-]+", record_id) or record_id.startswith("."):
+            raise HTTPException(404, "게임 기록을 찾을 수 없습니다")
+        path = records_dir_for(_clips_dir(app)) / f"{record_id}.jpg"
+        if not path.exists():
+            raise HTTPException(404, "결과 화면 이미지가 없습니다")
+        return path
+
+    @app.get("/api/games/records/{record_id}/result-image")
+    def game_record_image(record_id: str):
+        return FileResponse(_record_image(record_id), media_type="image/jpeg")
+
+    @app.delete("/api/games/records/{record_id}")
+    @locked
+    def delete_game_record(record_id: str):
+        if not re.fullmatch(r"[0-9A-Za-z._-]+", record_id) or record_id.startswith("."):
+            raise HTTPException(404, "게임 기록을 찾을 수 없습니다")
+        if not delete_record(records_dir_for(_clips_dir(app)), record_id):
+            raise HTTPException(404, "게임 기록을 찾을 수 없습니다")
+        return {"id": record_id, "deleted": True}
 
     def find_any(clip_id: str):
         found = _locate(app, clip_id)
@@ -338,6 +381,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         for clip in scan_clips(trash_dir):
             freed += clip.size_bytes
             archive_if_labeled(clip.meta_path, archive_dir_for(clips_dir))
+            record_game(clip.meta_path, records_dir_if_kept(clips_dir))
             for f in [clip.meta_path.with_suffix(".mp4"), clip.meta_path]:
                 _unlink(f)
             thumb = clip.meta.get("thumbnailPath")

@@ -20,6 +20,7 @@ interface Draft {
   maxTotalGb: string
   protectPinned: boolean
   protectTags: string[]
+  keepGameRecords: boolean
 }
 
 const toDraft = (r: RetentionSettings): Draft => ({
@@ -34,6 +35,7 @@ const toDraft = (r: RetentionSettings): Draft => ({
   maxTotalGb: r.maxTotalGb == null ? '' : String(r.maxTotalGb),
   protectPinned: r.protectPinned,
   protectTags: r.protectTags,
+  keepGameRecords: r.keepGameRecords ?? true,
 })
 
 const toSettings = (d: Draft): RetentionSettings => ({
@@ -45,6 +47,7 @@ const toSettings = (d: Draft): RetentionSettings => ({
   maxTotalGb: d.gbOn ? parseLimit(d.maxTotalGb) : null,
   protectPinned: d.protectPinned,
   protectTags: d.protectTags,
+  keepGameRecords: d.keepGameRecords,
 })
 
 export function CleanupPanel() {
@@ -223,6 +226,17 @@ export function CleanupPanel() {
           ))}
         </div>
         <p className="text-xs text-zinc-500">선택한 태그가 붙은 클립은 정리하지 않습니다.</p>
+        <label className="flex items-center gap-2 text-sm text-zinc-300">
+          <input
+            type="checkbox"
+            checked={draft.keepGameRecords}
+            onChange={(e) => patch({ keepGameRecords: e.target.checked })}
+          />
+          게임 기록은 유지
+        </label>
+        <p className="text-xs text-zinc-500">
+          클립이 모두 삭제된 경기도 순위·전적·결과표를 목록에 &quot;클립 삭제됨&quot;으로 남깁니다(경기당 약 100~200KB). 끄면 그런 경기의 기록도 지웁니다.
+        </p>
       </section>
 
       <section className="flex flex-wrap items-center gap-3 border-t border-zinc-700 pt-3">

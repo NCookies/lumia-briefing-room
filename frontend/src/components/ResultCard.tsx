@@ -1,15 +1,14 @@
 import { useEffect } from 'react'
-import { resultImageUrl } from '../api'
 import { formatMatchResult } from '../grouping'
 import type { MatchResult } from '../types'
 
 interface CardProps {
-  clipId: string
+  imageUrl: string
   result: MatchResult
   onOpen: () => void
 }
 
-export function ResultCard({ clipId, result, onOpen }: CardProps) {
+export function ResultCard({ imageUrl, result, onOpen }: CardProps) {
   return (
     <button
       type="button"
@@ -18,7 +17,7 @@ export function ResultCard({ clipId, result, onOpen }: CardProps) {
       title="결과표 크게 보기"
     >
       <img
-        src={resultImageUrl(clipId)}
+        src={imageUrl}
         alt="결과표"
         className="h-full w-full object-cover transition-transform group-hover:scale-105"
       />
@@ -35,7 +34,7 @@ export function ResultCard({ clipId, result, onOpen }: CardProps) {
 }
 
 interface ViewerProps {
-  games: { key: string; clipId: string; caption: string }[]
+  games: { key: string; imageUrl: string; caption: string }[]
   index: number
   onIndexChange: (index: number) => void
   onClose: () => void
@@ -89,7 +88,7 @@ export function ResultViewer({ games, index, onIndexChange, onClose }: ViewerPro
         {game.caption} · {index + 1}/{games.length}
       </div>
       <img
-        src={resultImageUrl(game.clipId)}
+        src={game.imageUrl}
         alt="결과표"
         className="max-h-[calc(100%-2rem)] max-w-full rounded"
         onClick={(e) => e.stopPropagation()}

@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from lumia_briefing_room.config import RetentionConfig
+from lumia_briefing_room.pipeline.game_records import record_game
 from lumia_briefing_room.pipeline.label_archive import archive_if_labeled
 
 _default_now: Callable[[], datetime] = lambda: datetime.now(timezone.utc)
@@ -113,12 +114,18 @@ def list_expired(
 
 
 def purge_expired(
-    trash_dir: Path, *, trash_days: int, now: Callable[[], datetime] = _default_now, archive_dir: Path | None = None
+    trash_dir: Path,
+    *,
+    trash_days: int,
+    now: Callable[[], datetime] = _default_now,
+    archive_dir: Path | None = None,
+    records_dir: Path | None = None,
 ) -> list[Path]:
     """유예 기간이 지난 클립을 실제로(되돌릴 수 없게) 지운다. 라벨 붙은 클립은 archive_dir 에 근거·라벨을 남긴다."""
     purged = list_expired(trash_dir, trash_days=trash_days, now=now)
     for meta_path in purged:
         archive_if_labeled(meta_path, archive_dir)
+        record_game(meta_path, records_dir)
         for f in _clip_files(meta_path, _read_meta(meta_path)):
             f.unlink(missing_ok=True)
         meta_path.unlink()

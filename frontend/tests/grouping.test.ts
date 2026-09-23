@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { formatAgo, formatKda, formatMatchResult, formatTeammates, groupByGame, totalSize, withResultImage } from '../src/grouping.ts'
+import {
+  formatAgo,
+  formatKda,
+  formatMatchResult,
+  formatTeammates,
+  gameRecordId,
+  groupByGame,
+  totalSize,
+  withResultImage,
+} from '../src/grouping.ts'
 
 const c = (id: string, matchStartUtc: string, sessionDir = 's1', pvpScore: number | null = null) => ({
   id,
@@ -151,4 +160,40 @@ test('formatTeammates lists teammate characters, never nicknames, and marks unkn
   assert.equal(formatTeammates(result({ teammates: [] })), null)
   assert.equal(formatTeammates(result()), null)
   assert.equal(formatTeammates(null), null)
+})
+
+const record = (id: string, matchStartUtc: string, sessionDir = 's1') => ({
+  id,
+  sessionDir,
+  matchStartUtc,
+  matchResult: { matchType: 'rank' as const, matchLabel: '랭크', placement: 2, total: 8, outcome: null, nickname: null },
+})
+
+test('groupByGame adds clip-less rows for game records, ordered with the other games', () => {
+  const groups = groupByGame(clips, 'asc', [record('r1', '2026-09-20T12:30:00Z')])
+  assert.deepEqual(
+    groups.map((g) => [g.matchStartUtc, g.clips.length, g.recordId ?? null]),
+    [
+      ['2026-09-20T12:00:00Z', 2, null],
+      ['2026-09-20T12:30:00Z', 0, 'r1'],
+      ['2026-09-20T13:00:00Z', 2, null],
+    ],
+  )
+  assert.equal(groups[1].result?.placement, 2)
+})
+
+test('groupByGame ignores a record whose game still has clips', () => {
+  const groups = groupByGame(clips, 'asc', [record('r1', '2026-09-20T12:00:00Z')])
+  assert.equal(groups.length, 2)
+  assert.equal(groups[0].recordId, undefined)
+})
+
+test('groupByGame pvp sort puts clip-less games last without NaN ordering', () => {
+  const scored = [c('a', '2026-09-20T12:00:00Z', 's1', 0.2)]
+  const groups = groupByGame(scored, 'pvp', [record('r1', '2026-09-20T11:00:00Z')])
+  assert.deepEqual(groups.map((g) => g.recordId ?? null), [null, 'r1'])
+})
+
+test('gameRecordId matches the server key', () => {
+  assert.equal(gameRecordId('sess a', '2026-09-01T10:00:00Z'), 'sess_a__2026-09-01T10_00_00Z')
 })

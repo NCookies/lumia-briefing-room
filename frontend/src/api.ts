@@ -1,4 +1,4 @@
-import type { Clip, UserLabel } from './types'
+import type { Clip, GameRecord, UserLabel } from './types'
 
 const BASE = '/api'
 
@@ -101,6 +101,20 @@ export async function startReprocess(clipId: string): Promise<string> {
 export async function getReprocessStatus(key: string): Promise<ReprocessStatus> {
   const res = await checkOk(await fetch(`${BASE}/games/reprocess/${key}`), '분석 상태 조회')
   return res.json()
+}
+
+export async function listGameRecords(): Promise<GameRecord[]> {
+  const res = await checkOk(await fetch(`${BASE}/games/records`), '게임 기록 조회')
+  return res.json()
+}
+
+export async function deleteGameRecord(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/games/records/${id}`, { method: 'DELETE' })
+  if (!res.ok && res.status !== 404) throw new Error(`게임 기록 삭제에 실패했습니다 (${res.status})`)
+}
+
+export function gameRecordImageUrl(id: string): string {
+  return `${BASE}/games/records/${id}/result-image`
 }
 
 export function resultImageUrl(id: string): string {
