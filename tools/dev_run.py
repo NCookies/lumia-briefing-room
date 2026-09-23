@@ -14,12 +14,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
+FRONTEND = ROOT / "frontend"
+FRONTEND_SRC = FRONTEND / "src"
+FRONTEND_EXTS = (".ts", ".tsx", ".css", ".html", ".svg")
 DEBOUNCE_MS = 500
 STOP_TIMEOUT = 5.0
 
 
 def is_source_change(changes) -> bool:
     return any(str(p).endswith(".py") and "__pycache__" not in str(p) for _, p in changes)
+
+
+def is_frontend_change(changes) -> bool:
+    return any(Path(p).is_relative_to(FRONTEND_SRC) and str(p).endswith(FRONTEND_EXTS) for _, p in changes)
 
 
 def build_command(app_args: list[str], *, first_start: bool) -> list[str]:
@@ -49,15 +56,23 @@ def _spawn(cmd):
     return subprocess.Popen(cmd, cwd=ROOT)
 
 
+def _build_frontend() -> None:
+    result = subprocess.run("npm run build", cwd=FRONTEND, shell=True)
+    print("[dev] 프론트 빌드 " + ("완료 - 브라우저를 새로고침하세요." if result.returncode == 0 else "실패"), flush=True)
+
+
 def _default_watch():
     from watchfiles import watch
 
-    return watch(SRC, debounce=DEBOUNCE_MS, yield_on_timeout=True, rust_timeout=1000)
+    return watch(SRC, FRONTEND_SRC, debounce=DEBOUNCE_MS, yield_on_timeout=True, rust_timeout=1000)
 
 
-def run(app_args: list[str], *, watch=None, spawn=_spawn) -> None:
+def run(app_args: list[str], *, watch=None, spawn=_spawn, build_frontend=_build_frontend) -> None:
     proc = spawn(build_command(app_args, first_start=True))
     for changes in watch if watch is not None else _default_watch():
+        if is_frontend_change(changes):
+            print("[dev] 프론트 변경을 감지해 빌드합니다.", flush=True)
+            build_frontend()
         if not is_source_change(changes):
             if proc is not None and proc.poll() == 0:
                 print("[dev] 앱이 종료되어 개발 실행도 끝냅니다.", flush=True)

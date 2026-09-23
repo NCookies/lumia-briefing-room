@@ -56,7 +56,7 @@ UI 를 보려면 먼저 `cd frontend && npm install && npm run build` 를 한 �
 [dev.bat](dev.bat) (= `python tools/dev_run.py [cli.app 옵션]`)은 `src/` 아래 `.py` 를 저장할 때마다 앱(트레이 + 서버)을 껐다가 다시 띄운다.
 브라우저는 첫 기동에만 열리고, 재시작 뒤에는 열려 있는 탭을 새로고침하면 된다(포트가 고정이라 origin 이 그대로다).
 트레이 "종료"로 앱을 끄면 `dev.bat` 도 끝나고, 앱이 오류로 죽으면 다음 저장까지 기다린다.
-`watchfiles` 가 필요하다(`pip install -e ".[dev]"`). 프론트(`frontend/src`)는 재시작 대상이 아니므로 `npm run build` 후 새로고침한다. 평소 실사용은 그대로 `run.bat`.
+`watchfiles` 가 필요하다(`pip install -e ".[dev]"`). `frontend/src` 를 저장하면 `npm run build` 도 자동으로 돌려 `frontend/dist` 를 갱신한다(서버 재시작 없음) — 빌드가 끝났다는 메시지가 나오면 브라우저를 새로고침한다. 평소 실사용은 그대로 `run.bat`.
 
 ### 1. 실사용 — 트레이 상주 (평소에 쓰는 방법)
 

@@ -93,3 +93,24 @@ def test_run_waits_for_change_after_crash():
 
     dev_run.run([], watch=iter([set(), {(1, "a.py")}]), spawn=spawn)
     assert procs == []
+
+
+def test_frontend_change_builds_without_restart():
+    spawned = []
+    builds = []
+    fe = str(dev_run.FRONTEND_SRC / "App.tsx")
+    ignored = str(dev_run.FRONTEND_SRC / "notes.md")
+
+    def spawn(cmd):
+        p = FakeProc()
+        spawned.append(p)
+        return p
+
+    dev_run.run(
+        [],
+        watch=iter([{(1, fe)}, {(1, ignored)}]),
+        spawn=spawn,
+        build_frontend=lambda: builds.append(1),
+    )
+    assert len(builds) == 1
+    assert len(spawned) == 1
