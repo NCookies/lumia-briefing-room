@@ -233,6 +233,25 @@ ffmpeg/ffprobe·H.264 인코더·OCR 엔진 로드). 콘솔이 없는 빌드라 
 dist\LumiaBriefingRoom\LumiaBriefingRoom.exe --selftest
 ```
 
+### 11. 설치기 만들기 (친구·공개 배포용)
+
+```bash
+.uild.bat                              # 먼저 dist\LumiaBriefingRoom 을 만든다
+python tools/build_installer.py          # → dist\LumiaBriefingRoom-<버전>-setup.exe (약 134MB)
+```
+
+- [Inno Setup 6](https://jrsoftware.org/isinfo.php) 이 필요하다(`winget install JRSoftware.InnoSetup`).
+  `installer/lumia.iss` 를 직접 컴파일하지 말고 이 스크립트로 만든다 — 버전·경로를 `/D` 정의로 넘긴다.
+- **관리자 권한 없이** `%LOCALAPPDATA%\Programs\LumiaBriefingRoom` 에 설치된다(실측 확인).
+- 설치기는 자동 시작 레지스트리 값을 쓰지 않는다. 앱이 `ui.autoStart` 설정에 따라 스스로 등록한다.
+  **제거할 때는 그 값을 지운다**(안 지우면 로그인마다 없는 exe 를 실행하려 한다).
+- 제거해도 **클립 폴더는 건드리지 않는다.** 설정·로그(`%LOCALAPPDATA%\LumiaBriefingRoom`)는 지울지 물어본다
+  (무인 제거 `/VERYSILENT` 에서는 묻지 않고 남긴다).
+- 실행 중이면 설치기가 닫아 달라고 알린다(`AppMutex` 가 앱의 중복 실행 방지 뮤텍스와 같은 이름이다).
+- `THIRD_PARTY_NOTICES.md` 가 설치 폴더에 같이 들어간다. ffmpeg LGPL 고지와 소스 링크가 여기 있다.
+- **코드 서명을 하지 않으므로 SmartScreen 경고가 뜬다.** 사용자에게 "추가 정보 → 실행" 을 안내한다
+  ([docs/friend-guide.md](docs/friend-guide.md)).
+
 ### 9. 브라우저 디버깅 (개발용)
 
 - **클라이언트 오류 로그**: 프론트가 `window.onerror` / `unhandledrejection` / `console.error` 를 `POST /api/client-log` 로 보내고, 서버가 `[client]` 접두로 로그 파일에 남긴다. 로그 파일은 `%LOCALAPPDATA%\LumiaBriefingRoom\logs\app.log` (서버 로그와 같은 파일, 2MB 회전). Claude Code 에 "브라우저 오류 봐줘" 라고 하면 이 파일을 읽는다. 프론트를 고쳤으면 `npm run build`.
