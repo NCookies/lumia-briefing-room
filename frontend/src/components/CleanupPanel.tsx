@@ -12,8 +12,11 @@ interface Draft {
   autoCleanEnabled: boolean
   deleteMode: 'trash' | 'permanent'
   trashDays: string
+  ageOn: boolean
   maxAgeDays: string
+  countOn: boolean
   maxCount: string
+  gbOn: boolean
   maxTotalGb: string
   protectPinned: boolean
   protectTags: string[]
@@ -23,8 +26,11 @@ const toDraft = (r: RetentionSettings): Draft => ({
   autoCleanEnabled: r.autoCleanEnabled,
   deleteMode: r.deleteMode,
   trashDays: String(r.trashDays),
+  ageOn: r.maxAgeDays != null,
   maxAgeDays: r.maxAgeDays == null ? '' : String(r.maxAgeDays),
+  countOn: r.maxCount != null,
   maxCount: r.maxCount == null ? '' : String(r.maxCount),
+  gbOn: r.maxTotalGb != null,
   maxTotalGb: r.maxTotalGb == null ? '' : String(r.maxTotalGb),
   protectPinned: r.protectPinned,
   protectTags: r.protectTags,
@@ -34,9 +40,9 @@ const toSettings = (d: Draft): RetentionSettings => ({
   autoCleanEnabled: d.autoCleanEnabled,
   deleteMode: d.deleteMode,
   trashDays: Math.max(1, Math.round(parseLimit(d.trashDays) ?? 30)),
-  maxAgeDays: parseLimit(d.maxAgeDays),
-  maxCount: parseLimit(d.maxCount),
-  maxTotalGb: parseLimit(d.maxTotalGb),
+  maxAgeDays: d.ageOn ? parseLimit(d.maxAgeDays) : null,
+  maxCount: d.countOn ? parseLimit(d.maxCount) : null,
+  maxTotalGb: d.gbOn ? parseLimit(d.maxTotalGb) : null,
   protectPinned: d.protectPinned,
   protectTags: d.protectTags,
 })
@@ -54,6 +60,8 @@ export function CleanupPanel() {
   }, [])
 
   if (!draft) return <p className="text-sm text-zinc-400">{status ?? '불러오는 중입니다...'}</p>
+
+  const on = draft.autoCleanEnabled
 
   const patch = (change: Partial<Draft>) => {
     setDraft({ ...draft, ...change })
@@ -112,32 +120,53 @@ export function CleanupPanel() {
       </section>
 
       <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium text-zinc-200">정리 기준 (비워 두면 제한하지 않습니다)</h3>
+        <h3 className="text-sm font-medium text-zinc-200">정리 기준 (체크한 기준만 적용합니다)</h3>
         <label className="flex items-center gap-2 text-sm text-zinc-300">
+          <input
+            type="checkbox"
+            disabled={!on}
+            checked={draft.ageOn}
+            onChange={(e) => patch({ ageOn: e.target.checked })}
+          />
           경기 후
           <input
             className={INPUT}
             inputMode="decimal"
+            disabled={!on || !draft.ageOn}
             value={draft.maxAgeDays}
             onChange={(e) => patch({ maxAgeDays: e.target.value })}
           />
           일이 지난 클립
         </label>
         <label className="flex items-center gap-2 text-sm text-zinc-300">
+          <input
+            type="checkbox"
+            disabled={!on}
+            checked={draft.countOn}
+            onChange={(e) => patch({ countOn: e.target.checked })}
+          />
           클립 수가
           <input
             className={INPUT}
             inputMode="numeric"
+            disabled={!on || !draft.countOn}
             value={draft.maxCount}
             onChange={(e) => patch({ maxCount: e.target.value })}
           />
           개를 넘으면 오래된 클립부터 정리
         </label>
         <label className="flex items-center gap-2 text-sm text-zinc-300">
+          <input
+            type="checkbox"
+            disabled={!on}
+            checked={draft.gbOn}
+            onChange={(e) => patch({ gbOn: e.target.checked })}
+          />
           총 용량이
           <input
             className={INPUT}
             inputMode="decimal"
+            disabled={!on || !draft.gbOn}
             value={draft.maxTotalGb}
             onChange={(e) => patch({ maxTotalGb: e.target.value })}
           />
