@@ -2,7 +2,7 @@
 
 > 대상: [SPEC.md §4 배포 시 주의](SPEC.md), [§6 v2 이후 후보](SPEC.md), [§7.11 업데이트·데이터 전송](SPEC.md), [plan-ui.md §7](plan-ui.md) 의 "추후 구현" 항목들.
 > 목표: 파이썬·node·ffmpeg 를 따로 설치하지 않은 친구 PC 에서 설치 파일 하나로 돌아가게 한다. 최종적으로는 공개 배포(GitHub Releases)까지 간다.
-> **D1~D4 는 구현했고(2026-09-24), D5 이후는 계획이다.** 각 단계를 끝낼 때 아래 체크박스와 "확인 필요"를 갱신한다. 다음 세션은 §0 → §7 → §9 순으로 읽는다.
+> **D1~D6 은 구현했고(2026-09-24), D7 이후는 계획이다.** 각 단계를 끝낼 때 아래 체크박스와 "확인 필요"를 갱신한다. 다음 세션은 §0 → §12 → §7 → §9·§11 순으로 읽는다.
 
 ## 0. 진행 상태 (세션이 끊겨도 여기부터 이어간다)
 
@@ -354,3 +354,50 @@ Windows 샌드박스는 이 PC(Windows 11 Pro)에 기본으로 있다. 안 켜�
 샌드박스를 닫으면 안의 모든 것이 사라진다. 진단 zip·스크린샷은 **닫기 전에** 쓰기 가능한 매핑 폴더로
 복사하거나 내용을 적어 둔다(위 .wsb 는 둘 다 읽기 전용이라 쓰기용 폴더를 하나 더 매핑해야 한다).
 실패한 항목은 위 체크리스트 줄을 그대로 알려 주면 이어서 고친다.
+
+## 11. D5~D6 구현 중 발견한 함정 (2026-09-24)
+
+- **빌드본에서만 서버가 안 떴다.** `--noconsole` 이면 `sys.stdout` 이 `None` 인데 uvicorn 의 기본 로깅 설정이
+  `ColourizedFormatter` → `sys.stdout.isatty()` 를 불러 `AttributeError` → `Unable to configure formatter 'default'`
+  로 서버 스레드가 죽는다. 트레이는 멀쩡히 뜨고 UI 만 영영 안 열려서 원인을 찾기 어려운 종류다.
+  `uvicorn.Config(log_config=None)` 로 고쳤다. **D5 에서 넣은 스레드 예외 훅이 이걸 로그 파일에 남겨 줘서 찾았다** —
+  훅이 없었으면 조용히 실패했을 것이다.
+- **`pythonw.exe` 로 띄우는 것만으로는 `--noconsole` 을 재현하지 못한다.** 셸에서 실행하면 콘솔 핸들을
+  물려받아 `sys.stderr` 가 살아 있다. `creationflags=DETACHED_PROCESS` 를 줘야 `stdout/stderr/stdin` 이 전부 `None` 이
+  된다(실측). 콘솔 없는 동작을 테스트하려면 이 조합을 써야 한다.
+- **PyInstaller 가 `--add-data` 안의 `.dll` 을 바이너리로도 분류한다.** `vendor/ffmpeg` 를 datas 로 넣었더니
+  DLL 이 `_internal` 루트에 한 벌 더 복사돼 149MB 가 통째로 중복됐다(607MB → 452MB). 빌드 뒤에 직접 복사한다.
+- **번들 ffmpeg 가 개발 환경 테스트를 깬다.** `vendor/ffmpeg` 가 생기면 `discover_ffmpeg()` 가 LGPL 빌드를
+  먼저 고르는데, 합성 녹화 픽스처는 `libx264` 가 필요해 24개가 실패했다. `tests/conftest.py` 가 테스트에서만
+  PATH 의 전체 빌드를 `LUMIA_FFMPEG` 로 지정하게 했다(제품 코드 탐색 순서는 그대로).
+- **BtbN ffmpeg 는 shared 빌드가 훨씬 작다** — 정적 267MB vs shared 149MB(DLL 포함). 실측해서 shared 를 골랐다.
+- **rapidocr 는 모델 5개를 받아 두지만 실제로 여는 것은 4개다**(korean/ch 인식, 방향 분류, v6 검출).
+  안 쓰는 `PP-OCRv6_rec_small.onnx`(21MB)와 `cv2/opencv_videoio_ffmpeg*.dll`(31MB)을 뺐다 → 400MB, zip 178MB.
+  뺀 뒤에는 반드시 `--selftest` 로 OCR 엔진이 여전히 뜨는지 확인한다.
+- **`dist` 폴더를 셸의 작업 디렉터리로 들어가면 지울 수 없다**("Device or resource busy"). 빌드를 다시 하기 전에
+  셸이 그 안에 있지 않은지 확인할 것.
+- **Inno Setup 은 winget 으로 넣으면 사용자 영역**(`%LOCALAPPDATA%\Programs\Inno Setup 6`)에 깔린다.
+  `Program Files` 만 보면 못 찾는다(`tools/build_installer.py` 가 두 곳 다 본다).
+- **무인 제거에서 `MsgBox` 는 그대로 뜬다.** 설정 삭제 여부를 묻는 대화상자가 `/VERYSILENT` 에서 멈춰 버리므로
+  `UninstallSilent` 를 확인해 건너뛴다.
+- **앱이 실행 중이면 빌드본을 테스트할 수 없다.** 중복 실행 방지 뮤텍스는 개발 앱과 빌드본이 공유한다
+  (의도한 동작이다). 빌드본을 확인하려면 개발 앱을 먼저 닫아야 한다.
+- **첫 실행 화면을 한 번 마치면 `consent.version` 이 올라가 UI 가 자동으로 안 열린다.**
+  `ui.startMinimized=true` 면 트레이로만 뜨므로, 그 뒤 테스트에는 `--open-ui` 가 필요하다(버그가 아니다).
+- **셸 heredoc 백슬래시 함정은 이번에도 재발했다**(§9 에 이미 적어 둔 것). `.iss`·`.wsb` 처럼 백슬래시가 많은
+  문서를 만들 때는 Write 도구로 파일을 쓰고 결과를 확인할 것.
+
+## 12. 다음 세션이 이어받을 것
+
+**바로 할 수 있는 것**
+
+1. **[§10](#10-windows-샌드박스-확인-절차-사용자가-직접) 샌드박스 확인** — 남은 실측의 대부분이 여기 있다.
+   특히 `h264_mf` 가 깨끗한 윈도우에 있는지(§7-2)와 HEVC 없는 환경의 프록시 자동 전환(§7-5).
+2. **D8 실제 배포** — `dist\LumiaBriefingRoom-0.1.0-setup.exe` 와 [friend-guide.md](friend-guide.md) 를 같이 준다.
+   전달 경로는 §7-10 이 아직 미정(비공개 저장소 릴리스 vs 디스코드 파일 전달).
+3. **D7 공개 저장소 정리** — LICENSE 선택(§7-12), `_samples` 이미지와 git 이력 정리(§4), 사용자용 README.
+
+**D9·D10 전에 정해야 하는 것**: 수신처(§7-11), 공개 저장소 여부(§7-10 — 비공개면 업데이트 확인이 안 된다).
+
+**손대지 않은 것**: 버전은 아직 `0.1.0` 하나뿐이라 업그레이드 설치(같은 `AppId` 로 덮어쓰기)는 실측하지 못했다.
+D9 자동 업데이트가 이 경로를 쓰므로 그때 버전을 올려 실제로 덮어써 봐야 한다.
