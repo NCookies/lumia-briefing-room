@@ -13,7 +13,8 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from lumia_briefing_room import __version__
+from lumia_briefing_room import __version__, paths
+from lumia_briefing_room.appmode import resolve_mode
 from lumia_briefing_room.api.clips import find_clip, scan_clips, to_summary_dict
 from lumia_briefing_room.api.export import (
     export_video,
@@ -454,7 +455,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
 
     @app.get("/api/app-info")
     def get_app_info():
-        return {"version": __version__}
+        return {"version": __version__, "mode": resolve_mode(current_config().app.mode, frozen=paths.is_frozen())}
 
     @app.get("/api/config")
     def get_config():

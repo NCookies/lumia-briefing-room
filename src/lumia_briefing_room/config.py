@@ -214,7 +214,30 @@ class VodConfig:
 
 
 @dataclass
+class AppConfig:
+    mode: str = "auto"
+
+
+@dataclass
+class UpdateConfig:
+    check: bool = False
+
+
+@dataclass
+class TelemetryConfig:
+    send_labels: bool = False
+    send_logs: bool = False
+    install_id: str = ""
+
+
+@dataclass
+class ConsentConfig:
+    version: int = 0
+
+
+@dataclass
 class Config:
+    app: AppConfig = field(default_factory=AppConfig)
     paths: PathsConfig = field(default_factory=PathsConfig)
     watch: WatchConfig = field(default_factory=WatchConfig)
     filter: FilterConfig = field(default_factory=FilterConfig)
@@ -225,6 +248,9 @@ class Config:
     ui: UiConfig = field(default_factory=UiConfig)
     player: PlayerConfig = field(default_factory=PlayerConfig)
     vod: VodConfig = field(default_factory=VodConfig)
+    update: UpdateConfig = field(default_factory=UpdateConfig)
+    telemetry: TelemetryConfig = field(default_factory=TelemetryConfig)
+    consent: ConsentConfig = field(default_factory=ConsentConfig)
 
 
 DEFAULT_CONFIG_PATH = _default_appdata() / "LumiaBriefingRoom" / "config.json"
