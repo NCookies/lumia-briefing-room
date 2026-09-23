@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ClipId } from './ClipId'
 import { thumbnailUrl } from '../api'
 import type { Clip, UserLabel } from '../types'
 import { LabelButtons } from './LabelButtons'
@@ -134,6 +135,8 @@ export function ClipCard({
             </button>
           </div>
         )}
+
+        <ClipId id={clip.id} />
 
         <div className="flex flex-wrap gap-1">
           {clip.tags.map((t) => (

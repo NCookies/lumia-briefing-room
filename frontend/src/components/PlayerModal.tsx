@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { ClipId } from './ClipId'
 import { videoUrl } from '../api'
 import { SIGNAL_LABELS } from '../labels'
 import { applyLabel, labelForKey, nextUnlabeledIndex, progress } from '../labeling'
@@ -146,6 +147,7 @@ export function PlayerModal({
             ) : (
               <>
                 <h2 className="text-lg font-medium">{clip.title}</h2>
+                <ClipId id={clip.id} />
                 <button
                   type="button"
                   aria-label="이름 수정"
