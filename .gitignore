@@ -47,3 +47,6 @@ config.local.json
 
 # 검토용 HTML (커밋하지 않는다)
 review.html
+
+# Playwright MCP 산출물
+.playwright-mcp/
