@@ -45,6 +45,7 @@ from lumia_briefing_room.pipeline.game_records import (
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for, archive_if_labeled
 from lumia_briefing_room.pipeline.cleanup import plan_cleanup, remove_orphan_result_images, run_cleanup
 from lumia_briefing_room.pipeline.clip_assets import resolve_result_image, resolve_thumbnail
+from lumia_briefing_room.pipeline.move_clips import MoveError, move_clips_dir
 from lumia_briefing_room.pipeline.retention import restore_clip, trash_clip
 from lumia_briefing_room.pipeline.proxy import create_proxy, is_proxy_fresh, proxy_path, remove_orphan_proxies
 from lumia_briefing_room.pipeline.reprocess import GameRef, ReprocessError, reprocess_game
@@ -542,6 +543,28 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             # 설정 파일만 고치면 다음 실행 때까지 레지스트리가 그대로라, 옵션에서 끈 뒤에도 한 번 더 자동 실행된다.
             autostart.apply_setting(new_cfg)
         return dataclass_to_camel_dict(new_cfg)
+
+    @app.post("/api/clips-dir/move")
+    @locked
+    def move_clips(body: dict):
+        """클립 저장 폴더를 새 위치로 바꾸면서 기존 클립도 함께 옮긴다. 옮기지 못하면 설정은 그대로 둔다."""
+        source, raw = body.get("source"), str(body.get("path") or "").strip()
+        if source not in ("steam", "vod"):
+            raise HTTPException(400, "source 는 steam 또는 vod 여야 합니다")
+        if not raw:
+            raise HTTPException(400, "새 폴더를 지정해야 합니다")
+        if any(j["state"] == "running" for j in jobs.values()):
+            raise HTTPException(409, "게임을 분석하는 중에는 클립을 옮길 수 없습니다. 끝난 뒤 다시 시도하세요")
+        resolved = resolve_paths(current_config().paths)
+        old = resolved.clips if source == "steam" else resolved.vod_clips
+        try:
+            moved = move_clips_dir(old, Path(raw))
+        except MoveError as e:
+            raise HTTPException(409, str(e))
+        except OSError as e:
+            raise HTTPException(500, f"클립을 옮기다 실패했습니다. 남은 클립은 기존 폴더에 있으니 다시 시도하세요: {e}")
+        put_config({"paths": {"clips" if source == "steam" else "vodClips": raw}})
+        return {"moved": moved}
 
     @app.post("/api/client-log", status_code=204)
     def post_client_log(body: ClientLog):
