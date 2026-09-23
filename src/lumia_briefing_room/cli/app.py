@@ -36,18 +36,33 @@ def _free_port() -> int:
         return s.getsockname()[1]
 
 
-def resolve_port(port_setting, *, fallback_range: int = 20) -> int:
-    """SPEC §7.7 ui.port: 고정 포트가 점유 중이면 다음 빈 포트로 폴백한다. "auto" 면 임의의 빈 포트.
+HOSTNAME = "lumia-briefingroom.localhost"
+HTTP_PORT = 80
 
-    포트가 바뀌면 브라우저 origin 이 달라져 localStorage 가 초기화되므로 기본은 고정 포트다.
+
+def port_candidates(port_setting, *, fallback_range: int = 20) -> list[int]:
+    """SPEC §7.7 ui.port: 80번(주소에서 포트 생략) → 설정 포트 → 그 뒤 +20 순. "auto" 면 후보 없이 임의의 빈 포트.
+
+    순서를 고정해 두는 이유: 포트가 바뀌면 브라우저 origin 이 달라져 localStorage 가 초기화된다.
     """
     if port_setting == "auto":
-        return _free_port()
+        return []
     base = int(port_setting)
-    for port in range(base, base + fallback_range + 1):
-        if _is_free(port):
+    ports = [HTTP_PORT, *range(base, base + fallback_range + 1)]
+    return list(dict.fromkeys(ports))
+
+
+def resolve_port(port_setting, *, fallback_range: int = 20, is_free=_is_free) -> int:
+    for port in port_candidates(port_setting, fallback_range=fallback_range):
+        if is_free(port):
             return port
     return _free_port()
+
+
+def access_url(port: int, *, hostname: str = HOSTNAME) -> str:
+    """사용자에게 보이는 주소. 서버는 127.0.0.1 에만 바인드하고, *.localhost 는 브라우저가 스스로 루프백으로 푼다."""
+    suffix = "" if port == HTTP_PORT else f":{port}"
+    return f"http://{hostname}{suffix}/"
 
 
 def make_on_open(*, host="127.0.0.1", port=8000, config_path=None, open_browser=webbrowser.open):
@@ -68,7 +83,7 @@ def make_on_open(*, host="127.0.0.1", port=8000, config_path=None, open_browser=
             serve_cli.wait_until_started(server)
             state["server"] = server
             state["thread"] = thread
-        open_browser(f"http://{host}:{port}/")
+        open_browser(access_url(port))
 
     return on_open
 

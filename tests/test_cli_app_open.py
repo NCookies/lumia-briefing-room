@@ -1,4 +1,4 @@
-from lumia_briefing_room.cli.app import make_on_open, resolve_port
+from lumia_briefing_room.cli.app import access_url, make_on_open, port_candidates, resolve_port
 
 
 def test_resolve_port_auto_picks_a_free_port():
@@ -7,21 +7,37 @@ def test_resolve_port_auto_picks_a_free_port():
     assert 1 <= port <= 65535
 
 
-def test_resolve_port_fixed_value_is_used_as_is():
-    assert resolve_port(8123) == 8123
-    assert resolve_port("8123") == 8123
+def test_port_candidates_try_80_then_configured_port_then_next_20():
+    assert port_candidates(8765) == [80, *range(8765, 8786)]
+    assert port_candidates("8765") == port_candidates(8765)
+
+
+def test_port_candidates_do_not_repeat_80_and_auto_has_none():
+    assert port_candidates(80) == list(range(80, 101))
+    assert port_candidates("auto") == []
+
+
+def test_resolve_port_prefers_80_when_free():
+    assert resolve_port(8765, is_free=lambda p: True) == 80
+
+
+def test_resolve_port_falls_back_to_configured_port_when_80_is_busy():
+    assert resolve_port(8765, is_free=lambda p: p != 80) == 8765
+    assert resolve_port("8765", is_free=lambda p: p != 80) == 8765
 
 
 def test_resolve_port_falls_back_to_next_free_port_when_busy():
-    import socket
+    assert resolve_port(8765, is_free=lambda p: p not in (80, 8765, 8766)) == 8767
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as busy:
-        busy.bind(("127.0.0.1", 0))
-        busy.listen()
-        taken = busy.getsockname()[1]
-        port = resolve_port(taken)
-    assert port != taken
-    assert taken < port <= taken + 20
+
+def test_resolve_port_uses_any_free_port_when_all_candidates_are_busy():
+    port = resolve_port(8765, is_free=lambda p: False)
+    assert 1 <= port <= 65535
+
+
+def test_access_url_drops_port_80_and_keeps_others():
+    assert access_url(80) == "http://lumia-briefingroom.localhost/"
+    assert access_url(8765) == "http://lumia-briefingroom.localhost:8765/"
 
 
 def test_default_ui_port_is_fixed():
@@ -59,7 +75,7 @@ def test_make_on_open_starts_server_once_and_opens_browser(monkeypatch):
     on_open()
 
     assert started == [("the-app", "127.0.0.1", 8123)]
-    assert opened == ["http://127.0.0.1:8123/", "http://127.0.0.1:8123/"]
+    assert opened == ["http://lumia-briefingroom.localhost:8123/"] * 2
 
 
 def test_watch_controller_toggle_starts_and_stops(monkeypatch):

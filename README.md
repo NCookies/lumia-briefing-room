@@ -51,6 +51,8 @@ UI 를 보려면 먼저 `cd frontend && npm install && npm run build` 를 한 �
 프로그램은 트레이 아이콘(작업표시줄 우측 `^` 숨겨진 아이콘 안일 수 있음)으로 상주하며,
 터미널 창은 로그용이라 닫으면 프로그램도 종료된다.
 
+접속 주소는 `http://lumia-briefingroom.localhost` 다(주소창에 직접 쳐도 된다). 서버는 80번 포트를 먼저 잡아 포트가 안 붙고, 80번이 쓰이고 있으면 `ui.port`(기본 8765) → 그 뒤 +20 순으로 잡아 `http://lumia-briefingroom.localhost:8765` 처럼 포트가 붙는다. 서버는 `127.0.0.1` 에만 바인드한다. 주소가 바뀌었으므로 예전 `127.0.0.1:8765` 에 저장됐던 볼륨·선택 탭 등은 새 주소에서 한 번 비어 있다. `cli.serve` 독립 실행은 기존 `--host/--port` 그대로다.
+
 ### 0-1. 개발용 — 코드 저장 시 자동 재시작 (`dev.bat`)
 
 [dev.bat](dev.bat) (= `python tools/dev_run.py [cli.app 옵션]`)은 `src/` 아래 `.py` 를 저장할 때마다 앱(트레이 + 서버)을 껐다가 다시 띄운다.
