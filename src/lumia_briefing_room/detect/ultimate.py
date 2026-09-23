@@ -10,7 +10,7 @@ BLUE_OVER_RED = 20
 # SPEC §2.12 #9, plan-pvp.md §2.8-b: 라벨 110개(pvp 73 / pve 37)로 검증.
 # 클립 안에서 이 값의 최솟값 대비 최댓값 차이(delta)가 이 임계를 넘으면 궁을 쓴 것으로 본다.
 # AUC(delta) = 0.914 (pvp 90% 검출, pve 27% 검출) — scripts/probe/eval_ultimate_signal.py.
-DELTA_THRESHOLD = 0.15
+DELTA_THRESHOLD = 0.25
 
 # 2026-09-23 실사용 오탐 2건으로 발견: W/E/R 스킬을 아직 안 찍으면 아이콘이 빨간 X 로
 # 덮인 "잠김" 상태(어둡고 채도 낮음)다. 교전 중 레벨업해서 스킬을 찍는 순간 원래 색

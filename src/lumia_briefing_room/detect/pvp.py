@@ -7,17 +7,19 @@ from lumia_briefing_room.detect.types import CombatInterval
 ENEMY_RINGS_FULL_AT = 1.5
 
 # 궁극기(R) 쿨타임 진입 델타(detect/ultimate.py) 임계. 이 이상이면 "궁을 썼다"로 본다.
-ULTIMATE_DELTA_THRESHOLD = 0.15
+ULTIMATE_DELTA_THRESHOLD = 0.25
 
 # enemyRings 는 0: 라벨 57개로 재보니 증거 없는 교전(8)과 사냥(21)을 못 가른다(AUC 0.53).
 # teammateDeathSplit: 1~2일차는 무료 부활이라 팀원이 흩어져 사냥하다 혼자 죽는다(스플릿). 그 날의 팀원 사망은 덜 믿는다.
 # ultimateUsed: 라벨 110개(pvp 73/pve 37)로 재보니 AUC(delta) 0.914 로 강하게 갈린다(pvp 90%/pve 27% 검출,
 # scripts/probe/eval_ultimate_signal.py). 사망(0.9)·팀원 사망(0.8)보다는 낮게, 미니맵(0)보다는 훨씬 높게 잡았다 -
 # 야생동물·보스전에도 궁을 쓸 수 있어(pve 27%) 확정 증거는 아니지만, 지금까지의 어떤 추정 증거보다 세다.
+# 2026-09-24 라벨 276개로 재조정: 킬·어시·사망 없는 클립에서 델타 0.15~0.25 는 교전 3 : 사냥 9(25%),
+# 0.25 이상은 16 : 4(80%) 라 임계를 0.15->0.25, 가중치를 0.6->0.75 로 올렸다(plan-pvp.md §2.10).
 # 신호 자체는 계속 기록하고, 임계·가중치는 다음 라벨 라운드에서 더 조정한다.
 FREE_REVIVE_LAST_DAY = 2
 DEFAULT_WEIGHTS = {
-    "enemyRings": 0.0, "death": 0.9, "teammateDeath": 0.8, "teammateDeathSplit": 0.5, "ultimateUsed": 0.6,
+    "enemyRings": 0.0, "death": 0.9, "teammateDeath": 0.8, "teammateDeathSplit": 0.5, "ultimateUsed": 0.75,
 }
 
 

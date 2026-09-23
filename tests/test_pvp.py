@@ -98,9 +98,9 @@ def test_default_weights_use_ultimate_because_labels_showed_strong_separation():
     # AUC(delta) 0.914 (라벨 110개, 2026-09-22) - 미니맵(0.53)과 반대로 채택했다.
     from lumia_briefing_room.detect.pvp import DEFAULT_WEIGHTS
 
-    assert DEFAULT_WEIGHTS["ultimateUsed"] == 0.6
-    assert FilterConfig().pvp_weights["ultimateUsed"] == 0.6
-    assert score_interval(iv(ultimate=0.5), DEFAULT_WEIGHTS).score == 0.6
+    assert DEFAULT_WEIGHTS["ultimateUsed"] == 0.75
+    assert FilterConfig().pvp_weights["ultimateUsed"] == 0.75
+    assert score_interval(iv(ultimate=0.5), DEFAULT_WEIGHTS).score == 0.75
 
 
 def test_a_zero_weighted_signal_is_not_listed_as_evidence():
@@ -155,3 +155,11 @@ def test_ultimate_used_loses_to_stronger_confirmed_evidence():
 
 def test_kill_still_wins_outright_even_with_ultimate_evidence():
     assert score_interval(iv(k=1, ultimate=0.5), WEIGHTS).score == 1.0
+
+
+def test_ultimate_delta_threshold_is_025_because_the_015_to_025_band_was_mostly_hunting():
+    # 라벨 276개(2026-09-24): 킬·어시·사망 없는 클립에서 델타 0.15~0.25 는 교전 3 : 사냥 9(정밀도 25%),
+    # 0.25 이상은 16 : 4(80%).
+    assert score_interval(iv(ultimate=0.2), WEIGHTS).signals == []
+    assert score_interval(iv(ultimate=0.249), WEIGHTS).signals == []
+    assert score_interval(iv(ultimate=0.25), WEIGHTS).signals == ["ultimate_used"]
