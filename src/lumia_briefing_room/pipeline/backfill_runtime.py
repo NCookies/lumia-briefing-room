@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import re
 import threading
 from collections.abc import Callable
 from pathlib import Path
@@ -34,6 +35,10 @@ from lumia_briefing_room.video.source import SteamSegmentSource
 log = logging.getLogger("lumia_briefing_room.backfill")
 
 MAX_SEGMENT_NUMBER = 10**7
+DEFAULT_SEGMENT_SEC = 3.0
+# 실측(2세션 약 130분 분량, 경기 5판 처리 포함 292초)의 약 27배속에서 여유를 둔 값. 다른 PC 는 다를 수 있어 안내에는 "대략"이라고 쓴다.
+ESTIMATE_SPEEDUP = 25.0
+_VIDEO_CHUNK = re.compile(r"^chunk-stream0-(\d{5})\.m4s$")
 
 
 def staging_config(cfg: Config) -> Config:
@@ -128,3 +133,37 @@ def make_process_window(
             return []
 
     return process
+
+
+def estimate_backfill(recording_root: Path, state_dir: Path) -> dict:
+    """확인 창에 보여 줄 값: 세션 수·녹화 길이·용량과 대략의 소요 시간. 이미 훑어 캐시된 구간은 시간에서 뺀다."""
+    cache_dir = state_dir / f"scan-v{ANALYSIS_VERSION}"
+    sessions = list_session_dirs(recording_root)
+    segments = size_bytes = 0
+    video_sec = unscanned_sec = 0.0
+    for folder in sessions:
+        try:
+            seg_sec = RecordingSession.load(folder).segment_duration_sec
+        except (SessionParseError, OSError, ValueError, TypeError):
+            seg_sec = DEFAULT_SEGMENT_SEC
+        count = 0
+        try:
+            for entry in folder.iterdir():
+                if entry.name.endswith((".m4s", ".mpd")):
+                    size_bytes += entry.stat().st_size
+                if _VIDEO_CHUNK.match(entry.name):
+                    count += 1
+        except OSError:
+            continue
+        cached = len(StateCache(cache_dir / f"{folder.name}.states.jsonl.gz").load())
+        segments += count
+        video_sec += count * seg_sec
+        unscanned_sec += max(0, count - cached) * seg_sec
+    return {
+        "sessions": len(sessions),
+        "segments": segments,
+        "videoSeconds": video_sec,
+        "sizeBytes": size_bytes,
+        "unscannedSeconds": unscanned_sec,
+        "estimatedSeconds": unscanned_sec / ESTIMATE_SPEEDUP,
+    }
