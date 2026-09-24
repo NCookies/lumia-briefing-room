@@ -33,6 +33,7 @@ class Label(_Allowlist):
     labeledAt: str | None = Field(default=None, max_length=40)
     matchKey: HexKey
     clipKey: HexKey
+    source: Literal["recording", "vod"] | None = None
 
     gameMode: str | None = Field(default=None, max_length=32)
     sourceWidth: int | None = Field(default=None, ge=1, le=20000)

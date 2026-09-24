@@ -4,169 +4,557 @@
   "title": "lumia receiver 전송 계약",
   "description": "앱이 서버로 보내는 페이로드. 원본은 이 파일이며 P:\\lumia_briefing_room 의 tests/contract 는 복사본이다. 서버는 여기 없는 필드를 받으면 조용히 버리지만, 앱은 여기 없는 필드를 보내면 안 된다(additionalProperties: false).",
   "$defs": {
-    "schemaVersion": { "type": "integer", "minimum": 1, "maximum": 1000 },
-    "mode": { "enum": ["dev", "release"] },
-    "installId": { "type": "string", "format": "uuid", "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$" },
-    "hexKey": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
-
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000
+    },
+    "mode": {
+      "enum": [
+        "dev",
+        "release"
+      ]
+    },
+    "installId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "hexKey": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
     "Label": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["userLabel", "matchKey", "clipKey"],
+      "required": [
+        "userLabel",
+        "matchKey",
+        "clipKey"
+      ],
       "properties": {
-        "userLabel": { "enum": ["combat", "other"] },
-        "labelSource": { "enum": ["user", "migrated"] },
-        "labelNote": { "type": "string", "maxLength": 500 },
-        "labelConflict": { "type": "boolean" },
-        "labeledAt": { "type": "string", "maxLength": 40 },
-        "matchKey": { "$ref": "#/$defs/hexKey" },
-        "clipKey": { "$ref": "#/$defs/hexKey" },
-
-        "gameMode": { "type": "string", "maxLength": 32 },
-        "sourceWidth": { "type": "integer", "minimum": 1, "maximum": 20000 },
-        "sourceHeight": { "type": "integer", "minimum": 1, "maximum": 20000 },
-        "sourceIncomplete": { "type": "boolean" },
-        "prerollSource": { "type": "string", "maxLength": 32 },
-        "audioStatus": { "type": "string", "maxLength": 32 },
-
-        "durationSec": { "type": "number", "minimum": 0 },
-        "combatStartOffsetSec": { "type": "number", "minimum": 0 },
-        "combatEndOffsetSec": { "type": "number", "minimum": 0 },
-
-        "tags": { "type": "array", "maxItems": 32, "items": { "type": "string", "maxLength": 64 } },
-        "pvpScore": { "type": "number", "minimum": 0, "maximum": 1 },
-        "pvpSignals": { "type": "array", "maxItems": 64, "items": { "type": "string", "maxLength": 64 } },
+        "userLabel": {
+          "enum": [
+            "combat",
+            "other"
+          ]
+        },
+        "labelSource": {
+          "enum": [
+            "user",
+            "migrated"
+          ]
+        },
+        "labelNote": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "labelConflict": {
+          "type": "boolean"
+        },
+        "labeledAt": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "matchKey": {
+          "$ref": "#/$defs/hexKey"
+        },
+        "clipKey": {
+          "$ref": "#/$defs/hexKey"
+        },
+        "source": {
+          "enum": [
+            "recording",
+            "vod"
+          ]
+        },
+        "gameMode": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "sourceWidth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20000
+        },
+        "sourceHeight": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20000
+        },
+        "sourceIncomplete": {
+          "type": "boolean"
+        },
+        "prerollSource": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "audioStatus": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "durationSec": {
+          "type": "number",
+          "minimum": 0
+        },
+        "combatStartOffsetSec": {
+          "type": "number",
+          "minimum": 0
+        },
+        "combatEndOffsetSec": {
+          "type": "number",
+          "minimum": 0
+        },
+        "tags": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "pvpScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "pvpSignals": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
         "pvpSignalValues": {
           "type": "object",
           "maxProperties": 64,
-          "propertyNames": { "maxLength": 64 },
-          "additionalProperties": { "type": "number" }
+          "propertyNames": {
+            "maxLength": 64
+          },
+          "additionalProperties": {
+            "type": "number"
+          }
         },
-        "teamWipe": { "type": ["string", "null"], "maxLength": 32 },
-        "enemyRingMean": { "type": ["number", "null"] },
-        "ultimateDelta": { "type": ["number", "null"] },
-        "killDelta": { "type": "integer" },
-        "assistDelta": { "type": "integer" },
-        "died": { "type": "boolean" },
-        "detectorConfidence": { "type": "number" },
-
-        "region": { "type": ["string", "null"], "maxLength": 64 },
-        "gameDay": { "type": ["integer", "null"] },
-        "dayNight": { "type": ["string", "null"], "maxLength": 16 },
-        "phaseIndex": { "type": ["integer", "null"] },
-        "reviveCost": { "type": ["string", "null"], "maxLength": 16 },
-
-        "myCharacter": { "type": ["string", "null"], "maxLength": 64 },
-        "matchKills": { "type": ["integer", "null"], "minimum": 0 },
-        "matchAssists": { "type": ["integer", "null"], "minimum": 0 },
-        "matchTeamKills": { "type": ["integer", "null"], "minimum": 0 }
-      }
-    },
-
-    "LabelBatch": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["installId", "appVersion", "schemaVersion", "mode", "labels"],
-      "properties": {
-        "installId": { "$ref": "#/$defs/installId" },
-        "appVersion": { "type": "string", "maxLength": 32 },
-        "schemaVersion": { "$ref": "#/$defs/schemaVersion" },
-        "mode": { "$ref": "#/$defs/mode" },
-        "labels": { "type": "array", "maxItems": 500, "items": { "$ref": "#/$defs/Label" } }
-      }
-    },
-
-    "Environment": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["appVersion", "os"],
-      "properties": {
-        "appVersion": { "type": "string", "maxLength": 32 },
-        "os": { "type": "string", "maxLength": 128 },
-        "resolution": { "type": ["string", "null"], "maxLength": 32 },
-        "displayScale": { "type": ["number", "null"], "minimum": 0 },
-        "aspectRatio": { "type": ["string", "null"], "maxLength": 16 },
-        "codec": { "type": ["string", "null"], "maxLength": 32 },
-        "cpuModel": { "type": ["string", "null"], "maxLength": 128 },
-        "cpuCores": { "type": ["integer", "null"], "minimum": 1 },
-        "gpuName": { "type": ["string", "null"], "maxLength": 128 },
-        "memoryMb": { "type": ["integer", "null"], "minimum": 1 },
-        "hwaccel": { "type": ["boolean", "null"] },
-        "hevcPlayable": { "type": ["boolean", "null"] },
-        "ffmpegBuild": { "type": ["string", "null"], "maxLength": 64 },
-        "proxyEncoder": { "type": ["string", "null"], "maxLength": 32 },
-        "steamBufferMinutes": { "type": ["integer", "null"], "minimum": 0 },
-        "locale": { "type": ["string", "null"], "maxLength": 32 },
-        "timezone": { "type": ["string", "null"], "maxLength": 64 },
-        "analysisTimeRatio": { "type": ["number", "null"], "minimum": 0 },
-        "proxyBuildSec": { "type": ["number", "null"], "minimum": 0 },
-        "readFailStats": {
-          "type": "object",
-          "maxProperties": 64,
-          "propertyNames": { "maxLength": 64 },
-          "additionalProperties": { "type": "integer" }
+        "teamWipe": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 32
+        },
+        "enemyRingMean": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ultimateDelta": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "killDelta": {
+          "type": "integer"
+        },
+        "assistDelta": {
+          "type": "integer"
+        },
+        "died": {
+          "type": "boolean"
+        },
+        "detectorConfidence": {
+          "type": "number"
+        },
+        "region": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "gameDay": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "dayNight": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 16
+        },
+        "phaseIndex": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "reviveCost": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 16
+        },
+        "myCharacter": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "matchKills": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "matchAssists": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "matchTeamKills": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
         }
       }
     },
-
+    "LabelBatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "installId",
+        "appVersion",
+        "schemaVersion",
+        "mode",
+        "labels"
+      ],
+      "properties": {
+        "installId": {
+          "$ref": "#/$defs/installId"
+        },
+        "appVersion": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/schemaVersion"
+        },
+        "mode": {
+          "$ref": "#/$defs/mode"
+        },
+        "labels": {
+          "type": "array",
+          "maxItems": 500,
+          "items": {
+            "$ref": "#/$defs/Label"
+          }
+        }
+      }
+    },
+    "Environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "appVersion",
+        "os"
+      ],
+      "properties": {
+        "appVersion": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "os": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "resolution": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 32
+        },
+        "displayScale": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "aspectRatio": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 16
+        },
+        "codec": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 32
+        },
+        "cpuModel": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "cpuCores": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "gpuName": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "memoryMb": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "hwaccel": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "hevcPlayable": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "ffmpegBuild": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "proxyEncoder": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 32
+        },
+        "steamBufferMinutes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "locale": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 32
+        },
+        "timezone": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "analysisTimeRatio": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "proxyBuildSec": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "readFailStats": {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": {
+            "maxLength": 64
+          },
+          "additionalProperties": {
+            "type": "integer"
+          }
+        }
+      }
+    },
     "LogEntry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["ts", "level", "message"],
+      "required": [
+        "ts",
+        "level",
+        "message"
+      ],
       "properties": {
-        "ts": { "type": "string", "maxLength": 40 },
-        "level": { "type": "string", "maxLength": 16 },
-        "logger": { "type": "string", "maxLength": 128 },
-        "message": { "type": "string", "maxLength": 2000 },
-        "exceptionType": { "type": "string", "maxLength": 128 },
-        "stack": { "type": "string", "maxLength": 8000 },
-        "fingerprint": { "type": "string", "pattern": "^[0-9a-f]{16,64}$" }
+        "ts": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "level": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "logger": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "exceptionType": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "stack": {
+          "type": "string",
+          "maxLength": 8000
+        },
+        "fingerprint": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{16,64}$"
+        }
       }
     },
-
     "LogBatch": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["installId", "schemaVersion", "mode", "env", "entries"],
+      "required": [
+        "installId",
+        "schemaVersion",
+        "mode",
+        "env",
+        "entries"
+      ],
       "properties": {
-        "installId": { "$ref": "#/$defs/installId" },
-        "schemaVersion": { "$ref": "#/$defs/schemaVersion" },
-        "mode": { "$ref": "#/$defs/mode" },
-        "env": { "$ref": "#/$defs/Environment" },
-        "entries": { "type": "array", "maxItems": 2000, "items": { "$ref": "#/$defs/LogEntry" } }
+        "installId": {
+          "$ref": "#/$defs/installId"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/schemaVersion"
+        },
+        "mode": {
+          "$ref": "#/$defs/mode"
+        },
+        "env": {
+          "$ref": "#/$defs/Environment"
+        },
+        "entries": {
+          "type": "array",
+          "maxItems": 2000,
+          "items": {
+            "$ref": "#/$defs/LogEntry"
+          }
+        }
       }
     },
-
     "DiagnosticBundle": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["installId", "schemaVersion", "mode", "displayId", "env", "entries"],
+      "required": [
+        "installId",
+        "schemaVersion",
+        "mode",
+        "displayId",
+        "env",
+        "entries"
+      ],
       "properties": {
-        "installId": { "$ref": "#/$defs/installId" },
-        "schemaVersion": { "$ref": "#/$defs/schemaVersion" },
-        "mode": { "$ref": "#/$defs/mode" },
-        "displayId": { "type": "string", "pattern": "^LUMIA-[0-9A-Z]{4}-[0-9A-Z]{4}$" },
-        "env": { "$ref": "#/$defs/Environment" },
-        "entries": { "type": "array", "maxItems": 2000, "items": { "$ref": "#/$defs/LogEntry" } }
+        "installId": {
+          "$ref": "#/$defs/installId"
+        },
+        "schemaVersion": {
+          "$ref": "#/$defs/schemaVersion"
+        },
+        "mode": {
+          "$ref": "#/$defs/mode"
+        },
+        "displayId": {
+          "type": "string",
+          "pattern": "^LUMIA-[0-9A-Z]{4}-[0-9A-Z]{4}$"
+        },
+        "env": {
+          "$ref": "#/$defs/Environment"
+        },
+        "entries": {
+          "type": "array",
+          "maxItems": 2000,
+          "items": {
+            "$ref": "#/$defs/LogEntry"
+          }
+        }
       }
     },
-
     "LabelResponse": {
       "type": "object",
-      "required": ["saved"],
-      "properties": { "saved": { "type": "integer", "minimum": 0 } }
+      "required": [
+        "saved"
+      ],
+      "properties": {
+        "saved": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
     },
     "LogResponse": {
       "type": "object",
-      "required": ["saved"],
-      "properties": { "saved": { "type": "integer", "minimum": 0 } }
+      "required": [
+        "saved"
+      ],
+      "properties": {
+        "saved": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
     },
     "DiagnosticResponse": {
       "type": "object",
-      "required": ["receiptId", "saved"],
+      "required": [
+        "receiptId",
+        "saved"
+      ],
       "properties": {
-        "receiptId": { "type": "string", "pattern": "^R-[0-9]{8}-[A-Z2-9]{6}$" },
-        "saved": { "type": "integer", "minimum": 0 }
+        "receiptId": {
+          "type": "string",
+          "pattern": "^R-[0-9]{8}-[A-Z2-9]{6}$"
+        },
+        "saved": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     }
   }
