@@ -10,6 +10,7 @@
 - [x] I2. Terraform 으로 OCI 기본 인프라(VCN·게이트웨이·라우트 테이블·보안 목록·서브넷·VM) 구성 — **2026-09-25 `apply` 완료.** VM 은 `VM.Standard.E2.1.Micro`(A1 은 `LaunchInstance` 404 로 실패, [§7](#7-실제-구성-2026-09-25)). 로컬 상태 파일
 - [x] I3. 도커로 수신 API 컨테이너 배포 (1단계 저장: 파일) — caddy + receiver + watchtower, `https://server.example.invalid` 에서 동작. 실서버에서 토큰 없음 401·라벨 저장·삭제·`/docs` 404 확인. 자동 업데이트(ghcr + watchtower, **간격 5분 — 나중에 1~2시간으로 늘릴 TODO**)
 - [x] I3-b. **서버 전송 계약 확정·구현·배포 (2026-09-25)** — 계약 원본 `infra\contract`, 서버 스키마를 앱 실제 메타데이터와 대조해 확정, `POST /v1/diagnostics`(접수 번호), `mode=dev` 분리, 90일 자동 삭제, 접근 로그 IP 비활성, watchtower 2시간(`WATCHTOWER_POLL_INTERVAL`), 일별 집계, 다중 토큰. pytest 55개 통과. **실서버 배포·읽기 전용 스모크 완료**(caddy 설정 서버에서 `caddy validate`, `docker compose up -d`; 토큰 없는 `/v1/diagnostics`·`/v1/labels`·`DELETE` 401, `/docs` 404, `/healthz` 200, 재기동 후 컨테이너 로그에 클라이언트 IP 없음 — 라벨 등 데이터를 쓰는 요청은 하지 않았다). 이 저장소의 계약 테스트는 [D10 전송 계약](plan-deploy.md#d10-라벨오류-로그-전송--서버-전송-계약) 참고
+- [x] I3-c. **요청 제한·이상 요청 차단·Discord 알림 (2026-09-25 코드·로컬 도커 통합 테스트 완료, 실서버 반영 전)** — IP 별 메모리 제한(10분에 60회, 거부 15회 → 1시간 차단, 429), 알림은 IP 앞 두 자리만·시간당 10건 상한, 웹훅 URL 은 `.env` 로만. pytest 68개, caddy→receiver 실제 경로에서 차단·healthz 예외·로그에 클라이언트 IP 없음 확인
 - [ ] I4. 이 저장소 쪽 전송 클라이언트 연결 (= plan-deploy D10 과 같이 진행)
 - [ ] I5. 파일 → DB 이전 (2단계 저장, [§4](#4-저장-계층-파일--db))
 
@@ -83,12 +84,12 @@
 - **겪은 함정**(해결법은 README): `.oci` 폴더를 사용자 폴더 밖에 잘못 만듦, `config` 의 `key_file=` 상대 경로, `compartment_ocid` 에 user OCID 를 넣음, ghcr 태그 대문자(`repository name must be lowercase`).
 - **I4 에서 서버에 더 필요했던 것(2026-09-25 구현·배포 완료)**: 진단 번들 업로드 경로와 접수 번호 응답(plan-deploy D14), 라벨 메모 필드 `labelNote`(plan-deploy D12).
 - **앱 쪽 연결(I4)에 필요한 것**: 주소 `https://server.example.invalid`, `X-Api-Token`(값은 infra 저장소의 `terraform.tfvars`, 커밋되지 않음). 서버의 라벨 필드 허용 목록은 2026-09-25 에 앱 `ClipMetadata` 와 하나씩 대조해 확정했다(`contract/app-metadata-fields.json`, 앱 테스트가 대조).
-- **남은 위험**: 요청 빈도 제한 없음, 공유 토큰이 앱에 들어가므로 완전한 인증이 아님(회수 방법은 [roadmap §4-2](roadmap.md)), 공인 IP 가 예약 IP 가 아니라 VM 재생성 시 바뀜, 1GB 메모리, 저장은 파일뿐.
+- **남은 위험**: 요청 제한은 IP 기준이라 VPN 등으로 우회 가능(완화 수단), 공유 토큰이 앱에 들어가므로 완전한 인증이 아님(회수 방법은 [roadmap §4-2](roadmap.md)), 공인 IP 가 예약 IP 가 아니라 VM 재생성 시 바뀜, 1GB 메모리, 저장은 파일뿐.
 
 ### §6 확인 필요 중 결정된 것
 - 항목 1(무료 한도·가용성): 위와 같이 실측. A1 은 안 됐고 E2.1.Micro 로 확정.
 - 항목 2(상태 파일): 로컬 파일. 백업 필요.
 - 항목 3(언어): FastAPI.
-- 항목 4(인증): 공유 토큰 + 크기 상한, **여러 토큰 동시 허용으로 무중단 교체 가능(2026-09-25 구현)**. 빈도 제한은 미구현.
+- 항목 4(인증): 공유 토큰(공개 키 수준) + 크기 상한 + **IP 별 요청 제한·차단·알림(2026-09-25 구현, [roadmap §4-2](roadmap.md))**. 여러 토큰 동시 허용도 가능.
 - 항목 5(개인정보): 보관 기간·IP 처리는 [privacy.md](privacy.md) 대로 서버에 구현(접근 로그 비활성, 로그·진단 90일 자동 삭제). **배포는 했고 접근 로그에 IP 가 없는 것까지 확인했다.** 인터넷 스캐너가 만드는 TLS 오류 기록에 IP 가 남는지와 90일 자동 삭제의 실제 동작(오래된 파일이 생겨야 관측 가능)은 아직 관측하지 못했다 — 그래서 [privacy.md](privacy.md) 는 초안으로 둔다.
 - 항목 6·7·8: 아직 미정.
