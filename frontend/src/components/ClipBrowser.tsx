@@ -12,6 +12,7 @@ import {
   restoreClip,
   startReprocess,
   trashClip,
+  splitClip,
   trimClip,
 } from '../api'
 import { useConfirm } from '../confirmContext'
@@ -516,8 +517,13 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
           onLabel={handleLabel}
           onExport={setExportTarget}
           onRename={handleRename}
-          onTrim={async (clip, start, end) => {
-            await trimClip(clip.id, start, end)
+          onTrim={async (clip, ranges) => {
+            if (ranges.length === 1) {
+              await trimClip(clip.id, ranges[0].start, ranges[0].end)
+            } else {
+              const pieces = await splitClip(clip.id, ranges)
+              setPlayingId(pieces[0]?.id ?? null)
+            }
             reload()
           }}
           paused={exportTarget !== null}

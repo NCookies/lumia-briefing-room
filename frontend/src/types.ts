@@ -86,6 +86,7 @@ export interface Clip {
   detectorConfidence: number
   sizeBytes?: number
   trimmed?: boolean
+  splitFrom?: string
   originalDurationSec?: number
   matchResult?: MatchResult | null
 }

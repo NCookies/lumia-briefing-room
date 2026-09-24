@@ -143,6 +143,24 @@ export async function trimClip(id: string, start: number, end: number): Promise<
   return res.json()
 }
 
+export async function splitClip(id: string, ranges: { start: number; end: number }[]): Promise<Clip[]> {
+  const res = await fetch(`${BASE}/clips/${id}/split`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ranges }),
+  })
+  if (!res.ok) {
+    let detail = ''
+    try {
+      detail = (await res.json()).detail ?? ''
+    } catch {
+      // 본문이 JSON 이 아니면 상태 코드만 보여준다
+    }
+    throw new Error(`자르기에 실패했습니다 (${res.status})${detail ? `: ${detail}` : ''}`)
+  }
+  return res.json()
+}
+
 export function proxyVideoUrl(id: string, version?: number): string {
   return `${BASE}/clips/${id}/video?proxy=1${version === undefined ? '' : `&v=${version}`}`
 }

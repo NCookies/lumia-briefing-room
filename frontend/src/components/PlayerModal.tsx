@@ -8,6 +8,7 @@ import { loadVolume, saveVolume } from '../volume'
 import { LabelButtons } from './LabelButtons'
 import { ScoreChip } from './ScoreChip'
 import { TagBadge } from './TagBadge'
+import type { TrimRange } from '../trimming'
 import { TrimPanel } from './TrimPanel'
 
 interface Props {
@@ -18,7 +19,7 @@ interface Props {
   onTrash: (clip: Clip) => void
   onRename: (clip: Clip, title: string) => void
   onExport: (clip: Clip) => void
-  onTrim: (clip: Clip, start: number, end: number) => Promise<void>
+  onTrim: (clip: Clip, ranges: TrimRange[]) => Promise<void>
   paused: boolean
   onClose: () => void
 }
@@ -214,10 +215,10 @@ export function PlayerModal({
             getVideo={() => videoRef.current}
             busy={trimBusy}
             onCancel={() => setTrimming(false)}
-            onApply={async (start, end) => {
+            onApply={async (ranges) => {
               setTrimBusy(true)
               try {
-                await onTrim(clip, start, end)
+                await onTrim(clip, ranges)
                 setTrimming(false)
               } catch (e) {
                 alert((e as Error).message)

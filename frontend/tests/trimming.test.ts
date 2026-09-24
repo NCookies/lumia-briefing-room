@@ -31,3 +31,42 @@ test('initialRange falls back to the beginning when the playhead is at or near t
   assert.deepEqual(initialRange(32.5, 33), { start: 0, end: 33 })
   assert.deepEqual(initialRange(Number.NaN, 33), { start: 0, end: 33 })
 })
+
+import { addRange, clampRangeAt, removeRange, splitSummary } from '../src/trimming.ts'
+
+test('addRange puts the new range in the free gap at the playhead and keeps ranges sorted', () => {
+  const r = addRange([{ start: 0, end: 5 }], 8, 30)
+  assert.deepEqual(r, { ranges: [{ start: 0, end: 5 }, { start: 8, end: 30 }], index: 1 })
+})
+
+test('addRange stops at the next range and falls back to the first free gap when the playhead is on a range', () => {
+  assert.deepEqual(addRange([{ start: 10, end: 20 }], 2, 30), {
+    ranges: [{ start: 2, end: 10 }, { start: 10, end: 20 }],
+    index: 0,
+  })
+  assert.deepEqual(addRange([{ start: 0, end: 20 }], 5, 30), {
+    ranges: [{ start: 0, end: 20 }, { start: 20, end: 30 }],
+    index: 1,
+  })
+})
+
+test('addRange returns null when no free gap is at least the minimum length', () => {
+  assert.equal(addRange([{ start: 0, end: 30 }], 5, 30), null)
+  assert.equal(addRange([{ start: 0, end: 10 }, { start: 10.5, end: 30 }], 5, 30), null)
+})
+
+test('clampRangeAt cannot cross neighbours', () => {
+  const ranges = [{ start: 0, end: 5 }, { start: 10, end: 15 }, { start: 20, end: 25 }]
+  assert.deepEqual(clampRangeAt(ranges, 1, 'start', 2, 30)[1], { start: 5, end: 15 })
+  assert.deepEqual(clampRangeAt(ranges, 1, 'end', 28, 30)[1], { start: 10, end: 20 })
+  assert.deepEqual(clampRangeAt(ranges, 1, 'start', 12, 30)[1], { start: 12, end: 15 })
+  assert.deepEqual(clampRangeAt(ranges, 0, 'start', -4, 30)[0], { start: 0, end: 5 })
+})
+
+test('removeRange drops one range', () => {
+  assert.deepEqual(removeRange([{ start: 0, end: 5 }, { start: 6, end: 9 }], 0), [{ start: 6, end: 9 }])
+})
+
+test('splitSummary totals the kept and removed seconds', () => {
+  assert.deepEqual(splitSummary([{ start: 0, end: 5 }, { start: 10, end: 14 }], 30), { count: 2, kept: 9, removed: 21 })
+})
