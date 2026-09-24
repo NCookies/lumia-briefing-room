@@ -1,0 +1,70 @@
+{
+  "_설명": "앱 ClipMetadata(pipeline/metadata.py)의 모든 필드를 전송 여부로 분류한 표. 앱 저장소 테스트가 dataclass 필드와 이 표가 일치하는지 검사하므로, 앱에 필드가 추가되면 여기에 분류하지 않는 한 테스트가 깨진다.",
+  "sent": [
+    "tags",
+    "pvpScore",
+    "pvpSignals",
+    "teamWipe",
+    "enemyRingMean",
+    "ultimateDelta",
+    "killDelta",
+    "assistDelta",
+    "died",
+    "region",
+    "gameDay",
+    "dayNight",
+    "phaseIndex",
+    "reviveCost",
+    "durationSec",
+    "gameMode",
+    "sourceWidth",
+    "sourceHeight",
+    "sourceIncomplete",
+    "audioStatus",
+    "prerollSource",
+    "combatStartOffsetSec",
+    "combatEndOffsetSec",
+    "matchKills",
+    "matchAssists",
+    "matchTeamKills",
+    "myCharacter",
+    "detectorConfidence",
+    "labelSource",
+    "labelConflict"
+  ],
+  "converted": {
+    "userLabel": "userLabel (pvp→combat, pve→other)",
+    "labelNote": "labelNote (앱이 이미 앞뒤 공백 제거·500자로 정리)",
+    "sessionDir+matchStartUtc": "matchKey (해시)",
+    "sessionDir+matchStartUtc+videoOffsetSec": "clipKey (해시)"
+  },
+  "excluded": {
+    "title": "수동 편집 가능해 닉네임이 섞일 수 있음",
+    "sessionDir": "경로 원문(matchKey 로 대체)",
+    "sessionStartUtc": "시청 시각",
+    "matchStartUtc": "시청 시각(matchKey 로 대체)",
+    "matchEndUtc": "시청 시각",
+    "segmentStart": "로컬 녹화 세그먼트 번호",
+    "segmentEnd": "로컬 녹화 세그먼트 번호",
+    "videoOffsetSec": "로컬 녹화 안의 위치(교전 위치는 combatStart/EndOffsetSec 로 충분)",
+    "thumbnailPath": "경로 원문",
+    "pinned": "화면 상태",
+    "deletedAt": "휴지통 상태",
+    "teamCharacters": "팀원 정보 전송 안 함",
+    "matchResult": "닉네임·팀원·이미지 경로 포함"
+  },
+  "appMissing": {
+    "pvpSignalValues": "신호별 수치는 앱이 아직 저장하지 않음(D10 에서 추가)",
+    "labeledAt": "라벨 붙인 시각을 앱이 아직 저장하지 않음(D10 에서 추가)"
+  },
+  "vodOnly": {
+    "_설명": "VOD 클립(vod_clips.py)에만 있는 필드. VOD 클립 라벨을 전송할지는 D10 에서 정하며, 전송하더라도 아래는 보내지 않는다.",
+    "excluded": [
+      "vodFile",
+      "streamer",
+      "vodGameIndex",
+      "gameStartOffsetSec",
+      "gameEndOffsetSec"
+    ]
+  }
+}

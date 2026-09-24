@@ -1,0 +1,42 @@
+{
+  "installId": "3f2b8c1e-5a4d-4e6f-9b7a-1c2d3e4f5a6b",
+  "schemaVersion": 1,
+  "mode": "release",
+  "displayId": "LUMIA-7K3F-9QX2",
+  "env": {
+    "appVersion": "0.1.1",
+    "os": "Windows 11",
+    "resolution": "2560x1440",
+    "displayScale": 1.25,
+    "aspectRatio": "16:9",
+    "codec": "hevc",
+    "cpuModel": "AMD Ryzen 7",
+    "cpuCores": 8,
+    "gpuName": "NVIDIA RTX 3060",
+    "memoryMb": 16384,
+    "hwaccel": true,
+    "hevcPlayable": false,
+    "ffmpegBuild": "lgpl-7.1",
+    "proxyEncoder": "h264_mf",
+    "steamBufferMinutes": 30,
+    "locale": "ko-KR",
+    "timezone": "Asia/Seoul",
+    "analysisTimeRatio": 0.6,
+    "proxyBuildSec": 12.5,
+    "readFailStats": {
+      "badge_unreadable": 3,
+      "region_missing": 1
+    }
+  },
+  "entries": [
+    {
+      "ts": "2026-09-25T10:00:00",
+      "level": "ERROR",
+      "logger": "lumia_briefing_room.pipeline.clip",
+      "message": "cut failed",
+      "exceptionType": "RuntimeError",
+      "stack": "Traceback ...\n  File \"<path>\\clip.py\", line 10",
+      "fingerprint": "0123456789abcdef"
+    }
+  ]
+}
