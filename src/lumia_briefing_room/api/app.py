@@ -50,7 +50,7 @@ from lumia_briefing_room.pipeline.move_clips import MoveError, execute_move, pla
 from lumia_briefing_room.pipeline.retention import restore_clip, trash_clip
 from lumia_briefing_room.pipeline.proxy import create_proxy, is_proxy_fresh, proxy_path, remove_orphan_proxies
 from lumia_briefing_room.pipeline.reprocess import GameRef, ReprocessError, reprocess_game
-from lumia_briefing_room.pipeline.trim import trim_clip, validate_range
+from lumia_briefing_room.pipeline.trim import split_clip, trim_clip, validate_range, validate_ranges
 from lumia_briefing_room.steam_paths import resolve_recording_root
 
 
@@ -472,6 +472,32 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         except (OSError, subprocess.CalledProcessError) as e:
             raise HTTPException(500, f"자르기에 실패했습니다: {e}")
         return _serialize(find_clip(clip_root, clip_id))
+
+    @app.post("/api/clips/{clip_id}/split")
+    @locked
+    def split(clip_id: str, body: dict):
+        found = _locate(app, clip_id)
+        if found is None or found[2]:
+            raise HTTPException(404, "클립을 찾을 수 없습니다")
+        clip_root, clip, _ = found
+        try:
+            ranges = [(float(r["start"]), float(r["end"])) for r in body["ranges"]]
+            validate_ranges(ranges, float(clip.meta.get("durationSec", 0.0)))
+        except (KeyError, TypeError):
+            raise HTTPException(400, "구간 목록(ranges)을 시작·끝 숫자로 지정해야 합니다")
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        ffmpeg = discover_ffmpeg()
+        if ffmpeg is None:
+            raise HTTPException(503, "ffmpeg를 찾을 수 없습니다")
+        try:
+            pieces = split_clip(
+                clip.meta_path, ranges, trash_dir=clip_root / ".trash", ffmpeg_path=ffmpeg,
+                thumbnail=current_config().encode.thumbnail,
+            )
+        except (OSError, subprocess.CalledProcessError) as e:
+            raise HTTPException(500, f"자르기에 실패했습니다: {e}")
+        return [_serialize(find_clip(clip_root, p.stem)) for p in pieces]
 
     @app.post("/api/trash/empty")
     @locked

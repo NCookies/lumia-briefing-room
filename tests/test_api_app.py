@@ -679,3 +679,38 @@ def test_emptying_the_trash_keeps_only_the_labeled_clips_evidence(client):
     client.post("/api/trash/empty")
 
     assert sorted(p.name for p in (clips / ".labels").glob("*.json")) == ["a.json"]
+
+
+def test_split_rejects_bad_ranges_and_unknown_clip(client):
+    _write_clip(client.app.state.clips_dir_for_test, "a", durationSec=20.0)
+
+    assert client.post("/api/clips/a/split", json={"ranges": [{"start": 0, "end": 6}, {"start": 5, "end": 9}]}).status_code == 400
+    assert client.post("/api/clips/a/split", json={"ranges": []}).status_code == 400
+    assert client.post("/api/clips/a/split", json={}).status_code == 400
+    assert client.post("/api/clips/zzz/split", json={"ranges": [{"start": 0, "end": 5}, {"start": 6, "end": 9}]}).status_code == 404
+
+
+def test_split_creates_new_clips_and_trashes_the_original(client):
+    import subprocess
+
+    from conftest import FFMPEG_PATH
+
+    if FFMPEG_PATH is None:
+        pytest.skip("ffmpeg를 찾을 수 없다")
+    clips = client.app.state.clips_dir_for_test
+    _write_clip(clips, "a", durationSec=10.0, videoOffsetSec=50.0)
+    subprocess.run(
+        [str(FFMPEG_PATH), "-hide_banner", "-v", "error", "-y", "-f", "lavfi", "-i",
+         "testsrc=size=320x180:rate=30:duration=10", "-c:v", "libx264", "-g", "30", "-pix_fmt", "yuv420p",
+         str(clips / "a.mp4")],
+        check=True,
+    )
+
+    resp = client.post("/api/clips/a/split", json={"ranges": [{"start": 1, "end": 4}, {"start": 6, "end": 9}]})
+
+    assert resp.status_code == 200
+    ids = [c["id"] for c in resp.json()]
+    assert ids == ["a-p1", "a-p2"]
+    listed = {c["id"] for c in client.get("/api/clips").json()}
+    assert listed == {"a-p1", "a-p2"}
+    assert {c["id"] for c in client.get("/api/clips", params={"trashed": True}).json()} == {"a"}

@@ -102,3 +102,73 @@ def test_failed_trim_leaves_the_original_untouched(tmp_path):
     assert (tmp_path / "clip1.mp4").read_bytes() == before
     assert "trimmed" not in json.loads(meta_path.read_text(encoding="utf-8"))
     assert not list(tmp_path.glob("*.trim.mp4"))
+
+
+def test_validate_ranges_rejects_overlaps_and_sorts():
+    from lumia_briefing_room.pipeline.trim import validate_ranges
+
+    assert validate_ranges([(10.0, 15.0), (0.0, 5.0)], 20.0) == [(0.0, 5.0), (10.0, 15.0)]
+    assert validate_ranges([(0.0, 5.0), (5.0, 9.0)], 20.0) == [(0.0, 5.0), (5.0, 9.0)]
+    with pytest.raises(ValueError):
+        validate_ranges([(0.0, 6.0), (5.0, 9.0)], 20.0)
+    with pytest.raises(ValueError):
+        validate_ranges([], 20.0)
+    with pytest.raises(ValueError):
+        validate_ranges([(0.0, 5.0), (8.0, 8.2)], 20.0)
+
+
+@requires_ffmpeg
+def test_split_makes_one_new_clip_per_range_and_trashes_the_original(tmp_path):
+    from lumia_briefing_room.pipeline.trim import split_clip
+
+    meta_path = write_clip(tmp_path, matchStartUtc="2026-01-01T00:00:00Z", tags=["x"], pvpScore=0.8, labelSource="user")
+    trash = tmp_path / ".trash"
+
+    new_paths = split_clip(
+        meta_path, [(2.0, 6.0), (10.0, 15.0)], trash_dir=trash, ffmpeg_path=FFMPEG_PATH, thumbnail=ThumbnailConfig()
+    )
+
+    assert [p.stem for p in new_paths] == ["clip1-p1", "clip1-p2"]
+    metas = [json.loads(p.read_text(encoding="utf-8")) for p in new_paths]
+    assert [m["durationSec"] for m in metas] == [pytest.approx(4.0), pytest.approx(5.0)]
+    assert [m["videoOffsetSec"] for m in metas] == [pytest.approx(102.0), pytest.approx(110.0)]
+    for m, p in zip(metas, new_paths):
+        assert m["splitFrom"] == "clip1" and m["trimmed"] is True and m["originalDurationSec"] == 20.0
+        assert m["userLabel"] is None and m["pvpScore"] == 0.8 and m["tags"] == ["x"]
+        assert m["matchStartUtc"] == "2026-01-01T00:00:00Z"
+        assert (tmp_path / m["thumbnailPath"]).exists()
+        assert p.with_suffix(".mp4").exists()
+    assert video_seconds(new_paths[1].with_suffix(".mp4")) == pytest.approx(5.0, abs=0.2)
+    assert not meta_path.exists() and (trash / "clip1.json").exists() and (trash / "clip1.mp4").exists()
+
+
+@requires_ffmpeg
+def test_failed_split_removes_new_pieces_and_keeps_the_original(tmp_path):
+    from lumia_briefing_room.pipeline.trim import split_clip
+
+    meta_path = write_clip(tmp_path)
+
+    with pytest.raises(OSError):
+        split_clip(
+            meta_path, [(2.0, 6.0), (10.0, 15.0)], trash_dir=tmp_path / ".trash",
+            ffmpeg_path=tmp_path / "no-such-ffmpeg.exe", thumbnail=ThumbnailConfig(),
+        )
+
+    assert meta_path.exists() and (tmp_path / "clip1.mp4").exists()
+    assert sorted(p.name for p in tmp_path.glob("clip1-p*")) == []
+    assert not (tmp_path / ".trash").exists()
+
+
+@requires_ffmpeg
+def test_split_avoids_existing_ids(tmp_path):
+    from lumia_briefing_room.pipeline.trim import split_clip
+
+    meta_path = write_clip(tmp_path)
+    (tmp_path / "clip1-p1.json").write_text("{}", encoding="utf-8")
+
+    new_paths = split_clip(
+        meta_path, [(0.0, 4.0), (6.0, 10.0)], trash_dir=tmp_path / ".trash", ffmpeg_path=FFMPEG_PATH,
+        thumbnail=ThumbnailConfig(),
+    )
+
+    assert [p.stem for p in new_paths] == ["clip1-p2", "clip1-p3"]
