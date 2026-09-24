@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useAppInfo, versionLabel } from './appInfo'
 import { BackfillDialog } from './components/BackfillDialog'
 import { ClipBrowser, type ClipSource } from './components/ClipBrowser'
 import { FirstRunScreen } from './components/FirstRunScreen'
@@ -23,6 +24,7 @@ function loadTab(): ClipSource {
 }
 
 export default function App() {
+  const version = versionLabel(useAppInfo())
   const [tab, setTab] = useState<ClipSource>(loadTab)
   const [showSettings, setShowSettings] = useState(false)
   const [browserKey, setBrowserKey] = useState(0)
@@ -82,7 +84,10 @@ export default function App() {
       {firstRun && <FirstRunScreen onDone={() => setFirstRun(false)} />}
       <header className="flex items-end justify-between border-b border-zinc-700 px-4 pt-3">
         <div className="flex items-end gap-6">
-          <h1 className="pb-2 text-xl font-semibold">루미아 브리핑룸</h1>
+          <h1 className="pb-2 text-xl font-semibold">
+            루미아 브리핑룸
+            {version && <span className="ml-2 text-xs font-normal text-zinc-500">{version}</span>}
+          </h1>
           <nav className="flex gap-1" role="tablist">
             {TABS.map((t) => (
               <button

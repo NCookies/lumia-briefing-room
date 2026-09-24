@@ -13,6 +13,11 @@ export function showTuningUi(info: AppInfo): boolean {
   return info.mode === 'dev'
 }
 
+export function versionLabel(info: AppInfo): string {
+  if (!info.version) return ''
+  return info.mode === 'dev' ? `v${info.version} (dev)` : `v${info.version}`
+}
+
 export async function fetchAppInfo(): Promise<AppInfo> {
   const res = await fetch('/api/app-info')
   if (!res.ok) throw new Error(`앱 정보 조회에 실패했습니다 (${res.status})`)
