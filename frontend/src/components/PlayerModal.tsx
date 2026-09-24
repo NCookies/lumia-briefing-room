@@ -5,7 +5,9 @@ import { SIGNAL_LABELS } from '../labels'
 import { applyLabel, labelForKey, nextUnlabeledIndex, progress } from '../labeling'
 import type { Clip, UserLabel } from '../types'
 import { loadVolume, saveVolume } from '../volume'
+import { useLabelingUi } from '../labelingContext'
 import { LabelButtons } from './LabelButtons'
+import { LabelNoteInput } from './LabelNoteInput'
 import { ScoreChip } from './ScoreChip'
 import { TagBadge } from './TagBadge'
 import type { TrimRange } from '../trimming'
@@ -16,6 +18,7 @@ interface Props {
   index: number
   onIndexChange: (index: number) => void
   onLabel: (clip: Clip, label: UserLabel) => void
+  onNote: (clip: Clip, note: string | null) => void
   onTrash: (clip: Clip) => void
   onRename: (clip: Clip, title: string) => void
   onExport: (clip: Clip) => void
@@ -29,6 +32,7 @@ export function PlayerModal({
   index,
   onIndexChange,
   onLabel,
+  onNote,
   onTrash,
   onRename,
   onExport,
@@ -37,6 +41,7 @@ export function PlayerModal({
   onClose,
 }: Props) {
   const clip = clips[index]
+  const labeling = useLabelingUi()
   const volumeRef = useRef(loadVolume())
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [trimming, setTrimming] = useState(false)
@@ -48,7 +53,7 @@ export function PlayerModal({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (paused) return
-      if (e.target instanceof HTMLInputElement) return
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       if (trimming) {
         if (e.key === 'Escape') setTrimming(false)
         return
@@ -57,6 +62,7 @@ export function PlayerModal({
       if (e.key === 'ArrowRight') return onIndexChange(Math.min(index + 1, clips.length - 1))
       if (e.key === 'ArrowLeft') return onIndexChange(Math.max(index - 1, 0))
 
+      if (!labeling) return
       const label = labelForKey(e.key)
       if (label === undefined) return
       onLabel(clip, label)
@@ -66,7 +72,7 @@ export function PlayerModal({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [clips, clip, index, paused, trimming, onClose, onIndexChange, onLabel])
+  }, [clips, clip, index, paused, trimming, labeling, onClose, onIndexChange, onLabel])
 
   const startRename = () => {
     setDraftTitle(clip.title)
@@ -229,19 +235,25 @@ export function PlayerModal({
           />
         )}
 
+        {labeling && clip.userLabel !== null && (
+          <LabelNoteInput clipId={clip.id} value={clip.labelNote} onSave={(note) => onNote(clip, note)} />
+        )}
+
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-zinc-300">
           <div className="flex items-center gap-4">
-            <LabelButtons
-              value={clip.userLabel}
-              onChange={(l) => {
-                onLabel(clip, l)
-                if (l === null) return
-                const next = nextUnlabeledIndex(applyLabel(clips, clip.id, l), index)
-                if (next !== null) onIndexChange(next)
-              }}
-              showKeys
-              size="lg"
-            />
+            {labeling && (
+              <LabelButtons
+                value={clip.userLabel}
+                onChange={(l) => {
+                  onLabel(clip, l)
+                  if (l === null) return
+                  const next = nextUnlabeledIndex(applyLabel(clips, clip.id, l), index)
+                  if (next !== null) onIndexChange(next)
+                }}
+                showKeys
+                size="lg"
+              />
+            )}
             <span className="text-xs text-zinc-500">
               근거:{' '}
               {(clip.pvpSignals ?? []).length
@@ -276,12 +288,17 @@ export function PlayerModal({
               삭제
             </button>
             <span>
-              라벨 {labeled}/{total} · {index + 1}번째
+              {labeling && `라벨 ${labeled}/${total} · `}
+              {index + 1}번째
             </span>
             <span>
               <kbd className="rounded bg-zinc-700 px-1">←</kbd>
               <kbd className="ml-1 rounded bg-zinc-700 px-1">→</kbd> 이동 ·{' '}
-              <kbd className="rounded bg-zinc-700 px-1">0</kbd> 라벨 해제 ·{' '}
+              {labeling && (
+                <>
+                  <kbd className="rounded bg-zinc-700 px-1">0</kbd> 라벨 해제 ·{' '}
+                </>
+              )}
               <kbd className="rounded bg-zinc-700 px-1">Esc</kbd> 닫기
             </span>
           </div>

@@ -1,3 +1,4 @@
+import { LABEL_TEXT } from '../consent'
 import type { UserLabel } from '../types'
 
 interface Props {
@@ -9,8 +10,8 @@ interface Props {
 }
 
 const OPTIONS: { label: 'pvp' | 'pve'; text: string; key: string; active: string }[] = [
-  { label: 'pvp', text: '교전', key: '1', active: 'border-emerald-400 bg-emerald-500/30 text-emerald-100' },
-  { label: 'pve', text: '사냥', key: '2', active: 'border-zinc-300 bg-zinc-500/40 text-zinc-100' },
+  { label: 'pvp', text: LABEL_TEXT.pvp, key: '1', active: 'border-emerald-400 bg-emerald-500/30 text-emerald-100' },
+  { label: 'pve', text: LABEL_TEXT.pve, key: '2', active: 'border-zinc-300 bg-zinc-500/40 text-zinc-100' },
 ]
 
 export function LabelButtons({ value, onChange, showKeys = false, size = 'sm', onlyActive = false }: Props) {

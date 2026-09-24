@@ -40,7 +40,7 @@ export async function listClips(query: ClipQuery = {}): Promise<Clip[]> {
 
 export async function patchClip(
   id: string,
-  body: Partial<Pick<Clip, 'title' | 'pinned'>> & { userLabel?: UserLabel },
+  body: Partial<Pick<Clip, 'title' | 'pinned'>> & { userLabel?: UserLabel; labelNote?: string | null },
 ): Promise<Clip> {
   const res = await checkOk(
     await fetch(`${BASE}/clips/${id}`, {

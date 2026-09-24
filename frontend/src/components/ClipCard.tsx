@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ClipId } from './ClipId'
 import { thumbnailUrl } from '../api'
 import type { Clip, UserLabel } from '../types'
+import { useLabelingUi } from '../labelingContext'
 import { LabelButtons } from './LabelButtons'
 import { ScoreChip } from './ScoreChip'
 import { TagBadge } from './TagBadge'
@@ -42,6 +43,7 @@ export function ClipCard({
   onLabel,
   onExport,
 }: Props) {
+  const labeling = useLabelingUi()
   const [editing, setEditing] = useState(false)
   const [draftTitle, setDraftTitle] = useState(clip.title)
 
@@ -57,7 +59,7 @@ export function ClipCard({
   return (
     <div
       className={`flex flex-col overflow-hidden rounded-lg border bg-zinc-800/60 ${
-        (clip.userLabel && BORDER[clip.userLabel]) || 'border-zinc-700'
+        (labeling && clip.userLabel && BORDER[clip.userLabel]) || 'border-zinc-700'
       }`}
     >
       <button
@@ -80,10 +82,10 @@ export function ClipCard({
         <span className="absolute left-1 top-1">
           <ScoreChip score={clip.pvpScore} signals={clip.pvpSignals ?? []} />
         </span>
-        {clip.labelConflict && (
+        {labeling && clip.labelConflict && (
           <span
             className="absolute bottom-6 left-1 rounded bg-sky-600/90 px-1 text-xs"
-            title="이전 버전에서 교전/사냥 라벨이 섞여 있어 자동으로 옮겨 온 라벨입니다. 맞다면 같은 버튼을 한 번 더 눌러 확정하세요."
+            title="이전 버전에서 교전/그 외 라벨이 섞여 있어 자동으로 옮겨 온 라벨입니다. 맞다면 같은 버튼을 한 번 더 눌러 확정하세요."
           >
             옮겨 온 라벨 · 확인 필요
           </span>
@@ -164,7 +166,7 @@ export function ClipCard({
             </div>
           ) : (
             <>
-              <LabelButtons value={clip.userLabel} onChange={(l) => onLabel(clip, l)} onlyActive />
+              {labeling && <LabelButtons value={clip.userLabel} onChange={(l) => onLabel(clip, l)} onlyActive />}
               <div className="flex gap-2 text-xs">
                 <button
                   type="button"

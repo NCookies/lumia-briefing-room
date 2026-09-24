@@ -70,6 +70,7 @@ export interface Clip {
   ultimateDelta: number | null
   region: string | null
   userLabel: UserLabel
+  labelNote?: string | null
   labelSource?: 'user' | 'migrated' | null
   labelConflict?: boolean
   gameDay: number | null

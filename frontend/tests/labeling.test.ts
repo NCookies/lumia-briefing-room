@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  applyNote,
   applyLabel,
   labelForKey,
   nextUnlabeledIndex,
@@ -36,7 +37,7 @@ test('applyLabel changes only the matching clip and does not mutate', () => {
 })
 
 test('applyLabel can clear a label', () => {
-  assert.deepEqual(applyLabel([clip('a', 'pve')], 'a', null), [clip('a')])
+  assert.deepEqual(applyLabel([clip('a', 'pve')], 'a', null), [{ ...clip('a'), labelNote: null }])
 })
 
 test('nextUnlabeledIndex finds the next unlabeled clip after the current one', () => {
@@ -76,4 +77,20 @@ test('scoreTone separates confirmed, likely, weak and none', () => {
   assert.equal(scoreTone(0.2), 'weak')
   assert.equal(scoreTone(0), 'none')
   assert.equal(scoreTone(null), 'none')
+})
+
+test('applyNote sets the note on only the matching clip', () => {
+  const clips = [
+    { id: 'a', userLabel: 'pvp' as const, labelNote: null },
+    { id: 'b', userLabel: 'pve' as const, labelNote: null },
+  ]
+  const next = applyNote(clips, 'a', '적 둘과 교전')
+  assert.equal(next[0].labelNote, '적 둘과 교전')
+  assert.equal(next[1].labelNote, null)
+})
+
+test('clearing a label also clears its note, like the server does', () => {
+  const clips = [{ id: 'a', userLabel: 'pvp' as const, labelNote: '메모' }]
+  assert.equal(applyLabel(clips, 'a', null)[0].labelNote, null)
+  assert.equal(applyLabel(clips, 'a', 'pve')[0].labelNote, '메모')
 })

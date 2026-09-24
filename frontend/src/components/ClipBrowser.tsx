@@ -26,7 +26,8 @@ import { GameTimeline } from './GameTimeline'
 import { VodSection } from './VodSection'
 import { loadViewMode, saveViewMode, type ViewMode } from '../viewMode'
 import { formatMatchResult, gameRecordId, groupByGame, totalSize, withResultImage, type GameGroup } from '../grouping'
-import { applyLabel, progress } from '../labeling'
+import { applyLabel, applyNote, progress } from '../labeling'
+import { useLabelingUi } from '../labelingContext'
 import { formatBytes } from '../retention'
 import type { Clip, GameRecord, UserLabel } from '../types'
 import {
@@ -62,6 +63,10 @@ interface Props {
 
 export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChange }: Props) {
   const [filter, setFilter] = useState<FilterState>(source === 'vod' ? { ...DEFAULT_FILTER, sort: 'asc' } : DEFAULT_FILTER)
+  const labeling = useLabelingUi()
+  useEffect(() => {
+    if (!labeling) setFilter((f) => (f.label === '' ? f : { ...f, label: '' }))
+  }, [labeling])
   const [clips, setClips] = useState<Clip[]>([])
   const [records, setRecords] = useState<GameRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -328,6 +333,14 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
     if (result.ok && group.recordId) await runAndReload(() => deleteGameRecord(group.recordId!))
   }
 
+  const handleNote = (clip: Clip, note: string | null) => {
+    setClips((prev) => applyNote(prev, clip.id, note))
+    patchClip(clip.id, { labelNote: note }).catch((e: Error) => {
+      setError(`라벨 메모를 저장하지 못했습니다: ${e.message}`)
+      reload()
+    })
+  }
+
   const handleLabel = (clip: Clip, label: UserLabel) => {
     setClips((prev) => applyLabel(prev, clip.id, label))
     patchClip(clip.id, { userLabel: label }).catch((e: Error) => {
@@ -447,7 +460,7 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
       />
 
       <main className="flex-1 p-4">
-        {!filter.trashed && total > 0 && (
+        {labeling && !filter.trashed && total > 0 && (
           <p className="mb-2 text-sm text-zinc-400">
             라벨 {labeled}/{total}
           </p>
@@ -541,6 +554,7 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
           index={playingIndex}
           onIndexChange={(i) => setPlayingId(ordered[i]?.id ?? null)}
           onLabel={handleLabel}
+          onNote={handleNote}
           onExport={setExportTarget}
           onRename={handleRename}
           onTrim={async (clip, ranges) => {

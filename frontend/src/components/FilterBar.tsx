@@ -1,4 +1,6 @@
 import { useTuningUi } from '../appInfo'
+import { LABEL_TEXT } from '../consent'
+import { useLabelingUi } from '../labelingContext'
 import { TAG_LABELS } from '../labels'
 import type { ClipSort } from '../grouping'
 import type { ViewMode } from '../viewMode'
@@ -40,6 +42,7 @@ const SELECT = 'rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm'
 
 export function FilterBar({ value, onChange, variant = 'steam', viewMode, onViewModeChange }: Props) {
   const tuning = useTuningUi()
+  const labeling = useLabelingUi()
   const toggleTag = (tag: ClipTag) => {
     const has = value.tags.includes(tag)
     onChange({ ...value, tags: has ? value.tags.filter((t) => t !== tag) : [...value.tags, tag] })
@@ -80,6 +83,7 @@ export function FilterBar({ value, onChange, variant = 'steam', viewMode, onView
         <option value="pvp">교전 가능성순</option>
       </select>
 
+      {labeling && (
       <select
         className={SELECT}
         value={value.label}
@@ -88,9 +92,10 @@ export function FilterBar({ value, onChange, variant = 'steam', viewMode, onView
         <option value="">라벨 전체</option>
         <option value="unlabeled">라벨 없음</option>
         <option value="conflict">옮겨 온 라벨 (확인 필요)</option>
-        <option value="pvp">교전 라벨</option>
-        <option value="pve">사냥 라벨</option>
+        <option value="pvp">{LABEL_TEXT.pvp} 라벨</option>
+        <option value="pve">{LABEL_TEXT.pve} 라벨</option>
       </select>
+      )}
 
       {tuning && (
         <label className="flex items-center gap-2 text-sm text-zinc-300">

@@ -14,7 +14,14 @@ export function applyLabel<T extends { id: string; userLabel: UserLabel }>(
   id: string,
   label: UserLabel,
 ): T[] {
-  return clips.map((c) => (c.id === id ? { ...c, userLabel: label } : c))
+  return clips.map((c) => {
+    if (c.id !== id) return c
+    return label === null ? { ...c, userLabel: label, labelNote: null } : { ...c, userLabel: label }
+  })
+}
+
+export function applyNote<T extends { id: string }>(clips: T[], id: string, note: string | null): T[] {
+  return clips.map((c) => (c.id === id ? { ...c, labelNote: note } : c))
 }
 
 export function nextUnlabeledIndex(clips: { userLabel: UserLabel }[], from: number): number | null {
