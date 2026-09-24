@@ -1,14 +1,14 @@
 # 수신 서버 인프라 계획 (OCI · Terraform · 도커)
 
 > 대상: [plan-deploy.md D10·§7-11](plan-deploy.md) (라벨·오류 로그 수신처), [SPEC §7.11](SPEC.md) (동의 기반 데이터 전송), [SPEC §6 v2 이후 후보](SPEC.md) (호스팅 공유).
-> **이 문서는 계획이다. 아무것도 만들지 않았다.** 각 단계를 끝낼 때 아래 체크박스와 "확인 필요"를 갱신한다.
+> 인프라 코드와 **구성·운영 방법의 상세는 별도 저장소 [infra-owner/infra]((infra repository)) (`infra`) 의 README** 에 있다. 이 문서는 계획·결정과 이 저장소와의 연결 지점만 다룬다. 각 단계를 끝낼 때 아래 체크박스와 "확인 필요"를 갱신한다.
 
 ## 0. 진행 상태
 
 - [x] 계획 수립 (이 문서)
 - [x] I1. 별도 저장소 생성 — `infra` (범용 이름, 다른 프로젝트 인프라도 여기서 관리). Terraform 상태는 로컬 파일. 서버는 Python FastAPI 로 결정
-- [ ] I2. Terraform 으로 OCI 기본 인프라(네트워크·컴퓨트 인스턴스) 구성 — 코드 작성·`terraform validate` 통과, **`apply` 는 아직 안 함**(OCI 키·tfvars 필요)
-- [ ] I3. 도커로 수신 API 컨테이너 배포 (1단계 저장: 파일) — API·Dockerfile·compose·자동 업데이트(ghcr + watchtower) 작성, pytest 7건 통과. **도커 실행은 미확인**
+- [x] I2. Terraform 으로 OCI 기본 인프라(VCN·게이트웨이·라우트 테이블·보안 목록·서브넷·VM) 구성 — **2026-09-25 `apply` 완료.** VM 은 `VM.Standard.E2.1.Micro`(A1 은 `LaunchInstance` 404 로 실패, [§7](#7-실제-구성-2026-09-25)). 로컬 상태 파일
+- [x] I3. 도커로 수신 API 컨테이너 배포 (1단계 저장: 파일) — caddy + receiver + watchtower, `https://server.example.invalid` 에서 동작. 실서버에서 토큰 없음 401·라벨 저장·삭제·`/docs` 404 확인. 자동 업데이트(ghcr + watchtower, **간격 5분 — 나중에 1~2시간으로 늘릴 TODO**)
 - [ ] I4. 이 저장소 쪽 전송 클라이언트 연결 (= plan-deploy D10 과 같이 진행)
 - [ ] I5. 파일 → DB 이전 (2단계 저장, [§4](#4-저장-계층-파일--db))
 
@@ -71,3 +71,20 @@
 6. **호스팅 공유(클립 공유 서버)와의 관계** — SPEC §6 "호스팅 공유" 는 영상 전달이 필요해 이 수신 서버(영상 안 받음)와 성격이 다르다. 같은 인프라를 쓰되 서비스는 분리하는 것으로 가정하며 확정하지 않았다.
 7. **서버 비용·트래픽 상한** — 무료 한도를 넘었을 때 과금 알림·자동 중단 방법.
 8. **DB 종류** — [§4](#4-저장-계층-파일--db) 참고. 정하지 않았다.
+
+## 7. 실제 구성 (2026-09-25)
+
+설정 방법·운영 명령·문제 해결은 [infra 저장소 README]((infra repository)) 에 자세히 적었다. 여기에는 결정과 실측만 남긴다.
+
+- **결정된 것**: 서버는 Python FastAPI, Terraform 상태는 로컬 파일, 인프라 저장소 이름은 범용 `infra`(다른 프로젝트·AWS 도 여기서 관리할 수 있게 나중에 `terraform/oci`·`terraform/aws` 로 분리), 도메인은 `server.example.invalid`(가비아 A 레코드 → VM 공인 IP, caddy 가 Let's Encrypt HTTPS 자동 발급), 인증은 공유 토큰(`X-Api-Token`) + 요청 본문 20MB 상한.
+- **A1 은 실패했다.** `VM.Standard.A1.Flex` 로 `apply` 하니 네트워크는 만들어졌지만 `LaunchInstance` 가 `404-NotAuthorizedOrNotFound` 였다. 원인은 확인하지 못했고(권한 문제는 아님), 콘솔 기본 shape 이던 `VM.Standard.E2.1.Micro`(x86, 1GB, Always Free)로 바꿔 성공했다. 이 계정은 이전 프로젝트에서 만들다 만 micro 가 1개 있어 한도가 `1 of 2` 였고, 이번 VM 으로 무료 micro 슬롯이 다 찼다.
+- **겪은 함정**(해결법은 README): `.oci` 폴더를 사용자 폴더 밖에 잘못 만듦, `config` 의 `key_file=` 상대 경로, `compartment_ocid` 에 user OCID 를 넣음, ghcr 태그 대문자(`repository name must be lowercase`).
+- **앱 쪽 연결(I4)에 필요한 것**: 주소 `https://server.example.invalid`, `X-Api-Token`(값은 infra 저장소의 `terraform.tfvars`, 커밋되지 않음). 서버의 라벨 필드 허용 목록(`services/receiver/app/schemas.py`)은 SPEC 메타데이터 예시를 보고 추정한 것이라 **실제 전송 필드와 맞춰야 한다.**
+- **남은 위험**: 요청 빈도 제한 없음, 공유 토큰이 앱에 들어가므로 완전한 인증이 아님, 공인 IP 가 예약 IP 가 아니라 VM 재생성 시 바뀜, 1GB 메모리, 저장은 파일뿐.
+
+### §6 확인 필요 중 결정된 것
+- 항목 1(무료 한도·가용성): 위와 같이 실측. A1 은 안 됐고 E2.1.Micro 로 확정.
+- 항목 2(상태 파일): 로컬 파일. 백업 필요.
+- 항목 3(언어): FastAPI.
+- 항목 4(인증): 1차로 공유 토큰 + 크기 상한. 빈도 제한은 미구현.
+- 항목 5·6·7·8: 아직 미정.
