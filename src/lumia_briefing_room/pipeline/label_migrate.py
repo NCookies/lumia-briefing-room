@@ -5,6 +5,10 @@
   - 겹치는 라벨된 옛 클립 중 하나라도 pvp 면 pvp (기준: 클립에 교전이 *포함*되면 교전)
   - 전부 pve 면 pve
   - pvp 와 pve 가 섞이면 pvp 로 옮기되 labelConflict=True 로 표시해 사용자가 확인하게 한다
+  - 사용자가 직접 찍은 옛 라벨(labelSource=user)이 하나라도 겹치면 그것만 따른다(옮겨 온 라벨보다 사람이 우선)
+  - 옮겨 온(사람이 안 찍은) pvp 라벨은, 옛 클립이 새 클립보다 훨씬 커서(겹침이 옛 클립의 절반 미만)
+    새 클립엔 검출 신호가 없을(pvpScore 0) 때 물려주지 않는다 - 통짜 클립이 다시 쪼개질 때 무신호 조각이
+    통짜의 pvp 를 뒤집어쓰던 문제(2026-09-24). 이런 조각은 라벨 없음으로 남겨 사용자가 확인한다
 사용자가 새 클립에 이미 직접 찍은 라벨(labelSource=user)은 덮어쓰지 않는다.
 """
 
@@ -14,6 +18,7 @@ import json
 from pathlib import Path
 
 MIN_OVERLAP_SEC = 3.0
+MIN_CARRY_SHARE = 0.5
 
 
 def _overlap(a: dict, b: dict) -> float:
@@ -27,12 +32,25 @@ def _origin(meta: dict) -> str | None:
     return meta.get("sessionDir") or meta.get("vodId")
 
 
+def _trusted(new: dict, hits: list[dict]) -> list[dict]:
+    human = [o for o in hits if o.get("labelSource") == "user"]
+    if human:
+        return human
+    if new.get("pvpScore") != 0:
+        return hits
+    return [
+        o for o in hits
+        if o["userLabel"] != "pvp" or _overlap(new, o) >= MIN_CARRY_SHARE * o["durationSec"]
+    ]
+
+
 def migrate_label(new: dict, olds: list[dict]) -> tuple[str | None, bool, list[str]]:
     origin = _origin(new)
     hits = [
         o for o in olds
         if o.get("userLabel") and origin is not None and _origin(o) == origin and _overlap(new, o) >= MIN_OVERLAP_SEC
     ]
+    hits = _trusted(new, hits)
     if not hits:
         return None, False, []
     labels = {o["userLabel"] for o in hits}
