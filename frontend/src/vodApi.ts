@@ -33,7 +33,7 @@ const send = (url: string, method: string, body?: unknown) =>
   })
 
 export async function listVods(): Promise<Vod[]> {
-  return jsonOrThrow(await fetch(`${BASE}/vods`), '다시보기 목록 조회')
+  return jsonOrThrow(await fetch(`${BASE}/vods`), '다시보기 목록 불러오기')
 }
 
 export async function setStreamer(id: string, streamer: string): Promise<void> {
@@ -45,7 +45,7 @@ export async function startAnalysis(id: string, options: { force?: boolean; rebu
 }
 
 export async function getAnalysis(id: string): Promise<AnalysisJob> {
-  return jsonOrThrow(await fetch(`${BASE}/vods/${id}/analyze`), '분석 상태 조회')
+  return jsonOrThrow(await fetch(`${BASE}/vods/${id}/analyze`), '분석 상태 확인')
 }
 
 export async function cancelAnalysis(id: string): Promise<void> {
@@ -81,7 +81,7 @@ export async function getVodSettings(): Promise<VodSettings & { vodClips: string
   const cfg = await jsonOrThrow<{
     vod?: { sources?: string[]; recursive?: boolean }
     paths?: { vodClips?: string | null }
-  }>(await fetch(`${BASE}/config`), '설정 조회')
+  }>(await fetch(`${BASE}/config`), '설정 불러오기')
   return {
     sources: cfg.vod?.sources ?? [],
     recursive: cfg.vod?.recursive ?? false,

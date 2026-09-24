@@ -118,12 +118,12 @@ export function CleanupPanel() {
           자동 정리 켜기
         </label>
         <p className="text-xs text-zinc-500">
-          켜면 1시간마다 아래 기준을 넘은 클립을 자동으로 정리합니다. 끄면 클립과 휴지통이 자동으로 삭제되지 않습니다.
+          켜면 1시간마다 아래 기준을 넘은 클립을 자동으로 정리합니다. 끄면 클립과 휴지통의 파일이 자동으로 삭제되지 않습니다.
         </p>
       </section>
 
       <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium text-zinc-200">정리 기준 (체크한 기준만 적용합니다)</h3>
+        <h3 className="text-sm font-medium text-zinc-200">정리 기준 (체크한 기준만 적용됩니다)</h3>
         <label className="flex items-center gap-2 text-sm text-zinc-300">
           <input
             type="checkbox"
@@ -131,7 +131,7 @@ export function CleanupPanel() {
             checked={draft.ageOn}
             onChange={(e) => patch({ ageOn: e.target.checked })}
           />
-          경기 후
+          게임 후
           <input
             className={INPUT}
             inputMode="decimal"
@@ -185,7 +185,7 @@ export function CleanupPanel() {
           onChange={(e) => patch({ deleteMode: e.target.value as Draft['deleteMode'] })}
         >
           <option value="trash">휴지통으로 이동 (복구 가능)</option>
-          <option value="permanent">즉시 영구 삭제</option>
+          <option value="permanent">즉시 완전 삭제</option>
         </select>
         <label className="flex items-center gap-2 text-sm text-zinc-300">
           휴지통에서
@@ -195,7 +195,7 @@ export function CleanupPanel() {
             value={draft.trashDays}
             onChange={(e) => patch({ trashDays: e.target.value })}
           />
-          일이 지나면 영구 삭제
+          일이 지나면 완전 삭제
         </label>
       </section>
 
@@ -235,7 +235,7 @@ export function CleanupPanel() {
           게임 기록은 유지
         </label>
         <p className="text-xs text-zinc-500">
-          클립이 모두 삭제된 경기도 순위·전적·결과표를 목록에 &quot;클립 삭제됨&quot;으로 남깁니다(경기당 약 100~200KB). 끄면 그런 경기의 기록도 지웁니다.
+          클립이 모두 삭제된 게임도 순위·전적·결과표를 목록에 &quot;클립 삭제됨&quot;으로 남깁니다(게임당 약 100~200KB). 끄면 그런 게임의 기록도 지웁니다.
         </p>
       </section>
 

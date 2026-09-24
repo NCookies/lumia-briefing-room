@@ -6,7 +6,7 @@ export const TAG_LABELS: Record<ClipTag, string> = {
   death: '사망',
   teammate_death: '팀원 사망',
   team_wipe: '팀 전멸',
-  no_result: '무성과',
+  no_result: '성과 없음',
 }
 
 export const SIGNAL_LABELS: Record<string, string> = {

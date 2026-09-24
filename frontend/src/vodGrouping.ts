@@ -122,8 +122,8 @@ export function formatGameRange(startSec: number, endSec: number): string {
 const STATUS_LABELS: Record<VodStatus, string> = {
   new: '분석 안 함',
   analyzing: '분석 중',
-  interrupted: '분석이 중단됨',
-  cancelled: '분석을 멈춤',
+  interrupted: '분석 중단됨',
+  cancelled: '분석 취소됨',
   error: '분석 실패',
   done: '분석 완료',
 }

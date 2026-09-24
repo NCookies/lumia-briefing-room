@@ -70,7 +70,7 @@ export function VodSettingsPanel({ onClipsDirChanged }: { onClipsDirChanged: () 
       <section className="flex flex-col gap-2">
         <h3 className="text-sm font-medium text-zinc-200">다시보기 영상 경로</h3>
         <p className="text-xs text-zinc-500">
-          받아 둔 다시보기 영상 파일이나 그 영상들이 든 폴더를 추가합니다. 앱은 영상을 받지도 옮기거나 지우지도 않고 읽기만 합니다.
+          받아 둔 다시보기 영상 파일이나 그 영상들이 든 폴더를 추가합니다. 앱은 영상을 내려받거나 옮기거나 지우지 않고 읽기만 합니다.
         </p>
         <ul className="flex flex-col gap-1">
           {sources.length === 0 && <li className="text-sm text-zinc-500">추가한 경로가 없습니다</li>}

@@ -79,8 +79,8 @@ export function BackfillDialog({ status, onStatusChange, onClose }: Props) {
         {showPreview && (
           <>
             <p className="text-sm leading-relaxed text-zinc-300">
-              게임 로그에는 최근 게임 실행 2번 분량의 경기만 남아서, 그보다 오래된 경기는 자동으로 클립이 만들어지지 않습니다.
-              스팀 녹화 영상을 직접 훑어 그런 경기를 찾아 클립으로 만듭니다.
+              게임 로그에는 최근 두 번 실행한 분량만 남아 있어, 그 이전 게임은 자동으로 클립이 만들어지지 않습니다.
+              스팀 녹화 영상을 직접 살펴보고 그런 게임을 찾아 클립으로 만듭니다.
             </p>
             {preview && preview.canStart && (
               <dl className="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-1 rounded bg-zinc-900 p-3 text-sm">
@@ -100,14 +100,14 @@ export function BackfillDialog({ status, onStatusChange, onClose }: Props) {
             )}
             <ul className="list-disc space-y-1 pl-5 text-xs leading-relaxed text-zinc-400">
               <li>
-                <b className="text-zinc-300">시간이 걸릴 수 있고 컴퓨터가 느려질 수 있습니다.</b> 예상 시간은 이 앱을 만든 PC 에서
-                잰 속도로 어림한 값이라 사양에 따라 더 걸릴 수 있습니다. 게임을 끄고 실행하는 것을 권합니다.
+                <b className="text-zinc-300">시간이 걸릴 수 있고 컴퓨터가 느려질 수 있습니다.</b> 예상 시간은 개발 PC에서 측정한 속도를 바탕으로 한
+                추정값이라 사양에 따라 더 걸릴 수 있습니다. 게임을 종료한 뒤 실행하기를 권합니다.
               </li>
               <li>언제든 취소할 수 있습니다. 취소해도 이미 만든 클립은 그대로 남고, 다시 시작하면 이어서 합니다.</li>
               <li>
-                스팀은 새 녹화가 쌓이면 오래된 녹화를 지웁니다. 앞부분이 이미 지워진 경기는 만들 수 없습니다.
+                스팀은 새 녹화가 쌓이면 오래된 녹화를 지웁니다. 앞부분이 이미 지워진 게임은 만들 수 없습니다.
               </li>
-              <li>이미 클립이 있는 경기와 로그로 아는 경기는 건너뜁니다.</li>
+              <li>이미 클립이 있는 게임과 로그로 아는 게임은 건너뜁니다.</li>
             </ul>
           </>
         )}

@@ -26,7 +26,7 @@ test('formatBytes picks a readable unit', () => {
 test('describeCleanup summarizes what a run would do', () => {
   assert.equal(
     describeCleanup({ toTrash: 3, toPurge: 2, bytesToFree: 1024 ** 3, applied: false }),
-    '휴지통으로 이동 3개 · 영구 삭제 2개 · 1.00 GB',
+    '휴지통으로 이동 3개 · 완전 삭제 2개 · 1.00 GB',
   )
   assert.equal(describeCleanup({ toTrash: 0, toPurge: 0, bytesToFree: 0, applied: false }), '정리할 항목이 없습니다')
 })

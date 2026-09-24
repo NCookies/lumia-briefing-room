@@ -103,7 +103,7 @@ export function RecordingRootSection() {
             disabled={busy}
             onClick={() => void reset()}
           >
-            직접 고른 폴더를 버리고 자동으로 찾기
+            직접 고른 폴더 대신 자동으로 찾기
           </button>
         </div>
       )}

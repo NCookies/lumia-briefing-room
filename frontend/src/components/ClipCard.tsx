@@ -85,18 +85,18 @@ export function ClipCard({
         {labeling && clip.labelConflict && (
           <span
             className="absolute bottom-6 left-1 rounded bg-sky-600/90 px-1 text-xs"
-            title="이전 버전에서 교전/그 외 라벨이 섞여 있어 자동으로 옮겨 온 라벨입니다. 맞다면 같은 버튼을 한 번 더 눌러 확정하세요."
+            title="다시 분석하기 전 클립의 라벨을 옮겨 왔는데 교전과 그 외가 섞여 있어 확인이 필요합니다. 맞다면 같은 버튼을 한 번 더 눌러 확정하세요."
           >
             옮겨 온 라벨 · 확인 필요
           </span>
         )}
         {clip.audioStatus && clip.audioStatus !== 'full' && (
           <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 text-xs text-amber-300">
-            {clip.audioStatus === 'none' ? '소리 없음' : '소리 일부'}
+            {clip.audioStatus === 'none' ? '소리 없음' : '소리 일부 없음'}
           </span>
         )}
         {clip.sourceIncomplete && (
-          <span className="absolute right-1 top-1 rounded bg-amber-600/90 px-1 text-xs">일부 손실</span>
+          <span className="absolute right-1 top-1 rounded bg-amber-600/90 px-1 text-xs">원본 일부 손실</span>
         )}
       </button>
 

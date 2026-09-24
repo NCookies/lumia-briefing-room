@@ -20,7 +20,7 @@ type Tab = 'general' | 'export' | 'vod' | 'cleanup' | 'about'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'general', label: '일반' },
-  { id: 'export', label: '영상 저장' },
+  { id: 'export', label: '클립 내보내기' },
   { id: 'vod', label: '다시보기' },
   { id: 'cleanup', label: '자동 정리' },
   { id: 'about', label: '정보·진단' },
@@ -92,10 +92,10 @@ function GeneralPanel({
       <h3 className="text-sm font-medium text-zinc-200">시작</h3>
       <label className="flex items-center gap-2 text-sm text-zinc-300">
         <input type="checkbox" checked={autoStart} onChange={(e) => void changeAutoStart(e.target.checked)} />
-        윈도우에 로그인할 때 자동으로 실행
+        Windows에 로그인할 때 자동으로 실행
       </label>
       <p className="text-xs text-zinc-500">
-        켜 두면 로그인할 때 트레이에 조용히 떠서 경기가 끝날 때마다 클립을 만듭니다.
+        켜 두면 로그인할 때 트레이에 조용히 떠서 게임이 끝날 때마다 클립을 만듭니다.
         꺼도 이미 만든 클립은 그대로 남고, 직접 실행하면 그때부터 다시 감시합니다.
       </p>
       {autoStartError && <p className="text-xs text-rose-300">{autoStartError}</p>}
@@ -104,7 +104,7 @@ function GeneralPanel({
     <ClipsDirSection
       source="steam"
       title="내 녹화 클립 저장 폴더"
-      description="경기가 끝날 때마다 만드는 클립이 저장되는 폴더입니다. 비워 두면 기본 위치(내 비디오 폴더의 LumiaBriefingRoom)를 씁니다."
+      description="게임이 끝날 때마다 만드는 클립이 저장되는 폴더입니다. 비워 두면 기본 위치(내 비디오 폴더의 LumiaBriefingRoom)를 씁니다."
       onChanged={onClipsDirChanged}
     />
     <section className="flex flex-col gap-2">
@@ -124,14 +124,14 @@ function GeneralPanel({
         다음 클립의 재생용 영상을 미리 만들기
       </label>
       <p className="text-xs text-zinc-500">
-        이 PC 에서 원본(HEVC)을 바로 재생할 수 없어 재생용 사본을 만들 때만 해당합니다. 켜 두면 지금 보는 클립의 사본이 준비된 뒤 다음 클립 것을 뒤에서 만들어
-        넘길 때 기다리지 않습니다. 재생 중 CPU 를 조금 더 씁니다.
+        이 PC에서 원본(HEVC)을 바로 재생할 수 없어 재생용 영상을 만들 때만 해당합니다. 켜 두면 지금 보는 클립의 재생용 영상이 준비된 뒤 다음 클립의 것을 백그라운드에서 미리 만들어 두므로,
+        넘길 때 기다리지 않습니다. 재생 중에 CPU를 조금 더 사용합니다.
       </p>
     </section>
     <section className="flex flex-col gap-2">
       <h3 className="text-sm font-medium text-zinc-200">내 닉네임</h3>
       <p className="text-xs text-zinc-500">
-        첫 경기의 결과 화면에서 자동으로 인식해 채워집니다. 잘못 인식되었다면 여기서 수정하세요. (한글, 영문, 일본어, 한자를 모두 사용할 수 있습니다.)
+        첫 게임의 결과 화면에서 자동으로 인식해 채워집니다. 잘못 인식되었다면 여기서 수정하세요. (한글, 영문, 일본어, 한자를 모두 사용할 수 있습니다.)
       </p>
       <div className="flex items-center gap-2">
         <input
@@ -174,7 +174,7 @@ function ExportPanel() {
 
   return (
     <section className="flex flex-col gap-2">
-      <h3 className="text-sm font-medium text-zinc-200">영상 저장 기본 폴더</h3>
+      <h3 className="text-sm font-medium text-zinc-200">클립 내보내기 기본 폴더</h3>
       <p className="text-xs text-zinc-500">
         저장 창을 열면 이 폴더에서 시작합니다. 영상을 저장할 때마다 마지막으로 선택한 폴더로 자동 변경됩니다.
       </p>

@@ -5,7 +5,7 @@ export function ClipId({ id }: { id: string }) {
   return (
     <button
       type="button"
-      title="클릭하면 ID 복사"
+      title="클릭하면 ID를 복사합니다"
       className="w-fit font-mono text-[11px] text-zinc-500 hover:text-zinc-300"
       onClick={() => {
         try {

@@ -113,8 +113,8 @@ test('formatGameRange prints the position inside the video', () => {
 test('vodStatusLabel and analysisPercent', () => {
   assert.equal(vodStatusLabel('new'), '분석 안 함')
   assert.equal(vodStatusLabel('analyzing'), '분석 중')
-  assert.equal(vodStatusLabel('interrupted'), '분석이 중단됨')
-  assert.equal(vodStatusLabel('cancelled'), '분석을 멈춤')
+  assert.equal(vodStatusLabel('interrupted'), '분석 중단됨')
+  assert.equal(vodStatusLabel('cancelled'), '분석 취소됨')
   assert.equal(vodStatusLabel('error'), '분석 실패')
   assert.equal(vodStatusLabel('done'), '분석 완료')
   assert.equal(analysisPercent(vod({ analyzedSec: 1800, durationSec: 3600 })), 50)

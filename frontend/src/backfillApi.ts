@@ -16,11 +16,11 @@ async function json<T>(res: Response, action: string): Promise<T> {
 }
 
 export async function getBackfillPreview(): Promise<BackfillPreview> {
-  return json(await fetch(`${BASE}/preview`), '분석 대상 조회')
+  return json(await fetch(`${BASE}/preview`), '분석 대상 확인')
 }
 
 export async function getBackfillStatus(): Promise<BackfillStatus> {
-  return json(await fetch(BASE), '분석 상태 조회')
+  return json(await fetch(BASE), '분석 상태 확인')
 }
 
 export async function startBackfill(): Promise<void> {

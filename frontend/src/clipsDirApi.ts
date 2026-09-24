@@ -21,7 +21,7 @@ const send = (url: string, method: string, body: unknown) =>
   fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
 
 export async function getClipsDir(source: ClipsSource): Promise<string> {
-  const cfg = await jsonOrThrow<{ paths?: Record<string, string | null> }>(await fetch(`${BASE}/config`), '설정 조회')
+  const cfg = await jsonOrThrow<{ paths?: Record<string, string | null> }>(await fetch(`${BASE}/config`), '설정 불러오기')
   return cfg.paths?.[CONFIG_KEY[source]] ?? ''
 }
 
@@ -48,7 +48,7 @@ export async function moveClipsDir(
   while (job.state === 'running') {
     onProgress(job.totalBytes > 0 ? job.doneBytes / job.totalBytes : 0)
     await new Promise((resolve) => setTimeout(resolve, POLL_MS))
-    job = await jsonOrThrow<MoveJob>(await fetch(`${BASE}/clips-dir/move`), '진행 상황 조회')
+    job = await jsonOrThrow<MoveJob>(await fetch(`${BASE}/clips-dir/move`), '진행 상황 확인')
   }
   if (job.state === 'error') throw new Error(job.message)
   onProgress(1)

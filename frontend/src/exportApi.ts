@@ -33,13 +33,13 @@ export async function exportClip(id: string, dir: string, filename: string): Pro
 export async function getExportDefault(): Promise<string> {
   const cfg = await jsonOrThrow<{ paths?: { exportDefault?: string | null } }>(
     await fetch(`${BASE}/config`),
-    '설정 조회',
+    '설정 불러오기',
   )
   return cfg.paths?.exportDefault ?? ''
 }
 
 export async function getNickname(): Promise<string> {
-  const cfg = await jsonOrThrow<{ player?: { nickname?: string } }>(await fetch(`${BASE}/config`), '설정 조회')
+  const cfg = await jsonOrThrow<{ player?: { nickname?: string } }>(await fetch(`${BASE}/config`), '설정 불러오기')
   return cfg.player?.nickname ?? ''
 }
 
@@ -48,7 +48,7 @@ export async function setNickname(nickname: string): Promise<void> {
 }
 
 export async function getRetention(): Promise<RetentionSettings> {
-  const cfg = await jsonOrThrow<{ retention: RetentionSettings }>(await fetch(`${BASE}/config`), '설정 조회')
+  const cfg = await jsonOrThrow<{ retention: RetentionSettings }>(await fetch(`${BASE}/config`), '설정 불러오기')
   return cfg.retention
 }
 
@@ -61,7 +61,7 @@ export async function runCleanup(dryRun: boolean): Promise<CleanupResult> {
 }
 
 export async function getConfirmDelete(): Promise<boolean> {
-  const cfg = await jsonOrThrow<{ ui?: { confirmDelete?: boolean } }>(await fetch(`${BASE}/config`), '설정 조회')
+  const cfg = await jsonOrThrow<{ ui?: { confirmDelete?: boolean } }>(await fetch(`${BASE}/config`), '설정 불러오기')
   return cfg.ui?.confirmDelete ?? true
 }
 
@@ -70,7 +70,7 @@ export async function setConfirmDelete(confirmDelete: boolean): Promise<void> {
 }
 
 export async function getProxyPrefetch(): Promise<boolean> {
-  const cfg = await jsonOrThrow<{ encode?: { proxy?: { prefetch?: boolean } } }>(await fetch(`${BASE}/config`), '설정 조회')
+  const cfg = await jsonOrThrow<{ encode?: { proxy?: { prefetch?: boolean } } }>(await fetch(`${BASE}/config`), '설정 불러오기')
   return cfg.encode?.proxy?.prefetch ?? true
 }
 
@@ -83,7 +83,7 @@ export async function setExportDefault(dir: string): Promise<void> {
 }
 
 export async function getAutoStart(): Promise<boolean> {
-  const cfg = await jsonOrThrow<{ ui?: { autoStart?: boolean } }>(await fetch(`${BASE}/config`), '설정 조회')
+  const cfg = await jsonOrThrow<{ ui?: { autoStart?: boolean } }>(await fetch(`${BASE}/config`), '설정 불러오기')
   return cfg.ui?.autoStart ?? true
 }
 

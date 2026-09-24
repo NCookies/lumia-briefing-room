@@ -102,7 +102,7 @@ export function ClipsDirSection({ source, title, description, onChanged }: Props
           <p className="truncate text-xs text-zinc-400" title={draft}>
             새 폴더: {draft}
           </p>
-          <p className="text-sm text-zinc-100">기존 클립도 새 폴더로 옮길까요?</p>
+          <p className="text-sm text-zinc-100">기존 클립도 새 폴더로 옮기시겠습니까?</p>
           <p className="text-xs text-amber-300">
             옮기지 않으면 기존 클립은 이전 폴더에 남고, 새 폴더를 쓰는 동안 목록에 보이지 않습니다.
           </p>

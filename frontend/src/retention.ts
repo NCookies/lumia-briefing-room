@@ -31,5 +31,5 @@ export function formatBytes(bytes: number): string {
 
 export function describeCleanup(result: CleanupResult): string {
   if (result.toTrash === 0 && result.toPurge === 0) return '정리할 항목이 없습니다'
-  return `휴지통으로 이동 ${result.toTrash}개 · 영구 삭제 ${result.toPurge}개 · ${formatBytes(result.bytesToFree)}`
+  return `휴지통으로 이동 ${result.toTrash}개 · 완전 삭제 ${result.toPurge}개 · ${formatBytes(result.bytesToFree)}`
 }

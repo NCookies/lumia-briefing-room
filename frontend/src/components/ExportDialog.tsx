@@ -56,7 +56,7 @@ export function ExportDialog({ clip, onClose }: Props) {
         className="flex w-full max-w-lg flex-col gap-3 rounded-lg border border-zinc-600 bg-zinc-800 p-4 text-zinc-100"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-medium">영상 저장</h2>
+        <h2 className="text-lg font-medium">클립 내보내기</h2>
 
         <label className="flex flex-col gap-1 text-sm text-zinc-300">
           파일 이름

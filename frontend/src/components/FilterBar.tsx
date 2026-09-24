@@ -76,8 +76,8 @@ export function FilterBar({ value, onChange, variant = 'steam', viewMode, onView
           </>
         ) : (
           <>
-            <option value="desc">최신 순</option>
-            <option value="asc">오래된 순</option>
+            <option value="desc">최신순</option>
+            <option value="asc">오래된순</option>
           </>
         )}
         <option value="pvp">교전 가능성순</option>

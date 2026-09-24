@@ -93,10 +93,10 @@ export function ClipVideo({ clipId, nextClipId, version, videoRef, onVolumeChang
         ) : (
           <>
             <p>{proxyProgressText(status?.progress ?? 0)}</p>
-            <p className="text-xs text-zinc-500">이 PC 에서 원본(HEVC)을 바로 재생할 수 없어 H.264 사본을 만듭니다. 한 번만 만들어 둡니다.</p>
+            <p className="text-xs text-zinc-500">이 PC에서 원본(HEVC)을 바로 재생할 수 없어 재생용 영상(H.264)을 만드는 중입니다. 한 번만 만들면 됩니다.</p>
             <div className="mt-2 flex max-w-xl flex-col gap-1 px-4 text-left text-sm text-zinc-400">
               <p className="font-medium text-zinc-300">바로 재생하려면 (선택 사항)</p>
-              <p className="text-xs text-zinc-500">Windows 에 HEVC 비디오 확장을 설치하면 이 대기 없이 재생됩니다. 자동으로 설치하지는 않습니다.</p>
+              <p className="text-xs text-zinc-500">Windows에 HEVC 비디오 확장을 설치하면 기다리지 않고 바로 재생됩니다. 자동으로 설치하지는 않습니다.</p>
               <ul className="flex list-disc flex-col gap-1 pl-5">
                 <li>
                   <a className="text-sky-400 hover:underline" href={CODEC_STORE_URL} target="_blank" rel="noopener noreferrer">
@@ -106,7 +106,7 @@ export function ClipVideo({ clipId, nextClipId, version, videoRef, onVolumeChang
                 </li>
                 <li>
                   무료: 스토어에서 <span className="text-zinc-200">HEVC Video Extensions from Device Manufacturer</span> (제조사 제공 HEVC 비디오 확장)를
-                  검색해 설치 — PC 제조사에 따라 없을 수 있음
+                  검색해 설치합니다. PC 제조사에 따라 없을 수 있습니다.
                 </li>
               </ul>
               <p className="text-xs text-zinc-500">설치한 뒤 재생이 되지 않으면 앱을 다시 열어 보세요.</p>

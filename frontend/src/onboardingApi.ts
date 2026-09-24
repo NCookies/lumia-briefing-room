@@ -8,7 +8,7 @@ async function jsonOrThrow<T>(res: Response, action: string): Promise<T> {
 }
 
 export async function getFirstRun(): Promise<FirstRunInfo> {
-  return jsonOrThrow(await fetch(`${BASE}/first-run`), '첫 실행 정보 조회')
+  return jsonOrThrow(await fetch(`${BASE}/first-run`), '첫 실행 정보 불러오기')
 }
 
 export async function completeFirstRun(): Promise<void> {

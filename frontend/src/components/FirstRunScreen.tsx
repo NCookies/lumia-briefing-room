@@ -122,7 +122,7 @@ export function FirstRunScreen({ onDone }: { onDone: () => void }) {
         <header>
           <h2 className="text-2xl font-semibold">루미아 브리핑룸에 오신 것을 환영합니다</h2>
           <p className="mt-1 text-sm text-zinc-400">
-            스팀이 저장한 배경 녹화에서 교전 장면을 자동으로 잘라 줍니다. 시작하기 전에 두 가지만 확인하세요.
+            스팀이 저장한 배경 녹화에서 교전 장면을 자동으로 잘라 줍니다. 시작하기 전에 몇 가지만 확인하세요.
             게임 프로세스는 건드리지 않고, 스팀이 저장한 파일만 읽습니다.
           </p>
         </header>
@@ -175,7 +175,7 @@ export function FirstRunScreen({ onDone }: { onDone: () => void }) {
           )}
           {!info.ffmpegFound && (
             <p className="rounded border border-amber-500/60 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
-              ffmpeg 를 찾지 못했습니다. 클립을 만들 수 없습니다.
+              ffmpeg를 찾지 못했습니다. 클립을 만들 수 없습니다.
             </p>
           )}
         </section>
@@ -216,11 +216,11 @@ export function FirstRunScreen({ onDone }: { onDone: () => void }) {
             </div>
           ) : (
             <p className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-300">
-              아직 확인할 녹화가 없습니다. 첫 경기를 녹화한 뒤 옵션 → 정보·진단에서 확인할 수 있습니다.
+              아직 확인할 녹화가 없습니다. 첫 게임을 녹화한 뒤 옵션 → 정보·진단에서 확인할 수 있습니다.
             </p>
           )}
           <p className="text-xs text-zinc-500">
-            지원 해상도: 2560x1440 · 1920x1080(측정), 그 밖의 16:9 는 비례 축척. 확인 결과가 어떻든 시작은 막지 않습니다.
+            지원 해상도: 2560x1440 · 1920x1080(측정), 그 밖의 16:9 화면은 비율에 맞춰 조정해 대응합니다. 확인 결과와 관계없이 시작할 수 있습니다.
           </p>
         </section>
 
@@ -232,7 +232,7 @@ export function FirstRunScreen({ onDone }: { onDone: () => void }) {
             <h3 className="text-base font-medium">{showSetup ? '3. ' : ''}선택 기능</h3>
             <p className="text-xs text-zinc-400">
               모두 처음에는 꺼져 있고, 켜야만 동작합니다. 옵션 → 정보·진단에서 언제든 바꿀 수 있습니다. 이 버전에서는
-              아직 네트워크를 쓰는 기능이 동작하지 않으며, 켜 둔 선택은 해당 기능이 들어오는 버전부터 적용됩니다.
+              아직 네트워크를 쓰는 기능이 동작하지 않으며, 켜 둔 선택은 해당 기능이 추가되는 버전부터 적용됩니다.
             </p>
             <ConsentChoicesForm choices={choices} pending={info.pendingItems} onChange={setChoices} />
           </section>

@@ -106,7 +106,7 @@ export function PlayerModal({
     >
       <button
         type="button"
-        aria-label="이전 영상"
+        aria-label="이전 클립"
         className={`${NAV} left-2`}
         disabled={!hasPrev}
         onClick={(e) => {
@@ -118,7 +118,7 @@ export function PlayerModal({
       </button>
       <button
         type="button"
-        aria-label="다음 영상"
+        aria-label="다음 클립"
         className={`${NAV} right-2`}
         disabled={!hasNext}
         onClick={(e) => {
@@ -169,7 +169,7 @@ export function PlayerModal({
             <ScoreChip score={clip.pvpScore} signals={clip.pvpSignals ?? []} />
             {clip.audioStatus && clip.audioStatus !== 'full' && (
               <span className="rounded border border-amber-500/50 px-1.5 py-0.5 text-xs text-amber-300">
-                {clip.audioStatus === 'none' ? '소리 없음 (원본에 오디오가 없습니다)' : '소리 일부 (원본 오디오가 일부 유실되었습니다)'}
+                {clip.audioStatus === 'none' ? '소리 없음 (원본에 오디오가 없습니다)' : '소리 일부 없음 (원본의 소리가 일부 빠져 있습니다)'}
               </span>
             )}
             {clip.labelConflict && (

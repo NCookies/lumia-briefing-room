@@ -9,7 +9,7 @@ interface ConsentConfig {
 
 export async function getConsentChoices(): Promise<ConsentChoices> {
   const res = await fetch(`${BASE}/config`)
-  if (!res.ok) throw new Error(`설정 조회에 실패했습니다 (${res.status})`)
+  if (!res.ok) throw new Error(`설정 불러오기에 실패했습니다 (${res.status})`)
   const cfg: ConsentConfig = await res.json()
   return {
     update: cfg.update?.check === true,

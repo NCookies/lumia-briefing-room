@@ -33,7 +33,7 @@ export async function listClips(query: ClipQuery = {}): Promise<Clip[]> {
   if (query.sort) params.set('sort', query.sort)
   if (query.source) params.set('source', query.source)
 
-  const res = await checkOk(await fetch(`${BASE}/clips?${params}`), '클립 목록 조회')
+  const res = await checkOk(await fetch(`${BASE}/clips?${params}`), '클립 목록 불러오기')
   const clips: Clip[] = await res.json()
   return clips.map((c) => ({ ...c, userLabel: c.userLabel ?? null }))
 }
@@ -62,7 +62,7 @@ export async function restoreClip(id: string): Promise<void> {
 }
 
 export async function deleteClipForever(id: string): Promise<void> {
-  await checkOk(await fetch(`${BASE}/clips/${id}`, { method: 'DELETE' }), '영구 삭제')
+  await checkOk(await fetch(`${BASE}/clips/${id}`, { method: 'DELETE' }), '완전 삭제')
 }
 
 export function videoUrl(id: string, version?: number): string {
@@ -99,12 +99,12 @@ export async function startReprocess(clipId: string): Promise<string> {
 }
 
 export async function getReprocessStatus(key: string): Promise<ReprocessStatus> {
-  const res = await checkOk(await fetch(`${BASE}/games/reprocess/${key}`), '분석 상태 조회')
+  const res = await checkOk(await fetch(`${BASE}/games/reprocess/${key}`), '분석 상태 확인')
   return res.json()
 }
 
 export async function listGameRecords(): Promise<GameRecord[]> {
-  const res = await checkOk(await fetch(`${BASE}/games/records`), '게임 기록 조회')
+  const res = await checkOk(await fetch(`${BASE}/games/records`), '게임 기록 불러오기')
   return res.json()
 }
 
@@ -181,6 +181,6 @@ export async function prefetchProxy(id: string): Promise<void> {
 }
 
 export async function getProxyStatus(id: string): Promise<ProxyStatus> {
-  const res = await checkOk(await fetch(`${BASE}/clips/${id}/proxy`), '재생용 영상 상태 조회')
+  const res = await checkOk(await fetch(`${BASE}/clips/${id}/proxy`), '재생용 영상 상태 확인')
   return res.json()
 }

@@ -28,7 +28,7 @@ test('buildPhaseColumns marks the free revive zone up to phase 3 and the credit 
 
 test('buildPhaseColumns puts clips without a phase in a trailing unknown column', () => {
   const cols = buildPhaseColumns([{ phaseIndex: null }, { phaseIndex: 0 }])
-  assert.deepEqual(cols.map((c) => c.label), ['1일차 낮', '시점 미상'])
+  assert.deepEqual(cols.map((c) => c.label), ['1일차 낮', '시점 알 수 없음'])
   assert.equal(cols[1].zone, null)
   assert.equal(buildPhaseColumns([{ phaseIndex: null }]).length, 1)
   assert.deepEqual(buildPhaseColumns([]), [])

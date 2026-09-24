@@ -20,7 +20,7 @@ export function versionLabel(info: AppInfo): string {
 
 export async function fetchAppInfo(): Promise<AppInfo> {
   const res = await fetch('/api/app-info')
-  if (!res.ok) throw new Error(`앱 정보 조회에 실패했습니다 (${res.status})`)
+  if (!res.ok) throw new Error(`앱 정보 불러오기에 실패했습니다 (${res.status})`)
   const body = await res.json()
   return { version: String(body.version ?? ''), mode: body.mode === 'dev' ? 'dev' : 'release' }
 }

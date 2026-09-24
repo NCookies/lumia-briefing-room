@@ -30,6 +30,6 @@ export function buildPhaseColumns<T extends PhaseClip>(clips: T[]): PhaseColumn<
     }
   }
   const unknown = clips.filter((c) => c.phaseIndex === null)
-  if (unknown.length > 0) columns.push({ phaseIndex: null, label: '시점 미상', zone: null, clips: unknown })
+  if (unknown.length > 0) columns.push({ phaseIndex: null, label: '시점 알 수 없음', zone: null, clips: unknown })
   return columns
 }

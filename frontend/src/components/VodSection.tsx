@@ -142,7 +142,7 @@ export function VodSection({
 
         <div className="text-right text-sm text-zinc-400">
           <div>
-            게임 {gameCount}판 · 클립 {clipCount}개
+            게임 {gameCount}개 · 클립 {clipCount}개
           </div>
           <div className="text-xs text-zinc-500">{formatBytes(clipBytes)}</div>
         </div>
@@ -169,7 +169,7 @@ export function VodSection({
                     type="button"
                     className="text-zinc-400 hover:text-sky-300 disabled:opacity-50"
                     disabled={!canStart}
-                    title="저장된 판독으로 클립만 다시 만듭니다(설정의 클립 구간·필터를 바꾼 뒤)"
+                    title="저장된 분석 결과로 클립만 다시 만듭니다(설정의 클립 구간·필터를 바꾼 뒤)"
                     onClick={() => onAnalyze({ rebuild: true })}
                   >
                     클립 다시 만들기

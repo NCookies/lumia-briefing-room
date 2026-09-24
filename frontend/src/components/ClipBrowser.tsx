@@ -229,7 +229,7 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
 
   const handleReprocess = async (group: GameGroup<Clip>) => {
     const result = await ask({
-      message: `${gameLabel(group)}를 원본 녹화에서 다시 분석합니다.\n기존 클립은 라벨과 편집 내용을 포함해 휴지통으로 이동하고 새로 만듭니다.\n분석에는 몇 분이 걸릴 수 있습니다. 계속하시겠습니까?`,
+      message: `다음 게임을 원본 녹화에서 다시 분석합니다.\n${gameLabel(group)}\n기존 클립은 라벨과 편집 내용을 포함해 휴지통으로 이동하고 새로 만듭니다.\n분석에는 몇 분이 걸릴 수 있습니다. 계속하시겠습니까?`,
       confirmLabel: '다시 분석',
     })
     if (!result.ok) return
@@ -246,10 +246,10 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
 
   const handleAnalyze = async (vod: Vod, options: { force?: boolean; rebuild?: boolean }) => {
     const message = options.force
-      ? `"${vod.name}" 을 처음부터 다시 분석합니다.\n기존 클립은 라벨과 편집 내용을 포함해 휴지통으로 옮기고 새로 만듭니다.\n영상 길이에 따라 수십 분이 걸릴 수 있습니다. 계속하시겠습니까?`
+      ? `"${vod.name}" 영상을 처음부터 다시 분석합니다.\n기존 클립은 라벨과 편집 내용을 포함해 휴지통으로 옮기고 새로 만듭니다.\n영상 길이에 따라 수십 분이 걸릴 수 있습니다. 계속하시겠습니까?`
       : options.rebuild
-        ? `"${vod.name}" 의 클립을 저장된 판독으로 다시 만듭니다.\n기존 클립은 휴지통으로 옮기고 새로 만듭니다. 계속하시겠습니까?`
-        : `"${vod.name}" 을 분석합니다.\n영상 길이에 따라 수십 분이 걸릴 수 있으며, 도중에 취소해도 다음에 이어서 할 수 있습니다. 계속하시겠습니까?`
+        ? `"${vod.name}" 영상의 클립을 저장된 분석 결과로 다시 만듭니다.\n기존 클립은 휴지통으로 옮기고 새로 만듭니다. 계속하시겠습니까?`
+        : `"${vod.name}" 영상을 분석합니다.\n영상 길이에 따라 수십 분이 걸릴 수 있으며, 도중에 취소해도 다음에 이어서 할 수 있습니다. 계속하시겠습니까?`
     const result = await ask({
       message,
       confirmLabel: options.force ? '다시 분석' : options.rebuild ? '다시 만들기' : '분석 시작',
@@ -284,7 +284,7 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
   const handleTrashVod = async (id: string, name: string, count: number) => {
     if (
       await confirmTrash(
-        `"${name}" 의 클립 ${count}개를 모두 삭제하시겠습니까?\n삭제한 클립은 휴지통에서 복구할 수 있습니다. 영상 파일은 지우지 않습니다.`,
+        `"${name}" 영상의 클립 ${count}개를 모두 삭제하시겠습니까?\n삭제한 클립은 휴지통에서 복구할 수 있습니다. 영상 파일은 지우지 않습니다.`,
       )
     ) {
       await vodAction(() => trashVodClips(id))
@@ -293,7 +293,7 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
 
   const handleDeleteVodForever = async (id: string, name: string) => {
     const result = await ask({
-      message: `"${name}" 의 휴지통 클립을 완전히 삭제합니다. 영상 파일은 지우지 않습니다. 계속하시겠습니까?`,
+      message: `"${name}" 영상의 휴지통 클립을 완전히 삭제합니다. 영상 파일은 지우지 않습니다. 계속하시겠습니까?`,
       confirmLabel: '완전 삭제',
       danger: true,
     })

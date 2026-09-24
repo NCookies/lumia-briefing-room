@@ -30,7 +30,7 @@ export function recordingState(report: RecordingReport): RecordingState {
 export const RECORDING_STATE_TEXT: Record<RecordingState, string> = {
   ok: '녹화 폴더를 찾았습니다.',
   'no-root': '스팀 녹화 폴더를 자동으로 찾지 못했습니다. 아래에서 직접 골라 주세요.',
-  'missing-folder': '설정된 녹화 폴더가 없습니다. 아래에서 다시 골라 주세요.',
+  'missing-folder': '설정된 녹화 폴더를 찾을 수 없습니다. 아래에서 다시 골라 주세요.',
   'no-session':
     '폴더는 있지만 아직 녹화 기록이 없습니다. 스팀의 배경 녹화를 켜고 게임을 한 판 한 뒤 다시 확인하세요.',
 }

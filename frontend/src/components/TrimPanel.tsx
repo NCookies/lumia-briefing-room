@@ -79,7 +79,7 @@ export function TrimPanel({ duration, getVideo, busy, onApply, onCancel }: Props
         ? `${formatTime(range.start)} ~ ${formatTime(range.end)} 구간만 남기고 나머지 ${removed.toFixed(1)}초는 삭제합니다.
 삭제한 부분은 복구할 수 없습니다. 계속하시겠습니까?`
         : `${count}개 구간을 각각 별도 클립으로 나눕니다.
-원본은 휴지통으로 이동하며 유예기간 안에는 복구할 수 있습니다. 계속하시겠습니까?`
+원본은 휴지통으로 이동하며 휴지통에 보관하는 기간 안에는 복구할 수 있습니다. 계속하시겠습니까?`
     const result = await ask({ message, confirmLabel: count === 1 ? '자르기' : '나누기', danger: count === 1 })
     if (result.ok) onApply(ranges)
   }
@@ -123,7 +123,7 @@ export function TrimPanel({ duration, getVideo, busy, onApply, onCancel }: Props
           {formatTime(range.start)} ~ {formatTime(range.end)}
         </span>
         <span className="text-zinc-400">
-          {count > 1 && `구간 ${active + 1}/${count} · `}남는 길이 {kept.toFixed(1)}초 · 삭제 {removed.toFixed(1)}초 (구간 최소 {MIN_LENGTH}초, 서로 겹칠 수 없음)
+          {count > 1 && `구간 ${active + 1}/${count} · `}남는 길이 {kept.toFixed(1)}초 · 삭제 {removed.toFixed(1)}초 (구간은 최소 {MIN_LENGTH}초 이상이며 서로 겹칠 수 없습니다)
         </span>
         <button type="button" className="rounded border border-zinc-600 px-2 py-1 hover:bg-zinc-700" onClick={() => fromPlayhead('start')}>
           현재 위치를 시작으로
