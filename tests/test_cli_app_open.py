@@ -203,3 +203,79 @@ def test_watch_does_not_retry_unexpected_exceptions():
 
     _run_watch_safely(None, threading.Event(), run_fn=broken_run, retry_sec=0)
     assert len(attempts) == 1
+
+
+def test_watch_restart_reruns_with_fresh_settings_while_running(monkeypatch):
+    """녹화 폴더를 바꾸면 감시가 시작 때 읽은 옛 폴더를 계속 쓰지 않게 다시 시작한다."""
+    import threading
+    import time
+
+    starts = []
+    stops = []
+
+    def fake_run(args, *, should_stop=lambda: False):
+        index = len(starts)
+        starts.append(index)
+        while not should_stop():
+            time.sleep(0.005)
+        stops.append(index)
+
+    monkeypatch.setattr("lumia_briefing_room.cli.app.run", fake_run)
+    from lumia_briefing_room.cli.app import make_watch_controller
+
+    on_toggle_watch, watch_enabled = make_watch_controller("fake-args", auto_start=True)
+    deadline = time.time() + 2
+    while not starts and time.time() < deadline:
+        time.sleep(0.005)
+
+    on_toggle_watch.restart()
+
+    deadline = time.time() + 3
+    while len(starts) < 2 and time.time() < deadline:
+        time.sleep(0.005)
+    assert starts == [0, 1]
+    assert stops == [0]
+    assert watch_enabled() is True
+    on_toggle_watch()
+
+
+def test_watch_restart_does_not_resume_a_watch_the_user_paused(monkeypatch):
+    import time
+
+    starts = []
+
+    def fake_run(args, *, should_stop=lambda: False):
+        starts.append(1)
+        while not should_stop():
+            time.sleep(0.005)
+
+    monkeypatch.setattr("lumia_briefing_room.cli.app.run", fake_run)
+    from lumia_briefing_room.cli.app import make_watch_controller
+
+    on_toggle_watch, watch_enabled = make_watch_controller("fake-args", auto_start=False)
+
+    on_toggle_watch.restart()
+
+    time.sleep(0.1)
+    assert starts == []
+    assert watch_enabled() is False
+
+
+def test_make_on_open_connects_the_watch_restart_to_the_server_app(monkeypatch):
+    class FakeApp:
+        class state:
+            pass
+
+    fake = FakeApp()
+    monkeypatch.setattr("lumia_briefing_room.cli.app.serve_cli.build_app", lambda cfg, *, config_path=None: fake)
+    monkeypatch.setattr(
+        "lumia_briefing_room.cli.app.serve_cli.run_server_in_thread", lambda app, *, host, port: ("s", "t")
+    )
+    monkeypatch.setattr("lumia_briefing_room.cli.app.serve_cli.wait_until_started", lambda server, **kw: True)
+    monkeypatch.setattr("lumia_briefing_room.cli.app.load_config", lambda path: "cfg")
+    from lumia_briefing_room.cli.app import make_on_open
+
+    restart = lambda: None  # noqa: E731
+    make_on_open(port=1, open_browser=lambda url: None, on_recording_root_changed=restart)()
+
+    assert fake.state.on_recording_root_changed is restart

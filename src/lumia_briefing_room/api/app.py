@@ -108,6 +108,17 @@ def _unlink(path: Path, *, attempts: int = 5) -> None:
             time.sleep(0.05)
 
 
+def _notify_recording_root_changed(app: FastAPI) -> None:
+    """돌고 있는 감시가 새 녹화 폴더를 쓰게 한다. 실패해도 설정 저장은 성공으로 돌려준다."""
+    callback = getattr(app.state, "on_recording_root_changed", None)
+    if callback is None:
+        return
+    try:
+        callback()
+    except Exception:
+        logging.getLogger("lumia_briefing_room").exception("녹화 폴더를 바꿨는데 감시를 다시 시작하지 못했다")
+
+
 def _clips_dir(app: FastAPI) -> Path:
     return resolve_paths(app.state.config.paths).clips
 
@@ -142,6 +153,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     app.state.config = cfg
     app.state.config_path = config_path
     app.state.log_dir = None
+    app.state.on_recording_root_changed = None
     lock = threading.RLock()
     jobs: dict[str, dict] = {}
 
@@ -556,6 +568,8 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         app.state.config = new_cfg
         if app.state.config_path is not None:
             save_config(new_cfg, app.state.config_path)
+        if "steamRecording" in (body.get("paths") or {}):
+            _notify_recording_root_changed(app)
         if "autoStart" in (body.get("ui") or {}):
             # 설정 파일만 고치면 다음 실행 때까지 레지스트리가 그대로라, 옵션에서 끈 뒤에도 한 번 더 자동 실행된다.
             autostart.apply_setting(new_cfg)

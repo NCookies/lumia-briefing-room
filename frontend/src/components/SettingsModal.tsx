@@ -4,6 +4,7 @@ import { AboutPanel } from './AboutPanel'
 import { CleanupPanel } from './CleanupPanel'
 import { ClipsDirSection } from './ClipsDirSection'
 import { FolderPicker } from './FolderPicker'
+import { RecordingRootSection } from './RecordingRootSection'
 import { VodSettingsPanel } from './VodSettingsPanel'
 
 type Tab = 'general' | 'export' | 'vod' | 'cleanup' | 'about'
@@ -81,6 +82,7 @@ function GeneralPanel({
       </p>
       {autoStartError && <p className="text-xs text-rose-300">{autoStartError}</p>}
     </section>
+    <RecordingRootSection />
     <ClipsDirSection
       source="steam"
       title="내 녹화 클립 저장 폴더"

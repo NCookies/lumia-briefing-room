@@ -134,3 +134,40 @@ def test_first_run_accepts_the_parent_folder_the_friend_picked(tmp_path: Path):
 
     assert recording["root"] == str(video)
     assert recording["session"]["width"] == 2560
+
+
+def test_changing_the_recording_folder_notifies_the_running_watch(tmp_path: Path):
+    client, _, app = _make(tmp_path)
+    calls = []
+    app.state.on_recording_root_changed = lambda: calls.append(1)
+
+    client.put("/api/config", json={"paths": {"steamRecording": str(tmp_path / "video")}})
+    client.put("/api/config", json={"player": {"nickname": "x"}})
+
+    assert calls == [1]
+
+
+def test_clearing_the_recording_folder_also_notifies_and_returns_to_auto(tmp_path: Path):
+    client, config_path, app = _make(tmp_path, steam_recording=tmp_path / "video")
+    calls = []
+    app.state.on_recording_root_changed = lambda: calls.append(1)
+
+    body = client.put("/api/config", json={"paths": {"steamRecording": None}}).json()
+
+    assert body["paths"]["steamRecording"] is None
+    assert calls == [1]
+    assert load_config(config_path).paths.steam_recording is None
+
+
+def test_a_failing_watch_restart_does_not_break_saving_the_setting(tmp_path: Path):
+    client, _, app = _make(tmp_path)
+
+    def boom():
+        raise RuntimeError("감시 재시작 실패")
+
+    app.state.on_recording_root_changed = boom
+
+    resp = client.put("/api/config", json={"paths": {"steamRecording": str(tmp_path / "video")}})
+
+    assert resp.status_code == 200
+    assert resp.json()["paths"]["steamRecording"] == str(tmp_path / "video")

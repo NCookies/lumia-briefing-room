@@ -32,3 +32,5 @@ export const setRecordingRoot = (path: string) =>
 export const setClipsDir = (path: string) => putConfig({ paths: { clips: path } }, '클립 폴더 저장')
 
 export const DIAGNOSTICS_URL = `${BASE}/diagnostics`
+
+export const clearRecordingRoot = () => putConfig({ paths: { steamRecording: null } }, '녹화 폴더 초기화')

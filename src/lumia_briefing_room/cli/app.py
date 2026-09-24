@@ -69,7 +69,9 @@ def access_url(port: int, *, hostname: str = HOSTNAME) -> str:
     return f"http://{hostname}{suffix}/"
 
 
-def make_on_open(*, host="127.0.0.1", port=8000, config_path=None, open_browser=webbrowser.open):
+def make_on_open(
+    *, host="127.0.0.1", port=8000, config_path=None, open_browser=webbrowser.open, on_recording_root_changed=None
+):
     """트레이 "열기": 서버를 (최초 1회만) 띄우고 브라우저로 연다.
 
     pystray 의 icon.run() 이 이미 메인 스레드를 쓰고 있어 pywebview 의
@@ -85,6 +87,8 @@ def make_on_open(*, host="127.0.0.1", port=8000, config_path=None, open_browser=
             if "server" not in state:
                 cfg = load_config(config_path)
                 app = serve_cli.build_app(cfg, config_path=config_path)
+                if on_recording_root_changed is not None:
+                    app.state.on_recording_root_changed = on_recording_root_changed
                 server, thread = serve_cli.run_server_in_thread(app, host=host, port=port)
                 serve_cli.wait_until_started(server)
                 state["server"] = server
@@ -105,7 +109,8 @@ def make_watch_controller(args, *, auto_start: bool = True):
     state = {"thread": None, "stop_event": threading.Event(), "running": False}
 
     def _start() -> None:
-        state["stop_event"].clear()
+        # 새 Event 를 쓴다 — 옛 스레드가 아직 끝나기 전에 같은 Event 를 clear 하면 옛 감시가 계속 돈다.
+        state["stop_event"] = threading.Event()
         thread = threading.Thread(
             target=_run_watch_safely, args=(args, state["stop_event"]), daemon=True
         )
@@ -122,6 +127,21 @@ def make_watch_controller(args, *, auto_start: bool = True):
             _stop()
         else:
             _start()
+
+    def restart() -> None:
+        """감시는 시작 때 설정(녹화 폴더 등)을 한 번만 읽는다. 옵션에서 바꾸면 돌던 감시를 새 설정으로 다시 시작한다.
+
+        사용자가 감시를 꺼 둔 상태였다면 켜지 않는다.
+        """
+        if not state["running"]:
+            return
+        state["stop_event"].set()
+        old = state["thread"]
+        if old is not None:
+            old.join(timeout=RESTART_JOIN_SEC)
+        _start()
+
+    on_toggle_watch.restart = restart
 
     def watch_enabled() -> bool:
         return state["running"]
@@ -199,7 +219,10 @@ def _run_app(args, instance: SingleInstance) -> None:
     ).start()
 
     on_open = make_on_open(
-        host="127.0.0.1", port=resolve_port(cfg.ui.port), config_path=resolve_config_path(args.config)
+        host="127.0.0.1",
+        port=resolve_port(cfg.ui.port),
+        config_path=resolve_config_path(args.config),
+        on_recording_root_changed=on_toggle_watch.restart,
     )
 
     instance.listen(on_open)
@@ -221,6 +244,7 @@ _icon_ref: dict = {}
 
 
 WATCH_RETRY_SEC = 10.0
+RESTART_JOIN_SEC = 15.0
 
 
 def _run_watch_safely(args, stop_event: threading.Event, *, run_fn=None, retry_sec: float = WATCH_RETRY_SEC) -> None:
