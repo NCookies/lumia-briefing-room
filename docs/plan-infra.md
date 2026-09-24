@@ -37,7 +37,8 @@
 - **보내는 것**: [SPEC §7.11](SPEC.md) 과 [plan-deploy §5](plan-deploy.md) 표 그대로 — 라벨(`telemetry.sendLabels`), 오류 로그·환경 정보(`telemetry.sendLogs`). 서버는 이 밖의 필드를 받지 않고 버린다.
 - **식별**: `telemetry.installId`(무작위 UUID)만. 계정·닉네임과 연결하지 않는다. "보낸 데이터 삭제 요청"은 이 ID 로 서버에서 지운다.
 - **전송 방식**: 앱이 하루 1회 묶음으로 보내고 실패하면 조용히 다음으로 미룬다(대기분 상한 예: 20MB — SPEC §7.11).
-- **서버가 해야 할 것(수신 API 최소 범위)**: 수신·크기 상한·스키마 검증·`installId` 별 삭제. 조회·분석은 서버 밖(로컬 도구)에서 한다.
+- **진단 번들(plan-deploy D14)**: 사용자가 버튼으로 보내는 진단 정보(로그 발췌·환경 정보, 개인정보 제거 후)도 받는다. 서버는 접수 번호를 발급해 돌려주고 `installId` 로 묶는다. 영상·이미지는 받지 않는다.
+- **서버가 해야 할 것(수신 API 최소 범위)**: 수신·크기 상한·스키마 검증·`installId` 별 삭제·진단 번들 접수 번호 발급. 조회·분석은 서버 밖(로컬 도구)에서 한다.
 - **API 명세와 버전**은 서버 저장소가 정한다. 이 저장소는 D10 구현 때 [plan-deploy.md](plan-deploy.md) 에 확정한 계약을 링크한다.
 
 ## 4. 저장 계층: 파일 → DB
@@ -79,6 +80,7 @@
 - **결정된 것**: 서버는 Python FastAPI, Terraform 상태는 로컬 파일, 인프라 저장소 이름은 범용 `infra`(다른 프로젝트·AWS 도 여기서 관리할 수 있게 나중에 `terraform/oci`·`terraform/aws` 로 분리), 도메인은 `server.example.invalid`(가비아 A 레코드 → VM 공인 IP, caddy 가 Let's Encrypt HTTPS 자동 발급), 인증은 공유 토큰(`X-Api-Token`) + 요청 본문 20MB 상한.
 - **A1 은 실패했다.** `VM.Standard.A1.Flex` 로 `apply` 하니 네트워크는 만들어졌지만 `LaunchInstance` 가 `404-NotAuthorizedOrNotFound` 였다. 원인은 확인하지 못했고(권한 문제는 아님), 콘솔 기본 shape 이던 `VM.Standard.E2.1.Micro`(x86, 1GB, Always Free)로 바꿔 성공했다. 이 계정은 이전 프로젝트에서 만들다 만 micro 가 1개 있어 한도가 `1 of 2` 였고, 이번 VM 으로 무료 micro 슬롯이 다 찼다.
 - **겪은 함정**(해결법은 README): `.oci` 폴더를 사용자 폴더 밖에 잘못 만듦, `config` 의 `key_file=` 상대 경로, `compartment_ocid` 에 user OCID 를 넣음, ghcr 태그 대문자(`repository name must be lowercase`).
+- **I4 에서 서버에 더 필요한 것**: 진단 번들 업로드 경로와 접수 번호 응답(plan-deploy D14), 라벨 메모 필드 `labelNote`(plan-deploy D12).
 - **앱 쪽 연결(I4)에 필요한 것**: 주소 `https://server.example.invalid`, `X-Api-Token`(값은 infra 저장소의 `terraform.tfvars`, 커밋되지 않음). 서버의 라벨 필드 허용 목록(`services/receiver/app/schemas.py`)은 SPEC 메타데이터 예시를 보고 추정한 것이라 **실제 전송 필드와 맞춰야 한다.**
 - **남은 위험**: 요청 빈도 제한 없음, 공유 토큰이 앱에 들어가므로 완전한 인증이 아님, 공인 IP 가 예약 IP 가 아니라 VM 재생성 시 바뀜, 1GB 메모리, 저장은 파일뿐.
 

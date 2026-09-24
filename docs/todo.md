@@ -27,3 +27,9 @@
 - [x] 자르기 구간 여러 개(구간마다 별도 클립 분할, 겹침 금지, 원본은 휴지통) → plan-ui.md §0·§4-5(확인 필요 4건), SPEC §3 실사용 피드백 UI
 - [x] 자동 업데이트 기능 → 이미 SPEC §6 v2 이후 후보·§7.11, plan-deploy.md D9 에 있음(새로 적은 것 없음)
 - [x] terraform 으로 OCI 인프라 구축(도커, 파일 → 나중에 DB, MCP 조사) → 새 docs/plan-infra.md, plan-deploy.md §7-11, SPEC §7.11 수신처
+- [x] 버전 이름 명시(화면에 현재 버전 표시) → plan-deploy.md D11
+- [x] 첫 실행 동의 기본값 전부 꺼짐 → plan-deploy.md D12·D3·§5, SPEC §7.11 표(`update.check` 기본 선택을 켬 → 끔으로 변경)
+- [x] 라벨 전송이 꺼져 있으면 라벨링 UI 숨김 + 라벨 메모 입력창 → plan-deploy.md D12·§7-7, SPEC §7.11(`labelNote`), plan-infra.md §7(서버 스키마)
+- [x] 배포 자동화(Release 업로드 + 바이러스 검사) → plan-deploy.md D13(확인 필요 §7-16~19)
+- [x] 자동 업데이트를 꺼도 수동 확인·업데이트 가능 (대화 중 추가) → plan-deploy.md D9·D12, SPEC §7.11
+- [x] 진단 zip 첨부 대신 서버 전송 (대화 중 추가) → plan-deploy.md D14·D3·§7-11, plan-infra.md §3·§7, SPEC §7.11
