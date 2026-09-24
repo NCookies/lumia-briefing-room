@@ -1,4 +1,5 @@
 import { isPending, type ConsentChoices } from '../consent'
+import { PrivacyLink } from './PrivacyLink'
 
 const ITEMS: { key: keyof ConsentChoices; id: string; title: string; detail: string }[] = [
   {
@@ -12,13 +13,14 @@ const ITEMS: { key: keyof ConsentChoices; id: string; title: string; detail: str
     id: 'labels',
     title: '교전 / 그 외 라벨 보내기',
     detail:
-      '직접 붙인 라벨과 그 근거(검출 신호·수치)만 보냅니다. 영상과 화면 이미지는 보내지 않습니다. 켜야 클립에 라벨을 붙이는 기능이 나타납니다.',
+      '직접 붙인 라벨(교전 / 그 외)과 메모, 검출 근거 수치, 녹화 해상도·게임 모드, 결과 화면의 최종 킬·어시스트, 내 캐릭터 이름을 보냅니다. 영상·화면 이미지·닉네임·팀원 정보는 보내지 않습니다. 메모에는 닉네임 같은 개인정보를 적지 마세요. 켜야 클립에 라벨을 붙이는 기능이 나타납니다.',
   },
   {
     key: 'logs',
     id: 'logs',
     title: '오류 로그와 환경 정보 보내기',
-    detail: '앱 버전·OS·녹화 해상도·오류 기록만 보냅니다. 닉네임과 경로 속 사용자 이름은 지운 뒤 보냅니다.',
+    detail:
+      '프로그램 오류 기록(오류 종류·발생 위치)과 환경 정보(앱 버전·OS·CPU·그래픽카드·메모리·화면 배율·녹화 해상도·코덱·판독 실패 통계)를 보냅니다. 닉네임과 경로 속 사용자 이름은 지운 뒤 보냅니다.',
   },
 ]
 
@@ -47,6 +49,7 @@ export function ConsentChoicesForm({
           </span>
         </label>
       ))}
+      {(isPending(pending, 'labels') || isPending(pending, 'logs')) && <PrivacyLink />}
     </div>
   )
 }

@@ -6,6 +6,7 @@ import { DEFAULT_CHOICES, consentPatch, type ConsentChoices } from '../consent'
 import { getConsentChoices, saveConsentPatch } from '../consentApi'
 import { useLabelingState } from '../labelingContext'
 import { ConsentChoicesForm } from './ConsentChoicesForm'
+import { TelemetryPanel } from './TelemetryPanel'
 
 const TONE_CLASS = {
   ok: 'text-emerald-300',
@@ -36,6 +37,13 @@ export function AboutPanel() {
       .catch((e: Error) => setError(e.message))
   }
 
+  const reloadChoices = () => {
+    getConsentChoices()
+      .then(setChoices)
+      .catch(() => {})
+    reload()
+  }
+
   const resolution = firstRun?.recording.resolution
 
   return (
@@ -52,6 +60,8 @@ export function AboutPanel() {
         <h3 className="text-sm font-medium text-zinc-200">선택 기능</h3>
         <ConsentChoicesForm choices={choices} pending={['update', 'labels', 'logs']} onChange={changeChoices} />
       </section>
+
+      <TelemetryPanel refreshKey={choices} onChanged={reloadChoices} />
 
       <section className="flex flex-col gap-1">
         <h3 className="text-sm font-medium text-zinc-200">녹화 해상도</h3>
