@@ -15,6 +15,7 @@ class Settings:
     rate_limit_failures: int = 15
     block_sec: int = 3600
     discord_webhook_url: str = ""
+    admin_token: str = ""
 
 
 def _tokens(*raw: str) -> tuple[str, ...]:
@@ -38,4 +39,5 @@ def load_settings() -> Settings:
         rate_limit_failures=int(os.environ.get("RATE_LIMIT_FAILURES", 15)),
         block_sec=int(os.environ.get("BLOCK_SEC", 3600)),
         discord_webhook_url=os.environ.get("DISCORD_WEBHOOK_URL", "").strip(),
+        admin_token=os.environ.get("ADMIN_TOKEN", "").strip(),
     )

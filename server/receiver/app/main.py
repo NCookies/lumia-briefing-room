@@ -1,12 +1,14 @@
 import asyncio
+import base64
 import contextlib
 import hmac
 import ipaddress
 import json
 import logging
+from typing import Literal
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError
@@ -17,7 +19,7 @@ from .ratelimit import RateLimiter
 from .retention import purge_expired
 from .schemas import DiagnosticBundle, LabelBatch, LogBatch
 from .stats import DailyStats
-from .storage import FileStore
+from .storage import FileStore, list_labels
 
 log = logging.getLogger("receiver")
 
@@ -28,6 +30,18 @@ def _rejected_field_names(error: ValidationError) -> list[str]:
         name = next((p for p in reversed(item["loc"]) if isinstance(p, str)), "body")
         names.append(name)
     return names
+
+
+def _encode_cursor(key: tuple[str, str, str] | None) -> str | None:
+    return base64.urlsafe_b64encode(json.dumps(key).encode()).decode() if key else None
+
+
+def _decode_cursor(text: str) -> tuple[str, str, str] | None:
+    try:
+        key = json.loads(base64.urlsafe_b64decode(text.encode()))
+        return tuple(key) if isinstance(key, list) and len(key) == 3 else None
+    except ValueError:
+        return None
 
 
 REJECTED_STATUSES = {401, 404, 405, 413, 422}
@@ -110,6 +124,12 @@ def create_app(settings: Settings | None = None, alerter: Alerter | None = None)
         if not any(hmac.compare_digest(x_api_token, token) for token in settings.api_tokens):
             raise HTTPException(status_code=401, detail="invalid token")
 
+    def require_admin(x_admin_token: str = Header(default="")) -> None:
+        if not settings.admin_token:
+            raise HTTPException(status_code=404, detail="not found")
+        if not hmac.compare_digest(x_admin_token, settings.admin_token):
+            raise HTTPException(status_code=401, detail="invalid token")
+
     async def parse(request: Request, endpoint: str, model: type[BaseModel]):
         raw = await request.body()
         if len(raw) > settings.max_body_bytes:
@@ -168,6 +188,11 @@ def create_app(settings: Settings | None = None, alerter: Alerter | None = None)
              "entries": [e.model_dump(exclude_none=True) for e in batch.entries]},
         )
         return {"receiptId": receipt, "saved": len(batch.entries)}
+
+    @app.get("/v1/admin/labels", dependencies=[Depends(require_admin)])
+    def export_labels(mode: Literal["dev", "release"] = "release", after: str = "", limit: int = Query(500, ge=1, le=2000)):
+        labels, last = list_labels(settings.data_dir, mode, _decode_cursor(after), limit)
+        return {"labels": labels, "next": _encode_cursor(last)}
 
     @app.delete("/v1/installs/{install_id}", dependencies=[Depends(require_token)])
     def delete_install(install_id: UUID):
