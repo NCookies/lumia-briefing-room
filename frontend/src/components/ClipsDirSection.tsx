@@ -16,6 +16,8 @@ export function ClipsDirSection({ source, title, description, onChanged }: Props
   const [draft, setDraft] = useState('')
   const [mode, setMode] = useState<Mode>('view')
   const [busy, setBusy] = useState(false)
+  const [fraction, setFraction] = useState(0)
+  const [moving, setMoving] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
 
   useEffect(() => {
@@ -26,10 +28,12 @@ export function ClipsDirSection({ source, title, description, onChanged }: Props
 
   const apply = async (move: boolean) => {
     setBusy(true)
+    setMoving(move)
+    setFraction(0)
     setStatus(null)
     try {
       if (move) {
-        const moved = await moveClipsDir(source, draft)
+        const moved = await moveClipsDir(source, draft, setFraction)
         setStatus(`클립 ${moved}개를 새 폴더로 옮겼습니다.`)
       } else {
         await setClipsDirOnly(source, draft)
@@ -45,6 +49,8 @@ export function ClipsDirSection({ source, title, description, onChanged }: Props
       setBusy(false)
     }
   }
+
+  const percent = Math.round(fraction * 100)
 
   const choose = () => {
     if (draft === current) return setMode('view')
@@ -100,6 +106,11 @@ export function ClipsDirSection({ source, title, description, onChanged }: Props
           <p className="text-xs text-amber-300">
             옮기지 않으면 기존 클립은 이전 폴더에 남고, 새 폴더를 쓰는 동안 목록에 보이지 않습니다.
           </p>
+          {busy && moving && (
+            <div className="h-2 overflow-hidden rounded bg-zinc-700" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
+              <div className="h-full bg-sky-500 transition-[width]" style={{ width: `${percent}%` }} />
+            </div>
+          )}
           <div className="flex justify-end gap-2">
             <button
               type="button"
@@ -123,7 +134,7 @@ export function ClipsDirSection({ source, title, description, onChanged }: Props
               disabled={busy}
               onClick={() => void apply(true)}
             >
-              {busy ? '옮기는 중…' : '예, 옮기기'}
+              {busy && moving ? `옮기는 중… ${percent}%` : '예, 옮기기'}
             </button>
           </div>
         </div>

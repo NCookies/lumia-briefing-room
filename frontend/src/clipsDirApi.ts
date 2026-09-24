@@ -29,10 +29,28 @@ export async function setClipsDirOnly(source: ClipsSource, path: string): Promis
   await jsonOrThrow(await send(`${BASE}/config`, 'PUT', { paths: { [CONFIG_KEY[source]]: path } }), '설정 저장')
 }
 
-export async function moveClipsDir(source: ClipsSource, path: string): Promise<number> {
-  const result = await jsonOrThrow<{ moved: number }>(
-    await send(`${BASE}/clips-dir/move`, 'POST', { source, path }),
-    '클립 옮기기',
-  )
-  return result.moved
+interface MoveJob {
+  state: 'idle' | 'running' | 'done' | 'error'
+  doneBytes: number
+  totalBytes: number
+  moved: number
+  message: string
+}
+
+const POLL_MS = 300
+
+export async function moveClipsDir(
+  source: ClipsSource,
+  path: string,
+  onProgress: (fraction: number) => void,
+): Promise<number> {
+  let job = await jsonOrThrow<MoveJob>(await send(`${BASE}/clips-dir/move`, 'POST', { source, path }), '클립 옮기기')
+  while (job.state === 'running') {
+    onProgress(job.totalBytes > 0 ? job.doneBytes / job.totalBytes : 0)
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS))
+    job = await jsonOrThrow<MoveJob>(await fetch(`${BASE}/clips-dir/move`), '진행 상황 조회')
+  }
+  if (job.state === 'error') throw new Error(job.message)
+  onProgress(1)
+  return job.moved
 }

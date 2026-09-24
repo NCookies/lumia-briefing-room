@@ -1,4 +1,5 @@
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -90,14 +91,42 @@ def client(tmp_path):
     return TestClient(create_app(cfg, config_path=tmp_path / "config.json"))
 
 
+def _start_move(client, source, path):
+    resp = client.post("/api/clips-dir/move", json={"source": source, "path": str(path)})
+    if resp.status_code != 202:
+        return resp, None
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        status = client.get("/api/clips-dir/move").json()
+        if status["state"] != "running":
+            return resp, status
+        time.sleep(0.02)
+    raise AssertionError("이동이 끝나지 않았다")
+
+
+def test_progress_reports_bytes_up_to_total(tmp_path):
+    old, new = tmp_path / "old", tmp_path / "new"
+    _write_clip(old, "a")
+    _write_clip(old, "b")
+    seen = []
+
+    move_clips_dir(old, new, progress=lambda done, total: seen.append((done, total)))
+
+    total = seen[0][1]
+    assert total > 0
+    assert seen[0][0] == 0 and seen[-1] == (total, total)
+    assert [d for d, _ in seen] == sorted(d for d, _ in seen)
+
+
 def test_api_moves_clips_and_updates_config(client, tmp_path):
     _write_clip(tmp_path / "clips", "a", stored_thumb=str(tmp_path / "clips" / ".thumbs" / "a.jpg"))
     new = tmp_path / "elsewhere"
 
-    resp = client.post("/api/clips-dir/move", json={"source": "steam", "path": str(new)})
+    resp, status = _start_move(client, "steam", new)
 
-    assert resp.status_code == 200
-    assert resp.json()["moved"] == 1
+    assert resp.status_code == 202
+    assert status["state"] == "done" and status["moved"] == 1
+    assert status["doneBytes"] == status["totalBytes"] > 0
     assert client.get("/api/config").json()["paths"]["clips"] == str(new)
     assert [c["id"] for c in client.get("/api/clips").json()] == ["a"]
     assert client.get("/api/clips/a/thumbnail").status_code == 200
@@ -107,7 +136,7 @@ def test_api_conflict_keeps_old_config(client, tmp_path):
     _write_clip(tmp_path / "clips", "a")
     _write_clip(tmp_path / "elsewhere", "a")
 
-    resp = client.post("/api/clips-dir/move", json={"source": "steam", "path": str(tmp_path / "elsewhere")})
+    resp, _ = _start_move(client, "steam", tmp_path / "elsewhere")
 
     assert resp.status_code == 409
     assert client.get("/api/config").json()["paths"]["clips"] == str(tmp_path / "clips")
@@ -118,8 +147,15 @@ def test_api_moves_vod_clips(client, tmp_path):
     client.put("/api/config", json={"paths": {"vodClips": str(vod)}})
     _write_clip(vod, "vod_a")
 
-    resp = client.post("/api/clips-dir/move", json={"source": "vod", "path": str(tmp_path / "vod2")})
+    _, status = _start_move(client, "vod", tmp_path / "vod2")
 
-    assert resp.status_code == 200
+    assert status["state"] == "done"
     assert client.get("/api/config").json()["paths"]["vodClips"] == str(tmp_path / "vod2")
     assert (tmp_path / "vod2" / "vod_a.json").exists()
+
+
+def test_api_nothing_to_move_still_switches_folder(client, tmp_path):
+    _, status = _start_move(client, "steam", tmp_path / "fresh")
+
+    assert status["state"] == "done" and status["moved"] == 0
+    assert client.get("/api/config").json()["paths"]["clips"] == str(tmp_path / "fresh")

@@ -45,7 +45,7 @@ from lumia_briefing_room.pipeline.game_records import (
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for, archive_if_labeled
 from lumia_briefing_room.pipeline.cleanup import plan_cleanup, remove_orphan_result_images, run_cleanup
 from lumia_briefing_room.pipeline.clip_assets import resolve_result_image, resolve_thumbnail
-from lumia_briefing_room.pipeline.move_clips import MoveError, move_clips_dir
+from lumia_briefing_room.pipeline.move_clips import MoveError, execute_move, plan_move
 from lumia_briefing_room.pipeline.retention import restore_clip, trash_clip
 from lumia_briefing_room.pipeline.proxy import create_proxy, is_proxy_fresh, proxy_path, remove_orphan_proxies
 from lumia_briefing_room.pipeline.reprocess import GameRef, ReprocessError, reprocess_game
@@ -561,27 +561,57 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             autostart.apply_setting(new_cfg)
         return dataclass_to_camel_dict(new_cfg)
 
-    @app.post("/api/clips-dir/move")
-    @locked
+    move_job: dict = {"state": "idle", "doneBytes": 0, "totalBytes": 0, "moved": 0, "message": ""}
+
+    @app.post("/api/clips-dir/move", status_code=202)
     def move_clips(body: dict):
-        """클립 저장 폴더를 새 위치로 바꾸면서 기존 클립도 함께 옮긴다. 옮기지 못하면 설정은 그대로 둔다."""
+        """클립 저장 폴더를 새 위치로 바꾸면서 기존 클립도 백그라운드로 옮긴다. 진행률은 GET /api/clips-dir/move 로 본다.
+
+        옮기지 못하면 설정은 그대로 둔다.
+        """
         source, raw = body.get("source"), str(body.get("path") or "").strip()
         if source not in ("steam", "vod"):
             raise HTTPException(400, "source 는 steam 또는 vod 여야 합니다")
         if not raw:
             raise HTTPException(400, "새 폴더를 지정해야 합니다")
+        if move_job["state"] == "running":
+            raise HTTPException(409, "이미 클립을 옮기는 중입니다")
         if any(j["state"] == "running" for j in jobs.values()):
             raise HTTPException(409, "게임을 분석하는 중에는 클립을 옮길 수 없습니다. 끝난 뒤 다시 시도하세요")
         resolved = resolve_paths(current_config().paths)
         old = resolved.clips if source == "steam" else resolved.vod_clips
         try:
-            moved = move_clips_dir(old, Path(raw))
+            plan = plan_move(old, Path(raw))
         except MoveError as e:
             raise HTTPException(409, str(e))
-        except OSError as e:
-            raise HTTPException(500, f"클립을 옮기다 실패했습니다. 남은 클립은 기존 폴더에 있으니 다시 시도하세요: {e}")
-        put_config({"paths": {"clips" if source == "steam" else "vodClips": raw}})
-        return {"moved": moved}
+        config_key = "clips" if source == "steam" else "vodClips"
+        move_job.update(
+            state="running", doneBytes=0, totalBytes=plan.total_bytes if plan else 0, moved=0, message=""
+        )
+
+        def progress(done: int, total: int) -> None:
+            move_job.update(doneBytes=done, totalBytes=total)
+
+        def run() -> None:
+            try:
+                with lock:
+                    moved = execute_move(plan, progress) if plan else 0
+                    put_config({"paths": {config_key: raw}})
+                move_job.update(state="done", moved=moved)
+            except OSError as e:
+                move_job.update(
+                    state="error", message=f"클립을 옮기다 실패했습니다. 남은 클립은 기존 폴더에 있으니 다시 시도하세요: {e}"
+                )
+            except Exception as e:
+                logging.getLogger("lumia_briefing_room.move").exception("클립 폴더 이동 실패")
+                move_job.update(state="error", message=str(e))
+
+        threading.Thread(target=run, daemon=True).start()
+        return dict(move_job)
+
+    @app.get("/api/clips-dir/move")
+    def move_clips_status():
+        return dict(move_job)
 
     @app.post("/api/client-log", status_code=204)
     def post_client_log(body: ClientLog):

@@ -5,6 +5,8 @@
 """
 
 import shutil
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from lumia_briefing_room.pipeline.clip_assets import THUMBS_DIRNAME, TRASH_DIRNAME
@@ -22,7 +24,27 @@ def _is_inside(child: Path, parent: Path) -> bool:
     return child != parent and parent in child.parents
 
 
-def _plan(old: Path, new: Path) -> tuple[list[tuple[Path, Path]], int]:
+@dataclass
+class MovePlan:
+    old: Path
+    pairs: list[tuple[Path, Path]]
+    clips: int
+    total_bytes: int
+
+
+def plan_move(old: Path, new: Path) -> MovePlan | None:
+    """옮길 파일 목록을 만든다. 옮길 게 없으면(같은 폴더·없는 폴더) None, 옮길 수 없으면 MoveError.
+
+    같은 이름의 파일이 이미 new 에 있으면 아무것도 옮기기 전에 거부한다.
+    """
+    old, new = old.resolve(), new.resolve()
+    if old == new:
+        return None
+    if _is_inside(new, old) or _is_inside(old, new):
+        raise MoveError("새 폴더는 기존 폴더의 안쪽이거나 바깥쪽일 수 없습니다")
+    if not old.is_dir():
+        return None
+
     pairs: list[tuple[Path, Path]] = []
     clips = 0
     for meta in sorted(old.glob("*.json")):
@@ -36,34 +58,37 @@ def _plan(old: Path, new: Path) -> tuple[list[tuple[Path, Path]], int]:
         if side.is_dir():
             for file in sorted(p for p in side.rglob("*") if p.is_file()):
                 pairs.append((file, new / file.relative_to(old)))
-    return pairs, clips
 
-
-def move_clips_dir(old: Path, new: Path) -> int:
-    """old 폴더의 클립과 딸린 폴더를 new 로 옮기고 옮긴 클립 수를 돌려준다.
-
-    이미 같은 이름의 파일이 new 에 있으면 아무것도 옮기기 전에 거부한다. 도중에 실패해도 남은 것만 old 에 있으므로 다시 시도하면 이어서 옮겨진다.
-    """
-    old, new = old.resolve(), new.resolve()
-    if old == new:
-        return 0
-    if _is_inside(new, old) or _is_inside(old, new):
-        raise MoveError("새 폴더는 기존 폴더의 안쪽이거나 바깥쪽일 수 없습니다")
-    if not old.is_dir():
-        return 0
-
-    pairs, clips = _plan(old, new)
     clashes = [dst.name for _, dst in pairs if dst.exists()]
     if clashes:
         raise MoveError(f"새 폴더에 같은 이름의 파일이 이미 있습니다: {', '.join(clashes[:3])}")
+    return MovePlan(old=old, pairs=pairs, clips=clips, total_bytes=sum(src.stat().st_size for src, _ in pairs))
 
-    for src, dst in pairs:
+
+def execute_move(plan: MovePlan, progress: Callable[[int, int], None] | None = None) -> int:
+    """계획대로 옮기고 옮긴 클립 수를 돌려준다. progress(옮긴 바이트, 전체 바이트)는 파일 하나를 옮길 때마다 부른다.
+
+    도중에 실패해도 남은 것만 old 에 있으므로 다시 시도하면 이어서 옮겨진다.
+    """
+    done = 0
+    if progress is not None:
+        progress(0, plan.total_bytes)
+    for src, dst in plan.pairs:
+        size = src.stat().st_size
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(src), str(dst))
+        done += size
+        if progress is not None:
+            progress(done, plan.total_bytes)
 
     for name in SIDE_DIRNAMES:
-        _remove_empty_tree(old / name)
-    return clips
+        _remove_empty_tree(plan.old / name)
+    return plan.clips
+
+
+def move_clips_dir(old: Path, new: Path, progress: Callable[[int, int], None] | None = None) -> int:
+    plan = plan_move(old, new)
+    return 0 if plan is None else execute_move(plan, progress)
 
 
 def _remove_empty_tree(path: Path) -> None:
