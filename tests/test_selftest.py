@@ -105,3 +105,20 @@ def test_ocr_check_really_loads_the_engine():
     """PyInstaller 로 묶었을 때 rapidocr 모델·onnxruntime 누락을 잡는 검사다."""
     results = _by_name(selftest.check_ocr())
     assert results["결과 화면 OCR"].ok is True, results["결과 화면 OCR"].detail
+
+
+def test_telemetry_checks_pass_in_the_source_tree_and_report_the_token_state(monkeypatch):
+    from lumia_briefing_room.telemetry import endpoint
+
+    monkeypatch.setattr(endpoint, "bundled_endpoint", lambda: {})
+    results = {c.name: c for c in selftest.check_telemetry()}
+    assert results["전송 클라이언트(httpx·인증서)"].ok and results["개인정보 처리 안내"].ok
+    assert results["서버 연결 정보"].ok and "꺼져" in results["서버 연결 정보"].detail
+    monkeypatch.setattr(endpoint, "bundled_endpoint", lambda: {"token": "t"})
+    assert "들어 있다" in {c.name: c for c in selftest.check_telemetry()}["서버 연결 정보"].detail
+
+
+def test_missing_privacy_document_fails_the_check(tmp_path, monkeypatch):
+    monkeypatch.setattr(selftest.paths, "resource_dir", lambda: tmp_path)
+    results = {c.name: c for c in selftest.check_telemetry()}
+    assert results["개인정보 처리 안내"].ok is False

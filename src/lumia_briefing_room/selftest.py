@@ -90,8 +90,29 @@ def check_ocr() -> list[Check]:
     return [Check("결과 화면 OCR", True, f"엔진을 불러왔다 (빈 이미지에서 {len(lines)}줄)")]
 
 
+def check_telemetry() -> list[Check]:
+    """전송 기능이 빌드본에서 동작할 수 있는지 — httpx·인증서 번들·개인정보 안내 파일이 빠지면 여기서 드러난다."""
+    checks = []
+    try:
+        import httpx
+
+        from lumia_briefing_room.telemetry.client import Endpoint, ReceiverClient
+
+        httpx.create_ssl_context()
+        client = ReceiverClient(Endpoint("https://selftest.invalid", "x"), transport=httpx.MockTransport(lambda r: httpx.Response(200, json={})))
+        checks.append(Check("전송 클라이언트(httpx·인증서)", client.post("/v1/logs", {}).outcome == "ok", f"httpx {httpx.__version__}"))
+    except Exception as exc:
+        checks.append(Check("전송 클라이언트(httpx·인증서)", False, f"{type(exc).__name__}: {exc}"))
+    checks.append(_file_check("개인정보 처리 안내", paths.resource_dir() / "docs" / "privacy.md"))
+    from lumia_briefing_room.telemetry.endpoint import bundled_endpoint
+
+    has_token = bool(bundled_endpoint().get("token"))
+    checks.append(Check("서버 연결 정보", True, "토큰이 들어 있다" if has_token else "토큰이 없다 — 이 빌드는 서버 전송이 꺼져 있다"))
+    return checks
+
+
 def run_all() -> tuple[list[Check], bool]:
-    results = [*check_environment(), *check_resources(), *check_tools(), *check_ocr()]
+    results = [*check_environment(), *check_resources(), *check_tools(), *check_ocr(), *check_telemetry()]
     return results, all(r.ok for r in results)
 
 
