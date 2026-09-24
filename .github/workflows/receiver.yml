@@ -3,7 +3,7 @@ name: receiver
 on:
   push:
     branches: [main]
-    paths: ["services/receiver/**", ".github/workflows/receiver.yml"]
+    paths: ["services/receiver/**", "contract/**", ".github/workflows/receiver.yml"]
 
 permissions:
   contents: read
