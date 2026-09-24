@@ -22,7 +22,9 @@ import { ExportDialog } from './ExportDialog'
 import { GameSection } from './GameSection'
 import { PlayerModal } from './PlayerModal'
 import { ResultCard, ResultViewer } from './ResultCard'
+import { GameTimeline } from './GameTimeline'
 import { VodSection } from './VodSection'
+import { loadViewMode, saveViewMode, type ViewMode } from '../viewMode'
 import { formatMatchResult, gameRecordId, groupByGame, totalSize, withResultImage, type GameGroup } from '../grouping'
 import { applyLabel, progress } from '../labeling'
 import { formatBytes } from '../retention'
@@ -75,6 +77,7 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
   const [reprocessKey, setReprocessKey] = useState<string | null>(null)
   const [reprocessGame, setReprocessGame] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>(() => loadViewMode(source))
   const ask = useConfirm()
 
   const reload = useCallback(() => {
@@ -366,9 +369,36 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
 
   const { labeled, total } = progress(ordered)
 
-  const renderGame = (group: GameGroup<Clip>) => (
+  const renderClipCard = (clip: Clip) => (
+    <ClipCard
+      key={clip.id}
+      clip={clip}
+      trashed={filter.trashed}
+      onPlay={() => setPlayingId(clip.id)}
+      onTogglePin={handleTogglePin}
+      onRename={handleRename}
+      onTrash={handleTrash}
+      onRestore={handleRestore}
+      onDeleteForever={handleDeleteForever}
+      onLabel={handleLabel}
+      onExport={setExportTarget}
+    />
+  )
+
+  const timeline = viewMode === 'timeline'
+
+  const renderGame = (group: GameGroup<Clip>) => {
+    const lead = group.result?.imagePath ? (
+      <ResultCard
+        imageUrl={group.recordId ? gameRecordImageUrl(group.recordId) : resultImageUrl(group.clips[0].id)}
+        result={group.result}
+        onOpen={() => setResultViewKey(group.key)}
+      />
+    ) : null
+    return (
     <GameSection
       key={group.key}
+      bare={timeline}
               group={group}
               expanded={expandedKeys.has(group.key)}
               trashed={filter.trashed}
@@ -390,35 +420,31 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
                   : undefined
               }
             >
-              {group.result?.imagePath && (
-                <ResultCard
-                  imageUrl={group.recordId ? gameRecordImageUrl(group.recordId) : resultImageUrl(group.clips[0].id)}
-                  result={group.result}
-                  onOpen={() => setResultViewKey(group.key)}
-                />
+              {timeline ? (
+                <GameTimeline clips={group.clips} lead={lead} renderClip={renderClipCard} />
+              ) : (
+                <>
+                  {lead}
+                  {group.clips.map(renderClipCard)}
+                </>
               )}
-              {group.clips.map((clip) => (
-                <ClipCard
-                  key={clip.id}
-                  clip={clip}
-                  trashed={filter.trashed}
-                  onPlay={() => setPlayingId(clip.id)}
-                  onTogglePin={handleTogglePin}
-                  onRename={handleRename}
-                  onTrash={handleTrash}
-                  onRestore={handleRestore}
-                  onDeleteForever={handleDeleteForever}
-                  onLabel={handleLabel}
-                  onExport={setExportTarget}
-                />
-              ))}
             </GameSection>
-  )
+    )
+  }
 
 
   return (
     <div className="flex flex-1 flex-col">
-      <FilterBar value={filter} onChange={setFilter} variant={source} />
+      <FilterBar
+        value={filter}
+        onChange={setFilter}
+        variant={source}
+        viewMode={viewMode}
+        onViewModeChange={(mode) => {
+          setViewMode(mode)
+          saveViewMode(source, mode)
+        }}
+      />
 
       <main className="flex-1 p-4">
         {!filter.trashed && total > 0 && (

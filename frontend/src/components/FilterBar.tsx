@@ -1,6 +1,7 @@
 import { useTuningUi } from '../appInfo'
 import { TAG_LABELS } from '../labels'
 import type { ClipSort } from '../grouping'
+import type { ViewMode } from '../viewMode'
 import type { ClipTag } from '../types'
 
 const ALL_TAGS: ClipTag[] = ['kill', 'assist', 'death', 'teammate_death', 'no_result']
@@ -31,11 +32,13 @@ interface Props {
   value: FilterState
   onChange: (next: FilterState) => void
   variant?: 'steam' | 'vod'
+  viewMode: ViewMode
+  onViewModeChange: (mode: ViewMode) => void
 }
 
 const SELECT = 'rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm'
 
-export function FilterBar({ value, onChange, variant = 'steam' }: Props) {
+export function FilterBar({ value, onChange, variant = 'steam', viewMode, onViewModeChange }: Props) {
   const tuning = useTuningUi()
   const toggleTag = (tag: ClipTag) => {
     const has = value.tags.includes(tag)
@@ -44,6 +47,20 @@ export function FilterBar({ value, onChange, variant = 'steam' }: Props) {
 
   return (
     <div className="flex flex-wrap items-center gap-3 border-b border-zinc-700 bg-zinc-800/40 px-4 py-3">
+      <div className="flex overflow-hidden rounded border border-zinc-600 text-sm" role="group" aria-label="보기 모드">
+        {(['cards', 'timeline'] as const).map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            aria-pressed={viewMode === mode}
+            className={`px-3 py-1 ${viewMode === mode ? 'bg-sky-600 text-white' : 'bg-zinc-900 text-zinc-300 hover:bg-zinc-700'}`}
+            onClick={() => onViewModeChange(mode)}
+          >
+            {mode === 'cards' ? '카드' : '일자 타임라인'}
+          </button>
+        ))}
+      </div>
+
       <select
         className={SELECT}
         value={value.sort}

@@ -17,6 +17,7 @@ interface Props {
   timeLabel?: { main: string; sub?: string }
   hideReprocess?: boolean
   onDeleteRecord?: () => void
+  bare?: boolean
   children: ReactNode
 }
 
@@ -47,6 +48,7 @@ export function GameSection({
   timeLabel,
   hideReprocess,
   onDeleteRecord,
+  bare,
   children,
 }: Props) {
   const result = group.result
@@ -155,7 +157,9 @@ export function GameSection({
       </div>
 
       {expanded && (
-        <div className="grid grid-cols-1 gap-4 border-t border-zinc-700 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div
+          className={`border-t border-zinc-700 p-4 ${bare ? '' : 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}
+        >
           {children}
         </div>
       )}
