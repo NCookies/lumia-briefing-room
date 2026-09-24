@@ -561,7 +561,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             autostart.apply_setting(new_cfg)
         return dataclass_to_camel_dict(new_cfg)
 
-    move_job: dict = {"state": "idle", "doneBytes": 0, "totalBytes": 0, "moved": 0, "oldPath": "", "message": ""}
+    move_job: dict = {"state": "idle", "doneBytes": 0, "totalBytes": 0, "moved": 0, "message": ""}
 
     @app.post("/api/clips-dir/move", status_code=202)
     def move_clips(body: dict):
@@ -586,7 +586,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             raise HTTPException(409, str(e))
         config_key = "clips" if source == "steam" else "vodClips"
         move_job.update(
-            state="running", doneBytes=0, totalBytes=plan.total_bytes if plan else 0, moved=0, oldPath=str(old), message=""
+            state="running", doneBytes=0, totalBytes=plan.total_bytes if plan else 0, moved=0, message=""
         )
 
         def progress(done: int, total: int) -> None:
