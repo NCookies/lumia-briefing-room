@@ -9,6 +9,7 @@
 - [x] I1. 별도 저장소 생성 — `infra` (범용 이름, 다른 프로젝트 인프라도 여기서 관리). Terraform 상태는 로컬 파일. 서버는 Python FastAPI 로 결정
 - [x] I2. Terraform 으로 OCI 기본 인프라(VCN·게이트웨이·라우트 테이블·보안 목록·서브넷·VM) 구성 — **2026-09-25 `apply` 완료.** VM 은 `VM.Standard.E2.1.Micro`(A1 은 `LaunchInstance` 404 로 실패, [§7](#7-실제-구성-2026-09-25)). 로컬 상태 파일
 - [x] I3. 도커로 수신 API 컨테이너 배포 (1단계 저장: 파일) — caddy + receiver + watchtower, `https://server.example.invalid` 에서 동작. 실서버에서 토큰 없음 401·라벨 저장·삭제·`/docs` 404 확인. 자동 업데이트(ghcr + watchtower, **간격 5분 — 나중에 1~2시간으로 늘릴 TODO**)
+- [x] I3-b. **서버 전송 계약 확정·구현 (2026-09-25, 서버 배포 대기)** — 계약 원본 `infra\contract`, 서버 스키마를 앱 실제 메타데이터와 대조해 확정, `POST /v1/diagnostics`(접수 번호), `mode=dev` 분리, 90일 자동 삭제, 접근 로그 IP 비활성, watchtower 2시간(`WATCHTOWER_POLL_INTERVAL`), 일별 집계, 다중 토큰. pytest 55개 통과. 이 저장소의 계약 테스트는 [D10 전송 계약](plan-deploy.md#d10-라벨오류-로그-전송--서버-전송-계약) 참고
 - [ ] I4. 이 저장소 쪽 전송 클라이언트 연결 (= plan-deploy D10 과 같이 진행)
 - [ ] I5. 파일 → DB 이전 (2단계 저장, [§4](#4-저장-계층-파일--db))
 
@@ -39,7 +40,7 @@
 - **전송 방식**: 앱이 하루 1회 묶음으로 보내고 실패하면 조용히 다음으로 미룬다(대기분 상한 예: 20MB — SPEC §7.11).
 - **진단 번들(plan-deploy D14)**: 사용자가 버튼으로 보내는 진단 정보(로그 발췌·환경 정보, 개인정보 제거 후)도 받는다. 서버는 접수 번호를 발급해 돌려주고 `installId` 로 묶는다. 화면에 보이는 짧은 표시용 ID 로도 문의를 검색할 수 있게 하되 삭제는 전체 `installId` 로만 받는다. 영상·이미지는 받지 않는다.
 - **서버가 해야 할 것(수신 API 최소 범위)**: 수신·크기 상한·스키마 검증·`installId` 별 삭제·진단 번들 접수 번호 발급. 조회·분석은 서버 밖(로컬 도구)에서 한다.
-- **API 명세와 버전**은 서버 저장소가 정한다. 이 저장소는 D10 구현 때 [plan-deploy.md](plan-deploy.md) 에 확정한 계약을 링크한다.
+- **API 명세와 버전**은 서버 저장소가 정한다. 원본은 infra 저장소 `contract/receiver.schema.json`(JSON Schema)과 `contract/fixtures/`(수락·거부·버림 예시)이고, 이 저장소의 `tests/contract/` 는 `tools/sync_contract.py` 로 복사한 것이다. 확정한 내용과 앱이 할 일은 [plan-deploy.md D10 전송 계약](plan-deploy.md#d10-라벨오류-로그-전송--서버-전송-계약).
 
 ## 4. 저장 계층: 파일 → DB
 
@@ -80,13 +81,14 @@
 - **결정된 것**: 서버는 Python FastAPI, Terraform 상태는 로컬 파일, 인프라 저장소 이름은 범용 `infra`(다른 프로젝트·AWS 도 여기서 관리할 수 있게 나중에 `terraform/oci`·`terraform/aws` 로 분리), 도메인은 `server.example.invalid`(가비아 A 레코드 → VM 공인 IP, caddy 가 Let's Encrypt HTTPS 자동 발급), 인증은 공유 토큰(`X-Api-Token`) + 요청 본문 20MB 상한.
 - **A1 은 실패했다.** `VM.Standard.A1.Flex` 로 `apply` 하니 네트워크는 만들어졌지만 `LaunchInstance` 가 `404-NotAuthorizedOrNotFound` 였다. 원인은 확인하지 못했고(권한 문제는 아님), 콘솔 기본 shape 이던 `VM.Standard.E2.1.Micro`(x86, 1GB, Always Free)로 바꿔 성공했다. 이 계정은 이전 프로젝트에서 만들다 만 micro 가 1개 있어 한도가 `1 of 2` 였고, 이번 VM 으로 무료 micro 슬롯이 다 찼다.
 - **겪은 함정**(해결법은 README): `.oci` 폴더를 사용자 폴더 밖에 잘못 만듦, `config` 의 `key_file=` 상대 경로, `compartment_ocid` 에 user OCID 를 넣음, ghcr 태그 대문자(`repository name must be lowercase`).
-- **I4 에서 서버에 더 필요한 것**: 진단 번들 업로드 경로와 접수 번호 응답(plan-deploy D14), 라벨 메모 필드 `labelNote`(plan-deploy D12).
-- **앱 쪽 연결(I4)에 필요한 것**: 주소 `https://server.example.invalid`, `X-Api-Token`(값은 infra 저장소의 `terraform.tfvars`, 커밋되지 않음). 서버의 라벨 필드 허용 목록(`services/receiver/app/schemas.py`)은 SPEC 메타데이터 예시를 보고 추정한 것이라 **실제 전송 필드와 맞춰야 한다.**
-- **남은 위험**: 요청 빈도 제한 없음, 공유 토큰이 앱에 들어가므로 완전한 인증이 아님, 공인 IP 가 예약 IP 가 아니라 VM 재생성 시 바뀜, 1GB 메모리, 저장은 파일뿐.
+- **I4 에서 서버에 더 필요했던 것(2026-09-25 구현 완료, 배포 대기)**: 진단 번들 업로드 경로와 접수 번호 응답(plan-deploy D14), 라벨 메모 필드 `labelNote`(plan-deploy D12).
+- **앱 쪽 연결(I4)에 필요한 것**: 주소 `https://server.example.invalid`, `X-Api-Token`(값은 infra 저장소의 `terraform.tfvars`, 커밋되지 않음). 서버의 라벨 필드 허용 목록은 2026-09-25 에 앱 `ClipMetadata` 와 하나씩 대조해 확정했다(`contract/app-metadata-fields.json`, 앱 테스트가 대조).
+- **남은 위험**: 요청 빈도 제한 없음, 공유 토큰이 앱에 들어가므로 완전한 인증이 아님(회수 방법은 [roadmap §4-2](roadmap.md)), 공인 IP 가 예약 IP 가 아니라 VM 재생성 시 바뀜, 1GB 메모리, 저장은 파일뿐.
 
 ### §6 확인 필요 중 결정된 것
 - 항목 1(무료 한도·가용성): 위와 같이 실측. A1 은 안 됐고 E2.1.Micro 로 확정.
 - 항목 2(상태 파일): 로컬 파일. 백업 필요.
 - 항목 3(언어): FastAPI.
-- 항목 4(인증): 1차로 공유 토큰 + 크기 상한. 빈도 제한은 미구현.
-- 항목 5·6·7·8: 아직 미정.
+- 항목 4(인증): 공유 토큰 + 크기 상한, **여러 토큰 동시 허용으로 무중단 교체 가능(2026-09-25 구현)**. 빈도 제한은 미구현.
+- 항목 5(개인정보): 보관 기간·IP 처리는 [privacy.md](privacy.md) 대로 서버에 구현(접근 로그 비활성, 로그·진단 90일 자동 삭제). **배포 후 실측하고 확정**한다.
+- 항목 6·7·8: 아직 미정.
