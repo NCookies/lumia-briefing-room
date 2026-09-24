@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react'
-import { getAutoStart, getExportDefault, getNickname, setAutoStart, setExportDefault, setNickname } from '../exportApi'
+import {
+  getAutoStart,
+  getExportDefault,
+  getNickname,
+  getProxyPrefetch,
+  setAutoStart,
+  setExportDefault,
+  setNickname,
+  setProxyPrefetch,
+} from '../exportApi'
 import { AboutPanel } from './AboutPanel'
 import { CleanupPanel } from './CleanupPanel'
 import { ClipsDirSection } from './ClipsDirSection'
@@ -37,6 +46,7 @@ function GeneralPanel({
   const [status, setStatus] = useState<string | null>(null)
   const [autoStart, setAutoStartState] = useState(true)
   const [autoStartError, setAutoStartError] = useState<string | null>(null)
+  const [prefetch, setPrefetchState] = useState(true)
 
   useEffect(() => {
     getNickname()
@@ -44,6 +54,9 @@ function GeneralPanel({
       .catch((e: Error) => setStatus(e.message))
     getAutoStart()
       .then(setAutoStartState)
+      .catch(() => {})
+    getProxyPrefetch()
+      .then(setPrefetchState)
       .catch(() => {})
   }, [])
 
@@ -57,6 +70,11 @@ function GeneralPanel({
       setAutoStartState(previous)
       setAutoStartError((e as Error).message)
     }
+  }
+
+  const changePrefetch = (value: boolean) => {
+    setPrefetchState(value)
+    setProxyPrefetch(value).catch(() => setPrefetchState(!value))
   }
 
   const save = async () => {
@@ -97,6 +115,17 @@ function GeneralPanel({
       </label>
       <p className="text-xs text-zinc-500">
         끄면 삭제 버튼을 누르는 즉시 휴지통으로 이동합니다. 완전 삭제는 이 설정과 관계없이 항상 확인합니다.
+      </p>
+    </section>
+    <section className="flex flex-col gap-2">
+      <h3 className="text-sm font-medium text-zinc-200">재생</h3>
+      <label className="flex items-center gap-2 text-sm text-zinc-300">
+        <input type="checkbox" checked={prefetch} onChange={(e) => changePrefetch(e.target.checked)} />
+        다음 클립의 재생용 영상을 미리 만들기
+      </label>
+      <p className="text-xs text-zinc-500">
+        이 PC 에서 원본(HEVC)을 바로 재생할 수 없어 재생용 사본을 만들 때만 해당합니다. 켜 두면 지금 보는 클립의 사본이 준비된 뒤 다음 클립 것을 뒤에서 만들어
+        넘길 때 기다리지 않습니다. 재생 중 CPU 를 조금 더 씁니다.
       </p>
     </section>
     <section className="flex flex-col gap-2">

@@ -201,6 +201,7 @@ export function PlayerModal({
         <ClipVideo
           key={`${clip.id}-${clip.durationSec}`}
           clipId={clip.id}
+          nextClipId={clips[index + 1]?.id ?? null}
           version={clip.durationSec}
           videoRef={(el) => {
             videoRef.current = el

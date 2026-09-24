@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { getProxyStatus, proxyVideoUrl, startProxy, videoUrl, type ProxyStatus } from '../api'
+import { getProxyStatus, prefetchProxy, proxyVideoUrl, startProxy, videoUrl, type ProxyStatus } from '../api'
 import {
   browserCanPlayHevc,
+  CODEC_FREE_STORE_URL,
+  CODEC_STORE_URL,
   initialMode,
   needsProxy,
+  prefetchTarget,
   proxyProgressText,
   rememberProxyMode,
   rememberedMode,
@@ -14,12 +17,13 @@ const POLL_MS = 700
 
 interface Props {
   clipId: string
+  nextClipId: string | null
   version: number
   videoRef: (el: HTMLVideoElement | null) => void
   onVolumeChange: (el: HTMLVideoElement) => void
 }
 
-export function ClipVideo({ clipId, version, videoRef, onVolumeChange }: Props) {
+export function ClipVideo({ clipId, nextClipId, version, videoRef, onVolumeChange }: Props) {
   const [mode, setMode] = useState<PlaybackMode>(() => initialMode(browserCanPlayHevc(), rememberedMode()))
   const [status, setStatus] = useState<ProxyStatus | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -58,6 +62,12 @@ export function ClipVideo({ clipId, version, videoRef, onVolumeChange }: Props) 
     }
   }, [mode, clipId, attempt])
 
+  const proxyReady = status?.state === 'ready'
+  useEffect(() => {
+    const target = prefetchTarget(nextClipId ? [clipId, nextClipId] : [clipId], 0, mode, proxyReady)
+    if (target) prefetchProxy(target).catch(() => {})
+  }, [mode, proxyReady, clipId, nextClipId])
+
   const fallBack = useCallback(() => {
     rememberProxyMode()
     setMode('proxy')
@@ -85,6 +95,17 @@ export function ClipVideo({ clipId, version, videoRef, onVolumeChange }: Props) 
           <>
             <p>{proxyProgressText(status?.progress ?? 0)}</p>
             <p className="text-xs text-zinc-500">이 PC 에서 원본(HEVC)을 바로 재생할 수 없어 H.264 사본을 만듭니다. 한 번만 만들어 둡니다.</p>
+            <p className="max-w-lg px-4 text-center text-xs text-zinc-500">
+              Windows 에 HEVC 비디오 확장을 설치하면 이 대기 없이 바로 재생됩니다(선택 사항, 자동으로 설치하지 않습니다).{' '}
+              <a className="text-sky-400 hover:underline" href={CODEC_STORE_URL} target="_blank" rel="noopener noreferrer">
+                스토어 (유료)
+              </a>
+              {' · '}
+              <a className="text-sky-400 hover:underline" href={CODEC_FREE_STORE_URL} target="_blank" rel="noopener noreferrer">
+                제조사 제공 (무료)
+              </a>
+              {' '}— 무료판은 PC 제조사에 따라 없을 수 있습니다. 설치 후에는 앱을 다시 열어 주세요.
+            </p>
           </>
         )}
       </div>

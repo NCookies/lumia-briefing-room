@@ -69,6 +69,15 @@ export async function setConfirmDelete(confirmDelete: boolean): Promise<void> {
   await jsonOrThrow(await postJson(`${BASE}/config`, { ui: { confirmDelete } }, 'PUT'), '설정 저장')
 }
 
+export async function getProxyPrefetch(): Promise<boolean> {
+  const cfg = await jsonOrThrow<{ encode?: { proxy?: { prefetch?: boolean } } }>(await fetch(`${BASE}/config`), '설정 조회')
+  return cfg.encode?.proxy?.prefetch ?? true
+}
+
+export async function setProxyPrefetch(prefetch: boolean): Promise<void> {
+  await jsonOrThrow(await postJson(`${BASE}/config`, { encode: { proxy: { prefetch } } }, 'PUT'), '설정 저장')
+}
+
 export async function setExportDefault(dir: string): Promise<void> {
   await jsonOrThrow(await postJson(`${BASE}/config`, { paths: { exportDefault: dir } }, 'PUT'), '설정 저장')
 }

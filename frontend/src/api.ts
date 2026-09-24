@@ -176,6 +176,10 @@ export async function startProxy(id: string): Promise<ProxyStatus> {
   return res.json()
 }
 
+export async function prefetchProxy(id: string): Promise<void> {
+  await fetch(`${BASE}/clips/${id}/proxy?prefetch=1`, { method: 'POST' })
+}
+
 export async function getProxyStatus(id: string): Promise<ProxyStatus> {
   const res = await checkOk(await fetch(`${BASE}/clips/${id}/proxy`), '재생용 영상 상태 조회')
   return res.json()

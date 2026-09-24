@@ -17,6 +17,14 @@ export function proxyProgressText(progress: number): string {
   return `재생용 영상을 만드는 중… ${percent}%`
 }
 
+export function prefetchTarget(ids: string[], index: number, mode: PlaybackMode, proxyReady: boolean): string | null {
+  if (mode !== 'proxy' || !proxyReady || index < 0) return null
+  return ids[index + 1] ?? null
+}
+
+export const CODEC_STORE_URL = 'https://apps.microsoft.com/detail/9nmzlz57r3t7'
+export const CODEC_FREE_STORE_URL = 'https://apps.microsoft.com/detail/9n4wgh0z6vhq'
+
 export function browserCanPlayHevc(): string {
   const probe = document.createElement('video')
   return HEVC_TYPES.map((t) => probe.canPlayType(t)).find((r) => r !== '') ?? ''
