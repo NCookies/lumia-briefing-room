@@ -11,7 +11,25 @@ import cv2
 import numpy as np
 import pytest
 
-from lumia_briefing_room.config import discover_ffmpeg
+
+
+def _isolate_user_data_dirs() -> None:
+    """테스트가 실제 사용자 폴더(로그·outbox·설정)에 쓰지 않게 한다. 예전에는 테스트 실행이 진짜 app.log 에 트레이스백을 남겼다.
+    설정 기본 경로가 import 때 정해지므로 lumia_briefing_room 을 import 하기 전에 바꾼다."""
+    import atexit
+    import tempfile
+
+    root = Path(tempfile.mkdtemp(prefix="lumia_test_appdata_"))
+    (root / "Local").mkdir()
+    (root / "Roaming").mkdir()
+    os.environ["LOCALAPPDATA"] = str(root / "Local")
+    os.environ["APPDATA"] = str(root / "Roaming")
+    atexit.register(shutil.rmtree, root, ignore_errors=True)
+
+
+_isolate_user_data_dirs()
+
+from lumia_briefing_room.config import discover_ffmpeg  # noqa: E402
 
 
 def _prefer_full_ffmpeg_for_tests() -> None:

@@ -9,7 +9,7 @@ import sys
 import threading
 from pathlib import Path
 
-from lumia_briefing_room.logsetup import FORMAT, default_log_path, setup_file_logging
+from lumia_briefing_room.logsetup import FORMAT, default_log_path, setup_file_logging, setup_outbox_logging
 
 log = logging.getLogger("lumia_briefing_room.startup")
 
@@ -28,6 +28,7 @@ def setup_logging(*, log_path: Path | str | None = None, level: int = logging.IN
     global _log_dir
     path = Path(log_path) if log_path is not None else default_log_path()
     handler = setup_file_logging(path)
+    setup_outbox_logging(path.parent.parent / "outbox" / "errors.jsonl")
     _log_dir = path.parent
     if console_logging_wanted():
         logging.basicConfig(level=level, format=FORMAT)
