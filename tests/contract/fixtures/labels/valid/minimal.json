@@ -1,0 +1,13 @@
+{
+  "installId": "3f2b8c1e-5a4d-4e6f-9b7a-1c2d3e4f5a6b",
+  "appVersion": "0.1.1",
+  "schemaVersion": 1,
+  "mode": "release",
+  "labels": [
+    {
+      "userLabel": "other",
+      "matchKey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "clipKey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ]
+}

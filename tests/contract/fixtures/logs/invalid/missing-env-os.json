@@ -1,0 +1,19 @@
+{
+  "installId": "3f2b8c1e-5a4d-4e6f-9b7a-1c2d3e4f5a6b",
+  "schemaVersion": 1,
+  "mode": "release",
+  "env": {
+    "appVersion": "0.1.1"
+  },
+  "entries": [
+    {
+      "ts": "2026-09-25T10:00:00",
+      "level": "ERROR",
+      "logger": "lumia_briefing_room.pipeline.clip",
+      "message": "cut failed",
+      "exceptionType": "RuntimeError",
+      "stack": "Traceback ...\n  File \"<path>\\clip.py\", line 10",
+      "fingerprint": "0123456789abcdef"
+    }
+  ]
+}
