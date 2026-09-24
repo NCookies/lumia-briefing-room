@@ -104,3 +104,16 @@ def test_bad_admin_attempts_count_toward_the_rate_limit(tmp_path):
     for _ in range(3):
         c.get("/v1/admin/labels", headers=admin("nope"))
     assert c.get("/v1/admin/labels", headers=admin()).status_code == 429
+
+
+def test_response_always_carries_a_cursor_for_incremental_pulls(tmp_path):
+    c = make_client(tmp_path)
+    assert c.get("/v1/admin/labels", headers=admin()).json() == {"labels": [], "next": None, "cursor": None}
+    iid = uuid4()
+    upload(c, iid, label(clip_key="a" * 32))
+    first = c.get("/v1/admin/labels", headers=admin()).json()
+    assert first["next"] is None and first["cursor"]
+    assert c.get(f"/v1/admin/labels?after={first['cursor']}", headers=admin()).json()["labels"] == []
+    upload(c, iid, label(clip_key="b" * 32))
+    later = c.get(f"/v1/admin/labels?after={first['cursor']}", headers=admin()).json()
+    assert [i["label"]["clipKey"] for i in later["labels"]] == ["b" * 32]

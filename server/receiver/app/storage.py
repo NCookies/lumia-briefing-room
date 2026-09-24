@@ -62,12 +62,12 @@ class FileStore:
         return removed
 
 
-def list_labels(root: Path, mode: str, after: tuple[str, str, str] | None, limit: int) -> tuple[list[dict], tuple[str, str, str] | None]:
+def list_labels(root: Path, mode: str, after: tuple[str, str, str] | None, limit: int) -> tuple[list[dict], tuple[str, str, str] | None, bool]:
     """저장된 라벨을 (receivedAt, installId, clipKey) 순으로 돌려준다. after 는 그 튜플보다 뒤의 것만(같은 수신 시각이 많아도 빠짐·중복이 없다)."""
     base = root / "dev" if mode == "dev" else root
     labels_dir = base / "labels"
     if not labels_dir.is_dir():
-        return [], None
+        return [], None, False
     found = []
     for install_dir in labels_dir.iterdir():
         if not install_dir.is_dir():
@@ -82,5 +82,4 @@ def list_labels(root: Path, mode: str, after: tuple[str, str, str] | None, limit
                 found.append((key, {"installId": install_dir.name, **record}))
     found.sort(key=lambda item: item[0])
     page = found[:limit]
-    more = len(found) > limit
-    return [item for _, item in page], (page[-1][0] if more else None)
+    return [item for _, item in page], (page[-1][0] if page else None), len(found) > limit

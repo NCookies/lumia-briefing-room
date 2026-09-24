@@ -191,8 +191,9 @@ def create_app(settings: Settings | None = None, alerter: Alerter | None = None)
 
     @app.get("/v1/admin/labels", dependencies=[Depends(require_admin)])
     def export_labels(mode: Literal["dev", "release"] = "release", after: str = "", limit: int = Query(500, ge=1, le=2000)):
-        labels, last = list_labels(settings.data_dir, mode, _decode_cursor(after), limit)
-        return {"labels": labels, "next": _encode_cursor(last)}
+        labels, last, more = list_labels(settings.data_dir, mode, _decode_cursor(after), limit)
+        cursor = _encode_cursor(last)
+        return {"labels": labels, "next": cursor if more else None, "cursor": cursor}
 
     @app.delete("/v1/installs/{install_id}", dependencies=[Depends(require_token)])
     def delete_install(install_id: UUID):
