@@ -17,7 +17,7 @@
 - [ ] **D7. 공개 저장소 정리(게임 화면 이미지·git 이력, LICENSE, 사용자용 README)** — 친구 배포(D8)에는 필요 없고 공개 전까지 하면 된다
 - [~] **D8. 친구 배포 → 해상도·환경 피드백 수집** ([§6](#6-친구-배포--해상도-검증)) — **1차 완료(2026-09-25 확인): 카카오톡으로 exe 를 전달해 친구 PC 에서 클립 추출·재생이 정상 동작.** 친구 모니터 해상도가 개발 PC 와 같아 다른 해상도는 미확인(2차로 남김). 아래는 1차 배포 전 상태 기록 — **배포물은 준비됐다**(설치기 + [친구 안내문](friend-guide.md) + 진단 zip). 실제로 나눠 주고 피드백을 받는 것은 사용자가 한다. 나눠 주기 전에 [§10](#10-windows-샌드박스-확인-절차-사용자가-직접) 샌드박스 확인을 먼저 하는 것을 권한다 — 특히 HEVC 없는 환경의 프록시 자동 전환은 아직 아무 데서도 실측되지 않았다
 - [ ] **D9. 자동 업데이트(업데이트 확인·알림·설치기 실행)** — 첫 실행 동의 `update.check` 로 켜고 끈다
-- [ ] **D10. 라벨·오류 로그 전송** — 첫 실행 동의 `telemetry.*` 로 켜고 끈다([§5](#5-동의-기반-업데이트-확인과-데이터-전송)). **서버 쪽 전송 계약은 2026-09-25 확정·구현·실서버 배포까지 끝났다** — [D10 전송 계약](#d10-라벨오류-로그-전송--서버-전송-계약)이 앱 쪽 할 일
+- [x] **D10. 라벨·오류 로그 전송** — **2026-09-25 구현·검증**(pytest 1370개 + 로컬 도커 통합 테스트 4개 + 브라우저 확인, 프론트 빌드). 첫 실행 동의 `telemetry.*` 로 켜고 끈다([§5](#5-동의-기반-업데이트-확인과-데이터-전송)). 전송 클라이언트·스케줄러·outbox·개인정보 제거·옵션 탭(상태·미리보기·삭제 요청)·개인정보 처리 안내 보기·`tools/pull_labels.py`·동의 버전 3·빌드 시 토큰 주입까지 끝났다. 계약과 구현 결정은 [D10 전송 계약](#d10-라벨오류-로그-전송--서버-전송-계약). **남은 것**: 실서버 반영(receiver 새 이미지·관리자 토큰), 토큰을 넣은 실제 배포 빌드와 친구 PC 실측
 - [x] **D11. 화면에 현재 버전 표시** (헤더에 `v0.1.1`, 개발 모드는 `(dev)`, 버전을 못 읽으면 숨김 — `versionLabel` 테스트·빌드 확인) — [D11](#d11-화면에-현재-버전-표시)
 - [x] **D12. 동의 화면 기본값을 전부 꺼짐으로 · 라벨 전송이 꺼져 있으면 라벨링 UI 숨김 · 라벨 메모 입력창** (구현·빌드·브라우저 확인. 확인한 점: D3 첫 실행 화면에는 동의 항목이 아예 없었고 설정 기본값만 false 였다 → 세 체크박스를 새로 추가(consent 버전 2). 실제 업데이트 확인·전송 동작은 D9·D10, 서버로 보낼 때 `combat`/`other` 변환과 `labelNote` 서버 스키마는 아직) — [D12](#d12-동의-기본값-전부-꺼짐--라벨링-ui-숨김--라벨-메모). D3 에서 구현한 첫 실행 화면의 업데이트 기본 선택(켬)을 바꾸는 재작업 포함
 - [ ] **D14. 진단 정보를 zip 첨부 대신 서버로 전송** (설계만) — [D14](#d14-진단-정보-서버-전송). D8 친구 배포의 피드백 수집 방식을 바꾼다
@@ -139,6 +139,20 @@
 
 ### D10. 라벨·오류 로그 전송 — 서버 전송 계약
 
+**구현 결과(2026-09-25)** — 코드는 `src/lumia_briefing_room/telemetry/`:
+
+| 파일 | 하는 일 |
+|---|---|
+| `payload.py` | 클립 메타데이터 → 계약 `Label`(변환·형식·길이 정리, 키 해시, 표시용 ID) |
+| `collect.py` | 스팀 클립·다시보기 클립·`.labels/` 보관소에서 라벨을 모으고 휴지통은 뺀다 |
+| `outbox.py`·`scrub.py` | ERROR 로그 outbox(20MB), 개인정보 제거·오류 지문 |
+| `environment.py` | 환경 정보와 판독 실패 통계 |
+| `client.py` | httpx 클라이언트(ok/drop/retry 분류, 예외 없음) |
+| `sender.py` | 하루 1회·백오프·동의/모드 게이트·미리보기·상태·삭제 요청 |
+| `endpoint.py`·`state.py` | 서버 주소·토큰 탐색(설정→환경변수→번들), 진행 상태 파일 |
+
+결정한 것: ① 오류 수집은 `app.log` 파싱 대신 구조화 핸들러 outbox ② 서버 관리자 API(`GET /v1/admin/labels`)로 `tools/pull_labels.py` 가 라벨을 가져온다 ③ 토큰은 빌드 때 환경변수로 번들에 주입 ④ 다시보기 클립 라벨도 보낸다(`source=vod`) ⑤ 삭제 요청 성공 시 전송을 끄고 로컬 전송 기록을 지운다 ⑥ `consent.version` 3(라벨·오류 로그만 다시 묻는다). **발견·수정한 것**: 로그 핸들러가 같은 파일에 두 번 붙어 모든 줄이 두 번 기록되던 문제, 테스트 실행이 실제 사용자의 `app.log` 에 트레이스백을 남기던 문제(테스트가 사용자 폴더를 임시 폴더로 바꿔 쓴다). **아직 모으지 않는 것**: 환경 정보의 `hwaccel`·`hevcPlayable`·`proxyEncoder`·`analysisTimeRatio`·`proxyBuildSec`(앱이 값을 기록해 두지 않거나 브라우저만 안다), 신호별 수치 `pvpSignalValues`.
+
 **계약의 원본은 infra 저장소의 [`contract/receiver.schema.json`]((infra repository))(`infra\contract`)** 이고, 이 저장소의 [`tests/contract/`](../tests/contract/receiver.schema.json)는 `tools/sync_contract.py` 로 복사한 것이다. 수락·거부 예시는 `tests/contract/fixtures/`. 서버 테스트와 [`tests/test_contract.py`](../tests/test_contract.py)가 같은 픽스처를 쓰므로 한쪽만 고치면 그쪽 테스트가 깨진다. 서버 API·운영은 infra README.
 
 | 경로 | 보내는 것 | 응답 |
@@ -152,10 +166,10 @@
 
 - 전송 대상은 `userLabel` 이 있는 클립뿐이고 값은 `pvp→combat`, `pve→other` 로 **변환해서** 보낸다(로컬 저장값·`.labels/`·`eval_pvp.py` 는 그대로).
 - `matchKey`·`clipKey` 는 32자리 소문자 hex. 제안: `sha256(installId + "|" + sessionDir + "|" + matchStartUtc)`(`clipKey` 는 뒤에 `|videoOffsetSec` 추가)의 앞 32자 — 설치마다 소금이 달라 다른 설치와 이어 볼 수 없고 경로·시각 원문은 나가지 않는다. 같은 `clipKey` 를 다시 보내면 서버가 덮어쓰므로 라벨을 고친 뒤 재전송해도 중복되지 않는다. 다시 분석해 새 클립이 생기면 `clipKey` 가 달라져 새 라벨로 저장된다(이관된 라벨이 이중으로 쌓일 수 있음 — 분석 때 `matchKey` 로 묶는다).
-- **앱이 아직 저장하지 않는 값**: `labeledAt`(라벨 붙인 시각)과 `pvpSignalValues`(신호별 수치)는 스키마에는 선택 필드로 있고 앱 메타데이터에는 없다. 클라이언트를 만들 때 라벨을 붙이는 순간·점수 계산 때 저장하도록 추가한다(추가하면 `contract/app-metadata-fields.json` 의 `appMissing` 에서 옮긴다).
+- **`labeledAt`(라벨 붙인 시각)은 앱이 기록한다(구현됨)** — 라벨을 붙이거나 값을 바꿀 때만, 같은 값을 다시 눌러도 그대로. **`pvpSignalValues`(신호별 수치)는 앱이 아직 저장하지 않는다**(스키마에는 선택 필드, 계약 분류표의 `appMissing`). 검출기가 신호별 수치를 결과에 담게 되면 추가한다.
 - **`mode`**: 개발 모드(`app.mode=dev`)는 기본적으로 전송하지 않는다. 시험용으로 보낼 때는 `mode=dev` 로 보내면 서버가 운영 데이터와 다른 폴더(`data/dev`)에 둔다.
 - **보내지 않는 것**(`contract/app-metadata-fields.json` 의 `excluded`): `title`, `sessionDir`, `sessionStartUtc`, `matchStartUtc`, `matchEndUtc`, 세그먼트 번호, `videoOffsetSec`, `thumbnailPath`, `pinned`, `deletedAt`, `teamCharacters`, `matchResult`(닉네임·팀원 포함). 내 캐릭터(`myCharacter`)와 최종 K/A(`matchKills`·`matchAssists`·`matchTeamKills`)는 보낸다.
-- **VOD 클립**: `source=vod` 클립의 라벨을 보낼지는 정하지 않았다. 보낸다면 `streamer`·`vodFile` 등은 제외한다(계약의 `vodOnly`).
+- **VOD 클립**: `source=vod` 클립의 라벨도 보낸다(결정 2026-09-25). `streamer`·`vodFile`·`vodId`·`vodGameIndex`·게임 위치는 보내지 않고, `vodId`·`vodGameIndex` 는 `matchKey` 를 만드는 데만 쓴다(계약의 `vodOnly`).
 - **환경 정보(`env`)의 수집 항목**은 스키마의 `Environment` 를 그대로 따른다(CPU·GPU·메모리·배율·코덱·hevc 재생 가능·프록시 인코더·스팀 버퍼 분·분석 시간 비율 등, 값이 없으면 생략). `readFailStats` 의 키 목록은 클라이언트를 만들 때 확정한다(게임 패치 조기 경보용, roadmap §4-9).
 - 응답 처리: 413(크기)·422(스키마 어긋남)는 재시도해도 같으므로 그 묶음을 버리고 앱 로그에만 남기고, 401(토큰)·5xx·타임아웃·연결 실패는 다음 전송으로 미룬다(대기분 상한 20MB). 어느 경우에도 앱이 멈추면 안 된다.
 

@@ -35,6 +35,8 @@ pytest
 
 서버와 공유하는 **전송 계약 테스트**(`tests/test_contract.py`)는 `tests/contract/`(infra 저장소 `contract/` 의 복사본)를 쓴다. infra 저장소가 `infra` 처럼 이 저장소 옆에 있으면 복사본이 원본과 같은지도 검사하고, 없으면 그 검사만 건너뛴다. 서버 쪽 계약이 바뀌었으면 `python tools/sync_contract.py` 로 복사본을 갱신하고(`--check` 는 차이만 확인) 테스트를 다시 돌린다. 앱의 클립 메타데이터에 필드를 추가하면 `tests/contract/app-metadata-fields.json` 에 전송/제외 분류가 없어 이 테스트가 깨진다 — 분류는 infra 저장소 원본에서 고치고 다시 복사한다.
 
+**서버 통합 테스트**(`-m integration`)는 기본 `pytest` 에서 빠진다. 도커가 켜져 있고 infra 저장소가 이 저장소 옆(`infra`)에 있으면 `pytest -m integration tests/test_integration_receiver.py` 로 receiver 컨테이너를 임시 토큰으로 띄워 앱의 전송 클라이언트(라벨·오류 로그 전송, 재전송 덮어쓰기, 삭제 요청, `pull_labels.py`, 개발 모드 분리)를 실제 서버 코드에 붙여 본다. 운영 서버에는 접속하지 않는다.
+
 ffmpeg 를 찾을 수 없으면 ffmpeg 통합 테스트는 자동으로 skip 된다(제품 코드 실행에는 ffmpeg 가 필수지만, 순수 로직 테스트는 ffmpeg 없이도 전부 돈다). ffmpeg 위치를 지정하려면:
 
 ```bash
@@ -270,6 +272,26 @@ python tools/build_installer.py          # → dist\LumiaBriefingRoom-<버전>-s
 - **코드 서명을 하지 않으므로 SmartScreen 경고가 뜬다.** 사용자에게 "추가 정보 → 실행" 을 안내한다
   ([docs/friend-guide.md](docs/friend-guide.md)).
 
+### 12. 라벨·오류 로그 전송 (동의 기반, D10)
+
+전송은 **사용자가 켠 항목만** 한다. 첫 실행 화면이나 옵션 "정보·진단" 탭의 "선택 기능"에서 라벨 전송·오류 로그 전송을 켜고 끈다(기본은 둘 다 꺼짐, 꺼져 있으면 네트워크를 전혀 쓰지 않는다). 보내는 항목·보관 기간·삭제 방법은 [개인정보 처리 안내](docs/privacy.md)(앱 안에서는 동의 항목 아래 링크)에 있다.
+
+- **보내는 때**: 앱이 떠 있는 동안 종류별로 하루 한 번 묶어서 보낸다. 서버가 안 받으면 15분부터 두 배씩(최대 6시간) 늦춰 다시 시도하고, 앱은 멈추지 않는다.
+- **라벨**: 스팀 녹화·다시보기 클립의 교전/그 외 라벨과 근거 수치, 해상도·게임 모드, 결과 화면의 최종 킬·어시스트, 내 캐릭터, 라벨 메모(`labelNote`). 로컬 `pvp`/`pve` 는 `combat`/`other` 로 바뀌어 나간다. 라벨이나 메모를 고치면 같은 클립 키로 다시 보내 서버가 덮어쓴다. 제목·경로·닉네임·팀원·시각 원문은 나가지 않는다.
+- **오류 로그**: ERROR 이상 기록이 `%LOCALAPPDATA%\LumiaBriefingRoom\outbox\errors.jsonl` 에 쌓이고(20MB 상한), 보낼 때 닉네임·사용자 이름·경로 속 폴더 이름을 지운다. 환경 정보(OS·CPU·GPU·메모리·해상도·코덱·판독 실패 통계 등)가 같이 간다.
+- **미리보기·삭제**: 옵션 "정보·진단" 탭의 "보낼 내용 미리보기"(전송이 꺼져 있어도 볼 수 있고 네트워크를 쓰지 않는다), "보낸 데이터 삭제 요청"(서버의 내 데이터를 지우고 전송을 끈다).
+- **개발 모드**(소스 실행)는 기본적으로 서버에 보내지 않는다. 시험할 때만 설정 `telemetry.allowDevSend` 를 켜면 `mode=dev` 로 보내 서버가 운영 데이터와 다른 곳에 둔다. 서버 주소·토큰은 설정(`telemetry.serverUrl`·`apiToken`)이나 환경변수 `LUMIA_RECEIVER_URL`·`LUMIA_RECEIVER_TOKEN` 으로 줄 수 있다.
+- **서버 토큰은 git 에 없다.** 배포본을 만들 때 환경변수 `LUMIA_RECEIVER_TOKEN`(선택 `LUMIA_RECEIVER_URL`)을 주고 `build.bat` 을 돌리면 번들에 들어간다(`data/telemetry_endpoint.json`, 빌드 뒤 자동 삭제, gitignore). 토큰 없이 빌드하면 "서버 전송이 꺼진 빌드"라고 경고하고 전송 기능은 동작하지 않는다. `--selftest` 가 httpx·인증서·개인정보 안내 파일·토큰 유무를 점검한다.
+- **서버에 쌓인 라벨 가져오기** (분류기 튜닝용): 서버 관리자 토큰을 환경변수로 주고 실행한다.
+
+```bash
+set LUMIA_ADMIN_TOKEN=...                    # PowerShell: $env:LUMIA_ADMIN_TOKEN = "..."
+python tools/pull_labels.py --out pulled_labels          # → pulled_labels/.labels/<clipKey>.json (pvp/pve 로 되돌림)
+python tools/eval_pvp.py pulled_labels                   # 가져온 라벨로 점수 평가
+```
+
+  다음 실행부터는 새로 온·고쳐서 다시 온 라벨만 받는다(`--full` 은 처음부터, `--mode dev` 는 개발 모드 데이터).
+
 ### 9. 브라우저 디버깅 (개발용)
 
 - **클라이언트 오류 로그**: 프론트가 `window.onerror` / `unhandledrejection` / `console.error` 를 `POST /api/client-log` 로 보내고, 서버가 `[client]` 접두로 로그 파일에 남긴다. 로그 파일은 `%LOCALAPPDATA%\LumiaBriefingRoom\logs\app.log` (서버 로그와 같은 파일, 2MB 회전). Claude Code 에 "브라우저 오류 봐줘" 라고 하면 이 파일을 읽는다. 프론트를 고쳤으면 `npm run build`.
@@ -290,6 +312,7 @@ python tools/build_installer.py          # → dist\LumiaBriefingRoom-<버전>-s
 | `tools/rescore_clips.py` | 저장된 클립 메타데이터의 교전 점수를 재검출 없이 다시 계산 |
 | `tools/eval_pvp.py` | UI 에서 찍은 교전/사냥 라벨로 점수를 평가 (가중치·임계 튜닝) |
 | `tools/eval_detect.py` | 라벨셋 대비 검출 정확도 리포트 |
+| `tools/pull_labels.py` | 서버에 쌓인 라벨을 로컬로 받아 `eval_pvp.py` 가 읽는 `.labels/` 형태로 저장 (관리자 토큰은 환경변수 `LUMIA_ADMIN_TOKEN`, 증분 수집, `--full`·`--mode dev`) |
 | `tools/sync_contract.py` | 서버와 공유하는 전송 계약을 infra 저장소(`infra\contract`)에서 `tests/contract` 로 복사 (`--check` 는 차이만 확인, `--source` 로 경로 지정) |
 
 가상환경을 활성화한 상태에서 실행할 것.
