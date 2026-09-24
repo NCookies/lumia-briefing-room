@@ -33,3 +33,4 @@
 - [x] 배포 자동화(Release 업로드 + 바이러스 검사) → plan-deploy.md D13(확인 필요 §7-16~19)
 - [x] 자동 업데이트를 꺼도 수동 확인·업데이트 가능 (대화 중 추가) → plan-deploy.md D9·D12, SPEC §7.11
 - [x] 진단 zip 첨부 대신 서버 전송 (대화 중 추가) → plan-deploy.md D14·D3·§7-11, plan-infra.md §3·§7, SPEC §7.11
+- [x] 진단 전송용 클라이언트 고유 ID(표시용 짧은 ID, 대화 중 추가) → plan-deploy.md D14·§7-21, SPEC §7.11 `telemetry.installId`, plan-infra.md §3
