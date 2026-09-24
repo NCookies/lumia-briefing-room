@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
+import { BackfillDialog } from './components/BackfillDialog'
 import { ClipBrowser, type ClipSource } from './components/ClipBrowser'
 import { FirstRunScreen } from './components/FirstRunScreen'
 import { SettingsModal } from './components/SettingsModal'
 import { getConfirmDelete, setConfirmDelete } from './exportApi'
 import { getFirstRun } from './onboardingApi'
+import { isBackfillActive, progressPercent, type BackfillStatus } from './backfill'
+import { getBackfillStatus } from './backfillApi'
 
 const TABS: { id: ClipSource; label: string }[] = [
   { id: 'steam', label: '내 녹화' },
@@ -25,6 +28,8 @@ export default function App() {
   const [browserKey, setBrowserKey] = useState(0)
   const [confirmDelete, setConfirmDeleteState] = useState(true)
   const [firstRun, setFirstRun] = useState(false)
+  const [showBackfill, setShowBackfill] = useState(false)
+  const [backfill, setBackfill] = useState<BackfillStatus>({ state: 'idle' })
 
   useEffect(() => {
     getFirstRun()
@@ -37,6 +42,26 @@ export default function App() {
       .then(setConfirmDeleteState)
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    getBackfillStatus()
+      .then(setBackfill)
+      .catch(() => {})
+  }, [])
+
+  const backfillRunning = isBackfillActive(backfill.state)
+  useEffect(() => {
+    if (!backfillRunning) return
+    const timer = window.setInterval(() => {
+      getBackfillStatus()
+        .then((next) => {
+          setBackfill(next)
+          if (!isBackfillActive(next.state)) setBrowserKey((k) => k + 1)
+        })
+        .catch(() => {})
+    }, 1500)
+    return () => window.clearInterval(timer)
+  }, [backfillRunning])
 
   const changeConfirmDelete = (value: boolean) => {
     setConfirmDeleteState(value)
@@ -77,13 +102,23 @@ export default function App() {
             ))}
           </nav>
         </div>
-        <button
-          type="button"
-          className="mb-2 rounded border border-zinc-600 px-2 py-1 text-sm text-zinc-300 hover:bg-zinc-700"
-          onClick={() => setShowSettings(true)}
-        >
-          ⚙ 옵션
-        </button>
+        <div className="mb-2 flex items-center gap-2">
+          <button
+            type="button"
+            className="rounded border border-zinc-600 px-2 py-1 text-sm text-zinc-300 hover:bg-zinc-700"
+            title="게임 로그에 남지 않은 과거 녹화에서 경기를 찾아 클립으로 만듭니다"
+            onClick={() => setShowBackfill(true)}
+          >
+            {backfillRunning ? `과거 녹화 분석 중 ${progressPercent(backfill)}%` : '과거 녹화 분석'}
+          </button>
+          <button
+            type="button"
+            className="rounded border border-zinc-600 px-2 py-1 text-sm text-zinc-300 hover:bg-zinc-700"
+            onClick={() => setShowSettings(true)}
+          >
+            ⚙ 옵션
+          </button>
+        </div>
       </header>
 
       {TABS.map((t) => (
@@ -96,6 +131,17 @@ export default function App() {
           />
         </div>
       ))}
+
+      {showBackfill && (
+        <BackfillDialog
+          status={backfill}
+          onStatusChange={setBackfill}
+          onClose={() => {
+            setShowBackfill(false)
+            if (backfill.state === 'done' || backfill.state === 'cancelled') setBrowserKey((k) => k + 1)
+          }}
+        />
+      )}
 
       {showSettings && (
         <SettingsModal
