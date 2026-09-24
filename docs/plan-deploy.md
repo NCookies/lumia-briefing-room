@@ -400,7 +400,7 @@ Windows 샌드박스는 이 PC(Windows 11 Pro)에 기본으로 있다. 안 켜�
 
 1. **[§10](#10-windows-샌드박스-확인-절차-사용자가-직접) 샌드박스 확인** — 남은 실측의 대부분이 여기 있다.
    특히 `h264_mf` 가 깨끗한 윈도우에 있는지(§7-2)와 HEVC 없는 환경의 프록시 자동 전환(§7-5).
-2. **D8 실제 배포** — `dist\LumiaBriefingRoom-0.1.0-setup.exe` 와 [friend-guide.md](friend-guide.md) 를 같이 준다.
+2. **D8 실제 배포** — `dist\LumiaBriefingRoom-0.1.1-setup.exe` 와 [friend-guide.md](friend-guide.md) 를 같이 준다.
    전달 경로는 §7-10 이 아직 미정(비공개 저장소 릴리스 vs 디스코드 파일 전달).
 3. **D7 공개 저장소 정리** — LICENSE 선택(§7-12), `_samples` 이미지와 git 이력 정리(§4), 사용자용 README.
 
