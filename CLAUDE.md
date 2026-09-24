@@ -11,6 +11,8 @@
   [docs/plan.md](docs/plan.md) / [docs/plan-pipeline.md](docs/plan-pipeline.md) /
   [docs/plan-ui.md](docs/plan-ui.md) 는 작업 단계를 끝낼 때마다 진행 상태
   체크박스와 "확인 필요" 절을 갱신한다. 문서 갱신은 해당 작업 커밋에 포함시킨다.
+- 여러 plan 에 걸친 미완료 작업과 우선순위는 [docs/roadmap.md](docs/roadmap.md) 가 총괄한다.
+  작업을 끝내거나 우선순위가 바뀌면 그 문서의 표도 같이 고친다.
 
 ## 개발 환경
 
