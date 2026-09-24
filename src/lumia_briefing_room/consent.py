@@ -15,8 +15,8 @@ class ConsentItem:
 CONSENT_ITEMS: tuple[ConsentItem, ...] = (
     ConsentItem("setup", 1),
     ConsentItem("update", 2),
-    ConsentItem("labels", 2),
-    ConsentItem("logs", 2),
+    ConsentItem("labels", 3),
+    ConsentItem("logs", 3),
 )
 CONSENT_VERSION = max(item.since for item in CONSENT_ITEMS)
 

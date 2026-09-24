@@ -32,8 +32,11 @@ HIDDEN_IMPORTS = (
     "webview.platforms.winforms",
     "onnxruntime",
     "rapidocr",
+    "httpx",
+    "httpcore",
+    "h11",
 )
-COLLECT_DATA = ("rapidocr",)
+COLLECT_DATA = ("rapidocr", "certifi")
 COLLECT_SUBMODULES = ("uvicorn", "rapidocr")
 EXCLUDES = ("torch", "torchvision", "tensorrt", "paddle", "matplotlib", "tkinter", "pytest")
 REQUIRED_IN_BUNDLE = (
@@ -43,6 +46,7 @@ REQUIRED_IN_BUNDLE = (
     f"data/templates/days/{MEASURED_NPZ}",
     "lumia_briefing_room/profiles/builtin/2560x1440.json",
     "frontend/dist/index.html",
+    "docs/privacy.md",
     "vendor/ffmpeg/ffmpeg.exe",
     "vendor/ffmpeg/ffprobe.exe",
 )
@@ -70,6 +74,7 @@ def data_specs(root: Path) -> list[tuple[str, str]]:
         (str(root / "data"), "data"),
         (str(root / "src" / "lumia_briefing_room" / "profiles" / "builtin"), "lumia_briefing_room/profiles/builtin"),
         (str(root / "frontend" / "dist"), "frontend/dist"),
+        (str(root / "docs" / "privacy.md"), "docs"),
     ]
 
 
@@ -148,7 +153,31 @@ def pyinstaller_args(root: Path, *, version: str, icon: Path, work_dir: Path | N
     return args
 
 
-def verify_bundle(out_dir: Path) -> list[str]:
+ENDPOINT_FILE = "data/telemetry_endpoint.json"
+
+
+def write_endpoint_file(root: Path, environ=None) -> Path | None:
+    """서버 토큰을 번들에 넣는다(저장소가 공개라 토큰은 git 에 없다). 환경변수 LUMIA_RECEIVER_TOKEN(·LUMIA_RECEIVER_URL)에서 읽고,
+    없으면 파일을 만들지 않으며 남아 있던 옛 파일도 지운다 — 이 빌드는 서버 전송이 꺼진 채로 나간다."""
+    import json
+    import os
+
+    environ = os.environ if environ is None else environ
+    path = root / ENDPOINT_FILE
+    token = (environ.get("LUMIA_RECEIVER_TOKEN") or "").strip()
+    if not token:
+        path.unlink(missing_ok=True)
+        return None
+    data = {"token": token}
+    url = (environ.get("LUMIA_RECEIVER_URL") or "").strip()
+    if url:
+        data["url"] = url
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data), encoding="utf-8")
+    return path
+
+
+def verify_bundle(out_dir: Path, *, expect_endpoint: bool = False) -> list[str]:
     """PyInstaller 가 조용히 빠뜨린 리소스를 잡는다 — 빌드본에서만 나는 고장의 대부분이 이것이다."""
     problems = []
     exe = out_dir / f"{APP_NAME}.exe"
@@ -159,6 +188,8 @@ def verify_bundle(out_dir: Path) -> list[str]:
     for rel in REQUIRED_IN_BUNDLE:
         if not (base / rel).exists():
             problems.append(f"번들에 빠졌다: {rel}")
+    if expect_endpoint and not (base / ENDPOINT_FILE).exists():
+        problems.append(f"번들에 빠졌다: {ENDPOINT_FILE} (토큰을 넣는 빌드인데 파일이 없다)")
     return problems
 
 
@@ -223,12 +254,21 @@ def main(argv: list[str] | None = None) -> int:
             build_frontend(ROOT)
 
         icon = save_ico(ROOT / "build" / "icon.ico")
-        out_dir = run_pyinstaller(ROOT, version=version, icon=icon)
+        endpoint_file = write_endpoint_file(ROOT)
+        if endpoint_file is None:
+            print("  경고: LUMIA_RECEIVER_TOKEN 이 없어 서버 전송이 꺼진 빌드다 (라벨·오류 로그 전송은 동작하지 않는다)")
+        else:
+            print("  서버 토큰을 번들에 넣는다")
+        try:
+            out_dir = run_pyinstaller(ROOT, version=version, icon=icon)
+        finally:
+            if endpoint_file is not None:
+                endpoint_file.unlink(missing_ok=True)
         copy_vendor(ROOT, out_dir)
         for name, size_mb in prune_unused(out_dir):
             print(f"  뺐다: {name} ({size_mb:.0f} MB)")
 
-        problems = verify_bundle(out_dir)
+        problems = verify_bundle(out_dir, expect_endpoint=endpoint_file is not None)
         if problems:
             for problem in problems:
                 print(f"  - {problem}", file=sys.stderr)

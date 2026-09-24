@@ -16,6 +16,7 @@ def _fake_tree(root: Path) -> Path:
         "data/templates/days/2560x1440.npz",
         "src/lumia_briefing_room/profiles/builtin/2560x1440.json",
         "frontend/dist/index.html",
+        "docs/privacy.md",
         "vendor/ffmpeg/ffmpeg.exe",
         "vendor/ffmpeg/ffprobe.exe",
     ]:
@@ -38,6 +39,7 @@ def test_data_specs_cover_every_runtime_resource(tmp_path: Path):
     assert "data" in destinations
     assert "lumia_briefing_room/profiles/builtin" in destinations
     assert "frontend/dist" in destinations
+    assert "docs" in destinations
 
 
 def test_ffmpeg_is_copied_after_the_build_not_through_add_data(tmp_path: Path):
@@ -231,3 +233,34 @@ def test_a_failing_step_stops_the_build(tmp_path: Path, monkeypatch, step):
 
     assert build_release.main(["--skip-checks"]) == 1
     assert "pyinstaller" not in calls[calls.index(step) + 1 :]
+
+
+def test_endpoint_file_is_written_from_the_token_environment_variable(tmp_path: Path):
+    root = _fake_tree(tmp_path)
+    written = build_release.write_endpoint_file(root, environ={"LUMIA_RECEIVER_TOKEN": "tok-1", "LUMIA_RECEIVER_URL": "https://x.example"})
+    assert written == root / "data" / "telemetry_endpoint.json"
+    import json
+
+    assert json.loads(written.read_text(encoding="utf-8")) == {"token": "tok-1", "url": "https://x.example"}
+
+
+def test_endpoint_file_without_a_token_is_not_written_and_a_stale_one_is_removed(tmp_path: Path):
+    root = _fake_tree(tmp_path)
+    stale = root / "data" / "telemetry_endpoint.json"
+    stale.write_text('{"token": "old"}', encoding="utf-8")
+    assert build_release.write_endpoint_file(root, environ={}) is None
+    assert not stale.exists()
+
+
+def test_endpoint_file_never_lands_in_git():
+    text = (Path(__file__).resolve().parents[1] / ".gitignore").read_text(encoding="utf-8")
+    assert "data/telemetry_endpoint.json" in text
+
+
+def test_verify_bundle_requires_the_endpoint_file_only_when_a_token_was_injected(tmp_path: Path):
+    out = _complete_bundle(tmp_path)
+    assert build_release.verify_bundle(out, expect_endpoint=False) == []
+    assert any("telemetry_endpoint.json" in p for p in build_release.verify_bundle(out, expect_endpoint=True))
+    (out / "_internal" / "data").mkdir(parents=True, exist_ok=True)
+    (out / "_internal" / "data" / "telemetry_endpoint.json").write_text("{}", encoding="utf-8")
+    assert build_release.verify_bundle(out, expect_endpoint=True) == []

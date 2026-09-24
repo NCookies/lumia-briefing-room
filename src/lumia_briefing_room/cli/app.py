@@ -14,6 +14,7 @@ import webbrowser
 from lumia_briefing_room import autostart, paths, procs, selftest, startup
 from lumia_briefing_room.cli import serve as serve_cli
 from lumia_briefing_room.cli.watch import build_parser, run
+from lumia_briefing_room.telemetry.sender import TelemetrySender
 from lumia_briefing_room.consent import needs_first_run
 from lumia_briefing_room.logsetup import default_log_path
 from lumia_briefing_room.single_instance import SingleInstance
@@ -152,6 +153,15 @@ def make_watch_controller(args, *, auto_start: bool = True):
     return on_toggle_watch, watch_enabled
 
 
+def start_telemetry(config_path, *, sender=None):
+    """동의한 라벨·오류 로그를 하루 한 번 서버로 보내는 스레드. 동의가 꺼져 있으면 네트워크를 쓰지 않는다. (plan-deploy.md D10)"""
+    sender = sender or TelemetrySender(config_path=config_path)
+    stop = threading.Event()
+    thread = threading.Thread(target=sender.run_forever, args=(stop,), daemon=True, name="telemetry")
+    thread.start()
+    return thread, stop
+
+
 def should_open_ui_on_start(cfg, *, open_ui: bool) -> bool:
     """첫 실행 화면이 필요하면 ui.startMinimized 와 무관하게 UI 를 연다(plan-deploy.md D3)."""
     return open_ui or not cfg.ui.start_minimized or needs_first_run(cfg.consent.version)
@@ -217,6 +227,7 @@ def _run_app(args, instance: SingleInstance) -> None:
     threading.Thread(
         target=cleanup_loop, args=(make_cleanup_runner(args.config), threading.Event()), daemon=True
     ).start()
+    start_telemetry(resolve_config_path(args.config))
 
     on_open = make_on_open(
         host="127.0.0.1",

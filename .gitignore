@@ -53,3 +53,6 @@ review.html
 
 # 배포용 번들 바이너리 (tools/fetch_ffmpeg.py 가 받는다 — 커밋하지 않는다)
 vendor/
+
+# 빌드 때 환경변수에서 만드는 서버 토큰 파일 (공개 저장소에 올리지 않는다)
+data/telemetry_endpoint.json
