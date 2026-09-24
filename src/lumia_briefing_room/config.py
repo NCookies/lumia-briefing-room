@@ -153,6 +153,7 @@ class ProxyConfig:
     enabled: bool = False
     height: int = 1080
     crf: int = 23
+    prefetch: bool = True
 
 
 @dataclass

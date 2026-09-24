@@ -50,6 +50,7 @@ from lumia_briefing_room.pipeline.clip_assets import resolve_result_image, resol
 from lumia_briefing_room.pipeline.move_clips import MoveError, execute_move, plan_move
 from lumia_briefing_room.pipeline.retention import restore_clip, trash_clip
 from lumia_briefing_room.pipeline.proxy import create_proxy, is_proxy_fresh, proxy_path, remove_orphan_proxies
+from lumia_briefing_room.pipeline.proxy_queue import DIRECT, PREFETCH, PriorityGate, Ticket
 from lumia_briefing_room.pipeline.reprocess import GameRef, ReprocessError, reprocess_game
 from lumia_briefing_room.pipeline.trim import split_clip, trim_clip, validate_range, validate_ranges
 from lumia_briefing_room.steam_paths import resolve_recording_root
@@ -318,7 +319,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         return _serve_range(proxied, request, media_type="video/mp4")
 
     proxy_jobs: dict[str, dict] = {}
-    proxy_slot = threading.Semaphore(1)
+    proxy_gate = PriorityGate()
 
     def _proxy_files(clip_id: str):
         found = _locate(app, clip_id)
@@ -338,19 +339,26 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         return {"state": "none", "progress": 0.0}
 
     @app.post("/api/clips/{clip_id}/proxy")
-    def proxy_start(clip_id: str):
-        """HEVC 를 못 재생하는 PC 용 H.264 재생 사본을 백그라운드로 만든다. 처음 재생하려고 할 때 부른다."""
+    def proxy_start(clip_id: str, prefetch: int = 0):
+        """HEVC 를 못 재생하는 PC 용 H.264 재생 사본을 백그라운드로 만든다. 처음 재생하려고 할 때 부른다.
+
+        prefetch=1 은 다음 클립을 미리 만들어 두는 요청이라, 직접 요청보다 뒤에서 기다린다."""
         clip, source, out = _proxy_files(clip_id)
         if is_proxy_fresh(out, source):
             return JSONResponse({"state": "ready", "progress": 1.0}, status_code=200)
+        settings = current_config().encode.proxy
+        if prefetch and not settings.prefetch:
+            return JSONResponse({"state": "none", "progress": 0.0}, status_code=200)
         existing = proxy_jobs.get(clip_id)
         if existing and existing["state"] == "running":
+            if not prefetch:
+                proxy_gate.promote(existing["ticket"], DIRECT)
             return JSONResponse({"state": "running", "progress": existing["progress"]}, status_code=202)
         ffmpeg = discover_ffmpeg()
         if ffmpeg is None:
             raise HTTPException(503, "ffmpeg를 찾을 수 없습니다")
-        settings = current_config().encode.proxy
-        job = {"state": "running", "progress": 0.0, "message": ""}
+        ticket = Ticket(clip_id, PREFETCH if prefetch else DIRECT)
+        job = {"state": "running", "progress": 0.0, "message": "", "ticket": ticket}
         proxy_jobs[clip_id] = job
         duration = float(clip.meta.get("durationSec") or 0)
 
@@ -358,7 +366,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             job["progress"] = value
 
         def run() -> None:
-            with proxy_slot:
+            with proxy_gate.slot(ticket):
                 try:
                     create_proxy(
                         ffmpeg, source, out, height=settings.height, crf=settings.crf,

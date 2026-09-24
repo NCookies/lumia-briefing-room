@@ -188,3 +188,104 @@ def test_end_to_end_with_real_ffmpeg(client):
     assert _wait_ready(client, "a", timeout=30)["state"] == "ready"
     served = client.get("/api/clips/a/video", params={"proxy": 1})
     assert served.status_code == 200 and len(served.content) > 1000
+
+
+def _blocking_create(calls, gate):
+    def create(ffmpeg, src, out, *, height, crf, duration_sec, on_progress=None):
+        calls.append(src.stem)
+        gate.wait(5)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(b"proxy-bytes")
+        return "h264_mf"
+
+    return create
+
+
+def _wait_calls(calls, count, timeout=5):
+    deadline = time.time() + timeout
+    while time.time() < deadline and len(calls) < count:
+        time.sleep(0.02)
+    assert len(calls) >= count
+
+
+def _setup_three(client, monkeypatch):
+    import threading
+
+    calls, gate = [], threading.Event()
+    monkeypatch.setattr(app_module, "create_proxy", _blocking_create(calls, gate))
+    monkeypatch.setattr(app_module, "discover_ffmpeg", lambda: Path("ffmpeg"))
+    for cid in ("a", "b", "c"):
+        _write_clip(client.app.state.clips_dir_for_test, cid)
+    return calls, gate
+
+
+def test_prefetch_option_defaults_to_on_and_can_be_turned_off(client):
+    assert client.get("/api/config").json()["encode"]["proxy"]["prefetch"] is True
+    client.put("/api/config", json={"encode": {"proxy": {"prefetch": False}}})
+    assert client.get("/api/config").json()["encode"]["proxy"]["prefetch"] is False
+
+
+def test_prefetch_request_builds_the_proxy(client, monkeypatch):
+    monkeypatch.setattr(app_module, "create_proxy", _fake_create([]))
+    monkeypatch.setattr(app_module, "discover_ffmpeg", lambda: Path("ffmpeg"))
+    _write_clip(client.app.state.clips_dir_for_test, "a")
+
+    assert client.post("/api/clips/a/proxy", params={"prefetch": 1}).status_code == 202
+    assert _wait_ready(client, "a")["state"] == "ready"
+
+
+def test_prefetch_request_is_ignored_when_the_option_is_off(client, monkeypatch):
+    calls = []
+    monkeypatch.setattr(app_module, "create_proxy", _fake_create(calls))
+    monkeypatch.setattr(app_module, "discover_ffmpeg", lambda: Path("ffmpeg"))
+    _write_clip(client.app.state.clips_dir_for_test, "a")
+    client.put("/api/config", json={"encode": {"proxy": {"prefetch": False}}})
+
+    body = client.post("/api/clips/a/proxy", params={"prefetch": 1})
+
+    assert body.status_code == 200 and body.json()["state"] == "none"
+    assert calls == []
+    assert client.get("/api/clips/a/proxy").json()["state"] == "none"
+
+
+def test_direct_request_is_built_before_a_queued_prefetch(client, monkeypatch):
+    calls, gate = _setup_three(client, monkeypatch)
+    client.post("/api/clips/a/proxy", params={"prefetch": 1})
+    _wait_calls(calls, 1)
+    client.post("/api/clips/b/proxy", params={"prefetch": 1})
+    time.sleep(0.1)
+    client.post("/api/clips/c/proxy")
+
+    gate.set()
+    for cid in ("a", "b", "c"):
+        assert _wait_ready(client, cid)["state"] == "ready"
+    assert calls == ["a", "c", "b"]
+
+
+def test_direct_request_for_a_queued_prefetch_clip_promotes_it(client, monkeypatch):
+    calls, gate = _setup_three(client, monkeypatch)
+    client.post("/api/clips/a/proxy", params={"prefetch": 1})
+    _wait_calls(calls, 1)
+    client.post("/api/clips/b/proxy", params={"prefetch": 1})
+    client.post("/api/clips/c/proxy", params={"prefetch": 1})
+    time.sleep(0.1)
+
+    assert client.post("/api/clips/c/proxy").status_code == 202
+
+    gate.set()
+    for cid in ("a", "b", "c"):
+        assert _wait_ready(client, cid)["state"] == "ready"
+    assert calls == ["a", "c", "b"]
+
+
+def test_prefetch_request_does_not_demote_a_running_direct_job(client, monkeypatch):
+    calls, gate = _setup_three(client, monkeypatch)
+    client.post("/api/clips/a/proxy")
+    _wait_calls(calls, 1)
+
+    again = client.post("/api/clips/a/proxy", params={"prefetch": 1})
+
+    assert again.status_code == 202
+    gate.set()
+    assert _wait_ready(client, "a")["state"] == "ready"
+    assert calls == ["a"]
