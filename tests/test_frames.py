@@ -125,3 +125,69 @@ def test_extract_keyframe_frames_skips_missing_segments(tmp_path, make_synthetic
     )
 
     assert [seg for seg, _ in results] == [1, 2, 4, 5]
+
+
+@requires_ffmpeg
+def test_frames_are_produced_lazily_so_memory_stays_flat(tmp_path, make_synthetic_session):
+    """세그먼트 수백 개(수 GB)를 한 번에 메모리에 올리지 않는다 — 제너레이터가 프레임을 하나씩 낸다."""
+    import inspect
+
+    session_dir = make_synthetic_session(tmp_path, width=64, height=48, fps=10, segment_frames=10, num_segments=6)
+    session = RecordingSession.load(session_dir)
+
+    gen = extract_keyframe_frames(session, stream=0, segment_numbers=list(range(1, 7)), ffmpeg_path=FFMPEG_PATH)
+
+    assert inspect.isgenerator(gen)
+    first_segment, first_frame = next(gen)
+    assert first_segment == 1 and first_frame.shape == (48, 64, 3)
+    gen.close()
+
+
+@requires_ffmpeg
+def test_closing_early_stops_ffmpeg_and_leaves_no_temp_files(tmp_path, make_synthetic_session, monkeypatch):
+    import tempfile
+
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path / "tmp"))
+    (tmp_path / "tmp").mkdir()
+    session_dir = make_synthetic_session(tmp_path, width=64, height=48, fps=10, segment_frames=10, num_segments=8)
+    session = RecordingSession.load(session_dir)
+
+    gen = extract_keyframe_frames(session, stream=0, segment_numbers=list(range(1, 9)), ffmpeg_path=FFMPEG_PATH)
+    next(gen)
+    gen.close()
+
+    assert list((tmp_path / "tmp").iterdir()) == []
+
+
+@requires_ffmpeg
+def test_streamed_frames_match_the_merged_file_decode(tmp_path, make_synthetic_session):
+    """스트리밍으로 바꿔도 같은 프레임이 나온다 — 이어붙인 파일을 직접 디코딩한 것과 비교한다."""
+    import subprocess
+
+    session_dir = make_synthetic_session(tmp_path, width=64, height=48, fps=10, segment_frames=10, num_segments=5)
+    session = RecordingSession.load(session_dir)
+    merged = tmp_path / "merged.mp4"
+    write_merged_segment_file(session, 0, [1, 2, 3, 4, 5], merged)
+    raw = subprocess.run(
+        [str(FFMPEG_PATH), "-hide_banner", "-v", "error", "-skip_frame", "nokey", "-i", str(merged),
+         "-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"],
+        capture_output=True, check=True,
+    ).stdout
+    expected = reshape_raw_frames(raw, width=64, height=48)
+
+    got = [frame for _, frame in extract_keyframe_frames(
+        session, stream=0, segment_numbers=[1, 2, 3, 4, 5], ffmpeg_path=FFMPEG_PATH)]
+
+    assert len(got) == len(expected) == 5
+    for a, b in zip(got, expected):
+        assert np.array_equal(a, b)
+
+
+@requires_ffmpeg
+def test_a_broken_segment_raises_instead_of_silently_dropping_frames(tmp_path, make_synthetic_session):
+    session_dir = make_synthetic_session(tmp_path, width=64, height=48, fps=10, segment_frames=10, num_segments=5)
+    (session_dir / "chunk-stream0-00003.m4s").write_bytes(b"\x00" * 64)
+    session = RecordingSession.load(session_dir)
+
+    with pytest.raises(RuntimeError):
+        list(extract_keyframe_frames(session, stream=0, segment_numbers=[1, 2, 3, 4, 5], ffmpeg_path=FFMPEG_PATH))

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-import tempfile
+import subprocess
+import threading
+from collections import deque
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -8,7 +10,7 @@ import numpy as np
 
 from lumia_briefing_room.profiles.models import Roi
 from lumia_briefing_room.video.session import RecordingSession
-from lumia_briefing_room.procs import run_hidden
+from lumia_briefing_room.procs import popen_hidden
 
 
 def reshape_raw_frames(raw: bytes, *, width: int, height: int) -> np.ndarray:
@@ -61,6 +63,20 @@ def _contiguous_runs(
     return runs
 
 
+def _feed_segments(stdin, init_bytes: bytes, run: list[tuple[int, Path]]) -> None:
+    try:
+        stdin.write(init_bytes)
+        for _, chunk_path in run:
+            stdin.write(chunk_path.read_bytes())
+    except (BrokenPipeError, OSError):
+        pass
+    finally:
+        try:
+            stdin.close()
+        except OSError:
+            pass
+
+
 def _decode_run(
     init_bytes: bytes,
     run: list[tuple[int, Path]],
@@ -70,40 +86,51 @@ def _decode_run(
     ffmpeg_path: Path,
     hwaccel: str | None,
 ) -> Iterator[tuple[int, np.ndarray]]:
-    with tempfile.TemporaryDirectory(prefix="lumia_frames_") as tmp_dir:
-        merged_path = Path(tmp_dir) / "merged.mp4"
-        with open(merged_path, "wb") as out:
-            out.write(init_bytes)
-            for _, chunk_path in run:
-                out.write(chunk_path.read_bytes())
+    """연속 구간을 ffmpeg 에 파이프로 흘려 넣고 프레임을 한 장씩 받는다.
 
-        cmd = [str(ffmpeg_path), "-hide_banner", "-v", "error"]
-        if hwaccel:
-            cmd += ["-hwaccel", hwaccel]
-        cmd += [
-            "-skip_frame",
-            "nokey",
-            "-i",
-            str(merged_path),
-            "-fps_mode",
-            "passthrough",
-            "-f",
-            "rawvideo",
-            "-pix_fmt",
-            "rgb24",
-            "pipe:1",
-        ]
-        proc = run_hidden(cmd, capture_output=True, check=True)
+    예전에는 구간 전체를 임시 파일로 이어붙인 뒤 한 번에 디코딩해 프레임을 전부 메모리에 올렸다(40분 = 프레임 9GB,
+    실측 6배속). 지금은 임시 파일도 없고 메모리는 프레임 한 장 분량이며, 같은 구간을 64배속으로 읽는다(디스크가 병목).
+    """
+    cmd = [str(ffmpeg_path), "-hide_banner", "-v", "error"]
+    if hwaccel:
+        cmd += ["-hwaccel", hwaccel]
+    cmd += [
+        "-skip_frame", "nokey", "-i", "pipe:0",
+        "-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1",
+    ]
+    proc = popen_hidden(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    errors: deque[str] = deque(maxlen=5)
 
-    frames = reshape_raw_frames(proc.stdout, width=width, height=height)
+    def drain_stderr() -> None:
+        for raw in proc.stderr:
+            errors.append(raw.decode("utf-8", errors="replace").rstrip())
 
-    if frames.shape[0] != len(run):
-        raise RuntimeError(
-            f"키프레임 개수({frames.shape[0]})가 세그먼트 개수({len(run)})와 다르다"
-        )
+    feeder = threading.Thread(target=_feed_segments, args=(proc.stdin, init_bytes, run), daemon=True)
+    reader = threading.Thread(target=drain_stderr, daemon=True)
+    feeder.start()
+    reader.start()
 
-    for (segment_number, _), frame in zip(run, frames):
-        yield segment_number, frame
+    frame_bytes = width * height * 3
+    produced = 0
+    try:
+        while produced < len(run):
+            data = proc.stdout.read(frame_bytes)
+            if len(data) < frame_bytes:
+                break
+            segment_number = run[produced][0]
+            produced += 1
+            yield segment_number, np.frombuffer(data, dtype=np.uint8).reshape(height, width, 3)
+        extra = proc.stdout.read(1)
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+        proc.wait()
+        feeder.join(timeout=5)
+        reader.join(timeout=5)
+
+    if produced != len(run) or extra:
+        detail = " | ".join(errors) or f"종료 코드 {proc.returncode}"
+        raise RuntimeError(f"키프레임 개수({produced})가 세그먼트 개수({len(run)})와 다르다 - {detail}")
 
 
 def largest_contiguous_run(items: list[tuple[int, Path]]) -> list[tuple[int, Path]]:
