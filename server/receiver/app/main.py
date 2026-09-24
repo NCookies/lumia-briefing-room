@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import hmac
+import ipaddress
 import json
 import logging
 from uuid import UUID
@@ -10,7 +11,9 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError
 
+from .alerts import Alerter, discord_sender, mask_ip
 from .config import Settings, load_settings
+from .ratelimit import RateLimiter
 from .retention import purge_expired
 from .schemas import DiagnosticBundle, LabelBatch, LogBatch
 from .stats import DailyStats
@@ -27,10 +30,40 @@ def _rejected_field_names(error: ValidationError) -> list[str]:
     return names
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+REJECTED_STATUSES = {401, 404, 405, 413, 422}
+REASONS = {"requests": "요청이 너무 많음", "failures": "거부되는 요청이 반복됨"}
+
+
+def client_ip(request: Request) -> str:
+    """receiver 는 caddy 뒤에서만 접근되므로 caddy 가 붙인 X-Forwarded-For 의 마지막 값이 실제 클라이언트다."""
+    forwarded = request.headers.get("x-forwarded-for", "").split(",")[-1].strip()
+    try:
+        return str(ipaddress.ip_address(forwarded))
+    except ValueError:
+        return request.client.host if request.client else "unknown"
+
+
+def create_app(settings: Settings | None = None, alerter: Alerter | None = None) -> FastAPI:
     settings = settings or load_settings()
     store = FileStore(settings.data_dir)
     stats = DailyStats(settings.data_dir)
+    if alerter is None:
+        url = settings.discord_webhook_url
+        alerter = Alerter(discord_sender(url) if url else None)
+
+    def on_block(ip: str, reason: str) -> None:
+        alerter.notify(
+            f"[lumia receiver] 차단: {mask_ip(ip)} — {REASONS.get(reason, reason)} "
+            f"({settings.rate_limit_window_sec // 60}분 기준, {settings.block_sec // 60}분간 차단)"
+        )
+
+    limiter = RateLimiter(
+        window_sec=settings.rate_limit_window_sec,
+        max_requests=settings.rate_limit_requests,
+        max_failures=settings.rate_limit_failures,
+        block_sec=settings.block_sec,
+        on_block=on_block,
+    )
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -58,6 +91,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if declared and declared.isdigit() and int(declared) > settings.max_body_bytes:
             return JSONResponse({"detail": "payload too large"}, status_code=413)
         return await call_next(request)
+
+    @app.middleware("http")
+    async def rate_limit(request: Request, call_next):
+        if not request.url.path.startswith("/v1/"):
+            return await call_next(request)
+        ip = client_ip(request)
+        if not limiter.allow(ip):
+            return JSONResponse(
+                {"detail": "too many requests"}, status_code=429, headers={"Retry-After": str(settings.block_sec)}
+            )
+        response = await call_next(request)
+        if response.status_code in REJECTED_STATUSES:
+            limiter.record_failure(ip)
+        return response
 
     def require_token(x_api_token: str = Header(default="")) -> None:
         if not any(hmac.compare_digest(x_api_token, token) for token in settings.api_tokens):
