@@ -88,8 +88,8 @@ begin
     // 무인 제거(/VERYSILENT)에서는 묻지 않고 남겨 둔다 — 물어보면 대화상자에서 멈춘다.
     if DirExists(DataDir) and (not UninstallSilent) then
     begin
-      if MsgBox('설정과 로그도 지울까요?' + #13#10 + #13#10 + DataDir + #13#10 + #13#10 +
-                '저장된 클립 영상은 이 폴더에 없으며 지워지지 않습니다.',
+      if MsgBox('설정과 로그도 삭제하시겠습니까?' + #13#10 + #13#10 + DataDir + #13#10 + #13#10 +
+                '저장된 클립은 이 폴더에 없으며 지워지지 않습니다.',
                 mbConfirmation, MB_YESNO) = IDYES then
         DelTree(DataDir, True, True, True);
     end;
