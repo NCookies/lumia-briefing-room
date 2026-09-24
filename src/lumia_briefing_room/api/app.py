@@ -7,6 +7,7 @@ import re
 import subprocess
 import threading
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Response
@@ -226,6 +227,9 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             meta["labelConflict"] = False
             if body["userLabel"] is None:
                 meta["labelNote"] = None
+                meta["labeledAt"] = None
+            elif body["userLabel"] != clip.meta.get("userLabel") or not clip.meta.get("labeledAt"):
+                meta["labeledAt"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         clip.meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
         return meta | {"id": clip_id}
 

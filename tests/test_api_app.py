@@ -750,3 +750,34 @@ def test_label_note_is_kept_in_the_label_archive(client):
 
     kept = json.loads((clips / ".labels" / "a.json").read_text(encoding="utf-8"))
     assert kept["labelNote"] == "대치만 함"
+
+
+def test_labeling_records_when_the_label_was_set_and_clearing_removes_it(client):
+    clips_dir = client.app.state.clips_dir_for_test
+    _write_clip(clips_dir, "a")
+    first = client.patch("/api/clips/a", json={"userLabel": "pvp"}).json()
+    assert first["labeledAt"].endswith("Z") and len(first["labeledAt"]) == 20
+    cleared = client.patch("/api/clips/a", json={"userLabel": None}).json()
+    assert cleared["labeledAt"] is None
+
+
+def test_setting_the_same_label_again_or_editing_the_note_keeps_the_original_time(client):
+    clips_dir = client.app.state.clips_dir_for_test
+    _write_clip(clips_dir, "a", userLabel="pvp", labeledAt="2026-09-20T01:02:03Z")
+    same = client.patch("/api/clips/a", json={"userLabel": "pvp"}).json()
+    assert same["labeledAt"] == "2026-09-20T01:02:03Z"
+    noted = client.patch("/api/clips/a", json={"labelNote": "메모"}).json()
+    assert noted["labeledAt"] == "2026-09-20T01:02:03Z"
+
+
+def test_changing_the_label_value_updates_the_time(client):
+    clips_dir = client.app.state.clips_dir_for_test
+    _write_clip(clips_dir, "a", userLabel="pvp", labeledAt="2026-09-20T01:02:03Z")
+    changed = client.patch("/api/clips/a", json={"userLabel": "pve"}).json()
+    assert changed["labeledAt"] != "2026-09-20T01:02:03Z"
+
+
+def test_a_label_without_a_recorded_time_gets_one_when_touched(client):
+    clips_dir = client.app.state.clips_dir_for_test
+    _write_clip(clips_dir, "a", userLabel="pvp")
+    assert client.patch("/api/clips/a", json={"userLabel": "pvp"}).json()["labeledAt"]
