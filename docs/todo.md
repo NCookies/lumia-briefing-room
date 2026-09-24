@@ -9,8 +9,6 @@
 
 ## 추후 구현
 
-- [ ] 자동 업데이트 기능
-
 ## 처리됨
 
 <!-- /todo-sync 가 반영을 끝낸 항목을 "- [x] 내용 → 반영한 문서 §절" 형태로 옮긴다. -->
@@ -25,3 +23,6 @@
 - [x] 자동 정리 후 게임 기록 유지 (대화 중 추가) → plan-ui.md §0, SPEC §7.6 `retention.keepGameRecords`
 - [x] 코드 수정 시 서버 자동 재시작 → plan-ui.md §0 (개발용 `dev.bat` + `tools/dev_run.py`, `run.bat` 은 유지)
 - [x] 접속 주소를 `lumia-briefingroom.localhost` 로, 포트는 80번 우선 → plan-ui.md §0·§4-3(확인 필요 4건), SPEC §7.7 `ui.port`
+- [x] 보기 모드 추가(일자 타임라인) → plan-ui.md §0·§4-4(확인 필요 3건), SPEC §3 실사용 피드백 UI
+- [x] 자르기 구간 여러 개(구간마다 별도 클립 분할, 겹침 금지, 원본은 휴지통) → plan-ui.md §0·§4-5(확인 필요 4건), SPEC §3 실사용 피드백 UI
+- [x] 자동 업데이트 기능 → 이미 SPEC §6 v2 이후 후보·§7.11, plan-deploy.md D9 에 있음(새로 적은 것 없음)
