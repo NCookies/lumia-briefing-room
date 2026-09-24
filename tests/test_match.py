@@ -418,6 +418,43 @@ def test_finalize_match_spectator_far_from_combat_is_not_linked_to_it():
     assert "death" not in detection.intervals[0].tags
 
 
+def _intro_states(spectating_count, *, loading_count=4, live_count=5, step=3.0):
+    """로딩(spectating=None) -> 캐릭터 선택/팀 소개(spectating=True 로 오판) -> 정상 플레이."""
+    states = []
+    for i in range(loading_count + spectating_count + live_count):
+        t = i * step
+        loading = i < loading_count
+        intro = not loading and i < loading_count + spectating_count
+        blank = loading or intro
+        states.append(
+            FrameState(
+                t=t, combat=None if blank else False,
+                face_value=None if blank else 116.0, face_sat=None if blank else 26.0,
+                k=None if blank else 0, a=None if blank else 0, day_night=None if blank else "day",
+                spectating=None if loading else (True if intro else False),
+            )
+        )
+    return states
+
+
+def test_finalize_match_spectating_before_any_live_frame_is_not_a_death():
+    # 2026-09-24 실사용: 경기 시작 직후 캐릭터 선택/팀 소개 화면(RANK GAME 01~08)이 "관전"으로 읽혀
+    # 앞 12초가 "설명 안 되는 사망" 교전으로 뽑혔다. 죽으려면 먼저 살아 있는 화면이 있어야 한다.
+    detection = finalize_match(_intro_states(7))
+
+    assert detection.intervals == []
+
+
+def test_finalize_match_spectating_after_live_frames_is_still_a_death():
+    states = _intro_states(7, live_count=6)
+    tail = _spec_states(0.0, 4, combat_until=-1.0, total=4)
+    states += [FrameState(**{**s.__dict__, "t": (len(states) + i) * 3.0}) for i, s in enumerate(tail)]
+
+    detection = finalize_match(states)
+
+    assert any("death" in iv.tags for iv in detection.intervals)
+
+
 def test_analyze_frame_reads_spectating_from_ui_rois():
     profile = ResolutionProfile.for_resolution(2560, 1440)
     frame = np.full((1440, 2560, 3), 20, np.uint8)

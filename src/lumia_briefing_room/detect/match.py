@@ -311,6 +311,12 @@ def finalize_match(
     def _spectating(t: float) -> bool:
         return any(a <= t <= b for a, b in spectator_ranges)
 
+    # 경기 시작 직후 캐릭터 선택/팀 소개 화면(RANK GAME, 팀 01~08)은 미니맵 헤더 아이콘은 보이고
+    # 체력바만 없어 "관전"으로 읽힌다(2026-09-24 실사용). 죽으려면 먼저 살아 있는(spectating=False)
+    # 화면이 있어야 하므로, 그 전에 시작한 관전은 사망으로 보지 않는다.
+    first_live = next((s.t for s in states if s.spectating is False), None)
+    death_starts = [a for a, _ in spectator_ranges if first_live is not None and a > first_live]
+
     waiting_ranges = to_intervals(
         [(s.t, s.clock_zero) for s in states],
         gap_fill_samples=1, min_combat_samples=MIN_WAITING_SAMPLES,
@@ -333,7 +339,7 @@ def finalize_match(
         return False
 
     combat_ranges = to_intervals([(s.t, _fighting(s)) for s in states])
-    for sp_start, _ in spectator_ranges:
+    for sp_start in death_starts:
         if not any(_overlaps(a, b, sp_start, DEATH_LINK_SEC) for a, b in combat_ranges):
             first = states[0].t
             start = max(first, sp_start - UNEXPLAINED_DEATH_LOOKBACK_SEC)
@@ -383,7 +389,7 @@ def finalize_match(
         k_delta = sum(e.delta for e in k_events if _overlaps(start, end, e.t, tag_tolerance))
         a_delta = sum(e.delta for e in a_events if _overlaps(start, end, e.t, tag_tolerance))
         died = any(_intervals_overlap(start, end, d_start, d_end) for d_start, d_end in death_ranges)
-        died = died or any(_overlaps(start, end, sp_start, DEATH_LINK_SEC) for sp_start, _ in spectator_ranges)
+        died = died or any(_overlaps(start, end, sp_start, DEATH_LINK_SEC) for sp_start in death_starts)
 
         team_deaths = sum(
             1 for t, _ in teammate_deaths if _overlaps(start, end, t, DEATH_LINK_SEC)
