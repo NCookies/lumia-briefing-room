@@ -60,6 +60,8 @@
   "vodOnly": {
     "_설명": "VOD 클립(vod_clips.py)에만 있는 필드. VOD 클립 라벨을 전송할지는 D10 에서 정하며, 전송하더라도 아래는 보내지 않는다.",
     "excluded": [
+      "source",
+      "vodId",
       "vodFile",
       "streamer",
       "vodGameIndex",
