@@ -12,7 +12,12 @@ class ConsentItem:
     since: int
 
 
-CONSENT_ITEMS: tuple[ConsentItem, ...] = (ConsentItem("setup", 1),)
+CONSENT_ITEMS: tuple[ConsentItem, ...] = (
+    ConsentItem("setup", 1),
+    ConsentItem("update", 2),
+    ConsentItem("labels", 2),
+    ConsentItem("logs", 2),
+)
 CONSENT_VERSION = max(item.since for item in CONSENT_ITEMS)
 
 

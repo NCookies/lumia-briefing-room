@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react'
 import { useAppInfo } from '../appInfo'
 import { RESOLUTION_TONE, type FirstRunInfo } from '../onboarding'
 import { DIAGNOSTICS_URL, getFirstRun } from '../onboardingApi'
+import { DEFAULT_CHOICES, consentPatch, type ConsentChoices } from '../consent'
+import { getConsentChoices, saveConsentPatch } from '../consentApi'
+import { useLabelingState } from '../labelingContext'
+import { ConsentChoicesForm } from './ConsentChoicesForm'
 
 const TONE_CLASS = {
   ok: 'text-emerald-300',
@@ -13,12 +17,24 @@ export function AboutPanel() {
   const info = useAppInfo()
   const [firstRun, setFirstRun] = useState<FirstRunInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [choices, setChoices] = useState<ConsentChoices>(DEFAULT_CHOICES)
+  const { reload } = useLabelingState()
 
   useEffect(() => {
     getFirstRun()
       .then(setFirstRun)
       .catch((e: Error) => setError(e.message))
+    getConsentChoices()
+      .then(setChoices)
+      .catch(() => {})
   }, [])
+
+  const changeChoices = (next: ConsentChoices) => {
+    setChoices(next)
+    saveConsentPatch(consentPatch(next, ['update', 'labels', 'logs']))
+      .then(reload)
+      .catch((e: Error) => setError(e.message))
+  }
 
   const resolution = firstRun?.recording.resolution
 
@@ -30,6 +46,11 @@ export function AboutPanel() {
           {info.version || '알 수 없음'}
           {info.mode === 'dev' && <span className="ml-2 text-xs text-zinc-500">(개발 모드)</span>}
         </p>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h3 className="text-sm font-medium text-zinc-200">선택 기능</h3>
+        <ConsentChoicesForm choices={choices} pending={['update', 'labels', 'logs']} onChange={changeChoices} />
       </section>
 
       <section className="flex flex-col gap-1">

@@ -6,8 +6,12 @@ import {
   recordingState,
   type FirstRunInfo,
 } from '../onboarding'
+import { DEFAULT_CHOICES, consentPatch, isPending, type ConsentChoices } from '../consent'
+import { saveConsentPatch } from '../consentApi'
 import { completeFirstRun, getFirstRun, setClipsDir, setRecordingRoot } from '../onboardingApi'
+import { ConsentChoicesForm } from './ConsentChoicesForm'
 import { FolderPicker } from './FolderPicker'
+import { useLabelingState } from '../labelingContext'
 
 const TONE_CLASS = {
   ok: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-200',
@@ -62,6 +66,8 @@ function FolderEditor({
 }
 
 export function FirstRunScreen({ onDone }: { onDone: () => void }) {
+  const { reload } = useLabelingState()
+  const [choices, setChoices] = useState<ConsentChoices>(DEFAULT_CHOICES)
   const [info, setInfo] = useState<FirstRunInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState<'recording' | 'clips' | null>(null)
@@ -76,7 +82,9 @@ export function FirstRunScreen({ onDone }: { onDone: () => void }) {
 
   const finish = async () => {
     try {
+      await saveConsentPatch(consentPatch(choices, info?.pendingItems ?? []))
       await completeFirstRun()
+      reload()
       onDone()
     } catch (e) {
       setError((e as Error).message)
@@ -103,6 +111,8 @@ export function FirstRunScreen({ onDone }: { onDone: () => void }) {
     )
   }
 
+  const showSetup = isPending(info.pendingItems, 'setup')
+  const showConsent = ['update', 'labels', 'logs'].some((k) => isPending(info.pendingItems, k))
   const state = recordingState(info.recording)
   const resolution = info.recording.resolution
 
@@ -117,6 +127,8 @@ export function FirstRunScreen({ onDone }: { onDone: () => void }) {
           </p>
         </header>
 
+        {showSetup && (
+          <>
         <section className="flex flex-col gap-2">
           <h3 className="text-base font-medium">1. 스팀 녹화 폴더</h3>
           <div
@@ -212,6 +224,20 @@ export function FirstRunScreen({ onDone }: { onDone: () => void }) {
           </p>
         </section>
 
+          </>
+        )}
+
+        {showConsent && (
+          <section className="flex flex-col gap-2">
+            <h3 className="text-base font-medium">{showSetup ? '3. ' : ''}선택 기능</h3>
+            <p className="text-xs text-zinc-400">
+              모두 처음에는 꺼져 있고, 켜야만 동작합니다. 옵션 → 정보·진단에서 언제든 바꿀 수 있습니다. 이 버전에서는
+              아직 네트워크를 쓰는 기능이 동작하지 않으며, 켜 둔 선택은 해당 기능이 들어오는 버전부터 적용됩니다.
+            </p>
+            <ConsentChoicesForm choices={choices} pending={info.pendingItems} onChange={setChoices} />
+          </section>
+        )}
+
         {error && <p className="text-sm text-rose-300">{error}</p>}
         <div className="flex justify-end">
           <button
@@ -223,7 +249,7 @@ export function FirstRunScreen({ onDone }: { onDone: () => void }) {
           </button>
         </div>
         <p className="text-xs text-zinc-500">
-          이 창을 그냥 닫으면 다음에 실행할 때 다시 나타납니다. 이 앱은 지금 어떤 데이터도 외부로 보내지 않습니다.
+          이 창을 그냥 닫으면 다음에 실행할 때 다시 나타나며, 그때까지 선택 기능은 모두 꺼진 채로 있습니다. 이 앱은 지금 어떤 데이터도 외부로 보내지 않습니다.
         </p>
       </div>
     </div>

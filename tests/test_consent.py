@@ -27,6 +27,9 @@ def test_newer_answer_than_known_items_is_treated_as_answered():
     assert needs_first_run(CONSENT_VERSION + 5) is False
 
 
-def test_no_network_items_yet():
-    keys = {i.key for i in CONSENT_ITEMS}
-    assert not keys & {"update", "telemetry"}
+def test_network_items_are_asked_separately_from_setup():
+    since = {i.key: i.since for i in CONSENT_ITEMS}
+    assert since["setup"] == 1
+    assert since["update"] == since["labels"] == since["logs"] == 2
+    assert CONSENT_VERSION == 2
+    assert [i.key for i in pending_items(1)] == ["update", "labels", "logs"]

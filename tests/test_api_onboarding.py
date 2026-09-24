@@ -46,7 +46,7 @@ def test_first_run_needed_until_completed(tmp_path: Path):
     body = client.get("/api/first-run").json()
     assert body["needed"] is True
     assert body["currentVersion"] == CONSENT_VERSION
-    assert body["pendingItems"] == ["setup"]
+    assert body["pendingItems"] == ["setup", "update", "labels", "logs"]
     assert body["recording"]["root"] is None
     assert body["recording"]["session"] is None
     assert body["clipsDir"] == str(tmp_path / "clips")
