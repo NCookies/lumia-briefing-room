@@ -50,7 +50,7 @@ from lumia_briefing_room.pipeline.retention import restore_clip, trash_clip
 from lumia_briefing_room.pipeline.proxy import create_proxy, is_proxy_fresh, proxy_path, remove_orphan_proxies
 from lumia_briefing_room.pipeline.reprocess import GameRef, ReprocessError, reprocess_game
 from lumia_briefing_room.pipeline.trim import trim_clip, validate_range
-from lumia_briefing_room.steam_paths import discover_recording_root
+from lumia_briefing_room.steam_paths import resolve_recording_root
 
 
 client_log = logging.getLogger("lumia_briefing_room.client")
@@ -494,7 +494,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         if ffmpeg is None:
             raise HTTPException(503, "ffmpeg를 찾을 수 없습니다")
         cfg = current_config()
-        recording_root = cfg.paths.steam_recording or discover_recording_root()
+        recording_root = resolve_recording_root(cfg.paths.steam_recording)
         if recording_root is None:
             raise HTTPException(503, "스팀 녹화 폴더를 찾을 수 없습니다")
 

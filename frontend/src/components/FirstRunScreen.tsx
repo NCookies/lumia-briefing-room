@@ -138,7 +138,9 @@ export function FirstRunScreen({ onDone }: { onDone: () => void }) {
             <p className="text-xs text-zinc-400">
               스팀 → 설정 → 게임 녹화에서 <b>배경 녹화</b>를 켜고 녹화 폴더를 정해 두세요. 폴더 안에{' '}
               <span className="font-mono">bg_1049590_…</span> 같은 이름의 폴더들이 생기는 곳이 이 앱이 찾는
-              폴더입니다. 폴더를 지정하면 앱이 곧바로 감시를 시작합니다.
+              폴더입니다. 스팀에서 녹화 폴더를 바꾸지 않았다면 기본 위치는{' '}
+              <span className="font-mono">스팀 설치 폴더\userdata\숫자\gamerecordings\video</span> 입니다. 폴더를
+              지정하면 앱이 곧바로 감시를 시작합니다.
             </p>
           )}
           {editing === 'recording' ? (

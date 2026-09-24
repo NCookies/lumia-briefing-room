@@ -4,6 +4,7 @@ import pytest
 
 from lumia_briefing_room.steam_paths import (
     discover_recording_root,
+    normalize_recording_root,
     find_steam_install_path,
     parse_vdf,
     read_background_record_path,
@@ -114,3 +115,104 @@ def test_find_steam_install_path_matches_real_registry_when_steam_installed():
     if result is None:
         pytest.skip("이 PC 에는 스팀이 설치되어 있지 않다")
     assert result.exists()
+
+
+def _session(video_dir: Path, name: str = "bg_1049590_20260923_095917") -> None:
+    (video_dir / name).mkdir(parents=True)
+    (video_dir / name / "session.mpd").write_text("<MPD/>", encoding="utf-8")
+
+
+def _default_video(steam: Path, account: str) -> Path:
+    return steam / "userdata" / account / "gamerecordings" / "video"
+
+
+def test_discover_falls_back_to_the_default_folder_when_the_path_was_never_changed(tmp_path):
+    """녹화 폴더를 바꾸지 않으면 localconfig.vdf 에 BackgroundRecordPath 가 아예 없다(친구 PC 실측 사례)."""
+    _write_localconfig(tmp_path, "963388226", '"UserLocalConfigStore"\n{\n}\n')
+    video = _default_video(tmp_path, "963388226")
+    _session(video)
+
+    assert discover_recording_root(tmp_path) == video
+
+
+def test_discover_works_even_without_a_localconfig_file(tmp_path):
+    video = _default_video(tmp_path, "963388226")
+    _session(video)
+
+    assert discover_recording_root(tmp_path) == video
+
+
+def test_configured_path_wins_over_the_default_folder(tmp_path):
+    _write_localconfig(tmp_path, "100000001", REAL_SAMPLE)
+    _session(_default_video(tmp_path, "100000001"))
+
+    assert discover_recording_root(tmp_path) == Path("H:\steam video") / "video"
+
+
+def test_default_folder_with_recordings_beats_an_empty_one(tmp_path):
+    empty = _default_video(tmp_path, "100000002")
+    empty.mkdir(parents=True)
+    used = _default_video(tmp_path, "963388226")
+    _session(used)
+
+    assert discover_recording_root(tmp_path) == used
+
+
+def test_with_several_accounts_the_newest_recording_wins(tmp_path):
+    import os
+
+    old, new = _default_video(tmp_path, "111"), _default_video(tmp_path, "222")
+    _session(old)
+    _session(new)
+    os.utime(old / "bg_1049590_20260923_095917", (1000, 1000))
+    os.utime(new / "bg_1049590_20260923_095917", (2000, 2000))
+
+    assert discover_recording_root(tmp_path) == new
+
+
+def test_an_existing_but_empty_default_folder_is_still_offered(tmp_path):
+    video = _default_video(tmp_path, "963388226")
+    video.mkdir(parents=True)
+
+    assert discover_recording_root(tmp_path) == video
+
+
+def test_normalize_uses_the_video_subfolder_when_the_parent_was_picked(tmp_path):
+    """친구가 스팀 폴더 선택 창에서 gamerecordings(한 단계 위)를 고른 경우."""
+    parent = tmp_path / "gamerecordings"
+    _session(parent / "video")
+
+    assert normalize_recording_root(parent) == parent / "video"
+
+
+def test_normalize_keeps_a_folder_that_already_holds_sessions(tmp_path):
+    video = tmp_path / "video"
+    _session(video)
+
+    assert normalize_recording_root(video) == video
+
+
+def test_normalize_leaves_unrelated_folders_alone(tmp_path):
+    other = tmp_path / "somewhere"
+    other.mkdir()
+
+    assert normalize_recording_root(other) == other
+    assert normalize_recording_root(None) is None
+
+
+def test_resolve_prefers_and_normalizes_the_configured_folder(tmp_path, monkeypatch):
+    from lumia_briefing_room.steam_paths import resolve_recording_root
+
+    parent = tmp_path / "gamerecordings"
+    _session(parent / "video")
+    monkeypatch.setattr("lumia_briefing_room.steam_paths.discover_recording_root", lambda: Path("SHOULD_NOT_BE_USED"))
+
+    assert resolve_recording_root(parent) == parent / "video"
+
+
+def test_resolve_falls_back_to_discovery_when_nothing_is_configured(monkeypatch):
+    from lumia_briefing_room.steam_paths import resolve_recording_root
+
+    monkeypatch.setattr("lumia_briefing_room.steam_paths.discover_recording_root", lambda: Path("auto"))
+
+    assert resolve_recording_root(None) == Path("auto")

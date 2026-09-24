@@ -115,16 +115,67 @@ def read_buffer_minutes_override(steam_path: Path, app_id: str) -> float | None:
     return None
 
 
-def discover_recording_root(steam_path: Path | None = None) -> Path | None:
-    """스팀의 배경 녹화 저장 위치(`<BackgroundRecordPath>\\video`)를 자동으로 찾는다.
+SESSION_FOLDER = re.compile(r"^bg_\d+_\d{8}_\d{6}$")
 
-    스팀 설치를 못 찾거나, 어느 계정에도 배경 녹화 경로가 설정되어 있지 않으면
-    None 을 돌려준다 — 호출자가 --recording-root 를 요구하는 등으로 대체해야 한다.
+
+def _session_dirs(video_dir: Path) -> list[Path]:
+    try:
+        return [d for d in video_dir.iterdir() if d.is_dir() and SESSION_FOLDER.match(d.name)]
+    except OSError:
+        return []
+
+
+def _default_video_dirs(steam_path: Path) -> list[Path]:
+    """녹화 폴더를 바꾸지 않았을 때의 기본 위치 `userdata/<id>/gamerecordings/video`.
+
+    폴더를 바꾸지 않으면 localconfig.vdf 에 `BackgroundRecordPath` 자체가 저장되지 않는다(친구 PC 실측 사례).
+    계정이 여러 개면 녹화가 들어 있는 것, 그중에서도 가장 최근 세션이 있는 계정을 고른다.
+    """
+    found = []
+    for video in sorted(steam_path.glob("userdata/*/gamerecordings/video")):
+        if video.is_dir():
+            sessions = _session_dirs(video)
+            newest = max((d.stat().st_mtime for d in sessions), default=-1.0)
+            found.append((bool(sessions), newest, video))
+    found.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return [video for _, _, video in found]
+
+
+def discover_recording_root(steam_path: Path | None = None) -> Path | None:
+    """스팀의 배경 녹화 저장 위치를 자동으로 찾는다.
+
+    1) 사용자가 폴더를 바꿨다면 `<BackgroundRecordPath>/video`
+    2) 안 바꿨다면 기본 위치 `userdata/<id>/gamerecordings/video`(녹화가 있는 계정 우선)
+    스팀 설치를 못 찾거나 둘 다 없으면 None — 호출자가 직접 고르게 해야 한다.
     """
     steam_path = steam_path if steam_path is not None else find_steam_install_path()
     if steam_path is None:
         return None
     record_path = read_background_record_path(steam_path)
-    if record_path is None:
+    if record_path is not None:
+        return record_path / "video"
+    defaults = _default_video_dirs(steam_path)
+    return defaults[0] if defaults else None
+
+
+def normalize_recording_root(root: Path | None) -> Path | None:
+    """사용자가 직접 고른 폴더가 `gamerecordings`(한 단계 위)여도 `video` 로 바로잡는다.
+
+    녹화 세션(bg_...)이 이미 들어 있으면 그대로 두고, 없을 때만 `video` 하위 폴더를 본다.
+    """
+    if root is None:
         return None
-    return record_path / "video"
+    root = Path(root)
+    if _session_dirs(root):
+        return root
+    child = root / "video"
+    if child.is_dir() and _session_dirs(child):
+        return child
+    return root
+
+
+def resolve_recording_root(configured: Path | None) -> Path | None:
+    """설정에 지정한 폴더가 있으면 바로잡아서, 없으면 자동 탐지로 녹화 폴더를 정한다."""
+    if configured:
+        return normalize_recording_root(Path(configured))
+    return discover_recording_root()

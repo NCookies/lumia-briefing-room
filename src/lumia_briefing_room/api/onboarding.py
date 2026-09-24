@@ -17,11 +17,11 @@ from lumia_briefing_room.diagnostics import build_diagnostics_zip
 from lumia_briefing_room.logsetup import default_log_path
 from lumia_briefing_room.recording_info import find_latest_session
 from lumia_briefing_room.resolution_support import classify_resolution
-from lumia_briefing_room.steam_paths import discover_recording_root
+from lumia_briefing_room.steam_paths import discover_recording_root, normalize_recording_root
 
 
 def _recording_report(cfg: Config) -> dict:
-    root = cfg.paths.steam_recording
+    root = normalize_recording_root(cfg.paths.steam_recording)
     source = "config" if root else None
     if root is None:
         root = discover_recording_root()

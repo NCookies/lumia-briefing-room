@@ -122,3 +122,15 @@ def test_diagnostics_zip_is_scrubbed_download(tmp_path: Path, monkeypatch):
     assert info["mode"] in ("dev", "release")
     assert info["recording"]["resolution"]["kind"] == "measured"
     assert info["recording"]["session"]["codec"].startswith("hev1")
+
+
+def test_first_run_accepts_the_parent_folder_the_friend_picked(tmp_path: Path):
+    """친구가 스팀 선택 창에서 gamerecordings(한 단계 위)를 골라도 video 로 바로잡아 인식한다."""
+    video = _recording(tmp_path, 2560, 1440)
+    parent = video.parent
+    client, _, _ = _make(tmp_path, steam_recording=parent)
+
+    recording = client.get("/api/first-run").json()["recording"]
+
+    assert recording["root"] == str(video)
+    assert recording["session"]["width"] == 2560
