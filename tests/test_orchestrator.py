@@ -230,3 +230,63 @@ def test_aggregate_interval_keeps_the_first_known_game_day():
         )
 
     assert _aggregate_interval([iv(None), iv(4), iv(5)]).game_day == 4
+
+
+def test_read_result_scans_the_tail_of_the_range_when_the_end_is_the_lobby_return(monkeypatch):
+    """로그 기반 경기는 끝이 로비 복귀라 구간 끝에서 거슬러 오른다(기존 동작)."""
+    from lumia_briefing_room.pipeline import orchestrator as orch
+    from lumia_briefing_room.video.segments import SegmentRange
+
+    calls = []
+    monkeypatch.setattr(orch, "find_result_screen", lambda session, seg_range, **kw: calls.append(("tail", seg_range)) or "R")
+    monkeypatch.setattr(orch, "find_result_after", lambda *a, **kw: calls.append(("after", a, kw)) or "X")
+
+    assert orch._read_result("session", SegmentRange(10, 50), Path("ffmpeg"), None) == "R"
+    assert [c[0] for c in calls] == ["tail"]
+
+
+def test_read_result_scans_forward_from_the_game_end_for_screen_based_windows(monkeypatch):
+    """화면으로 찾은 경기는 끝이 '마지막 인게임 프레임'이라 그 뒤에서 앞으로 훑어야 결과 화면이 잡힌다(실측: 순위가 비었다)."""
+    from datetime import datetime, timedelta, timezone
+
+    from lumia_briefing_room.pipeline import orchestrator as orch
+    from lumia_briefing_room.video.segments import SegmentRange
+
+    class Session:
+        start_utc = datetime(2026, 9, 24, 6, 0, 0, tzinfo=timezone.utc)
+        segment_duration_sec = 3.0
+
+    calls = []
+    monkeypatch.setattr(orch, "find_result_screen", lambda *a, **kw: calls.append("tail") or "R")
+
+    def fake_after(session, after_segment, **kw):
+        calls.append(("after", after_segment, kw["before_segment"]))
+        return "X"
+
+    monkeypatch.setattr(orch, "find_result_after", fake_after)
+    game_end = Session.start_utc + timedelta(seconds=300)
+
+    got = orch._read_result(Session(), SegmentRange(10, 130), Path("ffmpeg"), None, search_from=game_end)
+
+    assert got == "X"
+    assert calls == [("after", 101, 131)]
+
+
+def test_read_result_failure_is_swallowed_in_both_modes(monkeypatch):
+    from datetime import datetime, timezone
+
+    from lumia_briefing_room.pipeline import orchestrator as orch
+    from lumia_briefing_room.video.segments import SegmentRange
+
+    class Session:
+        start_utc = datetime(2026, 9, 24, 6, 0, 0, tzinfo=timezone.utc)
+        segment_duration_sec = 3.0
+
+    def boom(*a, **kw):
+        raise RuntimeError("OCR 실패")
+
+    monkeypatch.setattr(orch, "find_result_screen", boom)
+    monkeypatch.setattr(orch, "find_result_after", boom)
+
+    assert orch._read_result(Session(), SegmentRange(1, 9), Path("ffmpeg"), None) is None
+    assert orch._read_result(Session(), SegmentRange(1, 9), Path("ffmpeg"), None, search_from=Session.start_utc) is None

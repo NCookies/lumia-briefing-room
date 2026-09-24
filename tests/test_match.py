@@ -1087,3 +1087,52 @@ def test_analyze_frame_reads_badge_and_daynight_on_a_1080p_frame():
     assert state.combat is True
     assert state.face_value == pytest.approx(120.0)
     assert state.day_night == "day"
+
+
+class _CountingSource:
+    """프레임을 몇 장 내줬는지 세는 가짜 소스. 취소가 프레임 사이에서 먹히는지 본다."""
+
+    width, height = 2560, 1440
+
+    def __init__(self, total: int):
+        self.total = total
+        self.yielded = 0
+
+    def gaps(self):
+        return []
+
+    def frames(self):
+        for n in range(self.total):
+            self.yielded += 1
+            yield n * 3.0, np.zeros((1440, 2560, 3), dtype=np.uint8)
+
+
+def test_detect_source_stops_between_frames_when_cancelled():
+    import threading
+
+    from lumia_briefing_room.detect.match import DetectionCancelled, detect_source
+
+    cancel = threading.Event()
+    source = _CountingSource(total=50)
+    original = source.frames
+
+    def frames_and_cancel_at_five():
+        for i, item in enumerate(original(), start=1):
+            if i == 5:
+                cancel.set()
+            yield item
+
+    source.frames = frames_and_cancel_at_five
+
+    with pytest.raises(DetectionCancelled):
+        detect_source(source, cancel=cancel)
+
+    assert source.yielded < 50
+
+
+def test_detect_source_without_cancel_reads_everything():
+    from lumia_briefing_room.detect.match import detect_source
+
+    source = _CountingSource(total=4)
+    detect_source(source)
+    assert source.yielded == 4

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from pathlib import Path
 
 import numpy as np
@@ -446,12 +447,17 @@ def finalize_match(
     )
 
 
+class DetectionCancelled(Exception):
+    """검출 도중 취소됐다. 프레임 사이에서만 멈추므로 반쯤 쓴 결과는 남지 않는다."""
+
+
 def detect_source(
     source: FrameSource,
     *,
     profile: ResolutionProfile | None = None,
     k_templates: dict[int, np.ndarray] | None = None,
     a_templates: dict[int, np.ndarray] | None = None,
+    cancel: threading.Event | None = None,
 ) -> MatchDetection:
     """프레임 공급자 하나를 통째로 검출한다. 스팀 세그먼트든 영상 파일이든 같은 시계열 처리를 쓴다."""
     profile = profile or ResolutionProfile.for_resolution(source.width, source.height)
@@ -460,13 +466,22 @@ def detect_source(
     region_templates = resolve_region_templates(profile)
     day_templates = resolve_day_templates(profile)
 
-    states = [
-        analyze_frame(
-            frame, profile, t=t, k_templates=k_templates, a_templates=a_templates,
-            tk_templates=tk_templates, region_templates=region_templates, day_templates=day_templates,
-        )
-        for t, frame in source.frames()
-    ]
+    states = []
+    frames = source.frames()
+    try:
+        for t, frame in frames:
+            if cancel is not None and cancel.is_set():
+                raise DetectionCancelled()
+            states.append(
+                analyze_frame(
+                    frame, profile, t=t, k_templates=k_templates, a_templates=a_templates,
+                    tk_templates=tk_templates, region_templates=region_templates, day_templates=day_templates,
+                )
+            )
+    finally:
+        close = getattr(frames, "close", None)
+        if close is not None:
+            close()
     return finalize_match(states, gaps=source.gaps())
 
 
@@ -480,11 +495,12 @@ def detect_match(
     k_templates: dict[int, np.ndarray] | None = None,
     a_templates: dict[int, np.ndarray] | None = None,
     hwaccel: str | None = None,
+    cancel: threading.Event | None = None,
 ) -> MatchDetection:
     """매치 구간(세그먼트 범위) 하나를 통째로 검출한다. (plan.md §9-6)"""
     source = SteamSegmentSource(
         session, seg_range, stream=stream, ffmpeg_path=ffmpeg_path, hwaccel=hwaccel
     )
     return detect_source(
-        source, profile=profile, k_templates=k_templates, a_templates=a_templates
+        source, profile=profile, k_templates=k_templates, a_templates=a_templates, cancel=cancel
     )

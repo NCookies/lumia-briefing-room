@@ -1,3 +1,4 @@
+import threading
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -15,8 +16,13 @@ from lumia_briefing_room.pipeline.clip import ClipRange, cut_clip, make_thumbnai
 from lumia_briefing_room.pipeline.filters import apply_filter
 from lumia_briefing_room.pipeline.metadata import build_metadata, write_metadata
 from lumia_briefing_room.pipeline.clip_assets import stored_asset_path
-from lumia_briefing_room.pipeline.result_scan import find_result_screen, result_image_name, save_result_image
-from lumia_briefing_room.video.segments import segment_time_range
+from lumia_briefing_room.pipeline.result_scan import (
+    find_result_after,
+    find_result_screen,
+    result_image_name,
+    save_result_image,
+)
+from lumia_briefing_room.video.segments import segment_number_at, segment_time_range
 from lumia_briefing_room.video.session import RecordingSession
 
 log = logging.getLogger(__name__)
@@ -125,9 +131,20 @@ def _resolve_clip_paths(cfg: Config, clips_dir: Path | None) -> tuple[Path, Path
     return clips_root, thumbnails_root
 
 
-def _read_result(session, seg_range, ffmpeg_path: Path, hwaccel: str | None) -> ResultScreen | None:
-    """결과 화면 판독은 부가 정보라 실패해도 클립 생성을 막지 않는다."""
+def _read_result(
+    session, seg_range, ffmpeg_path: Path, hwaccel: str | None, *, search_from: datetime | None = None
+) -> ResultScreen | None:
+    """결과 화면 판독은 부가 정보라 실패해도 클립 생성을 막지 않는다.
+
+    로그 기반 경기는 끝이 로비 복귀 시각이라 구간 끝에서 거슬러 오른다. 화면으로 찾은 경기(과거 녹화 복구)는 끝을 '마지막 인게임
+    프레임'으로 알 뿐이라 `search_from`(그 시각) 뒤에서 앞으로 훑는다 — 구간 끝(다음 경기 시작 전)까지만 본다.
+    """
     try:
+        if search_from is not None:
+            return find_result_after(
+                session, segment_number_at(session, search_from),
+                ffmpeg_path=ffmpeg_path, hwaccel=hwaccel, before_segment=seg_range.last + 1,
+            )
         return find_result_screen(session, seg_range, ffmpeg_path=ffmpeg_path, hwaccel=hwaccel)
     except Exception:
         log.exception("결과 화면 판독 실패 - 순위 정보 없이 저장한다")
@@ -162,6 +179,8 @@ def process_match(
     clips_dir: Path | None = None,
     hwaccel: str | None = None,
     on_result: Callable[[ResultScreen], None] | None = None,
+    cancel: threading.Event | None = None,
+    result_search_from: datetime | None = None,
 ) -> list[Path]:
     """SPEC §3 다이어그램 전체: 매치 하나를 검출부터 메타데이터 저장까지 처리한다.
 
@@ -170,7 +189,7 @@ def process_match(
     seg_range = segment_time_range(session, match_start, match_end)
     detection = detect_match(
         session, seg_range, ffmpeg_path=ffmpeg_path,
-        k_templates=k_templates, a_templates=a_templates, hwaccel=hwaccel,
+        k_templates=k_templates, a_templates=a_templates, hwaccel=hwaccel, cancel=cancel,
     )
 
     filtered = apply_filter(detection.intervals, cfg.filter, game_mode=game_mode)
@@ -183,7 +202,7 @@ def process_match(
     resolved.temp.mkdir(parents=True, exist_ok=True)
 
     plans = _plan_clips(filtered, cfg.clip)
-    result = _read_result(session, seg_range, ffmpeg_path, hwaccel)
+    result = _read_result(session, seg_range, ffmpeg_path, hwaccel, search_from=result_search_from)
     if result is not None and on_result is not None:
         on_result(result)
     result_image_path = _save_result_image(result, thumbnails_root / result_image_name(match_start), clips_root)
