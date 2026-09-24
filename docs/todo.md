@@ -26,3 +26,4 @@
 - [x] 보기 모드 추가(일자 타임라인) → plan-ui.md §0·§4-4(확인 필요 3건), SPEC §3 실사용 피드백 UI
 - [x] 자르기 구간 여러 개(구간마다 별도 클립 분할, 겹침 금지, 원본은 휴지통) → plan-ui.md §0·§4-5(확인 필요 4건), SPEC §3 실사용 피드백 UI
 - [x] 자동 업데이트 기능 → 이미 SPEC §6 v2 이후 후보·§7.11, plan-deploy.md D9 에 있음(새로 적은 것 없음)
+- [x] terraform 으로 OCI 인프라 구축(도커, 파일 → 나중에 DB, MCP 조사) → 새 docs/plan-infra.md, plan-deploy.md §7-11, SPEC §7.11 수신처
