@@ -23,7 +23,6 @@ export function prefetchTarget(ids: string[], index: number, mode: PlaybackMode,
 }
 
 export const CODEC_STORE_URL = 'https://apps.microsoft.com/detail/9nmzlz57r3t7'
-export const CODEC_FREE_STORE_URL = 'https://apps.microsoft.com/detail/9n4wgh0z6vhq'
 
 export function browserCanPlayHevc(): string {
   const probe = document.createElement('video')
