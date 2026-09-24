@@ -23,7 +23,7 @@ def classify_resolution(width: int, height: int) -> ResolutionSupport:
     if height and abs(width / height - RATIO_16_9) <= RATIO_TOLERANCE:
         return ResolutionSupport(
             width, height, "scaled",
-            f"{size} — 16:9 라서 측정한 해상도(2560x1440)를 비례 축척해 대응합니다. 판독이 틀리면 알려 주세요.",
+            f"{size} — 16:9 라서 측정한 해상도(2560x1440)를 비율에 맞춰 조정해 대응합니다. 판독이 틀리면 알려 주세요.",
         )
     return ResolutionSupport(
         width, height, "unsupported_ratio",

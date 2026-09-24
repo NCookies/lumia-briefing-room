@@ -11,8 +11,8 @@ from lumia_briefing_room import paths
 
 
 FFMPEG_NOT_FOUND_MESSAGE = (
-    "ffmpeg를 찾을 수 없다. 'winget install ffmpeg' 로 설치하거나, "
-    "--ffmpeg 옵션 또는 LUMIA_FFMPEG 환경변수로 ffmpeg.exe 경로를 직접 지정할 것."
+    "ffmpeg를 찾을 수 없습니다. 'winget install ffmpeg'로 설치하거나, "
+    "--ffmpeg 옵션 또는 LUMIA_FFMPEG 환경변수로 ffmpeg.exe 경로를 직접 지정해 주세요."
 )
 
 

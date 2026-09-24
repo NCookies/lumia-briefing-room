@@ -106,7 +106,7 @@ def register_backfill_routes(app: FastAPI, *, current_config: Callable[[], Confi
         if info["sessions"] == 0:
             return {**base, "reason": "분석할 이터널 리턴 녹화가 없습니다."}
         if discover_ffmpeg() is None:
-            return {**base, "reason": "ffmpeg 를 찾지 못했습니다."}
+            return {**base, "reason": "ffmpeg를 찾지 못했습니다."}
         return {**base, "canStart": True}
 
     @app.post("/api/backfill/start", status_code=202)

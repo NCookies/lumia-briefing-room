@@ -117,7 +117,7 @@ def create_proxy(
     """가능한 인코더를 차례로 시도해 프록시를 만들고, 쓴 인코더 이름을 돌려준다."""
     plan = encoder_plan(list_encoders(ffmpeg))
     if not plan:
-        raise ProxyError("H.264 인코더(h264_mf, libx264)가 이 ffmpeg 에 없다")
+        raise ProxyError("이 ffmpeg에 H.264 인코더(h264_mf, libx264)가 없습니다")
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_name(f"{out.stem}.tmp.mp4")
     errors = []

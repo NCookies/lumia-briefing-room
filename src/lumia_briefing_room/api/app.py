@@ -213,7 +213,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             raise HTTPException(404, "클립을 찾을 수 없습니다")
         clip = found[1]
         if "userLabel" in body and body["userLabel"] not in (None, "pvp", "pve"):
-            raise HTTPException(400, "라벨은 교전(pvp), 사냥(pve), 해제(null)만 지정할 수 있습니다")
+            raise HTTPException(400, "라벨은 교전(pvp), 그 외(pve), 해제(null)만 지정할 수 있습니다")
         meta = {**clip.meta, **{k: v for k, v in body.items() if k in ("title", "pinned", "userLabel")}}
         if "labelNote" in body:
             try:
@@ -657,7 +657,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
                 move_job.update(state="done", moved=moved)
             except OSError as e:
                 move_job.update(
-                    state="error", message=f"클립을 옮기다 실패했습니다. 남은 클립은 기존 폴더에 있으니 다시 시도하세요: {e}"
+                    state="error", message=f"클립을 옮기는 중 실패했습니다. 남은 클립은 기존 폴더에 있으니 다시 시도하세요: {e}"
                 )
             except Exception as e:
                 logging.getLogger("lumia_briefing_room.move").exception("클립 폴더 이동 실패")

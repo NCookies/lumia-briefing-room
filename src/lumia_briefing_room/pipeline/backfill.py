@@ -215,7 +215,7 @@ def run_backfill(
 
     todo.sort(key=lambda item: item[2].hud_start_utc)
     total_games = len(todo)
-    report("process", 0.5, f"경기 {total_games}개", session_total=total_sessions, games_total=total_games)
+    report("process", 0.5, f"게임 {total_games}개", session_total=total_sessions, games_total=total_games)
 
     for done, (key, session_dir, window) in enumerate(todo):
         if cancelled():
@@ -223,7 +223,7 @@ def run_backfill(
             return result
         base = 0.5 + 0.5 * (done / max(1, total_games))
         report(
-            "process", base, f"{window.hud_start_utc.astimezone().strftime('%m-%d %H:%M')} 경기",
+            "process", base, f"{window.hud_start_utc.astimezone().strftime('%m-%d %H:%M')} 게임",
             session_total=total_sessions, games_done=done, games_total=total_games, clips=result.clips_created,
         )
         staging = staging_root / _staging_name(key)
