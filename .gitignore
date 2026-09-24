@@ -56,3 +56,6 @@ vendor/
 
 # 빌드 때 환경변수에서 만드는 서버 토큰 파일 (공개 저장소에 올리지 않는다)
 data/telemetry_endpoint.json
+
+# tools/pull_labels.py 가 서버에서 받아 오는 라벨(개인 분석용)
+pulled_labels/
