@@ -23,7 +23,10 @@ class ClipRange:
 
 
 def resolve_clip_range(interval: CombatInterval, cfg: ClipConfig) -> ClipRange:
-    """SPEC §3 클립 구간: 교전 시작 -preroll ~ 교전 종료 +postroll, 상한 적용.
+    """SPEC §3 클립 구간: 교전 시작 -preroll ~ 교전 종료 +postroll. 길이 상한은 두지 않는다.
+
+    이어지는 교전은 끝까지 한 클립에 담는다(2026-09-24 실사용: 90초 상한이 126초 교전의 추격 장면을
+    잘랐다). 교전이 잘리지 않는 게 엉뚱한 장면이 섞이는 것보다 중요하다.
 
     team_combat_unreliable(팀원 링 판독이 매치 내내 포화돼 배지만으로 구간을 나눈 경우,
     detect/match.py::_team_combat_saturated)이면 preroll 을 fixed_preroll_sec 으로 넓힌다.
@@ -36,8 +39,6 @@ def resolve_clip_range(interval: CombatInterval, cfg: ClipConfig) -> ClipRange:
     source = "fixed" if interval.team_combat_unreliable else "combat"
     start = max(0.0, interval.start - preroll)
     end = interval.end + cfg.postroll_sec
-    if end - start > cfg.max_duration_sec:
-        end = start + cfg.max_duration_sec
     return ClipRange(start=start, end=end, preroll_source=source)
 
 

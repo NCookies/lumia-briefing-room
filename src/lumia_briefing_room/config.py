@@ -136,7 +136,6 @@ class ClipConfig:
     preroll_sec: float = 5.0
     postroll_sec: float = 8.0
     fixed_preroll_sec: float = 30.0
-    max_duration_sec: float = 90.0
     merge_gap_sec: float = 10.0
     include_audio: bool = True
     snap_to_keyframe: bool = True

@@ -23,7 +23,7 @@ def test_default_config_matches_spec_defaults():
     assert cfg.filter.min_duration_sec == 4
     assert cfg.clip.preroll_sec == 5
     assert cfg.clip.postroll_sec == 8
-    assert cfg.clip.max_duration_sec == 90
+    assert not hasattr(cfg.clip, "max_duration_sec")
     assert cfg.encode.proxy.enabled is False
     assert cfg.encode.thumbnail.enabled is True
     assert cfg.retention.delete_mode == "trash"

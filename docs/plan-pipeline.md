@@ -165,7 +165,7 @@ def cut_clip(session, seg_range: SegmentRange, out_path: Path, *, ffmpeg_path, i
 def make_thumbnail(clip_path: Path, out_path: Path, *, offset_ratio: float, width: int, ffmpeg_path) -> None:
 ```
 
-- `resolve_clip_range`: `prerollSec`/`postrollSec` 적용, `prerollSource` 결정(교전구간 있으면 `"combat"`, 없으면 `fixedPrerollSec` 로 `"fixed"`), `maxDurationSec` 상한.
+- `resolve_clip_range`: `prerollSec`/`postrollSec` 적용, `prerollSource` 결정(교전구간 있으면 `"combat"`, 없으면 `fixedPrerollSec` 로 `"fixed"`). 길이 상한은 없다(2026-09-24 폐지).
 - 컷 경계는 **3초 키프레임 격자에 맞춰 세그먼트 단위로 스냅**한다(SPEC §2.2/§3) — `segment_time_range()` 로 세그먼트 범위를 구하고 그 세그먼트들만 병합 후 `-c copy`.
 - `cut_clip`/`make_thumbnail` 은 ffmpeg 서브프로세스라 `requires_ffmpeg` 통합 테스트, `resolve_clip_range`/`merge_overlapping` 은 순수 함수라 일반 테스트.
 

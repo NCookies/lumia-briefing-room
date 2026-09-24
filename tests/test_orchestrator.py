@@ -64,7 +64,7 @@ def test_aggregate_single_interval_passthrough():
 
 
 def test_plan_clips_keeps_separate_when_far_apart():
-    cfg = ClipConfig(preroll_sec=5, postroll_sec=8, merge_gap_sec=10, max_duration_sec=90)
+    cfg = ClipConfig(preroll_sec=5, postroll_sec=8, merge_gap_sec=10)
     intervals = [ci(0, 10, {"kill"}), ci(200, 210, {"assist"})]
     plans = _plan_clips(intervals, cfg)
     assert len(plans) == 2
@@ -72,7 +72,7 @@ def test_plan_clips_keeps_separate_when_far_apart():
 
 
 def test_plan_clips_merges_close_intervals_into_one():
-    cfg = ClipConfig(preroll_sec=5, postroll_sec=8, merge_gap_sec=15, max_duration_sec=90)
+    cfg = ClipConfig(preroll_sec=5, postroll_sec=8, merge_gap_sec=15)
     # 첫 클립 범위: [0-5, 10+8] = [-5, 18] -> clamp [0, 18]
     # 둘째 교전 시작 25 는 18+15=33 이내라 병합된다
     intervals = [ci(0, 10, {"kill"}), ci(25, 35, {"assist"})]
@@ -110,7 +110,7 @@ def test_resolve_clip_paths_respects_explicit_thumbnails_config():
 
 
 def test_plan_clips_sorts_out_of_order_input():
-    cfg = ClipConfig(preroll_sec=5, postroll_sec=8, merge_gap_sec=10, max_duration_sec=90)
+    cfg = ClipConfig(preroll_sec=5, postroll_sec=8, merge_gap_sec=10)
     intervals = [ci(200, 210, {"assist"}), ci(0, 10, {"kill"})]
     plans = _plan_clips(intervals, cfg)
     assert len(plans) == 2

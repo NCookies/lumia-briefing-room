@@ -27,7 +27,7 @@ def ci(start, end, *, team_combat_unreliable=False):
 
 
 def test_resolve_clip_range_applies_preroll_and_postroll():
-    cfg = ClipConfig(preroll_sec=5, postroll_sec=8, max_duration_sec=90)
+    cfg = ClipConfig(preroll_sec=5, postroll_sec=8)
     r = resolve_clip_range(ci(100, 120), cfg)
     assert r.start == 95
     assert r.end == 128
@@ -35,22 +35,23 @@ def test_resolve_clip_range_applies_preroll_and_postroll():
 
 
 def test_resolve_clip_range_clamps_start_at_zero():
-    cfg = ClipConfig(preroll_sec=30, postroll_sec=8, max_duration_sec=90)
+    cfg = ClipConfig(preroll_sec=30, postroll_sec=8)
     r = resolve_clip_range(ci(10, 20), cfg)
     assert r.start == 0
 
 
-def test_resolve_clip_range_caps_at_max_duration():
-    cfg = ClipConfig(preroll_sec=5, postroll_sec=8, max_duration_sec=30)
-    r = resolve_clip_range(ci(100, 200), cfg)
-    assert r.end - r.start == 30
+def test_resolve_clip_range_never_truncates_a_long_fight():
+    # 2026-09-24 실사용: 126초 교전이 90초 상한에 뒷부분(추격 장면)이 잘렸다. 상한은 두지 않는다.
+    cfg = ClipConfig(preroll_sec=5, postroll_sec=8)
+    r = resolve_clip_range(ci(100, 226), cfg)
     assert r.start == 95
+    assert r.end == 234
 
 
 def test_resolve_clip_range_widens_preroll_when_team_combat_was_unreliable():
     # 2026-09-23: 팀원 링 오탐으로 배지만으로 잘린 매치는 구도 잡는 구간을 놓치기 쉽다
     # (pipeline/clip.py resolve_clip_range 주석 참고). fixed_preroll_sec 로 더 넉넉히 준다.
-    cfg = ClipConfig(preroll_sec=5, postroll_sec=8, fixed_preroll_sec=30, max_duration_sec=200)
+    cfg = ClipConfig(preroll_sec=5, postroll_sec=8, fixed_preroll_sec=30)
 
     r = resolve_clip_range(ci(100, 120, team_combat_unreliable=True), cfg)
 
@@ -60,7 +61,7 @@ def test_resolve_clip_range_widens_preroll_when_team_combat_was_unreliable():
 
 
 def test_resolve_clip_range_keeps_the_normal_preroll_when_team_combat_was_reliable():
-    cfg = ClipConfig(preroll_sec=5, postroll_sec=8, fixed_preroll_sec=30, max_duration_sec=200)
+    cfg = ClipConfig(preroll_sec=5, postroll_sec=8, fixed_preroll_sec=30)
 
     r = resolve_clip_range(ci(100, 120, team_combat_unreliable=False), cfg)
 
