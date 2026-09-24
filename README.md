@@ -33,6 +33,8 @@ pip install --no-deps rapidocr    # 결과 화면 OCR (아래 참고)
 pytest
 ```
 
+서버와 공유하는 **전송 계약 테스트**(`tests/test_contract.py`)는 `tests/contract/`(infra 저장소 `contract/` 의 복사본)를 쓴다. infra 저장소가 `infra` 처럼 이 저장소 옆에 있으면 복사본이 원본과 같은지도 검사하고, 없으면 그 검사만 건너뛴다. 서버 쪽 계약이 바뀌었으면 `python tools/sync_contract.py` 로 복사본을 갱신하고(`--check` 는 차이만 확인) 테스트를 다시 돌린다. 앱의 클립 메타데이터에 필드를 추가하면 `tests/contract/app-metadata-fields.json` 에 전송/제외 분류가 없어 이 테스트가 깨진다 — 분류는 infra 저장소 원본에서 고치고 다시 복사한다.
+
 ffmpeg 를 찾을 수 없으면 ffmpeg 통합 테스트는 자동으로 skip 된다(제품 코드 실행에는 ffmpeg 가 필수지만, 순수 로직 테스트는 ffmpeg 없이도 전부 돈다). ffmpeg 위치를 지정하려면:
 
 ```bash
@@ -288,5 +290,6 @@ python tools/build_installer.py          # → dist\LumiaBriefingRoom-<버전>-s
 | `tools/rescore_clips.py` | 저장된 클립 메타데이터의 교전 점수를 재검출 없이 다시 계산 |
 | `tools/eval_pvp.py` | UI 에서 찍은 교전/사냥 라벨로 점수를 평가 (가중치·임계 튜닝) |
 | `tools/eval_detect.py` | 라벨셋 대비 검출 정확도 리포트 |
+| `tools/sync_contract.py` | 서버와 공유하는 전송 계약을 infra 저장소(`infra\contract`)에서 `tests/contract` 로 복사 (`--check` 는 차이만 확인, `--source` 로 경로 지정) |
 
 가상환경을 활성화한 상태에서 실행할 것.
