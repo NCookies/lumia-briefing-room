@@ -17,6 +17,7 @@ dependencies = [
     "omegaconf",
     "colorlog",
     "requests",
+    "httpx>=0.27",
     "tqdm",
     "pyyaml",
     "six",

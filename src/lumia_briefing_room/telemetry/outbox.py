@@ -88,6 +88,13 @@ class Outbox:
         with _LOCK:
             return [e for e in map(self._parse, self._lines()) if e is not None]
 
+    def clear(self) -> None:
+        with _LOCK:
+            try:
+                self.path.unlink(missing_ok=True)
+            except OSError:
+                pass
+
     def discard_first(self, count: int) -> None:
         """보내는 데 성공한 앞쪽 count 개(읽을 수 있는 항목 기준)를 지운다. 그 뒤에 쌓인 것은 남는다."""
         if count <= 0:

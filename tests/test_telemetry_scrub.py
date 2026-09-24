@@ -43,6 +43,7 @@ def test_removes_the_windows_user_name_from_paths():
     text = r"Player.log 감시 시작(1.0초마다 훑는다): C:\Users\tester\AppData\LocalLow\NimbleNeuron\Eternal Return\Player.log"
     out = scrub(text)
     assert "tester" not in out and "Player.log" in out
+    assert "NimbleNeuron" not in out and "AppData" not in out and "Eternal Return" not in out
 
 
 def test_removes_user_names_that_are_not_in_the_known_list():

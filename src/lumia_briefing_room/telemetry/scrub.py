@@ -53,10 +53,10 @@ def _posix_path(match: re.Match) -> str:
 
 
 def _scrub_paths(text: str) -> str:
-    text = _USER_DIR.sub(lambda m: m.group("pre") + "<user>", text)
     text = _UNC_PATH.sub(_basename_path, text)
     text = _DRIVE_PATH.sub(_basename_path, text)
-    return _POSIX_HOME.sub(_posix_path, text)
+    text = _POSIX_HOME.sub(_posix_path, text)
+    return _USER_DIR.sub(lambda m: m.group("pre") + "<user>", text)
 
 
 def scrub_message(text, *, usernames, nicknames) -> str:
