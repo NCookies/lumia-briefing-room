@@ -72,7 +72,7 @@ UI 를 보려면 먼저 `cd frontend && npm install && npm run build` 를 한 �
 
 **HEVC 재생 폴백**: 브라우저가 스팀 녹화(HEVC)를 재생하지 못하면(검게 나오거나 오류) 플레이어가 그 클립의 H.264 재생용 사본을 `<클립 폴더>/.proxy/` 에 처음 한 번 만들고(진행률 표시, 90초 클립에 약 30초) 그걸 재생한다. 원본은 그대로다. 클립을 완전 삭제하거나 자르면 사본도 정리·무효화된다. ffmpeg 는 `LUMIA_FFMPEG` 환경변수 → 번들(`vendor/ffmpeg/ffmpeg.exe`) → PATH 순으로 찾는다. 이 PC 처럼 HEVC 가 재생되면 폴백은 일어나지 않는다(강제로 보려면 브라우저 콘솔에서 `sessionStorage['lumia.playback']='proxy'` 후 새로고침).
 
-**개발/배포 모드**: 소스로 실행하면 개발 모드, 빌드본이면 배포 모드다(`app.mode` 설정으로 `dev`/`release` 강제 가능). 배포 모드에서는 클립 ID·교전 점수 칩·점수 슬라이더를 숨긴다(라벨링 UI 는 유지).
+**개발/배포 모드**: 소스로 실행하면 개발 모드, 빌드본이면 배포 모드다(`app.mode` 설정으로 `dev`/`release` 강제 가능). 배포 모드에서는 클립 ID·교전 점수 칩·점수 슬라이더를 숨긴다(라벨링 UI 는 라벨 전송을 켠 경우에만 보인다).
 
 ### 0-1. 개발용 — 코드 저장 시 자동 재시작 (`dev.bat`)
 
@@ -252,7 +252,7 @@ dist\LumiaBriefingRoom\LumiaBriefingRoom.exe --selftest
 ### 11. 설치기 만들기 (친구·공개 배포용)
 
 ```bash
-.uild.bat                              # 먼저 dist\LumiaBriefingRoom 을 만든다
+.\build.bat                              # 먼저 dist\LumiaBriefingRoom 을 만든다
 python tools/build_installer.py          # → dist\LumiaBriefingRoom-<버전>-setup.exe (약 134MB)
 ```
 
