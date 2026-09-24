@@ -33,8 +33,12 @@ export function ClipsDirSection({ source, title, description, onChanged }: Props
     setStatus(null)
     try {
       if (move) {
-        const moved = await moveClipsDir(source, draft, setFraction)
-        setStatus(`클립 ${moved}개를 새 폴더로 옮겼습니다.`)
+        const { moved, oldPath } = await moveClipsDir(source, draft, setFraction)
+        setStatus(
+          moved > 0
+            ? `클립 ${moved}개를 새 폴더로 옮겼습니다.`
+            : `이전 폴더(${oldPath})에 옮길 클립이 없어 폴더만 바꿨습니다. 새 폴더에 이미 있는 클립은 그대로 보입니다.`,
+        )
       } else {
         await setClipsDirOnly(source, draft)
         setStatus('폴더만 바꿨습니다. 기존 클립은 이전 폴더에 그대로 있고 목록에는 보이지 않습니다. 이전 폴더로 되돌리면 다시 보입니다.')

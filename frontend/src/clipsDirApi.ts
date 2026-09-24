@@ -34,6 +34,7 @@ interface MoveJob {
   doneBytes: number
   totalBytes: number
   moved: number
+  oldPath: string
   message: string
 }
 
@@ -43,7 +44,7 @@ export async function moveClipsDir(
   source: ClipsSource,
   path: string,
   onProgress: (fraction: number) => void,
-): Promise<number> {
+): Promise<{ moved: number; oldPath: string }> {
   let job = await jsonOrThrow<MoveJob>(await send(`${BASE}/clips-dir/move`, 'POST', { source, path }), '클립 옮기기')
   while (job.state === 'running') {
     onProgress(job.totalBytes > 0 ? job.doneBytes / job.totalBytes : 0)
@@ -52,5 +53,5 @@ export async function moveClipsDir(
   }
   if (job.state === 'error') throw new Error(job.message)
   onProgress(1)
-  return job.moved
+  return { moved: job.moved, oldPath: job.oldPath }
 }
