@@ -127,7 +127,7 @@ def split_clip(
             run_hidden(cmd, check=True, capture_output=True)
 
             length = round(end - start, 3)
-            piece = {k: v for k, v in meta.items() if k not in ("userLabel", "labelSource", "labelConflict", "deletedAt")}
+            piece = {k: v for k, v in meta.items() if k not in ("userLabel", "labelNote", "labelSource", "labelConflict", "deletedAt")}
             piece.update(
                 userLabel=None,
                 durationSec=length,

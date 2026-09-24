@@ -121,7 +121,7 @@ def test_validate_ranges_rejects_overlaps_and_sorts():
 def test_split_makes_one_new_clip_per_range_and_trashes_the_original(tmp_path):
     from lumia_briefing_room.pipeline.trim import split_clip
 
-    meta_path = write_clip(tmp_path, matchStartUtc="2026-01-01T00:00:00Z", tags=["x"], pvpScore=0.8, labelSource="user")
+    meta_path = write_clip(tmp_path, matchStartUtc="2026-01-01T00:00:00Z", tags=["x"], pvpScore=0.8, labelSource="user", labelNote="메모")
     trash = tmp_path / ".trash"
 
     new_paths = split_clip(
@@ -134,7 +134,7 @@ def test_split_makes_one_new_clip_per_range_and_trashes_the_original(tmp_path):
     assert [m["videoOffsetSec"] for m in metas] == [pytest.approx(102.0), pytest.approx(110.0)]
     for m, p in zip(metas, new_paths):
         assert m["splitFrom"] == "clip1" and m["trimmed"] is True and m["originalDurationSec"] == 20.0
-        assert m["userLabel"] is None and m["pvpScore"] == 0.8 and m["tags"] == ["x"]
+        assert m["userLabel"] is None and "labelNote" not in m and m["pvpScore"] == 0.8 and m["tags"] == ["x"]
         assert m["matchStartUtc"] == "2026-01-01T00:00:00Z"
         assert (tmp_path / m["thumbnailPath"]).exists()
         assert p.with_suffix(".mp4").exists()

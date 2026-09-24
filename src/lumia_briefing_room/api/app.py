@@ -44,6 +44,7 @@ from lumia_briefing_room.pipeline.game_records import (
     records_dir_for,
 )
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for, archive_if_labeled
+from lumia_briefing_room.pipeline.label_note import normalize_label_note
 from lumia_briefing_room.pipeline.cleanup import plan_cleanup, remove_orphan_result_images, run_cleanup
 from lumia_briefing_room.pipeline.clip_assets import resolve_result_image, resolve_thumbnail
 from lumia_briefing_room.pipeline.move_clips import MoveError, execute_move, plan_move
@@ -213,9 +214,16 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         if "userLabel" in body and body["userLabel"] not in (None, "pvp", "pve"):
             raise HTTPException(400, "라벨은 교전(pvp), 사냥(pve), 해제(null)만 지정할 수 있습니다")
         meta = {**clip.meta, **{k: v for k, v in body.items() if k in ("title", "pinned", "userLabel")}}
+        if "labelNote" in body:
+            try:
+                meta["labelNote"] = normalize_label_note(body["labelNote"])
+            except ValueError as e:
+                raise HTTPException(400, str(e))
         if "userLabel" in body:
             meta["labelSource"] = "user" if body["userLabel"] is not None else None
             meta["labelConflict"] = False
+            if body["userLabel"] is None:
+                meta["labelNote"] = None
         clip.meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
         return meta | {"id": clip_id}
 

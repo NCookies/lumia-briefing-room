@@ -714,3 +714,39 @@ def test_split_creates_new_clips_and_trashes_the_original(client):
     listed = {c["id"] for c in client.get("/api/clips").json()}
     assert listed == {"a-p1", "a-p2"}
     assert {c["id"] for c in client.get("/api/clips", params={"trashed": True}).json()} == {"a"}
+
+
+def test_patch_label_note_is_saved_trimmed_and_capped(client):
+    clips_dir = client.app.state.clips_dir_for_test
+    _write_clip(clips_dir, "a", userLabel="pvp")
+
+    assert client.patch("/api/clips/a", json={"labelNote": "  적 둘과 교전  "}).json()["labelNote"] == "적 둘과 교전"
+    long = client.patch("/api/clips/a", json={"labelNote": "가" * 900}).json()["labelNote"]
+    assert len(long) == 500
+    assert json.loads((clips_dir / "a.json").read_text(encoding="utf-8"))["labelNote"] == long
+
+
+def test_patch_label_note_rejects_non_string(client):
+    _write_clip(client.app.state.clips_dir_for_test, "a")
+
+    assert client.patch("/api/clips/a", json={"labelNote": 5}).status_code == 400
+
+
+def test_clearing_the_label_clears_its_note(client):
+    clips_dir = client.app.state.clips_dir_for_test
+    _write_clip(clips_dir, "a", userLabel="pvp", labelNote="메모")
+
+    data = client.patch("/api/clips/a", json={"userLabel": None}).json()
+
+    assert data["userLabel"] is None and data["labelNote"] is None
+
+
+def test_label_note_is_kept_in_the_label_archive(client):
+    clips = client.app.state.clips_dir_for_test
+    _write_clip(clips, "a", userLabel="pve", labelNote="대치만 함")
+    client.post("/api/clips/a/trash")
+
+    client.delete("/api/clips/a")
+
+    kept = json.loads((clips / ".labels" / "a.json").read_text(encoding="utf-8"))
+    assert kept["labelNote"] == "대치만 함"
