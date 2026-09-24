@@ -2,12 +2,6 @@ import type { CleanupResult, RetentionSettings } from './retention'
 
 const BASE = '/api'
 
-export interface DirListing {
-  path: string
-  parent: string | null
-  dirs: string[]
-}
-
 async function jsonOrThrow<T>(res: Response, action: string): Promise<T> {
   if (!res.ok) {
     let detail = ''
@@ -24,12 +18,12 @@ async function jsonOrThrow<T>(res: Response, action: string): Promise<T> {
 const postJson = (url: string, body: unknown, method = 'POST') =>
   fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
 
-export async function listDirs(path: string): Promise<DirListing> {
-  return jsonOrThrow(await fetch(`${BASE}/fs/dirs?${new URLSearchParams({ path })}`), '폴더 조회')
-}
-
-export async function makeDir(path: string, name: string): Promise<{ path: string }> {
-  return jsonOrThrow(await postJson(`${BASE}/fs/mkdir`, { path, name }), '폴더 만들기')
+export async function pickFolder(initial: string, title?: string): Promise<string | null> {
+  const { path } = await jsonOrThrow<{ path: string | null }>(
+    await postJson(`${BASE}/fs/pick-folder`, { initial, title }),
+    '폴더 선택',
+  )
+  return path
 }
 
 export async function exportClip(id: string, dir: string, filename: string): Promise<{ path: string }> {

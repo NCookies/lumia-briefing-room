@@ -13,7 +13,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from lumia_briefing_room import __version__, autostart, paths
+from lumia_briefing_room import __version__, autostart, native_dialog, paths
 from lumia_briefing_room.appmode import resolve_mode
 from lumia_briefing_room.api.clips import find_clip, scan_clips, to_summary_dict
 from lumia_briefing_room.api.export import (
@@ -384,6 +384,23 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         except OSError as e:
             raise HTTPException(403, f"폴더를 열 수 없습니다: {e}")
         return {"path": str(target), "parent": parent_of(target), "dirs": dirs}
+
+    @app.post("/api/fs/pick-folder")
+    def fs_pick_folder(body: dict):
+        """윈도우 폴더 선택 창을 서버가 띄우고 고른 경로를 돌려준다. 취소하면 path 가 null."""
+        try:
+            chosen = native_dialog.pick_folder(str(body.get("initial") or ""), str(body.get("title") or "폴더 선택"))
+        except OSError as e:
+            raise HTTPException(500, f"폴더 선택 창을 열 수 없습니다: {e}")
+        return {"path": chosen}
+
+    @app.post("/api/fs/pick-videos")
+    def fs_pick_videos(body: dict):
+        try:
+            chosen = native_dialog.pick_video_files(str(body.get("initial") or ""))
+        except OSError as e:
+            raise HTTPException(500, f"파일 선택 창을 열 수 없습니다: {e}")
+        return {"paths": chosen}
 
     @app.post("/api/fs/mkdir")
     def fs_mkdir(body: dict):

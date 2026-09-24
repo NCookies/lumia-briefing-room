@@ -12,13 +12,6 @@ export interface AnalysisJob {
   message?: string
 }
 
-export interface VideoListing {
-  path: string
-  parent: string | null
-  dirs: string[]
-  files: { name: string; sizeBytes: number }[]
-}
-
 async function jsonOrThrow<T>(res: Response, action: string): Promise<T> {
   if (!res.ok) {
     let detail = ''
@@ -71,8 +64,12 @@ export async function deleteVodClipsForever(id: string): Promise<number> {
   return (await jsonOrThrow<{ count: number }>(await send(`${BASE}/vods/${id}/clips`, 'DELETE'), '완전 삭제')).count
 }
 
-export async function listVideos(path: string): Promise<VideoListing> {
-  return jsonOrThrow(await fetch(`${BASE}/fs/videos?${new URLSearchParams({ path })}`), '폴더 조회')
+export async function pickVideoFiles(initial = ''): Promise<string[]> {
+  const { paths } = await jsonOrThrow<{ paths: string[] }>(
+    await send(`${BASE}/fs/pick-videos`, 'POST', { initial }),
+    '파일 선택',
+  )
+  return paths
 }
 
 export interface VodSettings {
