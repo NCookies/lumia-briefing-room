@@ -50,6 +50,10 @@ def _camel_names() -> list[str]:
     return [_to_camel(f.name) for f in dataclasses.fields(ClipMetadata)]
 
 
+# 앱 메타데이터의 dataclass 필드가 아니지만 클라이언트가 만들어 붙이는 값(labelNote 는 API 가 추가로 쓰고, source 는 VOD 클립에만 있고, clipId 는 파일 이름)
+CLIENT_ADDED = {"labelNote", "source", "clipId"}
+
+
 def _classified() -> set[str]:
     converted = {key for key in FIELDS["converted"] if "+" not in key}
     return set(FIELDS["sent"]) | converted | set(FIELDS["excluded"])
@@ -61,7 +65,7 @@ def test_every_app_metadata_field_is_classified_as_sent_or_excluded():
 
 
 def test_classification_has_no_stale_entries():
-    stale = _classified() - set(_camel_names()) - {"labelNote"}
+    stale = _classified() - set(_camel_names()) - CLIENT_ADDED
     assert not stale, f"앱에 없는 필드가 분류표에 있다: {sorted(stale)}"
 
 
@@ -73,7 +77,7 @@ def test_sent_fields_are_all_in_the_label_schema_and_excluded_ones_are_not():
 
 def test_every_label_schema_field_is_explained():
     props = set(SCHEMA["$defs"]["Label"]["properties"])
-    made_by_contract = {"userLabel", "labelNote", "matchKey", "clipKey"} | set(FIELDS["appMissing"])
+    made_by_contract = {"userLabel", "labelNote", "matchKey", "clipKey", "source"} | set(FIELDS["appMissing"])
     assert props == set(FIELDS["sent"]) | made_by_contract
 
 
@@ -85,6 +89,6 @@ def test_privacy_sensitive_fields_are_never_sent():
 def test_vod_clip_extra_fields_are_classified_and_not_sent():
     from test_vod_clips import build
 
-    vod_only = set(build()) - set(_camel_names())
+    vod_only = set(build()) - set(_camel_names()) - {"source"}
     assert vod_only <= set(FIELDS["vodOnly"]["excluded"]), sorted(vod_only - set(FIELDS["vodOnly"]["excluded"]))
     assert not set(FIELDS["vodOnly"]["excluded"]) & set(SCHEMA["$defs"]["Label"]["properties"])

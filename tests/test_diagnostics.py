@@ -56,6 +56,11 @@ def test_scrub_config_drops_nickname_and_ids_and_scrubs_paths():
     assert out["player"]["nickname"] == "<nickname>"
 
 
+def test_scrub_config_drops_the_server_api_token():
+    out = scrub_config({"telemetry": {"apiToken": "s3cret", "serverUrl": "https://x", "installId": "i"}}, usernames=[], nicknames=[])
+    assert "s3cret" not in json.dumps(out) and out["telemetry"]["serverUrl"] == "https://x"
+
+
 def _zip_names_and_text(data: bytes) -> dict[str, str]:
     with zipfile.ZipFile(io.BytesIO(data)) as zf:
         return {name: zf.read(name).decode("utf-8") for name in zf.namelist()}

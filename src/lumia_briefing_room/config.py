@@ -229,6 +229,9 @@ class TelemetryConfig:
     send_labels: bool = False
     send_logs: bool = False
     install_id: str = ""
+    server_url: str = ""
+    api_token: str = ""
+    allow_dev_send: bool = False
 
 
 @dataclass

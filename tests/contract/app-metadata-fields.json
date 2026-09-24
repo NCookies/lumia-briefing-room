@@ -35,8 +35,9 @@
   "converted": {
     "userLabel": "userLabel (pvp→combat, pve→other)",
     "labelNote": "labelNote (앱이 이미 앞뒤 공백 제거·500자로 정리)",
-    "sessionDir+matchStartUtc": "matchKey (해시)",
-    "sessionDir+matchStartUtc+videoOffsetSec": "clipKey (해시)"
+    "sessionDir+matchStartUtc": "matchKey (스팀 녹화: sha256(installId|sessionDir|matchStartUtc) 앞 32자, VOD: sha256(installId|vodId|vodGameIndex) 앞 32자)",
+    "source": "source (스팀 녹화=recording, 다시보기 클립=vod — 클라이언트가 붙인다. 앱 메타데이터의 source 는 VOD 클립에만 있다)",
+    "clipId": "clipKey (sha256(installId|클립 ID(메타데이터 파일 이름)) 앞 32자 — 설치마다 소금이 달라 다른 설치와 이어 볼 수 없다)"
   },
   "excluded": {
     "title": "수동 편집 가능해 닉네임이 섞일 수 있음",
@@ -58,9 +59,8 @@
     "labeledAt": "라벨 붙인 시각을 앱이 아직 저장하지 않음(D10 에서 추가)"
   },
   "vodOnly": {
-    "_설명": "VOD 클립(vod_clips.py)에만 있는 필드. VOD 클립 라벨을 전송할지는 D10 에서 정하며, 전송하더라도 아래는 보내지 않는다.",
+    "_설명": "VOD 클립(vod_clips.py)에만 있는 필드. VOD 클립의 라벨도 전송하며(source=vod), 아래 필드는 보내지 않는다. vodId·vodGameIndex 는 matchKey 를 만드는 데만 쓴다.",
     "excluded": [
-      "source",
       "vodId",
       "vodFile",
       "streamer",

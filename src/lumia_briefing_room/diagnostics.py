@@ -8,7 +8,7 @@ from pathlib import Path
 
 MIN_STANDALONE_NAME_LEN = 3
 _USER_PATH = r"(?P<prefix>[\\/]Users[\\/])(?P<name>{name})(?=[\\/\s\"']|$)"
-_DROPPED_CONFIG_KEYS = {("telemetry", "installId")}
+_DROPPED_CONFIG_KEYS = {("telemetry", "installId"), ("telemetry", "apiToken")}
 
 
 def _clean(names) -> list[str]:
