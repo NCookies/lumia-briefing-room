@@ -281,11 +281,11 @@ python tools/build_installer.py          # → dist\LumiaBriefingRoom-<버전>-s
 - **오류 로그**: ERROR 이상 기록이 `%LOCALAPPDATA%\LumiaBriefingRoom\outbox\errors.jsonl` 에 쌓이고(20MB 상한), 보낼 때 닉네임·사용자 이름·경로 속 폴더 이름을 지운다. 환경 정보(OS·CPU·GPU·메모리·해상도·코덱·판독 실패 통계 등)가 같이 간다.
 - **미리보기·삭제**: 옵션 "정보·진단" 탭의 "보낼 내용 미리보기"(전송이 꺼져 있어도 볼 수 있고 네트워크를 쓰지 않는다), "보낸 데이터 삭제 요청"(서버의 내 데이터를 지우고 전송을 끈다).
 - **개발 모드**(소스 실행)는 기본적으로 서버에 보내지 않는다. 시험할 때만 설정 `telemetry.allowDevSend` 를 켜면 `mode=dev` 로 보내 서버가 운영 데이터와 다른 곳에 둔다. 서버 주소·토큰은 설정(`telemetry.serverUrl`·`apiToken`)이나 환경변수 `LUMIA_RECEIVER_URL`·`LUMIA_RECEIVER_TOKEN` 으로 줄 수 있다.
-- **서버 토큰은 git 에 없다.** 배포본을 만들 때 환경변수 `LUMIA_RECEIVER_TOKEN`(선택 `LUMIA_RECEIVER_URL`)을 주고 `build.bat` 을 돌리면 번들에 들어간다(`data/telemetry_endpoint.json`, 빌드 뒤 자동 삭제, gitignore). 토큰 없이 빌드하면 "서버 전송이 꺼진 빌드"라고 경고하고 전송 기능은 동작하지 않는다. `--selftest` 가 httpx·인증서·개인정보 안내 파일·토큰 유무를 점검한다.
+- **서버 토큰은 git 에 없다.** 배포본을 만들 때 환경변수 `LUMIA_RECEIVER_TOKEN`(선택 `LUMIA_RECEIVER_URL`, 값은 infra 저장소 `terraform.tfvars` 의 `receiver_api_token`)을 주고 `build.bat` 을 돌리면 번들에 들어간다(`data/telemetry_endpoint.json`, 빌드 뒤 자동 삭제, gitignore). 토큰 없이 빌드하면 "서버 전송이 꺼진 빌드"라고 경고하고 전송 기능은 동작하지 않는다. `--selftest` 가 httpx·인증서·개인정보 안내 파일·토큰 유무를 점검한다.
 - **서버에 쌓인 라벨 가져오기** (분류기 튜닝용): 서버 관리자 토큰을 환경변수로 주고 실행한다.
 
 ```bash
-set LUMIA_ADMIN_TOKEN=...                    # PowerShell: $env:LUMIA_ADMIN_TOKEN = "..."
+set LUMIA_ADMIN_TOKEN=...                    # 값은 infra 저장소 terraform.tfvars 의 admin_token. PowerShell: $env:LUMIA_ADMIN_TOKEN = "..."
 python tools/pull_labels.py --out pulled_labels          # → pulled_labels/.labels/<clipKey>.json (pvp/pve 로 되돌림)
 python tools/eval_pvp.py pulled_labels                   # 가져온 라벨로 점수 평가
 ```
