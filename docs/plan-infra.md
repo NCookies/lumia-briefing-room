@@ -6,9 +6,9 @@
 ## 0. 진행 상태
 
 - [x] 계획 수립 (이 문서)
-- [ ] I1. 별도 저장소 생성, OCI 계정·Terraform 상태 저장 방식 결정 ([§6](#6-확인-필요-추측으로-메우지-않은-것))
-- [ ] I2. Terraform 으로 OCI 기본 인프라(네트워크·컴퓨트 인스턴스) 구성
-- [ ] I3. 도커로 수신 API 컨테이너 배포 (1단계 저장: 파일)
+- [x] I1. 별도 저장소 생성 — `infra` (범용 이름, 다른 프로젝트 인프라도 여기서 관리). Terraform 상태는 로컬 파일. 서버는 Python FastAPI 로 결정
+- [ ] I2. Terraform 으로 OCI 기본 인프라(네트워크·컴퓨트 인스턴스) 구성 — 코드 작성·`terraform validate` 통과, **`apply` 는 아직 안 함**(OCI 키·tfvars 필요)
+- [ ] I3. 도커로 수신 API 컨테이너 배포 (1단계 저장: 파일) — API·Dockerfile·compose·자동 업데이트(ghcr + watchtower) 작성, pytest 7건 통과. **도커 실행은 미확인**
 - [ ] I4. 이 저장소 쪽 전송 클라이언트 연결 (= plan-deploy D10 과 같이 진행)
 - [ ] I5. 파일 → DB 이전 (2단계 저장, [§4](#4-저장-계층-파일--db))
 
