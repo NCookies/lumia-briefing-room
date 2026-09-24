@@ -7,11 +7,13 @@ import logging
 import os
 import re
 import subprocess
+import time
 from collections.abc import Callable
 from pathlib import Path
 
 from lumia_briefing_room.api.clips import scan_clips
 from lumia_briefing_room.procs import popen_hidden, run_hidden
+from lumia_briefing_room.telemetry.runtime_stats import record_proxy
 
 log = logging.getLogger("lumia_briefing_room.proxy")
 
@@ -125,6 +127,7 @@ def create_proxy(
         for encoder in plan:
             tmp.unlink(missing_ok=True)
             cmd = build_proxy_command(ffmpeg, src, tmp, encoder=encoder, height=height, crf=crf)
+            started = time.monotonic()
             try:
                 _run_encode(cmd, duration_sec, on_progress)
             except ProxyError as exc:
@@ -132,6 +135,7 @@ def create_proxy(
                 errors.append(f"{encoder}: {exc}")
                 continue
             os.replace(tmp, out)
+            record_proxy(encoder, time.monotonic() - started)
             return encoder
         raise ProxyError("; ".join(errors))
     finally:

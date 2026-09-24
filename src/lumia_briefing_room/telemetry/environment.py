@@ -1,7 +1,7 @@
 """오류 로그·진단에 붙이는 환경 정보(`Environment`). 값을 못 구하면 그 항목만 빠지고, 어떤 실패도 밖으로 내지 않는다.
 
-아직 모으지 않는 항목(계약에는 있음): hwaccel, hevcPlayable, proxyEncoder, analysisTimeRatio, proxyBuildSec —
-재생 가능 여부는 브라우저만 알고, 나머지는 앱이 값을 기록해 두지 않아서다.
+hevcPlayable·proxyEncoder·proxyBuildSec·analysisTimeRatio·hwaccel 은 앱이 돌면서 `runtime_stats` 에 스스로 재 둔 값이다
+(HEVC 재생 가능 여부는 브라우저가 알려 준다). 아직 측정한 적이 없으면 그 항목만 빠지고, hwaccel 은 다시보기 분석 설정으로 대신한다.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from lumia_briefing_room.api.clips import scan_clips
 from lumia_briefing_room.config import Config, discover_ffmpeg, resolve_paths
 from lumia_briefing_room.recording_info import find_latest_session
 from lumia_briefing_room.steam_paths import discover_recording_root, normalize_recording_root
+from lumia_briefing_room.telemetry import runtime_stats
 
 log = logging.getLogger("lumia_briefing_room.telemetry.environment")
 
@@ -183,6 +184,9 @@ def collect_environment(cfg: Config) -> dict:
         "timezone": _safe(_timezone_name),
     }
     env = {k: v for k, v in values.items() if v is not None}
+    runtime = _safe(lambda: runtime_stats.get_runtime_stats().snapshot()) or {}
+    env.update(runtime)
+    env.setdefault("hwaccel", bool(cfg.vod.hwaccel))
     stats = _safe(read_fail_stats, cfg)
     if stats is not None:
         env["readFailStats"] = stats

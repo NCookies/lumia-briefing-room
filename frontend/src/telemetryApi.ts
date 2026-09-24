@@ -27,3 +27,14 @@ export const deleteSentData = async (): Promise<{ ok: boolean; deleted: boolean 
 
 export const getPrivacyText = async (): Promise<string> =>
   (await jsonOrThrow<{ markdown: string }>(await fetch(`${BASE}/privacy`), '개인정보 처리 안내 불러오기')).markdown
+
+export const reportClientCapabilities = async (capabilities: { hevcPlayable: boolean }): Promise<void> => {
+  await jsonOrThrow(
+    await fetch(`${BASE}/client-capabilities`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(capabilities),
+    }),
+    '브라우저 기능 알리기',
+  )
+}

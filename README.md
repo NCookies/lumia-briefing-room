@@ -278,7 +278,7 @@ python tools/build_installer.py          # → dist\LumiaBriefingRoom-<버전>-s
 
 - **보내는 때**: 앱이 떠 있는 동안 종류별로 하루 한 번 묶어서 보낸다. 서버가 안 받으면 15분부터 두 배씩(최대 6시간) 늦춰 다시 시도하고, 앱은 멈추지 않는다.
 - **라벨**: 스팀 녹화·다시보기 클립의 교전/그 외 라벨과 근거 수치, 해상도·게임 모드, 결과 화면의 최종 킬·어시스트, 내 캐릭터, 라벨 메모(`labelNote`). 로컬 `pvp`/`pve` 는 `combat`/`other` 로 바뀌어 나간다. 라벨이나 메모를 고치면 같은 클립 키로 다시 보내 서버가 덮어쓴다. 제목·경로·닉네임·팀원·시각 원문은 나가지 않는다.
-- **오류 로그**: ERROR 이상 기록이 `%LOCALAPPDATA%\LumiaBriefingRoom\outbox\errors.jsonl` 에 쌓이고(20MB 상한), 보낼 때 닉네임·사용자 이름·경로 속 폴더 이름을 지운다. 환경 정보(OS·CPU·GPU·메모리·해상도·코덱·판독 실패 통계 등)가 같이 간다.
+- **오류 로그**: ERROR 이상 기록이 `%LOCALAPPDATA%\LumiaBriefingRoom\outbox\errors.jsonl` 에 쌓이고(20MB 상한), 보낼 때 닉네임·사용자 이름·경로 속 폴더 이름을 지운다. 환경 정보(OS·CPU·GPU·메모리·화면 배율·해상도·코덱·스팀 버퍼 길이·HEVC 재생 가능 여부·재생용 영상 인코더와 생성 시간·게임 분석 시간 비율·하드웨어 디코딩 사용 여부·판독 실패 통계)가 같이 간다. 재생·분석 값은 앱이 돌면서 `%LOCALAPPDATA%\LumiaBriefingRoom\runtime_stats.json` 에 스스로 재 둔 것이다.
 - **미리보기·삭제**: 옵션 "정보·진단" 탭의 "보낼 내용 미리보기"(전송이 꺼져 있어도 볼 수 있고 네트워크를 쓰지 않는다), "보낸 데이터 삭제 요청"(서버의 내 데이터를 지우고 전송을 끈다).
 - **개발 모드**(소스 실행)는 기본적으로 서버에 보내지 않는다. 시험할 때만 설정 `telemetry.allowDevSend` 를 켜면 `mode=dev` 로 보내 서버가 운영 데이터와 다른 곳에 둔다. 서버 주소·토큰은 설정(`telemetry.serverUrl`·`apiToken`)이나 환경변수 `LUMIA_RECEIVER_URL`·`LUMIA_RECEIVER_TOKEN` 으로 줄 수 있다.
 - **서버 토큰은 git 에 없다.** 배포본을 만들 때 환경변수 `LUMIA_RECEIVER_TOKEN`(선택 `LUMIA_RECEIVER_URL`, 값은 infra 저장소 `terraform.tfvars` 의 `receiver_api_token`)을 주고 `build.bat` 을 돌리면 번들에 들어간다(`data/telemetry_endpoint.json`, 빌드 뒤 자동 삭제, gitignore). 토큰 없이 빌드하면 "서버 전송이 꺼진 빌드"라고 경고하고 전송 기능은 동작하지 않는다. `--selftest` 가 httpx·인증서·개인정보 안내 파일·토큰 유무를 점검한다.

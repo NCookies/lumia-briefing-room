@@ -8,6 +8,8 @@ import { getConfirmDelete, setConfirmDelete } from './exportApi'
 import { getFirstRun } from './onboardingApi'
 import { isBackfillActive, progressPercent, type BackfillStatus } from './backfill'
 import { getBackfillStatus } from './backfillApi'
+import { browserCanPlayHevc } from './playback'
+import { reportClientCapabilities } from './telemetryApi'
 
 const TABS: { id: ClipSource; label: string }[] = [
   { id: 'steam', label: '내 녹화' },
@@ -37,6 +39,10 @@ export default function App() {
     getFirstRun()
       .then((info) => setFirstRun(info.needed))
       .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    reportClientCapabilities({ hevcPlayable: browserCanPlayHevc() !== '' }).catch(() => {})
   }, [])
 
   useEffect(() => {

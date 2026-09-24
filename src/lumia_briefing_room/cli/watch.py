@@ -12,6 +12,7 @@ usage:
 import argparse
 import logging
 import os
+import time
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
@@ -38,6 +39,7 @@ from lumia_briefing_room.pipeline.watcher import (
     run_polling,
 )
 from lumia_briefing_room.steam_paths import resolve_recording_root
+from lumia_briefing_room.telemetry.runtime_stats import record_analysis
 from lumia_briefing_room.video.segments import segment_time_range
 from lumia_briefing_room.video.session import RecordingSession
 
@@ -70,6 +72,7 @@ def make_processor(
             session = RecordingSession.load(rescued_dir)
             log.info("남은 여유가 적어 원본을 먼저 복사함: %s", rescued_dir)
 
+        started = time.monotonic()
         try:
             written = process_match(
                 session, match.start_utc, match.end_utc, cfg,
@@ -80,6 +83,9 @@ def make_processor(
         except ClipCutError as exc:
             log.warning("클립 생성 실패(세그먼트 없음): %s", exc)
             return
+        record_analysis(
+            time.monotonic() - started, (match.end_utc - match.start_utc).total_seconds(), bool(hwaccel)
+        )
 
         log.info("매치 %s: 클립 %d개", match.start_utc.isoformat(), len(written))
 

@@ -10,6 +10,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 
 from lumia_briefing_room import paths
+from lumia_briefing_room.telemetry import runtime_stats
 from lumia_briefing_room.telemetry.sender import TelemetrySender
 
 
@@ -47,3 +48,12 @@ def register_telemetry_routes(app: FastAPI) -> None:
             return {"markdown": privacy_path().read_text(encoding="utf-8")}
         except OSError:
             raise HTTPException(404, "개인정보 처리 안내를 찾을 수 없습니다")
+
+    @app.post("/api/client-capabilities")
+    def post_client_capabilities(body: dict):
+        """브라우저만 아는 값(HEVC 재생 가능 여부)을 받아 환경 정보에 쓸 수 있게 기록한다. 서버로 보내는 것이 아니라 로컬 기록이다."""
+        playable = body.get("hevcPlayable")
+        if not isinstance(playable, bool):
+            raise HTTPException(400, "hevcPlayable 은 true/false 여야 합니다")
+        runtime_stats.record_hevc(playable)
+        return {"ok": True}
