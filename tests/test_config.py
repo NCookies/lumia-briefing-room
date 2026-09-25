@@ -188,3 +188,11 @@ def test_discover_ffmpeg_prefers_env_then_bundle_then_path(tmp_path, monkeypatch
 
     (bundled / "ffmpeg.exe").unlink()
     assert discover_ffmpeg() == Path("C:/path/ffmpeg.exe")
+
+
+def test_config_with_a_utf8_bom_still_loads(tmp_path):
+    from lumia_briefing_room.config import load_config
+
+    path = tmp_path / "config.json"
+    path.write_bytes(b"\xef\xbb\xbf" + '{"consent": {"version": 3}}'.encode("utf-8"))
+    assert load_config(path).consent.version == 3
