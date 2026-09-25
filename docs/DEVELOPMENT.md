@@ -8,7 +8,7 @@
 - [docs/plan-pipeline.md](plan-pipeline.md) — 파이프라인 자동화(SPEC 2단계) 구현 계획 및 진행 상태
 - [docs/plan-ui.md](plan-ui.md) — 열람 UI(SPEC 3단계) 구현 계획 및 진행 상태
 - [docs/plan-pvp.md](plan-pvp.md) — PvP 판별(SPEC 4단계) 구현 계획 및 진행 상태
-- [docs/plan-deploy.md](plan-deploy.md) — 공개 배포 계획. D1~D6·D10·D14 구현 완료, D7 은 파일 정리 완료·git 이력 정리 대기. D13 배포 자동화는 워크플로 구현 완료(GitHub 러너 첫 실행 전). 남은 것은 D9 자동 업데이트
+- [docs/plan-deploy.md](plan-deploy.md) — 공개 배포 계획. D1~D6·D10·D14 구현 완료, D7 은 파일 정리 완료·git 이력 정리 대기. D13 배포 자동화는 워크플로 구현 완료(수동 실행 통과, 태그 릴리스는 아직). 남은 것은 D9 자동 업데이트
 - [docs/friend-guide.md](friend-guide.md) — **친구에게 설치기와 같이 주는 안내문**(설치·확인 항목·진단 파일 보내는 법)
 - [docs/plan-vod.md](plan-vod.md) — 다시보기(VOD) 클립(SPEC 5단계) 설계 및 진행 상태. 분석·클립 생성, API, UI 탭("다시보기")까지 구현됐다(아래 "실행 방법 8")
 
@@ -308,7 +308,7 @@ git push origin v0.1.4
 - 태그 없이 파이프라인만 시험하려면 Actions 탭 → release → **Run workflow**. 빌드·설치기·SHA-256 까지만 하고 Release 는 만들지 않으며, 설치기는 아티팩트(3일)로 남는다.
 - 결과 Release: 설치기(`LumiaBriefingRoom-<버전>-setup.exe`), `<설치기>.sha256`, 본문(CHANGELOG 절 + SHA-256 + VirusTotal 링크). 초안으로 만들었다가 마지막에 공개한다. VirusTotal 이 실패하면 링크만 빠진 채 공개되므로 Actions 로그를 확인한다.
 - 필요한 Secrets 는 README "릴리스 만들기" 참고. 로컬에서 흉내: `python tools/release_tools.py prepare v0.1.4` (설치기가 `dist/` 에 있어야 한다).
-- 러너에서의 Inno Setup 설치 방법·빌드 시간은 아직 실측 전이다([plan-deploy §7-19](plan-deploy.md)).
+- 러너 실측: Inno Setup 6.7.1 이 이미 설치돼 있고 전체 약 4분 반이다([plan-deploy §7-19](plan-deploy.md)).
 
 ### 9. 브라우저 디버깅 (개발용)
 
