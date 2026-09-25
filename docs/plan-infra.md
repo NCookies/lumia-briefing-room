@@ -84,7 +84,7 @@
 - **A1 은 실패했다.** `VM.Standard.A1.Flex` 로 `apply` 하니 네트워크는 만들어졌지만 `LaunchInstance` 가 `404-NotAuthorizedOrNotFound` 였다. 원인은 확인하지 못했고(권한 문제는 아님), 콘솔 기본 shape 이던 `VM.Standard.E2.1.Micro`(x86, 1GB, Always Free)로 바꿔 성공했다. 이 계정은 이전 프로젝트에서 만들다 만 micro 가 1개 있어 한도가 `1 of 2` 였고, 이번 VM 으로 무료 micro 슬롯이 다 찼다.
 - **겪은 함정**(해결법은 README): `.oci` 폴더를 사용자 폴더 밖에 잘못 만듦, `config` 의 `key_file=` 상대 경로, `compartment_ocid` 에 user OCID 를 넣음, ghcr 태그 대문자(`repository name must be lowercase`).
 - **I4 에서 서버에 더 필요했던 것(2026-09-25 구현·배포 완료)**: 진단 번들 업로드 경로와 접수 번호 응답(plan-deploy D14), 라벨 메모 필드 `labelNote`(plan-deploy D12).
-- **I4 이후 서버에 추가로 필요한 것(계획, 미구현)**: 클립 키 필드 `clipUid`(plan-ui.md §0). 서버에서 라벨은 `(installId, clipUid)` 로 구분하고 파일 ID 는 키로 쓰지 않는다. 라벨 허용 필드 목록(`schemas.py`)과 이 저장소의 전송 항목에 함께 추가한다.
+- **I4 이후 서버에 추가로 필요한 것(계획, 미구현)**: 클립 키 필드 `clipUid`(plan-ui.md §0). 서버에서 라벨은 `(installId, clipUid)` 로 구분하고 파일 ID 는 키로 쓰지 않는다. 라벨 허용 필드 목록(`schemas.py`)과 이 저장소의 전송 항목에 함께 추가한다. **승격 로직도 필요하다**: 전송 항목에 `legacyClipId`(옛 파일 ID)가 있으면 `(installId, legacyClipId)` 로 이미 저장된 행을 찾아 `clipUid` 를 붙여 갱신하고, 없으면 새로 만든다(이미 보낸 라벨이 중복으로 쌓이지 않게). 이 저장소의 `tools/pull_labels.py` 도 새 키를 이해해야 한다.
 - **앱 쪽 연결(I4)에 필요한 것**: 주소 서버 주소(`.env` 의 `LUMIA_RECEIVER_URL`), `X-Api-Token`(값은 infra 저장소의 `terraform.tfvars`, 커밋되지 않음). 서버의 라벨 필드 허용 목록은 2026-09-25 에 앱 `ClipMetadata` 와 하나씩 대조해 확정했다(`contract/app-metadata-fields.json`, 앱 테스트가 대조).
 - **남은 위험**: 요청 제한은 IP 기준이라 VPN 등으로 우회 가능(완화 수단), 공유 토큰이 앱에 들어가므로 완전한 인증이 아님(회수 방법은 [roadmap §4-2](roadmap.md)), 공인 IP 가 예약 IP 가 아니라 VM 재생성 시 바뀜, 1GB 메모리, 저장은 파일뿐.
 
