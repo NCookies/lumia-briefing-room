@@ -52,3 +52,15 @@ export function installProgressText(install: InstallStatus): string {
       return ''
   }
 }
+
+export const RESTART_SLOW_AFTER_SEC = 180
+
+export function restartProbe(o: { sawDown: boolean; reachable: boolean }): { sawDown: boolean; reload: boolean } {
+  if (!o.reachable) return { sawDown: true, reload: false }
+  return { sawDown: o.sawDown, reload: o.sawDown }
+}
+
+export function restartHint(elapsedSec: number): string {
+  if (elapsedSec < RESTART_SLOW_AFTER_SEC) return ''
+  return '예상보다 오래 걸리고 있습니다. 시작 메뉴에서 "루미아 브리핑룸"을 직접 실행해 보세요. 업데이트가 끝나 있으면 새 버전이 열립니다.'
+}

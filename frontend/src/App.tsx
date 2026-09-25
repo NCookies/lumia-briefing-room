@@ -5,6 +5,7 @@ import { ClipBrowser, type ClipSource } from './components/ClipBrowser'
 import { FirstRunScreen } from './components/FirstRunScreen'
 import { SettingsModal } from './components/SettingsModal'
 import { UpdateBanner } from './components/UpdateBanner'
+import { UpdateBadge } from './components/UpdateBadge'
 import { ActivityBar } from './components/ActivityBar'
 import { activityLabels } from './activity'
 import { useActivity } from './useActivity'
@@ -99,6 +100,7 @@ export default function App() {
           <h1 className="pb-2 text-xl font-semibold">
             루미아 브리핑룸
             {version && <span className="ml-2 text-xs font-normal text-zinc-500">{version}</span>}
+            <UpdateBadge />
           </h1>
           <nav className="flex gap-1" role="tablist">
             {TABS.map((t) => (

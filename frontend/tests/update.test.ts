@@ -39,3 +39,17 @@ test('buttons are locked while an install is running', () => {
 test('release summary names the version', () => {
   assert.equal(releaseSummary(release), '새 버전 v0.2.0')
 })
+
+import { RESTART_SLOW_AFTER_SEC, restartHint, restartProbe } from '../src/update.ts'
+
+test('the page reloads only after the server went away and came back', () => {
+  assert.deepEqual(restartProbe({ sawDown: false, reachable: true }), { sawDown: false, reload: false })
+  assert.deepEqual(restartProbe({ sawDown: false, reachable: false }), { sawDown: true, reload: false })
+  assert.deepEqual(restartProbe({ sawDown: true, reachable: false }), { sawDown: true, reload: false })
+  assert.deepEqual(restartProbe({ sawDown: true, reachable: true }), { sawDown: true, reload: true })
+})
+
+test('the restart screen tells the user what to do once it takes too long', () => {
+  assert.equal(restartHint(RESTART_SLOW_AFTER_SEC - 1), '')
+  assert.match(restartHint(RESTART_SLOW_AFTER_SEC), /시작 메뉴/)
+})

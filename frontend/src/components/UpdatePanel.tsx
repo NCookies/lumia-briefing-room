@@ -2,15 +2,13 @@ import { useState } from 'react'
 import { useAppInfo } from '../appInfo'
 import { UPDATE_CHECKED_EVENT, installProgressText, isInstallBusy, releaseSummary, type CheckResult } from '../update'
 import { checkForUpdate } from '../updateApi'
-import { useUpdateInstall } from '../useUpdateInstall'
-import { ReleaseNotesDialog } from './ReleaseNotesDialog'
+import { useUpdate } from '../updateContext'
 
 export function UpdatePanel() {
   const info = useAppInfo()
+  const { release: knownRelease, install, start, openNotes } = useUpdate()
   const [checking, setChecking] = useState(false)
   const [result, setResult] = useState<CheckResult | null>(null)
-  const [showNotes, setShowNotes] = useState(false)
-  const { install, start } = useUpdateInstall()
   const busy = isInstallBusy(install.state)
 
   const check = () => {
@@ -24,6 +22,7 @@ export function UpdatePanel() {
       .finally(() => setChecking(false))
   }
 
+  const release = result?.state === 'available' ? result.release : result === null || result.state === 'error' ? knownRelease : null
   const progress = installProgressText(install)
 
   return (
@@ -42,20 +41,20 @@ export function UpdatePanel() {
         {result?.state === 'error' && <span className="text-xs text-rose-300">{result.error}</span>}
       </div>
 
-      {result?.state === 'available' && (
+      {release && (
         <div className="flex flex-col gap-2 rounded-lg border border-sky-700 bg-sky-950/40 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-sm font-medium text-sky-100">{releaseSummary(result.release)}이 나왔습니다</p>
+              <p className="text-sm font-medium text-sky-100">{releaseSummary(release)}이 나왔습니다</p>
               <p className="text-xs text-sky-300/70">
-                {info.version ? `현재 v${info.version} → v${result.release.version}` : `v${result.release.version}`}
+                {info.version ? `현재 v${info.version} → v${release.version}` : `v${release.version}`}
               </p>
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 className="rounded border border-sky-600/60 px-3 py-1 text-xs text-sky-200 hover:bg-sky-500/20"
-                onClick={() => setShowNotes(true)}
+                onClick={() => openNotes(release)}
               >
                 변경 내용 보기
               </button>
@@ -69,20 +68,23 @@ export function UpdatePanel() {
               </button>
             </div>
           </div>
+          {busy && install.state === 'downloading' && install.total > 0 && (
+            <div className="h-1.5 overflow-hidden rounded bg-sky-900/60">
+              <div
+                className="h-full rounded bg-sky-400 transition-[width]"
+                style={{ width: `${Math.min(100, Math.floor((install.downloaded / install.total) * 100))}%` }}
+              />
+            </div>
+          )}
+          {busy && install.state === 'downloading' && install.total === 0 && (
+            <div className="h-1.5 overflow-hidden rounded bg-sky-900/60">
+              <div className="indeterminate-bar h-full rounded bg-sky-400" />
+            </div>
+          )}
           {progress && (
             <p className={`text-xs ${install.state === 'failed' ? 'text-rose-300' : 'text-zinc-300'}`}>{progress}</p>
           )}
         </div>
-      )}
-
-      {showNotes && result?.state === 'available' && (
-        <ReleaseNotesDialog
-          release={result.release}
-          currentVersion={info.version}
-          busy={busy}
-          onUpdate={start}
-          onClose={() => setShowNotes(false)}
-        />
       )}
 
       <p className="text-xs text-zinc-500">

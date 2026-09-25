@@ -5,6 +5,7 @@ import App from './App.tsx'
 import { AppInfoProvider } from './components/AppInfoProvider.tsx'
 import { LabelingProvider } from './components/LabelingProvider.tsx'
 import { ConfirmProvider } from './components/ConfirmProvider.tsx'
+import { UpdateProvider } from './components/UpdateProvider.tsx'
 import { installClientLog } from './clientLog.ts'
 
 installClientLog()
@@ -14,7 +15,9 @@ createRoot(document.getElementById('root')!).render(
     <AppInfoProvider>
       <LabelingProvider>
         <ConfirmProvider>
-          <App />
+          <UpdateProvider>
+            <App />
+          </UpdateProvider>
         </ConfirmProvider>
       </LabelingProvider>
     </AppInfoProvider>
