@@ -14,9 +14,13 @@
 !docs/**/*.png
 !docs/**/*.jpg
 
-# 단, 라벨링용 소형 프레임 크롭은 예외로 저장소에 둔다
+# 단, 테스트용 소형 프레임 크롭은 예외로 저장소에 둔다
 !tests/data/frames/*.png
-!data/templates/**/*.png
+
+# 본보기 라벨셋 원본(게임 화면에서 자른 이미지)과 라벨 — 공개 저장소에 넣지 않는다(개발 PC 에만 보관)
+data/templates/**/_samples/
+data/templates/digits/*_samples/
+data/templates/**/*_labels.jsonl
 
 # Python
 __pycache__/

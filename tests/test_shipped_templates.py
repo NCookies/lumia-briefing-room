@@ -28,10 +28,15 @@ def test_shipped_templates_read_their_own_labeled_samples_including_7_8_and_9():
     from lumia_briefing_room.detect.counter import read_field
     from lumia_briefing_room.detect.glyph import text_score
 
+    import pytest
+
     profile = ResolutionProfile.builtin(2560, 1440)
     templates = load_templates(profile.templates)
     root = Path(profile.templates).parent
-    labels = [json.loads(l) for l in (root / "2560x1440_labels.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()]
+    labels_file = root / "2560x1440_labels.jsonl"
+    if not labels_file.exists() or not (root / "2560x1440_samples").is_dir():
+        pytest.skip("라벨셋 원본은 공개 저장소에 없다(개발 PC 에만 보관)")
+    labels = [json.loads(l) for l in labels_file.read_text(encoding="utf-8").splitlines() if l.strip()]
 
     assert {7, 8, 9} <= set(templates)
     wrong = []
