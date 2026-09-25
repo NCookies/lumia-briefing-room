@@ -7,6 +7,7 @@ import { getConsentChoices, saveConsentPatch } from '../consentApi'
 import { useLabelingState } from '../labelingContext'
 import { ConsentChoicesForm } from './ConsentChoicesForm'
 import { DiagnosticsPanel } from './DiagnosticsPanel'
+import { PatchNotesDialog } from './PatchNotesDialog'
 import { TelemetryPanel } from './TelemetryPanel'
 
 const TONE_CLASS = {
@@ -20,6 +21,7 @@ export function AboutPanel() {
   const [firstRun, setFirstRun] = useState<FirstRunInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [choices, setChoices] = useState<ConsentChoices>(DEFAULT_CHOICES)
+  const [showPatchNotes, setShowPatchNotes] = useState(false)
   const { reload } = useLabelingState()
 
   useEffect(() => {
@@ -55,7 +57,15 @@ export function AboutPanel() {
           {info.version || '알 수 없음'}
           {info.mode === 'dev' && <span className="ml-2 text-xs text-zinc-500">(개발 모드)</span>}
         </p>
+        <button
+          type="button"
+          className="w-fit text-xs text-sky-300 underline hover:text-sky-200"
+          onClick={() => setShowPatchNotes(true)}
+        >
+          패치노트 보기
+        </button>
       </section>
+      {showPatchNotes && <PatchNotesDialog onClose={() => setShowPatchNotes(false)} />}
 
       <section className="flex flex-col gap-2">
         <h3 className="text-sm font-medium text-zinc-200">선택 기능</h3>

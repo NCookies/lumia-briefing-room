@@ -48,6 +48,7 @@ REQUIRED_IN_BUNDLE = (
     "lumia_briefing_room/profiles/builtin/2560x1440.json",
     "frontend/dist/index.html",
     "docs/privacy.md",
+    "CHANGELOG.md",
     "vendor/ffmpeg/ffmpeg.exe",
     "vendor/ffmpeg/ffprobe.exe",
     "pystray/__init__.py",
@@ -89,6 +90,7 @@ def data_specs(root: Path) -> list[tuple[str, str]]:
         (str(root / "src" / "lumia_briefing_room" / "profiles" / "builtin"), "lumia_briefing_room/profiles/builtin"),
         (str(root / "frontend" / "dist"), "frontend/dist"),
         (str(root / "docs" / "privacy.md"), "docs"),
+        (str(root / "CHANGELOG.md"), "."),
     ]
 
 

@@ -17,6 +17,7 @@ def _fake_tree(root: Path) -> Path:
         "src/lumia_briefing_room/profiles/builtin/2560x1440.json",
         "frontend/dist/index.html",
         "docs/privacy.md",
+        "CHANGELOG.md",
         "vendor/ffmpeg/ffmpeg.exe",
         "vendor/ffmpeg/ffprobe.exe",
     ]:
@@ -322,3 +323,9 @@ def test_endpoint_file_is_bundled_when_it_exists(tmp_path: Path):
 def test_endpoint_file_is_not_bundled_when_absent(tmp_path: Path):
     root = _fake_tree(tmp_path)
     assert not any(src.endswith("telemetry_endpoint.json") for src, _ in build_release.data_specs(root))
+
+
+def test_changelog_is_bundled_for_the_in_app_patch_notes(tmp_path: Path):
+    root = _fake_tree(tmp_path)
+    assert (str(root / "CHANGELOG.md"), ".") in build_release.data_specs(root)
+    assert "CHANGELOG.md" in build_release.REQUIRED_IN_BUNDLE
