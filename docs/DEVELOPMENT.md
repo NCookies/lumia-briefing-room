@@ -1,16 +1,16 @@
-# 루미아 브리핑룸 (Lumia Briefing Room)
+# 개발자 문서 (루미아 브리핑룸)
 
-이터널 리턴 교전 클립 자동 추출기. 설계 문서는 [docs/](docs/) 에 있다.
+사용자용 안내(설치·사용법)는 저장소 루트의 [README.md](../README.md) 에 있다. 이 문서는 소스에서 실행·빌드·테스트하는 개발자용이다. 설계 문서는 이 폴더에 있다.
 
-- [docs/SPEC.md](docs/SPEC.md) — 설계 결정과 근거
-- [docs/research.md](docs/research.md) — 0단계 조사 결과(실측)
-- [docs/plan.md](docs/plan.md) — 검출기 구현 계획 및 진행 상태
-- [docs/plan-pipeline.md](docs/plan-pipeline.md) — 파이프라인 자동화(SPEC 2단계) 구현 계획 및 진행 상태
-- [docs/plan-ui.md](docs/plan-ui.md) — 열람 UI(SPEC 3단계) 구현 계획 및 진행 상태
-- [docs/plan-pvp.md](docs/plan-pvp.md) — PvP 판별(SPEC 4단계) 구현 계획 및 진행 상태
-- [docs/plan-deploy.md](docs/plan-deploy.md) — 공개 배포 계획. D1~D6 구현 완료(경로·모드·첫 실행 화면·프록시·빌드·설치기). 남은 것은 D7 공개 저장소 정리, D9 자동 업데이트, D10 전송
-- [docs/friend-guide.md](docs/friend-guide.md) — **친구에게 설치기와 같이 주는 안내문**(설치·확인 항목·진단 파일 보내는 법)
-- [docs/plan-vod.md](docs/plan-vod.md) — 다시보기(VOD) 클립(SPEC 5단계) 설계 및 진행 상태. 분석·클립 생성, API, UI 탭("다시보기")까지 구현됐다(아래 "실행 방법 8")
+- [docs/SPEC.md](SPEC.md) — 설계 결정과 근거
+- [docs/research.md](research.md) — 0단계 조사 결과(실측)
+- [docs/plan.md](plan.md) — 검출기 구현 계획 및 진행 상태
+- [docs/plan-pipeline.md](plan-pipeline.md) — 파이프라인 자동화(SPEC 2단계) 구현 계획 및 진행 상태
+- [docs/plan-ui.md](plan-ui.md) — 열람 UI(SPEC 3단계) 구현 계획 및 진행 상태
+- [docs/plan-pvp.md](plan-pvp.md) — PvP 판별(SPEC 4단계) 구현 계획 및 진행 상태
+- [docs/plan-deploy.md](plan-deploy.md) — 공개 배포 계획. D1~D6·D10·D14 구현 완료, D7 은 파일 정리 완료·git 이력 정리 대기. 남은 것은 D9 자동 업데이트, D13 배포 자동화
+- [docs/friend-guide.md](friend-guide.md) — **친구에게 설치기와 같이 주는 안내문**(설치·확인 항목·진단 파일 보내는 법)
+- [docs/plan-vod.md](plan-vod.md) — 다시보기(VOD) 클립(SPEC 5단계) 설계 및 진행 상태. 분석·클립 생성, API, UI 탭("다시보기")까지 구현됐다(아래 "실행 방법 8")
 
 ## 개발 환경
 
@@ -47,11 +47,11 @@ $env:LUMIA_FFMPEG = "C:\path\to\ffmpeg.exe"   # PowerShell
 ## 실행 방법
 
 > 코드가 바뀌어 아래 내용이 실제와 달라지면 그때그때 이 섹션을 같이 고친다
-> ([CLAUDE.md](CLAUDE.md) 참고).
+> ([CLAUDE.md](../CLAUDE.md) 참고).
 
 ### 0. 가장 간편한 방법 — `run.bat` 더블클릭
 
-가상환경 활성화 없이 [run.bat](run.bat) 을 더블클릭(또는 PowerShell 에서 `.\run.bat`)하면
+가상환경 활성화 없이 [run.bat](../run.bat) 을 더블클릭(또는 PowerShell 에서 `.\run.bat`)하면
 1번(트레이 상주)이 `--open-ui` 로 실행돼 열람 UI 도 바로 브라우저로 열린다.
 UI 를 보려면 먼저 `cd frontend && npm install && npm run build` 를 한 번 해둘 것.
 프로그램은 트레이 아이콘(작업표시줄 우측 `^` 숨겨진 아이콘 안일 수 있음)으로 상주하며,
@@ -80,7 +80,7 @@ UI 를 보려면 먼저 `cd frontend && npm install && npm run build` 를 한 �
 
 ### 0-1. 개발용 — 코드 저장 시 자동 재시작 (`dev.bat`)
 
-[dev.bat](dev.bat) (= `python tools/dev_run.py [cli.app 옵션]`)은 `src/` 아래 `.py` 를 저장할 때마다 앱(트레이 + 서버)을 껐다가 다시 띄운다.
+[dev.bat](../dev.bat) (= `python tools/dev_run.py [cli.app 옵션]`)은 `src/` 아래 `.py` 를 저장할 때마다 앱(트레이 + 서버)을 껐다가 다시 띄운다.
 브라우저는 첫 기동에만 열리고, 재시작 뒤에는 열려 있는 탭을 새로고침하면 된다(포트가 고정이라 origin 이 그대로다).
 트레이 "종료"로 앱을 끄면 `dev.bat` 도 끝나고, 앱이 오류로 죽으면 다음 저장까지 기다린다.
 `watchfiles` 가 필요하다(`pip install -e ".[dev]"`). `frontend/src` 를 저장하면 `npm run build` 도 자동으로 돌려 `frontend/dist` 를 갱신한다(서버 재시작 없음) — 빌드가 끝났다는 메시지가 나오면 브라우저를 새로고침한다. 평소 실사용은 그대로 `run.bat`.
@@ -195,7 +195,7 @@ python -m lumia_briefing_room.cli.detect_match \
 **게임 결과(순위·랭크 여부)**: 경기가 끝날 때 나오는 결과 화면(`4/7 실험 종료`)을 OCR 로 읽어 클립 메타데이터의 `matchResult`(`matchType` rank/normal, `placement`, `total`, `outcome`, `nickname`)에 넣고, 게임 행에 `#4 랭크 … 13 / 3 / 6` 으로 표시한다. 원본 녹화가 남아 있는 새 경기부터 채워진다. 이미 저장된 클립은 영상에 결과 화면이 없어서, 원본이 아직 남은 경기만 `python tools/backfill_result.py [clips_dir] [--recording-root DIR] [--force]` 로 채운다(게임별로 마지막 클립 뒤에서 원본을 훑어 첫 결과 화면을 읽는다. 링버퍼가 지운 경기는 건너뛴다). 결과 화면은 1280px JPEG 로 `clips/.thumbs/<경기시작>_result.jpg` 에 저장돼 게임 섹션의 첫 칸에 썸네일처럼 보이고(클릭하면 크게), 이미 저장된 경기는 `backfill_result.py` 가 같이 만든다. 내 캐릭터는 결과 화면 오른쪽 세로 영문 이름을 읽어 `data/characters.json`(영문→한글, 없는 이름은 여기에 추가)으로 한글 이름을 찾는다. 닉네임은 첫 결과 화면에서 자동으로 읽어 설정에 저장하고(비어 있을 때만), 헤더 "⚙ 옵션" 에서 직접 고칠 수 있다.
 
 **기준: 클립에 사람과의 교전이 *포함*되어 있으면 "교전".** 사냥하다 교전하거나, 교전 뒤에 야생동물·오브젝트(알파/오메가/위클라인)를 잡는 클립도 교전이다.
-야생동물·보스만 상대했으면 "사냥", 판단이 안 되면 안 찍고 넘어간다. 자세한 표는 [plan-pvp.md §4-0](docs/plan-pvp.md).
+야생동물·보스만 상대했으면 "사냥", 판단이 안 되면 안 찍고 넘어간다. 자세한 표는 [plan-pvp.md §4-0](plan-pvp.md).
 
 ```bash
 python tools/eval_pvp.py          # 라벨로 점수를 평가: 오탐, 적 링 분포, 임계별 정밀도/재현율
@@ -270,11 +270,11 @@ python tools/build_installer.py          # → dist\LumiaBriefingRoom-<버전>-s
 - 실행 중이면 설치기가 닫아 달라고 알린다(`AppMutex` 가 앱의 중복 실행 방지 뮤텍스와 같은 이름이다).
 - `THIRD_PARTY_NOTICES.md` 가 설치 폴더에 같이 들어간다. ffmpeg LGPL 고지와 소스 링크가 여기 있다.
 - **코드 서명을 하지 않으므로 SmartScreen 경고가 뜬다.** 사용자에게 "추가 정보 → 실행" 을 안내한다
-  ([docs/friend-guide.md](docs/friend-guide.md)).
+  ([docs/friend-guide.md](friend-guide.md)).
 
 ### 12. 라벨·오류 로그 전송 (동의 기반, D10)
 
-전송은 **사용자가 켠 항목만** 한다. 첫 실행 화면이나 옵션 "정보·진단" 탭의 "선택 기능"에서 라벨 전송·오류 로그 전송을 켜고 끈다(기본은 둘 다 꺼짐, 꺼져 있으면 네트워크를 전혀 쓰지 않는다). 보내는 항목·보관 기간·삭제 방법은 [개인정보 처리 안내](docs/privacy.md)(앱 안에서는 동의 항목 아래 링크)에 있다.
+전송은 **사용자가 켠 항목만** 한다. 첫 실행 화면이나 옵션 "정보·진단" 탭의 "선택 기능"에서 라벨 전송·오류 로그 전송을 켜고 끈다(기본은 둘 다 꺼짐, 꺼져 있으면 네트워크를 전혀 쓰지 않는다). 보내는 항목·보관 기간·삭제 방법은 [개인정보 처리 안내](privacy.md)(앱 안에서는 동의 항목 아래 링크)에 있다.
 
 - **보내는 때**: 앱이 떠 있는 동안 종류별로 하루 한 번 묶어서 보낸다. 서버가 안 받으면 15분부터 두 배씩(최대 6시간) 늦춰 다시 시도하고, 앱은 멈추지 않는다.
 - **라벨**: 스팀 녹화·다시보기 클립의 교전/그 외 라벨과 근거 수치, 해상도·게임 모드, 결과 화면의 최종 킬·어시스트, 내 캐릭터, 라벨 메모(`labelNote`). 로컬 `pvp`/`pve` 는 `combat`/`other` 로 바뀌어 나간다. 라벨이나 메모를 고치면 같은 클립 키로 다시 보내 서버가 덮어쓴다. 제목·경로·닉네임·팀원·시각 원문은 나가지 않는다.
@@ -296,7 +296,7 @@ python tools/eval_pvp.py pulled_labels                   # 가져온 라벨로 �
 ### 9. 브라우저 디버깅 (개발용)
 
 - **클라이언트 오류 로그**: 프론트가 `window.onerror` / `unhandledrejection` / `console.error` 를 `POST /api/client-log` 로 보내고, 서버가 `[client]` 접두로 로그 파일에 남긴다. 로그 파일은 `%LOCALAPPDATA%\LumiaBriefingRoom\logs\app.log` (서버 로그와 같은 파일, 2MB 회전). Claude Code 에 "브라우저 오류 봐줘" 라고 하면 이 파일을 읽는다. 프론트를 고쳤으면 `npm run build`.
-- **브라우저 자동 조작(Playwright MCP)**: 저장소 루트 `.mcp.json` 에 시스템 Chrome(`--browser chrome`)으로 붙는 설정이 들어 있다. Claude Code 를 이 폴더에서 다시 열면 프로젝트 MCP 승인을 물어본다. 대상은 `python -m lumia_briefing_room.cli.serve --port 8000` 로 띄운 `http://127.0.0.1:8000/`. (Chrome 재생·콘솔 읽기 실측은 아직 안 했다 — [plan-ui.md §6](docs/plan-ui.md))
+- **브라우저 자동 조작(Playwright MCP)**: 저장소 루트 `.mcp.json` 에 시스템 Chrome(`--browser chrome`)으로 붙는 설정이 들어 있다. Claude Code 를 이 폴더에서 다시 열면 프로젝트 MCP 승인을 물어본다. 대상은 `python -m lumia_briefing_room.cli.serve --port 8000` 로 띄운 `http://127.0.0.1:8000/`. (Chrome 재생·콘솔 읽기 실측은 아직 안 했다 — [plan-ui.md §6](plan-ui.md))
 
 ## 개발 도구 (tools/)
 

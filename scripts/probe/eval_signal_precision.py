@@ -5,7 +5,7 @@ usage: PYTHONIOENCODING=utf-8 python scripts/probe/eval_signal_precision.py
 import json,glob,os,collections
 import numpy as np
 cl=[]
-for f in glob.glob('C:/Users/tester/Videos/LumiaBriefingRoom/clips/*.json'):
+for f in glob.glob(os.path.join(os.path.expanduser('~'),'Videos','LumiaBriefingRoom','clips','*.json')):
     d=json.load(open(f,encoding='utf-8')); d['id']=os.path.basename(f)[:-5]; cl.append(d)
 P=[c for c in cl if c['userLabel']=='pvp']; V=[c for c in cl if c['userLabel']=='pve']
 print('n',len(cl),len(P),len(V), 'conflict',sum(bool(c.get('labelConflict')) for c in cl))
