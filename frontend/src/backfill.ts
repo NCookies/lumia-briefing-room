@@ -92,7 +92,7 @@ export function describeResult(result: BackfillResult): string[] {
     lines.push(`게임 ${result.gamesProcessed}개에서 클립 ${result.clipsCreated}개를 만들었습니다.`)
   }
   const skipped = result.skipped
-  if (skipped.known > 0) lines.push(`이미 클립이 있는 게임 ${skipped.known}개는 건너뛰었습니다.`)
+  if (skipped.known > 0) lines.push(`이미 클립이 있거나 곧 자동으로 만들어질 게임 ${skipped.known}개는 건너뛰었습니다.`)
   if (skipped.cutAtStart > 0) {
     lines.push(`앞부분이 이미 지워진 게임 ${skipped.cutAtStart}개는 건너뛰었습니다(스팀이 오래된 녹화를 지웁니다).`)
   }

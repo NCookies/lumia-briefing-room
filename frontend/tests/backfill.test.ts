@@ -64,7 +64,7 @@ test('progress text before anything is known is calm', () => {
 test('the finished summary names what was made and what was skipped and why', () => {
   const lines = describeResult(result())
   assert.equal(lines[0], '게임 3개에서 클립 20개를 만들었습니다.')
-  assert.ok(lines.some((l) => l.includes('이미 클립이 있는 게임 1개')))
+  assert.ok(lines.some((l) => l.includes('이미 클립이 있거나 곧 자동으로 만들어질 게임 1개')))
   assert.ok(lines.some((l) => l.includes('앞부분이 이미 지워진 게임 1개')))
 })
 

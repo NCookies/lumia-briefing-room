@@ -36,11 +36,21 @@ STAGING_DIRNAME = "backfill_staging"
 
 
 def collect_log_starts(cfg: Config) -> list[datetime]:
-    """Player.log 로 아는 경기의 시작 시각. 아직 처리 안 된 것도 포함한다 — 곧 감시가 만들 경기를 여기서 또 만들지 않게."""
+    """Player.log 로 아는 경기 중 곧 감시가 만들 경기(아직 처리 안 됐거나 진행 중)의 시작 시각. 그 경기를 여기서 또 만들지 않게.
+
+    처리 이력에만 있는 경기는 뺀다 — 이력은 클립 폴더와 무관해서(폴더를 바꾸거나 지운 뒤에도 남는다) 감시는 다시 만들지 않으므로,
+    현재 클립 폴더에 클립이 없으면 과거 녹화 분석이 만들어야 한다. 클립이 실제로 있는 경기는 `collect_known_starts` 가 따로 거른다.
+    """
     try:
         from lumia_briefing_room.api.app import read_boundaries
+        from lumia_briefing_room.pipeline.watcher import ProcessedState, match_key
 
-        return [m.start_utc for m in read_boundaries(cfg)]
+        state_path = resolve_paths(cfg.paths).temp / "processed_matches.json"
+        try:
+            processed = ProcessedState.load(state_path).processed_keys
+        except (OSError, ValueError):
+            processed = frozenset()
+        return [m.start_utc for m in read_boundaries(cfg) if m.end_utc is None or match_key(m) not in processed]
     except Exception:
         log.warning("Player.log 를 읽지 못해 로그 기준 중복 제외는 건너뛴다", exc_info=True)
         return []
