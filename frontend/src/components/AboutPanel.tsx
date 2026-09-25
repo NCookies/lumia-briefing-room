@@ -9,6 +9,7 @@ import { ConsentChoicesForm } from './ConsentChoicesForm'
 import { DiagnosticsPanel } from './DiagnosticsPanel'
 import { PatchNotesDialog } from './PatchNotesDialog'
 import { TelemetryPanel } from './TelemetryPanel'
+import { UpdatePanel } from './UpdatePanel'
 
 const TONE_CLASS = {
   ok: 'text-emerald-300',
@@ -66,6 +67,8 @@ export function AboutPanel() {
         </button>
       </section>
       {showPatchNotes && <PatchNotesDialog onClose={() => setShowPatchNotes(false)} />}
+
+      <UpdatePanel />
 
       <section className="flex flex-col gap-2">
         <h3 className="text-sm font-medium text-zinc-200">선택 기능</h3>

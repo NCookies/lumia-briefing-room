@@ -4,6 +4,7 @@ import { BackfillDialog } from './components/BackfillDialog'
 import { ClipBrowser, type ClipSource } from './components/ClipBrowser'
 import { FirstRunScreen } from './components/FirstRunScreen'
 import { SettingsModal } from './components/SettingsModal'
+import { UpdateBanner } from './components/UpdateBanner'
 import { getConfirmDelete, setConfirmDelete } from './exportApi'
 import { getFirstRun } from './onboardingApi'
 import { isBackfillActive, progressPercent, type BackfillStatus } from './backfill'
@@ -29,6 +30,7 @@ export default function App() {
   const version = versionLabel(useAppInfo())
   const [tab, setTab] = useState<ClipSource>(loadTab)
   const [showSettings, setShowSettings] = useState(false)
+  const [settingsTab, setSettingsTab] = useState<'general' | 'about'>('general')
   const [browserKey, setBrowserKey] = useState(0)
   const [confirmDelete, setConfirmDeleteState] = useState(true)
   const [firstRun, setFirstRun] = useState(false)
@@ -125,12 +127,22 @@ export default function App() {
           <button
             type="button"
             className="rounded border border-zinc-600 px-2 py-1 text-sm text-zinc-300 hover:bg-zinc-700"
-            onClick={() => setShowSettings(true)}
+            onClick={() => {
+              setSettingsTab('general')
+              setShowSettings(true)
+            }}
           >
             ⚙ 옵션
           </button>
         </div>
       </header>
+
+      <UpdateBanner
+        onOpenAbout={() => {
+          setSettingsTab('about')
+          setShowSettings(true)
+        }}
+      />
 
       {TABS.map((t) => (
         <div key={`${t.id}-${browserKey}`} className={tab === t.id ? 'flex flex-1 flex-col' : 'hidden'}>
@@ -158,6 +170,7 @@ export default function App() {
         <SettingsModal
           confirmDelete={confirmDelete}
           onConfirmDeleteChange={changeConfirmDelete}
+          initialTab={settingsTab}
           onClose={() => setShowSettings(false)}
           onClipsDirChanged={() => setBrowserKey((k) => k + 1)}
         />

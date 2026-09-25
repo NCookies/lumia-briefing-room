@@ -31,6 +31,7 @@ interface Props {
   onConfirmDeleteChange: (value: boolean) => void
   onClose: () => void
   onClipsDirChanged: () => void
+  initialTab?: Tab
 }
 
 function GeneralPanel({
@@ -194,8 +195,8 @@ function ExportPanel() {
   )
 }
 
-export function SettingsModal({ confirmDelete, onConfirmDeleteChange, onClose, onClipsDirChanged }: Props) {
-  const [tab, setTab] = useState<Tab>('general')
+export function SettingsModal({ confirmDelete, onConfirmDeleteChange, onClose, onClipsDirChanged, initialTab }: Props) {
+  const [tab, setTab] = useState<Tab>(initialTab ?? 'general')
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

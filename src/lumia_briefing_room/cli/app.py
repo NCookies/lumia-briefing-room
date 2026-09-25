@@ -15,6 +15,7 @@ from lumia_briefing_room import autostart, paths, procs, selftest, startup
 from lumia_briefing_room.cli import serve as serve_cli
 from lumia_briefing_room.cli.watch import build_parser, run
 from lumia_briefing_room.telemetry.sender import TelemetrySender
+from lumia_briefing_room.updater import Updater
 from lumia_briefing_room.consent import needs_first_run
 from lumia_briefing_room.logsetup import default_log_path
 from lumia_briefing_room.single_instance import SingleInstance
@@ -40,6 +41,7 @@ def _free_port() -> int:
         return s.getsockname()[1]
 
 
+UPDATE_QUIT_DELAY_SEC = 3.0
 HOSTNAME = "lumia-briefingroom.localhost"
 HTTP_PORT = 80
 DEFAULT_PORT = 8765
@@ -71,7 +73,13 @@ def access_url(port: int, *, hostname: str = HOSTNAME) -> str:
 
 
 def make_on_open(
-    *, host="127.0.0.1", port=8000, config_path=None, open_browser=webbrowser.open, on_recording_root_changed=None
+    *,
+    host="127.0.0.1",
+    port=8000,
+    config_path=None,
+    open_browser=webbrowser.open,
+    on_recording_root_changed=None,
+    on_update_launched=None,
 ):
     """트레이 "열기": 서버를 (최초 1회만) 띄우고 브라우저로 연다.
 
@@ -90,6 +98,8 @@ def make_on_open(
                 app = serve_cli.build_app(cfg, config_path=config_path)
                 if on_recording_root_changed is not None:
                     app.state.on_recording_root_changed = on_recording_root_changed
+                if on_update_launched is not None:
+                    app.state.on_update_launched = on_update_launched
                 server, thread = serve_cli.run_server_in_thread(app, host=host, port=port)
                 serve_cli.wait_until_started(server)
                 state["server"] = server
@@ -160,6 +170,27 @@ def start_telemetry(config_path, *, sender=None):
     thread = threading.Thread(target=sender.run_forever, args=(stop,), daemon=True, name="telemetry")
     thread.start()
     return thread, stop
+
+
+def update_notice(release: dict) -> tuple[str, str]:
+    return f"새 버전 {release['version']} 이 나왔습니다. 앱 옵션의 '정보·진단' 탭에서 업데이트할 수 있습니다.", "루미아 브리핑룸"
+
+
+def start_update_checks(config_path, *, notify, updater=None):
+    """`update.check` 가 켜져 있으면 시작 시와 하루 1회 새 버전을 확인해 알리는 스레드. 꺼져 있으면 네트워크를 쓰지 않는다. (plan-deploy.md D9)"""
+    updater = updater or Updater(config_path=config_path, notify=notify)
+    stop = threading.Event()
+    thread = threading.Thread(target=updater.run_forever, args=(stop,), daemon=True, name="update-check")
+    thread.start()
+    return thread, stop
+
+
+def quit_after_update_launch(on_quit, *, delay: float = UPDATE_QUIT_DELAY_SEC, timer=threading.Timer):
+    """설치기가 뜬 뒤 앱을 종료한다. 화면이 "설치기를 실행했습니다" 를 받아 볼 시간을 잠깐 둔다."""
+    def quit_soon() -> None:
+        timer(delay, on_quit).start()
+
+    return quit_soon
 
 
 def should_open_ui_on_start(cfg, *, open_ui: bool) -> bool:
@@ -234,6 +265,7 @@ def _run_app(args, instance: SingleInstance) -> None:
         port=resolve_port(cfg.ui.port),
         config_path=resolve_config_path(args.config),
         on_recording_root_changed=on_toggle_watch.restart,
+        on_update_launched=quit_after_update_launch(lambda: _on_quit()),
     )
 
     instance.listen(on_open)
@@ -248,7 +280,15 @@ def _run_app(args, instance: SingleInstance) -> None:
         on_open_logs=open_logs_folder,
     )
     _icon_ref["icon"] = icon
-    icon.run()
+
+    def on_tray_ready(tray_icon) -> None:
+        tray_icon.visible = True
+        start_update_checks(
+            resolve_config_path(args.config),
+            notify=lambda release: tray_icon.notify(*update_notice(release)),
+        )
+
+    icon.run(setup=on_tray_ready)
 
 
 _icon_ref: dict = {}

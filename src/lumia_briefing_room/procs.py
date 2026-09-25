@@ -12,6 +12,10 @@ log = logging.getLogger("lumia_briefing_room.procs")
 
 CREATE_NO_WINDOW = 0x08000000
 BELOW_NORMAL_PRIORITY_CLASS = 0x00004000
+DETACHED_PROCESS = 0x00000008
+CREATE_NEW_PROCESS_GROUP = 0x00000200
+CREATE_BREAKAWAY_FROM_JOB = 0x01000000
+JOB_OBJECT_LIMIT_BREAKAWAY_OK = 0x0800
 JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000
 JOB_OBJECT_EXTENDED_LIMIT_INFORMATION = 9
 
@@ -25,6 +29,18 @@ def process_flags(*, low_priority: bool = False, platform: str | None = None) ->
     if low_priority:
         flags |= BELOW_NORMAL_PRIORITY_CLASS
     return flags
+
+
+def job_limit_flags() -> int:
+    """앱이 죽으면 자식을 모두 죽이되, 명시적으로 분리(breakaway)를 요청한 프로세스(업데이트 설치기)는 살려 둔다."""
+    return JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_BREAKAWAY_OK
+
+
+def installer_flags(*, platform: str | None = None) -> int:
+    """앱이 종료돼도 설치기가 이어서 돌도록 작업 개체와 콘솔에서 분리해 띄운다. (plan-deploy.md D9)"""
+    if (platform or sys.platform) != "win32":
+        return 0
+    return DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB
 
 
 def run_hidden(cmd, *, low_priority: bool = False, **kwargs):
@@ -96,7 +112,7 @@ def kill_children_on_exit() -> bool:
         log.warning("작업 개체를 만들지 못했다: %s", ctypes.get_last_error())
         return False
     limits = _ExtendedLimits()
-    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+    limits.BasicLimitInformation.LimitFlags = job_limit_flags()
     ok = kernel32.SetInformationJobObject(
         job, JOB_OBJECT_EXTENDED_LIMIT_INFORMATION, ctypes.byref(limits), ctypes.sizeof(limits)
     ) and kernel32.AssignProcessToJobObject(job, kernel32.GetCurrentProcess())

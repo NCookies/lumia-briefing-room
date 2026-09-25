@@ -8,7 +8,7 @@
 - [docs/plan-pipeline.md](plan-pipeline.md) — 파이프라인 자동화(SPEC 2단계) 구현 계획 및 진행 상태
 - [docs/plan-ui.md](plan-ui.md) — 열람 UI(SPEC 3단계) 구현 계획 및 진행 상태
 - [docs/plan-pvp.md](plan-pvp.md) — PvP 판별(SPEC 4단계) 구현 계획 및 진행 상태
-- [docs/plan-deploy.md](plan-deploy.md) — 공개 배포 계획. D1~D6·D10·D14 구현 완료, D7 은 파일 정리 완료·git 이력 정리 대기. D13 배포 자동화는 완료(v0.1.3 태그 릴리스까지 자동으로 성공). 남은 것은 D9 자동 업데이트
+- [docs/plan-deploy.md](plan-deploy.md) — 공개 배포 계획. D1~D6·D10·D14 구현 완료, D7 은 파일 정리 완료·git 이력 정리 대기. D13 배포 자동화는 완료(v0.1.3 태그 릴리스까지 자동으로 성공). D9 자동 업데이트는 구현·자동 테스트 완료, 남은 것은 덮어쓰기 설치 실측(수동 절차는 plan-deploy D9)
 - [docs/friend-guide.md](friend-guide.md) — **친구에게 설치기와 같이 주는 안내문**(설치·확인 항목·진단 파일 보내는 법)
 - [docs/plan-vod.md](plan-vod.md) — 다시보기(VOD) 클립(SPEC 5단계) 설계 및 진행 상태. 분석·클립 생성, API, UI 탭("다시보기")까지 구현됐다(아래 "실행 방법 8")
 
@@ -107,6 +107,8 @@ python -m lumia_briefing_room.cli.app \
 
 `--open-ui` 를 주지 않으면 UI 는 자동으로 열리지 않고 트레이 메뉴 "열기" 로 연다
 (`ui.startMinimized=false` 로 설정해도 시작 시 자동으로 열린다).
+
+**업데이트(D9)**: 트레이가 뜨면 `update.check` 가 켜진 경우에만 업데이트 확인 스레드가 시작 후·하루 1회 GitHub Releases 를 조회해 새 버전을 트레이 알림과 UI 배너로 알린다(꺼져 있으면 네트워크 0회). 꺼져 있어도 UI 옵션 → 정보·진단의 "지금 확인"·"업데이트"로 수동 확인·설치한다. 설치기 실행은 exe 로 빌드한 앱에서만 되고(개발 모드는 거부), 테스트는 `pytest tests/test_updater.py tests/test_update_routes.py`(로컬 HTTP 서버가 GitHub 를 흉내 내므로 인터넷 불필요). 상태 파일은 `%LOCALAPPDATA%\LumiaBriefingRoom\update_state.json`, 받은 설치기는 같은 폴더의 `updates\`.
 
 ### 2. 열람 UI만 독립 실행
 

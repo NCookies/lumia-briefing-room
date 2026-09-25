@@ -28,6 +28,7 @@ from lumia_briefing_room.api.backfill_routes import register_backfill_routes
 from lumia_briefing_room.api.onboarding import register_onboarding_routes
 from lumia_briefing_room.api.app_info_routes import register_app_info_routes
 from lumia_briefing_room.api.telemetry_routes import register_telemetry_routes
+from lumia_briefing_room.api.update_routes import register_update_routes
 from lumia_briefing_room.api.vods import register_vod_routes
 from lumia_briefing_room.api.filters import ClipQuery, filter_clip_summaries, sort_clip_summaries
 from lumia_briefing_room.config import (
@@ -688,6 +689,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     register_onboarding_routes(app, current_config=current_config, put_config=put_config)
     register_telemetry_routes(app)
     register_app_info_routes(app)
+    register_update_routes(app)
     register_backfill_routes(app, current_config=current_config)
     return app
 
