@@ -24,6 +24,8 @@ import { PlayerModal } from './PlayerModal'
 import { ResultCard, ResultViewer } from './ResultCard'
 import { GameTimeline } from './GameTimeline'
 import { VodSection } from './VodSection'
+import { VideoFormatHelp } from './VideoFormatHelp'
+import { emptyStateKind } from '../emptyState'
 import { loadViewMode, saveViewMode, type ViewMode } from '../viewMode'
 import { formatMatchResult, gameRecordId, groupByGame, totalSize, withResultImage, type GameGroup } from '../grouping'
 import { applyLabel, applyNote, progress } from '../labeling'
@@ -45,6 +47,19 @@ import { formatDuration, formatGameRange, groupByVod, type Vod } from '../vodGro
 
 export type ClipSource = 'steam' | 'vod'
 
+const EMPTY_TITLES: Record<string, string> = {
+  trash: '휴지통이 비어 있습니다',
+  filter: '조건에 맞는 클립이 없습니다',
+  steam: '아직 클립이 없습니다',
+  'vod-no-sources': '분석할 영상 파일이 없습니다. 영상 파일이나 폴더를 추가해 주세요',
+  'vod-no-clips': '표시할 클립이 없습니다',
+}
+const EMPTY_HINTS: Record<string, string> = {
+  filter: '필터를 풀면 나올 수 있습니다.',
+  steam: '게임이 끝나면 자동으로 만들어집니다. 이미 녹화해 둔 영상은 과거 녹화 분석으로 찾을 수 있습니다.',
+  'vod-no-clips': '영상 파일을 분석하면 게임별로 만들어집니다. 다른 영상은 옵션 → 영상 파일에서 추가할 수 있습니다.',
+}
+
 const filterActive = (f: FilterState): boolean =>
   f.trashed ||
   f.pinnedOnly ||
@@ -59,9 +74,20 @@ interface Props {
   active: boolean
   confirmDelete: boolean
   onConfirmDeleteChange: (value: boolean) => void
+  onBackfill: () => void
+  backfillLabel: string
+  onAddVodSources: () => void
 }
 
-export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChange }: Props) {
+export function ClipBrowser({
+  source,
+  active,
+  confirmDelete,
+  onConfirmDeleteChange,
+  onBackfill,
+  backfillLabel,
+  onAddVodSources,
+}: Props) {
   const [filter, setFilter] = useState<FilterState>(source === 'vod' ? { ...DEFAULT_FILTER, sort: 'asc' } : DEFAULT_FILTER)
   const labeling = useLabelingUi()
   useEffect(() => {
@@ -446,6 +472,17 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
   }
 
 
+  const listEmpty = source === 'steam' ? clips.length === 0 && records.length === 0 : vodGroups.length === 0
+  const emptyKind = emptyStateKind({
+    source,
+    loading,
+    error: error !== null,
+    empty: listEmpty,
+    trashed: filter.trashed,
+    filtered: !filter.trashed && filterActive(filter),
+    vodTotal: vods.length,
+  })
+
   return (
     <div className="flex flex-1 flex-col">
       <FilterBar
@@ -472,10 +509,32 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
           <p className="mb-2 text-sky-300">게임을 다시 분석하는 중입니다. 몇 분 걸릴 수 있으며, 끝나면 목록이 자동으로 갱신됩니다.</p>
         )}
         {notice && <p className="mb-2 text-emerald-400">{notice}</p>}
-        {!loading && !error && clips.length === 0 && records.length === 0 && (
-          <p className="text-zinc-500">
-            {filter.trashed ? '휴지통이 비어 있습니다' : '조건에 맞는 클립이 없습니다'}
-          </p>
+        {emptyKind !== 'none' && (
+          <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-center text-zinc-400">
+            <p className="text-base text-zinc-300">{EMPTY_TITLES[emptyKind]}</p>
+            {EMPTY_HINTS[emptyKind] && <p className="max-w-md text-sm text-zinc-500">{EMPTY_HINTS[emptyKind]}</p>}
+            {emptyKind === 'steam' && (
+              <button
+                type="button"
+                className="rounded border border-sky-500/60 px-4 py-1.5 text-sm text-sky-300 hover:bg-sky-500/20"
+                onClick={onBackfill}
+              >
+                {backfillLabel}
+              </button>
+            )}
+            {emptyKind === 'vod-no-sources' && (
+              <span className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="rounded border border-sky-500/60 px-4 py-1.5 text-sm text-sky-300 hover:bg-sky-500/20"
+                  onClick={onAddVodSources}
+                >
+                  영상 경로 추가
+                </button>
+                <VideoFormatHelp />
+              </span>
+            )}
+          </div>
         )}
 
         {groups.length > 0 && (
@@ -495,6 +554,7 @@ export function ClipBrowser({ source, active, confirmDelete, onConfirmDeleteChan
             >
               모두 접기
             </button>
+            {source === 'vod' && <VideoFormatHelp />}
             {filter.trashed && (
               <button
                 type="button"

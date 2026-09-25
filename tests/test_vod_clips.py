@@ -150,3 +150,9 @@ def test_vod_metadata_without_result_screen_or_streamer():
     assert meta["matchResult"] is None
     assert meta["streamer"] is None
     assert meta["myCharacter"] is None and meta["teamCharacters"] == []
+
+
+def test_vod_metadata_has_a_unique_clip_uid():
+    first, second = build(), build()
+    assert len(first["clipUid"]) == 32 and "-" not in first["clipUid"]
+    assert first["clipUid"] != second["clipUid"]

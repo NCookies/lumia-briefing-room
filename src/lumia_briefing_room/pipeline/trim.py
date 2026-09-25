@@ -13,6 +13,14 @@ from pathlib import Path
 from lumia_briefing_room.config import ThumbnailConfig
 from lumia_briefing_room.pipeline.clip import make_thumbnail
 from lumia_briefing_room.pipeline.clip_assets import THUMBS_DIRNAME, resolve_thumbnail
+from lumia_briefing_room.pipeline.clip_uid import (
+    ARCHIVE_DIRNAME,
+    UID_KEY,
+    collect_uids,
+    new_clip_uid,
+    piece_uids,
+    write_json_atomic,
+)
 from lumia_briefing_room.pipeline.retention import trash_clip
 from lumia_briefing_room.procs import run_hidden
 
@@ -111,10 +119,12 @@ def split_clip(
     src_mp4 = meta_path.with_suffix(".mp4")
     folder = meta_path.parent
     ids = _free_piece_ids(meta_path, trash_dir, len(ordered))
+    parent_uid = meta.get(UID_KEY) or new_clip_uid()
+    uids = piece_uids(parent_uid, collect_uids(folder, trash_dir, folder / ARCHIVE_DIRNAME), len(ordered))
 
     created: list[Path] = []
     try:
-        for piece_id, (start, end) in zip(ids, ordered):
+        for piece_id, piece_uid, (start, end) in zip(ids, uids, ordered):
             end = min(end, duration)
             piece_meta_path = folder / f"{piece_id}.json"
             piece_mp4 = piece_meta_path.with_suffix(".mp4")
@@ -135,6 +145,7 @@ def split_clip(
                 trimmed=True,
                 originalDurationSec=meta.get("originalDurationSec", duration),
                 splitFrom=meta_path.stem,
+                clipUid=piece_uid,
             )
             if meta.get("thumbnailPath"):
                 thumb = folder / THUMBS_DIRNAME / f"{piece_id}.jpg"
@@ -146,6 +157,8 @@ def split_clip(
                 piece["thumbnailPath"] = f"{THUMBS_DIRNAME}/{piece_id}.jpg"
             created.append(piece_meta_path)
             piece_meta_path.write_text(json.dumps(piece, ensure_ascii=False, indent=2), encoding="utf-8")
+        if not meta.get(UID_KEY):
+            write_json_atomic(meta_path, meta | {UID_KEY: parent_uid})
         trash_clip(meta_path, trash_dir)
     except BaseException:
         for f in created:

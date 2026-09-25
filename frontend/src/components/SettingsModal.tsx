@@ -21,7 +21,7 @@ type Tab = 'general' | 'export' | 'vod' | 'cleanup' | 'about'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'general', label: '일반' },
   { id: 'export', label: '클립 내보내기' },
-  { id: 'vod', label: '다시보기' },
+  { id: 'vod', label: '영상 파일' },
   { id: 'cleanup', label: '자동 정리' },
   { id: 'about', label: '정보·진단' },
 ]
@@ -104,7 +104,7 @@ function GeneralPanel({
     <RecordingRootSection />
     <ClipsDirSection
       source="steam"
-      title="내 녹화 클립 저장 폴더"
+      title="스팀 녹화 클립 저장 폴더"
       description="게임이 끝날 때마다 만드는 클립이 저장되는 폴더입니다. 비워 두면 기본 위치(내 비디오 폴더의 LumiaBriefingRoom)를 씁니다."
       onChanged={onClipsDirChanged}
     />

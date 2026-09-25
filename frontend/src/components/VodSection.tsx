@@ -226,7 +226,7 @@ export function VodSection({
       {expanded && (
         <div className="flex flex-col gap-3 border-t border-zinc-700 p-3">
           {visibleClipCount === 0 && (
-            <p className="px-1 text-sm text-zinc-500">
+            <p className="px-1 text-center text-sm text-zinc-500">
               {vod?.status === 'done' ? '조건에 맞는 클립이 없습니다' : '아직 클립이 없습니다. 분석을 시작하면 게임별로 만들어집니다.'}
             </p>
           )}

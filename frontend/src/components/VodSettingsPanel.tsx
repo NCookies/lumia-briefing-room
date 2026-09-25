@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { getVodSettings, pickVideoFiles, saveVodSettings } from '../vodApi'
 import { pickFolder } from '../exportApi'
 import { ClipsDirSection } from './ClipsDirSection'
+import { VideoFormatHelp } from './VideoFormatHelp'
 
 export function VodSettingsPanel({ onClipsDirChanged }: { onClipsDirChanged: () => void }) {
   const [sources, setSources] = useState<string[]>([])
@@ -51,7 +52,7 @@ export function VodSettingsPanel({ onClipsDirChanged }: { onClipsDirChanged: () 
   }
 
   const pickFolders = async () => {
-    const chosen = await pickFolder('', '다시보기 영상이 든 폴더 선택')
+    const chosen = await pickFolder('', '영상 파일이 든 폴더 선택')
     return chosen ? [chosen] : []
   }
 
@@ -68,9 +69,12 @@ export function VodSettingsPanel({ onClipsDirChanged }: { onClipsDirChanged: () 
   return (
     <div className="flex flex-col gap-6">
       <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium text-zinc-200">다시보기 영상 경로</h3>
+        <h3 className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+          영상 경로
+          <VideoFormatHelp />
+        </h3>
         <p className="text-xs text-zinc-500">
-          받아 둔 다시보기 영상 파일이나 그 영상들이 든 폴더를 추가합니다. 앱은 영상을 내려받거나 옮기거나 지우지 않고 읽기만 합니다.
+          방송 다시보기나 OBS 등으로 녹화해 둔 영상 파일, 또는 그 영상들이 든 폴더를 추가합니다. 앱은 영상을 내려받거나 옮기거나 지우지 않고 읽기만 합니다.
         </p>
         <ul className="flex flex-col gap-1">
           {sources.length === 0 && <li className="text-sm text-zinc-500">추가한 경로가 없습니다</li>}
@@ -115,8 +119,8 @@ export function VodSettingsPanel({ onClipsDirChanged }: { onClipsDirChanged: () 
 
       <ClipsDirSection
         source="vod"
-        title="다시보기 클립 저장 폴더"
-        description="내 녹화 클립과 섞이지 않게 따로 저장합니다. 비워 두면 기본 위치(내 비디오 폴더의 LumiaBriefingRoom)를 씁니다."
+        title="영상 파일 클립 저장 폴더"
+        description="스팀 녹화 클립과 섞이지 않게 따로 저장합니다. 비워 두면 기본 위치(내 비디오 폴더의 LumiaBriefingRoom)를 씁니다."
         onChanged={onClipsDirChanged}
       />
 

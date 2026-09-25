@@ -7,6 +7,7 @@ from lumia_briefing_room.detect.pvp import PvpScore
 from lumia_briefing_room.detect.result import ResultScreen
 from lumia_briefing_room.detect.types import CombatInterval
 from lumia_briefing_room.pipeline.clip import ClipRange
+from lumia_briefing_room.pipeline.clip_uid import new_clip_uid
 from lumia_briefing_room.pipeline.metadata import (
     _teammate_names,
     match_result_dict,
@@ -79,6 +80,7 @@ def build_vod_metadata(
     day_night = interval.day_night
     phase = phase_index(game_day, day_night) if game_day is not None and day_night is not None else None
     return {
+        "clipUid": new_clip_uid(),
         "title": title,
         "source": "vod",
         "vodId": vod_id,

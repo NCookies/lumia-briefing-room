@@ -13,8 +13,8 @@ import { browserCanPlayHevc } from './playback'
 import { reportClientCapabilities } from './telemetryApi'
 
 const TABS: { id: ClipSource; label: string }[] = [
-  { id: 'steam', label: '내 녹화' },
-  { id: 'vod', label: '다시보기' },
+  { id: 'steam', label: '스팀 녹화' },
+  { id: 'vod', label: '영상 파일' },
 ]
 const TAB_KEY = 'lumia.tab'
 
@@ -30,7 +30,7 @@ export default function App() {
   const version = versionLabel(useAppInfo())
   const [tab, setTab] = useState<ClipSource>(loadTab)
   const [showSettings, setShowSettings] = useState(false)
-  const [settingsTab, setSettingsTab] = useState<'general' | 'about'>('general')
+  const [settingsTab, setSettingsTab] = useState<'general' | 'vod' | 'about'>('general')
   const [browserKey, setBrowserKey] = useState(0)
   const [confirmDelete, setConfirmDeleteState] = useState(true)
   const [firstRun, setFirstRun] = useState(false)
@@ -151,6 +151,12 @@ export default function App() {
             active={tab === t.id}
             confirmDelete={confirmDelete}
             onConfirmDeleteChange={changeConfirmDelete}
+            onBackfill={() => setShowBackfill(true)}
+            backfillLabel={backfillRunning ? `과거 녹화 분석 중 ${progressPercent(backfill)}%` : '과거 녹화 분석'}
+            onAddVodSources={() => {
+              setSettingsTab('vod')
+              setShowSettings(true)
+            }}
           />
         </div>
       ))}

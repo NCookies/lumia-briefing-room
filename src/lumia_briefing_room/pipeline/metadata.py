@@ -8,6 +8,7 @@ from lumia_briefing_room.detect.pvp import PvpScore
 from lumia_briefing_room.detect.result import ResultScreen
 from lumia_briefing_room.detect.types import CombatInterval
 from lumia_briefing_room.pipeline.clip import ClipRange, CutResult
+from lumia_briefing_room.pipeline.clip_uid import new_clip_uid
 from lumia_briefing_room.video.session import RecordingSession
 
 
@@ -73,6 +74,7 @@ class ClipMetadata:
     detector_confidence: float
     match_result: dict | None = None
     match_end_utc: str | None = None
+    clip_uid: str | None = None
 
 
 def match_result_dict(result: ResultScreen | None, image_path: str | None = None) -> dict | None:
@@ -171,6 +173,7 @@ def build_metadata(
         detector_confidence=interval.confidence,
         match_result=match_result_dict(match_result, result_image_path),
         match_end_utc=_isoformat_z(match_end_utc) if match_end_utc else None,
+        clip_uid=new_clip_uid(),
     )
 
 

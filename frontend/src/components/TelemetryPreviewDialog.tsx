@@ -64,7 +64,7 @@ export function TelemetryPreviewDialog({ onClose }: { onClose: () => void }) {
                   <details key={i} className="rounded border border-zinc-700 bg-zinc-900/50 p-2 text-sm">
                     <summary className="cursor-pointer">
                       {wireLabel(item.userLabel)}
-                      {item.source === 'vod' && ' · 다시보기'}
+                      {item.source === 'vod' && ' · 영상 파일'}
                       {typeof item.labelNote === 'string' && ` · 메모: ${item.labelNote}`}
                     </summary>
                     <Raw value={item} />

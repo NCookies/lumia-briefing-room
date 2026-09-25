@@ -75,3 +75,17 @@ def test_permanent_auto_delete_archives_labeled_clips(tmp_path):
 
 def test_load_archived_is_empty_without_an_archive(tmp_path):
     assert load_archived(tmp_path) == []
+
+
+def test_archive_keeps_the_clip_uid_and_invents_one_for_clips_without(tmp_path):
+    root = tmp_path / "clips"
+    with_uid = write_clip(root, "a_01", clipUid="u" * 32)
+    without = write_clip(root, "a_02")
+    archive = archive_dir_for(root)
+
+    archive_if_labeled(with_uid, archive)
+    archive_if_labeled(without, archive)
+
+    assert json.loads((archive / "a_01.json").read_text(encoding="utf-8"))["clipUid"] == "u" * 32
+    invented = json.loads((archive / "a_02.json").read_text(encoding="utf-8"))["clipUid"]
+    assert len(invented) == 32

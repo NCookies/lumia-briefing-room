@@ -9,6 +9,7 @@ import sys
 from collections.abc import Sequence
 from ctypes import WINFUNCTYPE, byref, c_long, c_uint, c_ulong, c_ushort, c_ubyte, c_void_p, c_wchar_p
 from pathlib import Path
+from lumia_briefing_room import video_formats
 
 _CLSID_FILE_OPEN_DIALOG = "{DC1C5A9C-E88A-4dde-A5A1-60F82A20AEF7}"
 _IID_FILE_OPEN_DIALOG = "{d57c7288-d4ad-4768-be02-9d969532d960}"
@@ -144,8 +145,12 @@ def pick_folder(initial: str = "", title: str = "폴더 선택") -> str | None:
     return paths[0] if paths else None
 
 
+def video_patterns() -> str:
+    return ";".join(f"*{ext}" for ext in video_formats.sorted_extensions())
+
+
 def pick_video_files(initial: str = "", title: str = "영상 파일 선택") -> list[str]:
-    patterns = ";".join(f"*{ext}" for ext in (".mp4", ".mkv", ".ts", ".webm", ".mov"))
+    patterns = video_patterns()
     paths = _show(
         title=title,
         initial=initial,

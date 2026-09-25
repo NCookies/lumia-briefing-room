@@ -15,6 +15,7 @@ from pathlib import Path
 import uvicorn
 
 from lumia_briefing_room.api.app import create_app
+from lumia_briefing_room.api.clip_uid_startup import start_backfill_thread
 from lumia_briefing_room.api.static import find_frontend_dist, mount_static
 from lumia_briefing_room import startup
 from lumia_briefing_room.config import Config, load_config, resolve_config_path
@@ -24,6 +25,7 @@ log = logging.getLogger("lumia_briefing_room.serve")
 
 def build_app(cfg: Config, *, config_path: Path | None = None):
     app = create_app(cfg, config_path=config_path)
+    start_backfill_thread(app)
     dist_dir = find_frontend_dist()
     if dist_dir is not None:
         mount_static(app, dist_dir)

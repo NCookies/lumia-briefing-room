@@ -21,8 +21,8 @@ from lumia_briefing_room.pipeline.retention import restore_clip, trash_clip
 from lumia_briefing_room.pipeline.vod_analyze import VodCancelled, VodProgress, analyze_vod
 from lumia_briefing_room.pipeline.vod_store import load_index, vod_id
 from lumia_briefing_room.video.vod import find_ffprobe, probe_video
+from lumia_briefing_room.video_formats import VIDEO_EXTENSIONS
 
-VIDEO_EXTENSIONS = frozenset({".mp4", ".mkv", ".ts", ".webm", ".mov"})
 
 
 def is_video(path: Path) -> bool:

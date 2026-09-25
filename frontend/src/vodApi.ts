@@ -33,7 +33,7 @@ const send = (url: string, method: string, body?: unknown) =>
   })
 
 export async function listVods(): Promise<Vod[]> {
-  return jsonOrThrow(await fetch(`${BASE}/vods`), '다시보기 목록 불러오기')
+  return jsonOrThrow(await fetch(`${BASE}/vods`), '영상 파일 목록 불러오기')
 }
 
 export async function setStreamer(id: string, streamer: string): Promise<void> {

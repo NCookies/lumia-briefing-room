@@ -9,6 +9,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from lumia_briefing_room.pipeline.clip_uid import UID_KEY, new_clip_uid
+
 LABELS = ("pvp", "pve")
 ARCHIVE_DIRNAME = ".labels"
 
@@ -27,6 +29,8 @@ def archive_if_labeled(meta_path: Path, archive_dir: Path | None) -> Path | None
     if isinstance(kept.get("matchResult"), dict):
         kept["matchResult"] = {k: v for k, v in kept["matchResult"].items() if k != "imagePath"}
     kept["id"] = meta_path.stem
+    if not kept.get(UID_KEY):
+        kept[UID_KEY] = new_clip_uid()
     kept["archivedAt"] = datetime.now(timezone.utc).isoformat()
     archive_dir.mkdir(parents=True, exist_ok=True)
     target = archive_dir / f"{meta_path.stem}.json"

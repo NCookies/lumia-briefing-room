@@ -14,9 +14,10 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from lumia_briefing_room import __version__, autostart, native_dialog, paths
+from lumia_briefing_room import __version__, autostart, native_dialog, paths, video_formats
 from lumia_briefing_room.appmode import resolve_mode
 from lumia_briefing_room.api.clips import find_clip, scan_clips, to_summary_dict
+from lumia_briefing_room.pipeline.clip_uid import ensure_clip_uid
 from lumia_briefing_room.api.export import (
     export_video,
     is_valid_folder_name,
@@ -162,6 +163,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     app.state.log_dir = None
     app.state.on_recording_root_changed = None
     lock = threading.RLock()
+    app.state.lock = lock
     jobs: dict[str, dict] = {}
 
     def locked(fn):
@@ -190,6 +192,12 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         clips_dir = _source_root(app, source)
         target = (clips_dir / ".trash") if trashed else clips_dir
         summaries = scan_clips(target)
+        for clip in summaries:
+            if not clip.meta.get("clipUid"):
+                try:
+                    ensure_clip_uid(clip.meta_path)
+                except (OSError, ValueError):
+                    logging.getLogger("lumia_briefing_room").warning("clipUid 를 채우지 못했다: %s", clip.meta_path, exc_info=True)
         query = ClipQuery(
             tags=[t for t in tags.split(",") if t],
             day_night=dayNight,
@@ -604,7 +612,14 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
 
     @app.get("/api/app-info")
     def get_app_info():
-        return {"version": __version__, "mode": resolve_mode(current_config().app.mode, frozen=paths.is_frozen())}
+        return {
+            "version": __version__,
+            "mode": resolve_mode(current_config().app.mode, frozen=paths.is_frozen()),
+            "videoFormats": {
+                "supported": video_formats.sorted_extensions(),
+                "verified": sorted(video_formats.VERIFIED_EXTENSIONS),
+            },
+        }
 
     @app.get("/api/config")
     def get_config():

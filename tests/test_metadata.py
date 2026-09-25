@@ -264,3 +264,21 @@ def test_build_metadata_records_the_match_end_so_the_game_can_be_reanalyzed_late
 
     assert with_end.match_end_utc == "2026-09-19T15:40:01Z"
     assert build_metadata(**kwargs).match_end_utc is None
+
+
+def test_build_metadata_gives_every_new_clip_its_own_unique_clip_uid():
+    def build():
+        return build_metadata(
+            title="t", session=_FakeSession(),
+            match_start_utc=datetime(2026, 9, 19, 15, 22, 20, tzinfo=timezone.utc),
+            game_mode="battle_royale", interval=_interval(),
+            clip_range=ClipRange(start=1.0, end=2.0, preroll_source="combat"),
+            cut_result=CutResult(segment_start=1, segment_end=2, duration_sec=1.0, source_incomplete=False),
+            thumbnail_path=None,
+        )
+
+    first, second = build(), build()
+    assert len(first.clip_uid) == 32 and "-" not in first.clip_uid
+    assert first.clip_uid != second.clip_uid
+    from lumia_briefing_room.config import dataclass_to_camel_dict
+    assert dataclass_to_camel_dict(first)["clipUid"] == first.clip_uid

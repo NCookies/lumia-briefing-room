@@ -172,3 +172,62 @@ def test_split_avoids_existing_ids(tmp_path):
     )
 
     assert [p.stem for p in new_paths] == ["clip1-p2", "clip1-p3"]
+
+
+@requires_ffmpeg
+def test_split_pieces_get_uids_derived_from_the_original_and_original_keeps_its_own(tmp_path):
+    from lumia_briefing_room.pipeline.trim import split_clip
+
+    parent = "a" * 32
+    meta_path = write_clip(tmp_path, clipUid=parent)
+
+    new_paths = split_clip(
+        meta_path, [(0.0, 4.0), (6.0, 10.0)], trash_dir=tmp_path / ".trash", ffmpeg_path=FFMPEG_PATH,
+        thumbnail=ThumbnailConfig(),
+    )
+
+    uids = [json.loads(p.read_text(encoding="utf-8"))["clipUid"] for p in new_paths]
+    assert uids == [f"{parent}-1", f"{parent}-2"]
+    assert json.loads((tmp_path / ".trash" / "clip1.json").read_text(encoding="utf-8"))["clipUid"] == parent
+
+
+@requires_ffmpeg
+def test_split_gives_an_original_without_uid_one_and_continues_after_existing_pieces(tmp_path):
+    from lumia_briefing_room.pipeline.trim import split_clip
+
+    meta_path = write_clip(tmp_path)
+    original_uid = "b" * 32
+    (tmp_path / ".trash").mkdir()
+    (tmp_path / ".trash" / "old.json").write_text(json.dumps({"clipUid": f"{original_uid}-1"}), encoding="utf-8")
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    meta["clipUid"] = original_uid
+    meta_path.write_text(json.dumps(meta), encoding="utf-8")
+    (tmp_path / ".labels").mkdir()
+    (tmp_path / ".labels" / "gone.json").write_text(json.dumps({"clipUid": f"{original_uid}-3"}), encoding="utf-8")
+
+    new_paths = split_clip(
+        meta_path, [(0.0, 4.0), (6.0, 10.0)], trash_dir=tmp_path / ".trash", ffmpeg_path=FFMPEG_PATH,
+        thumbnail=ThumbnailConfig(),
+    )
+
+    uids = [json.loads(p.read_text(encoding="utf-8"))["clipUid"] for p in new_paths]
+    assert uids == [f"{original_uid}-4", f"{original_uid}-5"]
+
+
+@requires_ffmpeg
+def test_splitting_a_piece_appends_another_level(tmp_path):
+    from lumia_briefing_room.pipeline.trim import split_clip
+
+    parent = "c" * 32 + "-2"
+    meta_path = write_clip(tmp_path, clipUid=parent)
+    new_paths = split_clip(
+        meta_path, [(0.0, 4.0)], trash_dir=tmp_path / ".trash", ffmpeg_path=FFMPEG_PATH, thumbnail=ThumbnailConfig(),
+    )
+    assert json.loads(new_paths[0].read_text(encoding="utf-8"))["clipUid"] == parent + "-1"
+
+
+@requires_ffmpeg
+def test_single_range_trim_keeps_the_clip_uid(tmp_path):
+    meta_path = write_clip(tmp_path, clipUid="d" * 32)
+    meta = trim_clip(meta_path, 2.0, 8.0, ffmpeg_path=FFMPEG_PATH, thumbnail=ThumbnailConfig())
+    assert meta["clipUid"] == "d" * 32
