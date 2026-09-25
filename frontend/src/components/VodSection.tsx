@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { formatBytes } from '../retention'
-import { analysisPercent, formatDuration, vodStatusLabel, type Vod } from '../vodGrouping'
+import { analysisBlockedReason, analysisPercent, formatDuration, vodStatusLabel, type Vod } from '../vodGrouping'
 import type { AnalysisJob } from '../vodApi'
 
 interface Props {
@@ -107,6 +107,7 @@ export function VodSection({
   const percent = running ? Math.round((job?.fraction ?? 0) * 100) : vod ? analysisPercent(vod) : 0
   const resolution = vod?.width && vod.height ? `${vod.height}p` : ''
   const canStart = vod !== null && vod.exists && !analysisBusy
+  const blockedReason = analysisBlockedReason(vod, analysisBusy)
 
   return (
     <section className="overflow-hidden rounded-xl border-2 border-zinc-600 bg-zinc-900/60">
@@ -169,7 +170,7 @@ export function VodSection({
                     type="button"
                     className="text-zinc-400 hover:text-sky-300 disabled:opacity-50"
                     disabled={!canStart}
-                    title="저장된 분석 결과로 클립만 다시 만듭니다(설정의 클립 구간·필터를 바꾼 뒤)"
+                    title={blockedReason || '저장된 분석 결과로 클립만 다시 만듭니다(설정의 클립 구간·필터를 바꾼 뒤)'}
                     onClick={() => onAnalyze({ rebuild: true })}
                   >
                     클립 다시 만들기
@@ -178,7 +179,7 @@ export function VodSection({
                     type="button"
                     className="text-zinc-400 hover:text-sky-300 disabled:opacity-50"
                     disabled={!canStart}
-                    title="판독까지 처음부터 다시 분석합니다"
+                    title={blockedReason || '판독까지 처음부터 다시 분석합니다'}
                     onClick={() => onAnalyze({ force: true })}
                   >
                     다시 분석
@@ -189,6 +190,7 @@ export function VodSection({
                   type="button"
                   className="rounded border border-sky-500/60 px-3 py-1 text-sky-300 hover:bg-sky-500/20 disabled:opacity-50"
                   disabled={!canStart}
+                  title={blockedReason}
                   onClick={() => onAnalyze({})}
                 >
                   {vod.status === 'new' ? '분석 시작' : '이어서 분석'}

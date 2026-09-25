@@ -292,3 +292,54 @@ def test_fs_videos_lists_folders_and_only_video_files(env):
     assert data["files"][0]["sizeBytes"] == 3000
     assert client.get("/api/fs/videos", params={"path": str(videos / "nope")}).status_code == 404
     assert client.get("/api/fs/videos").json()["dirs"]
+
+
+def test_listing_does_not_wait_for_slow_duration_probes_and_reports_probing(env, monkeypatch):
+    client, a, b, *_ = env
+    release = threading.Event()
+    probed = []
+
+    def slow_probe(path, ffmpeg):
+        probed.append(path.name)
+        release.wait(5)
+        return 1234.5
+
+    monkeypatch.setattr(vods_module, "_probe_duration", slow_probe)
+    started = time.time()
+    first = by_id(client.get("/api/vods"))
+    assert time.time() - started < 2
+    assert all(entry["probing"] and entry["durationSec"] is None for entry in first.values())
+
+    release.set()
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        second = by_id(client.get("/api/vods"))
+        if not any(entry["probing"] for entry in second.values()):
+            break
+        time.sleep(0.05)
+    assert all(entry["durationSec"] == 1234.5 and not entry["probing"] for entry in second.values())
+    assert sorted(probed) == ["a.mp4"]
+
+    client.get("/api/vods")
+    assert sorted(probed) == ["a.mp4"]
+
+
+def test_indexed_vods_and_missing_files_are_never_probed(env, monkeypatch):
+    client, a, b, vod_dir, *_ = env
+    vid = vod_id(a)
+    save_index(vod_dir, {"id": vid, "path": str(a), "status": "done", "durationSec": 99.0, "games": [], "clips": []})
+    probed = []
+    monkeypatch.setattr(vods_module, "_probe_duration", lambda path, ffmpeg: probed.append(path.name))
+    entry = by_id(client.get("/api/vods"))[vid]
+    time.sleep(0.3)
+    assert entry["durationSec"] == 99.0 and entry["probing"] is False
+    assert "a.mp4" not in probed
+
+
+def test_a_missing_file_is_not_probing(env):
+    client, a, b, vod_dir, *_ = env
+    vid = vod_id(a)
+    save_index(vod_dir, {"id": vid, "path": str(a), "status": "done", "durationSec": 5.0, "games": [], "clips": []})
+    a.unlink()
+    entry = by_id(client.get("/api/vods"))[vid]
+    assert entry["exists"] is False and entry["probing"] is False

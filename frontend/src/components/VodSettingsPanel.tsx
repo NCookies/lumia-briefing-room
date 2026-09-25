@@ -28,6 +28,7 @@ export function VodSettingsPanel({ onClipsDirChanged }: { onClipsDirChanged: () 
     try {
       await saveVodSettings({ vod: { sources: next } })
       setSources(next)
+      onClipsDirChanged()
     } catch (e) {
       setStatus((e as Error).message)
     }
@@ -61,6 +62,7 @@ export function VodSettingsPanel({ onClipsDirChanged }: { onClipsDirChanged: () 
     try {
       await saveVodSettings({ vod: { recursive: value } })
       setRecursive(value)
+      onClipsDirChanged()
     } catch (e) {
       setStatus((e as Error).message)
     }

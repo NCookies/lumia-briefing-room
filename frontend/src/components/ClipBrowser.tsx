@@ -25,6 +25,7 @@ import { ResultCard, ResultViewer } from './ResultCard'
 import { GameTimeline } from './GameTimeline'
 import { VodSection } from './VodSection'
 import { VideoFormatHelp } from './VideoFormatHelp'
+import { LoadingBar } from './LoadingBar'
 import { emptyStateKind } from '../emptyState'
 import { loadViewMode, saveViewMode, type ViewMode } from '../viewMode'
 import { formatMatchResult, gameRecordId, groupByGame, totalSize, withResultImage, type GameGroup } from '../grouping'
@@ -43,7 +44,7 @@ import {
   trashVodClips,
   type AnalysisJob,
 } from '../vodApi'
-import { formatDuration, formatGameRange, groupByVod, type Vod } from '../vodGrouping'
+import { formatDuration, formatGameRange, groupByVod, probeProgress, type Vod } from '../vodGrouping'
 
 export type ClipSource = 'steam' | 'vod'
 
@@ -101,6 +102,7 @@ export function ClipBrowser({
   const [resultViewKey, setResultViewKey] = useState<string | null>(null)
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
   const [vods, setVods] = useState<Vod[]>([])
+  const [vodsLoaded, setVodsLoaded] = useState(source !== 'vod')
   const [job, setJob] = useState<AnalysisJob | null>(null)
   const [collapsedVods, setCollapsedVods] = useState<Set<string>>(new Set())
   const [playingId, setPlayingId] = useState<string | null>(null)
@@ -145,6 +147,7 @@ export function ClipBrowser({
     listVods()
       .then(setVods)
       .catch((e: Error) => setError(e.message))
+      .finally(() => setVodsLoaded(true))
   }, [source])
 
   useEffect(() => {
@@ -152,6 +155,17 @@ export function ClipBrowser({
   }, [active, reloadVods])
 
   const runningVodId = vods.find((v) => v.status === 'analyzing')?.id ?? null
+  const probe = probeProgress(vods)
+
+  useEffect(() => {
+    if (!active || source !== 'vod' || !probe.active) return
+    const timer = setInterval(() => {
+      listVods()
+        .then(setVods)
+        .catch(() => {})
+    }, 2000)
+    return () => clearInterval(timer)
+  }, [active, source, probe.active])
 
   useEffect(() => {
     if (!active || source !== 'vod' || runningVodId === null) return
@@ -475,7 +489,7 @@ export function ClipBrowser({
   const listEmpty = source === 'steam' ? clips.length === 0 && records.length === 0 : vodGroups.length === 0
   const emptyKind = emptyStateKind({
     source,
-    loading,
+    loading: loading || !vodsLoaded,
     error: error !== null,
     empty: listEmpty,
     trashed: filter.trashed,
@@ -502,7 +516,17 @@ export function ClipBrowser({
             라벨 {labeled}/{total}
           </p>
         )}
-        {loading && <p className="text-zinc-400">불러오는 중입니다...</p>}
+        {loading && <LoadingBar label={source === 'vod' ? '클립 목록을 불러오는 중입니다…' : '클립 목록을 불러오는 중입니다…'} />}
+        {source === 'vod' && !loading && !vodsLoaded && <LoadingBar label="영상 파일 목록을 불러오는 중입니다…" />}
+        {source === 'vod' && vodsLoaded && probe.active && (
+          <div className="mb-3 rounded border border-zinc-700 bg-zinc-800/60 p-3">
+            <LoadingBar
+              label={`영상 정보를 읽는 중입니다 (${probe.done}/${probe.total})`}
+              detail="용량이 큰 영상은 길이를 읽는 데 1분 넘게 걸릴 수 있습니다. 그동안에도 다른 화면은 쓸 수 있고, 끝나면 목록이 자동으로 채워집니다."
+              percent={probe.percent}
+            />
+          </div>
+        )}
         {error && <p className="text-rose-400">오류가 발생했습니다: {error}</p>}
         {actionError && <p className="mb-2 text-rose-400">{actionError}</p>}
         {reprocessKey !== null && (
@@ -523,7 +547,7 @@ export function ClipBrowser({
               </button>
             )}
             {emptyKind === 'vod-no-sources' && (
-              <span className="flex items-center gap-2">
+              <span className="relative inline-flex">
                 <button
                   type="button"
                   className="rounded border border-sky-500/60 px-4 py-1.5 text-sm text-sky-300 hover:bg-sky-500/20"
@@ -531,7 +555,9 @@ export function ClipBrowser({
                 >
                   영상 경로 추가
                 </button>
-                <VideoFormatHelp />
+                <span className="absolute left-full top-1/2 ml-2 -translate-y-1/2">
+                  <VideoFormatHelp />
+                </span>
               </span>
             )}
           </div>

@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Callable
 from pathlib import Path
 
@@ -89,12 +90,30 @@ def register_vod_routes(
         except OSError:
             return None
 
-    def duration_of(path: Path) -> float | None:
+    probe_lock = threading.Lock()
+    pending: set[tuple[str, int, int]] = set()
+    prober = ThreadPoolExecutor(max_workers=1, thread_name_prefix="vod-probe")
+
+    def probe_in_background(key: tuple[str, int, int], path: Path) -> None:
+        try:
+            value = _probe_duration(path, discover_ffmpeg())
+        except Exception:
+            value = None
+        with probe_lock:
+            duration_cache[key] = value
+            pending.discard(key)
+
+    def duration_of(path: Path) -> tuple[float | None, bool]:
+        """(길이, 재는 중인지). 큰 영상은 길이를 재는 데 오래 걸려서(11GB 파일 실측 1분 이상) 목록 요청이 기다리지 않고 백그라운드로 잰다."""
         stat = path.stat()
         key = (str(path), stat.st_size, int(stat.st_mtime))
-        if key not in duration_cache:
-            duration_cache[key] = _probe_duration(path, discover_ffmpeg())
-        return duration_cache[key]
+        with probe_lock:
+            if key in duration_cache:
+                return duration_cache[key], False
+            if key not in pending:
+                pending.add(key)
+                prober.submit(probe_in_background, key, path)
+            return None, True
 
     def clip_stats(directory: Path) -> dict[str, dict]:
         stats: dict[str, dict] = {}
@@ -121,8 +140,9 @@ def register_vod_routes(
         exists = path.exists()
         size = path.stat().st_size if exists else (index or {}).get("size")
         duration = (index or {}).get("durationSec")
+        probing = False
         if duration is None and exists:
-            duration = duration_of(path)
+            duration, probing = duration_of(path)
         return {
             "id": vid,
             "path": str(path),
@@ -130,6 +150,7 @@ def register_vod_routes(
             "exists": exists,
             "sizeBytes": size,
             "durationSec": duration,
+            "probing": probing,
             "width": (index or {}).get("width"),
             "height": (index or {}).get("height"),
             "status": status_of(vid, index),

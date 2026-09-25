@@ -41,3 +41,17 @@ body {
   background: #38bdf8;
   cursor: ew-resize;
 }
+
+@keyframes lumia-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
+}
+
+.indeterminate-bar {
+  width: 30%;
+  animation: lumia-slide 1.2s ease-in-out infinite;
+}

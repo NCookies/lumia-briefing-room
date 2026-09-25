@@ -27,6 +27,7 @@ function vod(over: Partial<Vod> = {}): Vod {
     clipCount: 0,
     clipBytes: 0,
     trashedCount: 0,
+    probing: false,
     ...over,
   }
 }
@@ -131,4 +132,26 @@ test('vodStatusLabel and analysisPercent', () => {
   assert.equal(analysisPercent(vod({ analyzedSec: 1800, durationSec: 3600 })), 50)
   assert.equal(analysisPercent(vod({ analyzedSec: null })), 0)
   assert.equal(analysisPercent(vod({ analyzedSec: 9999, durationSec: 3600 })), 100)
+})
+
+import { probeProgress } from '../src/vodGrouping.ts'
+
+test('probe progress counts the videos whose length is still being read', () => {
+  const vods = [vod({ id: 'a', probing: true }), vod({ id: 'b', probing: false }), vod({ id: 'c', probing: true }), vod({ id: 'd' })]
+  assert.deepEqual(probeProgress(vods), { total: 4, pending: 2, done: 2, percent: 50, active: true })
+})
+
+test('probe progress is inactive when nothing is being read', () => {
+  assert.deepEqual(probeProgress([vod({ id: 'a' })]), { total: 1, pending: 0, done: 1, percent: 100, active: false })
+  assert.deepEqual(probeProgress([]), { total: 0, pending: 0, done: 0, percent: 100, active: false })
+})
+
+import { analysisBlockedReason } from '../src/vodGrouping.ts'
+
+test('a disabled analysis button always says why', () => {
+  assert.equal(analysisBlockedReason(vod(), false), '')
+  assert.match(analysisBlockedReason(vod({ exists: false }), false), /찾을 수 없/)
+  assert.match(analysisBlockedReason(vod(), true), /다른 영상을 분석하는 중/)
+  assert.match(analysisBlockedReason(vod({ exists: false }), true), /찾을 수 없/)
+  assert.equal(analysisBlockedReason(null, false), '')
 })

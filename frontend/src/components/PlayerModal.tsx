@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTuningUi } from '../appInfo'
 import { ClipId } from './ClipId'
 import { ClipVideo } from './ClipVideo'
 import { SIGNAL_LABELS } from '../labels'
@@ -42,6 +43,7 @@ export function PlayerModal({
 }: Props) {
   const clip = clips[index]
   const labeling = useLabelingUi()
+  const tuning = useTuningUi()
   const volumeRef = useRef(loadVolume())
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [trimming, setTrimming] = useState(false)
@@ -255,12 +257,14 @@ export function PlayerModal({
                 size="lg"
               />
             )}
-            <span className="text-xs text-zinc-500">
-              근거:{' '}
-              {(clip.pvpSignals ?? []).length
-                ? clip.pvpSignals.map((s) => SIGNAL_LABELS[s] ?? s).join(' · ')
-                : '없음'}
-            </span>
+            {tuning && (
+              <span className="text-xs text-zinc-500">
+                근거:{' '}
+                {(clip.pvpSignals ?? []).length
+                  ? clip.pvpSignals.map((s) => SIGNAL_LABELS[s] ?? s).join(' · ')
+                  : '없음'}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-4 text-xs text-zinc-400">
             <button

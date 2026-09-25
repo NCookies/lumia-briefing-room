@@ -11,11 +11,18 @@ import {
 } from '../backfill'
 import { cancelBackfill, getBackfillPreview, startBackfill } from '../backfillApi'
 import { formatBytes } from '../retention'
+import { LoadingBar } from './LoadingBar'
 
 interface Props {
   status: BackfillStatus
   onStatusChange: (status: BackfillStatus) => void
   onClose: () => void
+}
+
+function startBlockedReason(preview: BackfillPreview | null, busy: boolean): string {
+  if (!preview) return '스팀 녹화 파일을 확인하는 중입니다'
+  if (!preview.canStart) return preview.reason ?? '지금은 시작할 수 없습니다'
+  return busy ? '시작하는 중입니다' : ''
 }
 
 export function BackfillDialog({ status, onStatusChange, onClose }: Props) {
@@ -82,6 +89,12 @@ export function BackfillDialog({ status, onStatusChange, onClose }: Props) {
               게임 로그에는 최근 두 번 실행한 분량만 남아 있어, 그 이전 게임은 자동으로 클립이 만들어지지 않습니다.
               스팀 녹화 영상을 직접 살펴보고 그런 게임을 찾아 클립으로 만듭니다.
             </p>
+            {!preview && !error && (
+              <LoadingBar
+                label="스팀 녹화 파일을 확인하는 중입니다…"
+                detail="확인이 끝나면 분석을 시작할 수 있습니다. 녹화가 많으면 조금 걸립니다."
+              />
+            )}
             {preview && preview.canStart && (
               <dl className="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-1 rounded bg-zinc-900 p-3 text-sm">
                 <dt className="text-zinc-500">대상</dt>
@@ -157,9 +170,10 @@ export function BackfillDialog({ status, onStatusChange, onClose }: Props) {
               type="button"
               className="rounded bg-sky-600 px-4 py-1.5 text-sm hover:bg-sky-500 disabled:opacity-40"
               disabled={busy || !preview?.canStart}
+              title={startBlockedReason(preview, busy)}
               onClick={() => void start()}
             >
-              분석 시작
+              {preview ? '분석 시작' : '확인 중…'}
             </button>
           ) : (
             <button

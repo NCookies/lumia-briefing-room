@@ -31,6 +31,7 @@ export interface Vod {
   clipCount: number
   clipBytes: number
   trashedCount: number
+  probing: boolean
 }
 
 export interface VodClipLike {
@@ -101,6 +102,21 @@ export function groupByVod<T extends VodClipLike>(
   return groups.sort((a, b) => a.name.localeCompare(b.name, 'ko', { sensitivity: 'base' }))
 }
 
+export interface ProbeProgress {
+  total: number
+  pending: number
+  done: number
+  percent: number
+  active: boolean
+}
+
+export function probeProgress(vods: Pick<Vod, 'probing'>[]): ProbeProgress {
+  const total = vods.length
+  const pending = vods.filter((v) => v.probing).length
+  const done = total - pending
+  return { total, pending, done, percent: total === 0 ? 100 : Math.floor((done / total) * 100), active: pending > 0 }
+}
+
 export function formatDuration(sec: number | null | undefined): string {
   if (sec == null) return ''
   const total = Math.max(0, Math.floor(sec))
@@ -136,4 +152,11 @@ export function vodStatusLabel(status: VodStatus): string {
 export function analysisPercent(vod: Pick<Vod, 'analyzedSec' | 'durationSec'>): number {
   if (!vod.analyzedSec || !vod.durationSec) return 0
   return Math.min(100, Math.round((vod.analyzedSec / vod.durationSec) * 100))
+}
+
+export function analysisBlockedReason(vod: Pick<Vod, 'exists'> | null, analysisBusy: boolean): string {
+  if (vod === null) return ''
+  if (!vod.exists) return '영상 파일을 찾을 수 없어 분석할 수 없습니다'
+  if (analysisBusy) return '다른 영상을 분석하는 중입니다. 끝나면 시작할 수 있습니다'
+  return ''
 }
