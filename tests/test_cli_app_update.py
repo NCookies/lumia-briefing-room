@@ -112,3 +112,56 @@ def test_the_installer_relaunches_the_app_with_its_server_started():
     iss = (Path(__file__).resolve().parents[1] / "installer" / "lumia.iss").read_text(encoding="utf-8")
     relaunch = [line for line in iss.splitlines() if "Check: RelaunchRequested" in line]
     assert len(relaunch) == 1 and '--start-server' in relaunch[0]
+
+
+def test_installer_launch_is_deferred_until_the_app_has_exited():
+    launched = []
+    deferred = cli_app.DeferredInstaller(launch=launched.append)
+
+    deferred.launcher("C:/x/setup.exe")
+
+    assert launched == []
+    deferred.run_pending()
+    assert launched == ["C:/x/setup.exe"]
+    deferred.run_pending()
+    assert launched == ["C:/x/setup.exe"]
+
+
+def test_run_pending_without_an_installer_does_nothing():
+    launched = []
+    cli_app.DeferredInstaller(launch=launched.append).run_pending()
+    assert launched == []
+
+
+def test_a_failing_deferred_launch_does_not_crash_the_shutdown(caplog):
+    def broken(path):
+        raise OSError("실행 거부")
+
+    deferred = cli_app.DeferredInstaller(launch=broken)
+    deferred.launcher("C:/x/setup.exe")
+    deferred.run_pending()
+    assert "설치기" in caplog.text
+
+
+def test_update_route_hands_the_deferred_launcher_to_the_updater(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from lumia_briefing_room.api import update_routes
+    from lumia_briefing_room.api.app import create_app
+    from lumia_briefing_room.config import Config
+
+    captured = {}
+
+    class FakeUpdater:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        def status(self):
+            return {"enabled": False, "current": "0", "lastChecked": None, "available": None, "install": {}}
+
+    monkeypatch.setattr(update_routes, "Updater", FakeUpdater)
+    app = create_app(Config(), config_path=tmp_path / "c.json")
+    marker = object()
+    app.state.update_launcher = marker
+    TestClient(app).get("/api/update/status")
+    assert captured["launcher"] is marker

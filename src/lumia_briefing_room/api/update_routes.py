@@ -18,6 +18,7 @@ def register_update_routes(app: FastAPI) -> None:
             current = Updater(
                 config_path=app.state.config_path,
                 on_launched=getattr(app.state, "on_update_launched", None),
+                launcher=getattr(app.state, "update_launcher", None),
             )
             app.state.updater = current
         return current

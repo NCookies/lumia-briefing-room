@@ -15,7 +15,7 @@ from lumia_briefing_room import autostart, paths, procs, selftest, startup
 from lumia_briefing_room.cli import serve as serve_cli
 from lumia_briefing_room.cli.watch import build_parser, run
 from lumia_briefing_room.telemetry.sender import TelemetrySender
-from lumia_briefing_room.updater import Updater
+from lumia_briefing_room.updater import Updater, launch_installer
 from lumia_briefing_room.consent import needs_first_run
 from lumia_briefing_room.logsetup import default_log_path
 from lumia_briefing_room.single_instance import SingleInstance
@@ -100,6 +100,8 @@ def make_on_open(
                     app.state.on_recording_root_changed = on_recording_root_changed
                 if on_update_launched is not None:
                     app.state.on_update_launched = on_update_launched
+                if paths.is_frozen():
+                    app.state.update_launcher = deferred_installer.launcher
                 server, thread = serve_cli.run_server_in_thread(app, host=host, port=port)
                 serve_cli.wait_until_started(server)
                 state["server"] = server
@@ -174,6 +176,33 @@ def start_telemetry(config_path, *, sender=None):
     thread = threading.Thread(target=sender.run_forever, args=(stop,), daemon=True, name="telemetry")
     thread.start()
     return thread, stop
+
+
+class DeferredInstaller:
+    """설치기 실행을 앱이 완전히 종료된 뒤로 미룬다.
+
+    설치기는 시작할 때 실행 중인 앱(`AppMutex`)을 발견하면 조용한 모드에서 곧바로 중단한다(종료 코드 1). 그래서 설치기를 먼저 띄우고
+    앱을 나중에 닫으면 설치가 절대 진행되지 않는다. 앱이 단일 실행 잠금까지 놓은 뒤(`main` 의 끝)에 실행해야 한다. (plan-deploy.md D9)
+    """
+
+    def __init__(self, launch=launch_installer):
+        self._launch = launch
+        self._path = None
+
+    def launcher(self, path) -> None:
+        self._path = path
+
+    def run_pending(self) -> None:
+        path, self._path = self._path, None
+        if path is None:
+            return
+        try:
+            self._launch(path)
+        except Exception:
+            log.exception("종료 뒤 설치기를 실행하지 못했다: %s", path)
+
+
+deferred_installer = DeferredInstaller()
 
 
 def update_notice(release: dict) -> tuple[str, str]:
@@ -259,6 +288,7 @@ def main(argv: list[str] | None = None) -> None:
         raise
     finally:
         instance.close()
+        deferred_installer.run_pending()
 
 
 def _run_app(args, instance: SingleInstance) -> None:
