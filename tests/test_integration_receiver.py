@@ -177,3 +177,16 @@ def test_dev_mode_data_lands_apart_from_release_data(tmp_path, server):
     release = [i for i in exported(server) if i["installId"] == install_id]
     dev = httpx.get(f"{server}/v1/admin/labels?mode=dev", headers={"X-Admin-Token": ADMIN_TOKEN}, timeout=10).json()["labels"]
     assert release == [] and any(i["installId"] == install_id for i in dev)
+
+
+def test_diagnostics_send_returns_distinct_receipt_ids(tmp_path, server):
+    import re
+
+    env = Env(tmp_path, server)
+    sender = env.sender()
+    first = sender.send_diagnostics()
+    second = sender.send_diagnostics()
+    assert first["ok"] is True and second["ok"] is True
+    pattern = re.compile(r"^R-\d{8}-[0-9A-Z]{6}$")
+    assert pattern.match(first["receiptId"]) and pattern.match(second["receiptId"])
+    assert first["receiptId"] != second["receiptId"]
