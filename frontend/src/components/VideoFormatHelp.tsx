@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAppInfo, videoFormatHelpText } from '../appInfo'
 
-export function VideoFormatHelp() {
+export function VideoFormatHelp({ centered = false }: { centered?: boolean }) {
   const text = videoFormatHelpText(useAppInfo().videoFormats)
   const [open, setOpen] = useState(false)
   if (!text) return null
@@ -22,7 +22,7 @@ export function VideoFormatHelp() {
       {open && (
         <span
           role="tooltip"
-          className="absolute left-0 top-full z-20 mt-1 w-72 whitespace-pre-line rounded border border-zinc-600 bg-zinc-800 p-2 text-left text-xs text-zinc-200 shadow-lg"
+          className={`absolute top-full z-20 mt-1 w-72 ${centered ? 'left-1/2 -translate-x-1/2' : 'left-0'} whitespace-pre-line rounded border border-zinc-600 bg-zinc-800 p-2 text-left text-xs text-zinc-200 shadow-lg`}
         >
           {text}
         </span>

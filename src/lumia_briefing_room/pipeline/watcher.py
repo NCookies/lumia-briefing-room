@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone, tzinfo
 from pathlib import Path
 
+from lumia_briefing_room.activity import registry as activity_registry
 from lumia_briefing_room.config import Config
 from lumia_briefing_room.pipeline.playerlog import MatchBoundary, extract_matches
 from lumia_briefing_room.steam_paths import find_steam_install_path, read_buffer_minutes_override
@@ -227,8 +228,10 @@ def run_polling(
                 no_session.add(key)
                 continue
             margin = remaining_margin_minutes(m.start_utc, now(), buffer_minutes)
+            label = f"게임 분석 중 ({m.start_utc.astimezone().strftime('%m/%d %H:%M')} 시작)"
             try:
-                process(session_dir, m, should_rescue(margin, rescue_threshold_min))
+                with activity_registry.track("watch", label):
+                    process(session_dir, m, should_rescue(margin, rescue_threshold_min))
             except Exception:
                 failures[key] = failures.get(key, 0) + 1
                 log.exception("매치 %s 처리 실패 (%d/%d)", key, failures[key], max_failures)

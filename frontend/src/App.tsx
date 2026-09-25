@@ -5,6 +5,9 @@ import { ClipBrowser, type ClipSource } from './components/ClipBrowser'
 import { FirstRunScreen } from './components/FirstRunScreen'
 import { SettingsModal } from './components/SettingsModal'
 import { UpdateBanner } from './components/UpdateBanner'
+import { ActivityBar } from './components/ActivityBar'
+import { activityLabels } from './activity'
+import { useActivity } from './useActivity'
 import { getConfirmDelete, setConfirmDelete } from './exportApi'
 import { getFirstRun } from './onboardingApi'
 import { isBackfillActive, progressPercent, type BackfillStatus } from './backfill'
@@ -60,6 +63,7 @@ export default function App() {
   }, [])
 
   const backfillRunning = isBackfillActive(backfill.state)
+  const { tasks, refreshTick } = useActivity(backfillRunning)
   useEffect(() => {
     if (!backfillRunning) return
     const timer = window.setInterval(() => {
@@ -137,6 +141,10 @@ export default function App() {
         </div>
       </header>
 
+      <ActivityBar
+        labels={activityLabels(tasks, backfillRunning ? `과거 녹화 분석 중 ${progressPercent(backfill)}%` : null)}
+      />
+
       <UpdateBanner
         onOpenAbout={() => {
           setSettingsTab('about')
@@ -151,6 +159,7 @@ export default function App() {
             active={tab === t.id}
             confirmDelete={confirmDelete}
             onConfirmDeleteChange={changeConfirmDelete}
+            refreshTick={refreshTick}
             onBackfill={() => setShowBackfill(true)}
             backfillLabel={backfillRunning ? `과거 녹화 분석 중 ${progressPercent(backfill)}%` : '과거 녹화 분석'}
             onAddVodSources={() => {

@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from lumia_briefing_room import __version__, autostart, native_dialog, paths, video_formats
+from lumia_briefing_room import __version__, activity, autostart, native_dialog, paths, video_formats
 from lumia_briefing_room.appmode import resolve_mode
 from lumia_briefing_room.api.clips import find_clip, scan_clips, to_summary_dict
 from lumia_briefing_room.pipeline.clip_uid import ensure_clip_uid
@@ -609,6 +609,10 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             "bytesToFree": plan.bytes_to_free,
             "applied": not dry_run and cfg.retention.auto_clean_enabled,
         }
+
+    @app.get("/api/activity")
+    def get_activity():
+        return {"tasks": activity.registry.snapshot()}
 
     @app.get("/api/app-info")
     def get_app_info():

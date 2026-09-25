@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   deleteClipForever,
   deleteGameRecord,
@@ -78,6 +78,7 @@ interface Props {
   onBackfill: () => void
   backfillLabel: string
   onAddVodSources: () => void
+  refreshTick: number
 }
 
 export function ClipBrowser({
@@ -88,6 +89,7 @@ export function ClipBrowser({
   onBackfill,
   backfillLabel,
   onAddVodSources,
+  refreshTick,
 }: Props) {
   const [filter, setFilter] = useState<FilterState>(source === 'vod' ? { ...DEFAULT_FILTER, sort: 'asc' } : DEFAULT_FILTER)
   const labeling = useLabelingUi()
@@ -113,9 +115,11 @@ export function ClipBrowser({
   const [viewMode, setViewMode] = useState<ViewMode>(() => loadViewMode(source))
   const ask = useConfirm()
 
-  const reload = useCallback(() => {
-    setLoading(true)
-    setError(null)
+  const reload = useCallback((silent = false) => {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+    }
     listClips({
       tags: filter.tags,
       dayNight: filter.dayNight || undefined,
@@ -127,7 +131,9 @@ export function ClipBrowser({
       source,
     })
       .then(setClips)
-      .catch((e: Error) => setError(e.message))
+      .catch((e: Error) => {
+        if (!silent) setError(e.message)
+      })
       .finally(() => setLoading(false))
     if (source === 'steam' && !filterActive(filter)) {
       listGameRecords()
@@ -142,6 +148,8 @@ export function ClipBrowser({
     if (active) reload()
   }, [active, reload])
 
+  const handledTick = useRef(refreshTick)
+
   const reloadVods = useCallback(() => {
     if (source !== 'vod') return
     listVods()
@@ -153,6 +161,14 @@ export function ClipBrowser({
   useEffect(() => {
     if (active) reloadVods()
   }, [active, reloadVods])
+
+  useEffect(() => {
+    if (handledTick.current === refreshTick) return
+    handledTick.current = refreshTick
+    if (!active) return
+    reload(true)
+    reloadVods()
+  }, [refreshTick, active, reload, reloadVods])
 
   const runningVodId = vods.find((v) => v.status === 'analyzing')?.id ?? null
   const probe = probeProgress(vods)
@@ -547,7 +563,7 @@ export function ClipBrowser({
               </button>
             )}
             {emptyKind === 'vod-no-sources' && (
-              <span className="relative inline-flex">
+              <>
                 <button
                   type="button"
                   className="rounded border border-sky-500/60 px-4 py-1.5 text-sm text-sky-300 hover:bg-sky-500/20"
@@ -555,10 +571,11 @@ export function ClipBrowser({
                 >
                   영상 경로 추가
                 </button>
-                <span className="absolute left-full top-1/2 ml-2 -translate-y-1/2">
-                  <VideoFormatHelp />
+                <span className="flex items-center gap-1.5 text-xs text-zinc-500">
+                  어떤 영상을 넣을 수 있나요?
+                  <VideoFormatHelp centered />
                 </span>
-              </span>
+              </>
             )}
           </div>
         )}
