@@ -2,23 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAppInfo } from '../appInfo'
 import { formatReleaseDate, isCurrentRelease, type PatchNoteRelease } from '../patchNotes'
 import { getPatchNotes } from '../patchNotesApi'
-import { parseInlineBold } from '../telemetry'
-
-function Inline({ text }: { text: string }) {
-  return (
-    <>
-      {parseInlineBold(text).map((part, i) =>
-        part.bold ? (
-          <strong key={i} className="font-semibold text-zinc-100">
-            {part.text}
-          </strong>
-        ) : (
-          <span key={i}>{part.text}</span>
-        ),
-      )}
-    </>
-  )
-}
+import { PatchNoteSections } from './PatchNoteBody'
 
 export function PatchNotesDialog({ onClose }: { onClose: () => void }) {
   const info = useAppInfo()
@@ -64,18 +48,7 @@ export function PatchNotesDialog({ onClose }: { onClose: () => void }) {
                 )}
                 <span className="text-xs font-normal text-zinc-500">{formatReleaseDate(release.date)}</span>
               </h3>
-              {release.sections.map((section, i) => (
-                <div key={i} className="flex flex-col gap-1">
-                  {section.title && <h4 className="text-xs font-medium text-zinc-400">{section.title}</h4>}
-                  <ul className="list-disc space-y-1 pl-5 text-sm text-zinc-300">
-                    {section.items.map((item, j) => (
-                      <li key={j}>
-                        <Inline text={item} />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+              <PatchNoteSections sections={release.sections} />
             </section>
           ))}
         </div>
