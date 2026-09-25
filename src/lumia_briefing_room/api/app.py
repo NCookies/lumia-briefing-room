@@ -25,6 +25,7 @@ from lumia_briefing_room.api.export import (
     list_subdirs,
     parent_of,
 )
+from lumia_briefing_room.api.admin_routes import register_admin_routes
 from lumia_briefing_room.api.backfill_routes import register_backfill_routes
 from lumia_briefing_room.api.onboarding import register_onboarding_routes
 from lumia_briefing_room.api.app_info_routes import register_app_info_routes
@@ -708,6 +709,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     register_onboarding_routes(app, current_config=current_config, put_config=put_config)
     register_telemetry_routes(app)
     register_app_info_routes(app)
+    register_admin_routes(app, current_config=current_config)
     register_update_routes(app)
     register_backfill_routes(app, current_config=current_config)
     return app

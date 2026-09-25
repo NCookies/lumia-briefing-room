@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useAppInfo, versionLabel } from './appInfo'
+import { showTuningUi, useAppInfo, versionLabel } from './appInfo'
+import { AdminPanel } from './components/AdminPanel'
 import { BackfillDialog } from './components/BackfillDialog'
 import { ClipBrowser, type ClipSource } from './components/ClipBrowser'
 import { FirstRunScreen } from './components/FirstRunScreen'
@@ -20,19 +21,26 @@ const TABS: { id: ClipSource; label: string }[] = [
   { id: 'steam', label: '스팀 녹화' },
   { id: 'vod', label: '영상 파일' },
 ]
+const ADMIN_TAB = { id: 'admin', label: '관리자' } as const
+type Tab = ClipSource | typeof ADMIN_TAB.id
 const TAB_KEY = 'lumia.tab'
 
-function loadTab(): ClipSource {
+function loadTab(): Tab {
   try {
-    return localStorage.getItem(TAB_KEY) === 'vod' ? 'vod' : 'steam'
+    const saved = localStorage.getItem(TAB_KEY)
+    return saved === 'vod' || saved === 'admin' ? saved : 'steam'
   } catch {
     return 'steam'
   }
 }
 
 export default function App() {
-  const version = versionLabel(useAppInfo())
-  const [tab, setTab] = useState<ClipSource>(loadTab)
+  const appInfo = useAppInfo()
+  const version = versionLabel(appInfo)
+  const isDev = showTuningUi(appInfo)
+  const [savedTab, setTab] = useState<Tab>(loadTab)
+  const tab: Tab = savedTab === 'admin' && !isDev ? 'steam' : savedTab
+  const navTabs: { id: Tab; label: string }[] = isDev ? [...TABS, ADMIN_TAB] : TABS
   const [showSettings, setShowSettings] = useState(false)
   const [settingsTab, setSettingsTab] = useState<'general' | 'vod' | 'about'>('general')
   const [browserKey, setBrowserKey] = useState(0)
@@ -83,7 +91,7 @@ export default function App() {
     setConfirmDelete(value).catch(() => {})
   }
 
-  const selectTab = (next: ClipSource) => {
+  const selectTab = (next: Tab) => {
     setTab(next)
     try {
       localStorage.setItem(TAB_KEY, next)
@@ -103,7 +111,7 @@ export default function App() {
             <UpdateBadge />
           </h1>
           <nav className="flex gap-1" role="tablist">
-            {TABS.map((t) => (
+            {navTabs.map((t) => (
               <button
                 key={t.id}
                 type="button"
@@ -148,6 +156,12 @@ export default function App() {
       />
 
       <UpdateBanner />
+
+      {isDev && (
+        <div className={tab === 'admin' ? 'flex flex-1 flex-col' : 'hidden'}>
+          <AdminPanel active={tab === 'admin'} />
+        </div>
+      )}
 
       {TABS.map((t) => (
         <div key={`${t.id}-${browserKey}`} className={tab === t.id ? 'flex flex-1 flex-col' : 'hidden'}>

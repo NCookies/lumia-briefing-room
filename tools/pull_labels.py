@@ -22,13 +22,14 @@ from pathlib import Path
 
 import httpx
 
+from lumia_briefing_room.admin_labels import AdminError, fetch_page
+
 TOKEN_ENV = "LUMIA_ADMIN_TOKEN"
 PAGE_LIMIT = 500
 LOCAL_LABELS = {"combat": "pvp", "other": "pve"}
 
 
-class PullError(Exception):
-    pass
+PullError = AdminError
 
 
 @dataclass
@@ -51,22 +52,7 @@ def _local_record(item: dict) -> dict:
 
 
 def _fetch_page(client: httpx.Client, mode: str, after: str | None) -> dict:
-    params = {"mode": mode, "limit": PAGE_LIMIT}
-    if after:
-        params["after"] = after
-    try:
-        response = client.get("/v1/admin/labels", params=params)
-    except httpx.HTTPError as exc:
-        raise PullError(f"서버에 연결하지 못했습니다 ({type(exc).__name__})") from exc
-    if response.status_code == 401:
-        raise PullError("관리자 토큰이 맞지 않습니다")
-    if response.status_code == 404:
-        raise PullError("서버의 관리자 API 가 꺼져 있습니다(서버 .env 에 ADMIN_TOKEN 이 없다)")
-    if response.status_code == 429:
-        raise PullError("요청이 너무 많아 서버가 잠시 막았습니다. 잠시 뒤에 다시 시도하세요")
-    if response.status_code != 200:
-        raise PullError(f"서버가 오류를 돌려줬습니다 (HTTP {response.status_code})")
-    return response.json()
+    return fetch_page(client, mode, after, PAGE_LIMIT)
 
 
 def pull(client: httpx.Client, out: Path, *, mode: str, full: bool = False) -> PullResult:
