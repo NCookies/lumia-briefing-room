@@ -10,6 +10,8 @@ export interface TelemetryStatus {
   pendingLogs: number
   lastLabelsSentAt: number | null
   lastLogsSentAt: number | null
+  lastDiagnosticReceipt: string | null
+  lastDiagnosticAt: number | null
 }
 
 export interface TelemetryPreview {
@@ -121,3 +123,35 @@ export function parseInlineBold(text: string): InlinePart[] {
   if (last < text.length) parts.push({ text: text.slice(last), bold: false })
   return parts
 }
+
+export interface DiagnosticsPreview {
+  displayId: string
+  mode: 'dev' | 'release'
+  env: Record<string, unknown>
+  count: number
+  items: Record<string, unknown>[]
+  endpointConfigured: boolean
+  canSend: boolean
+}
+
+export interface DiagnosticsResult {
+  ok: boolean
+  receiptId: string | null
+  saved: number
+}
+
+export function diagnosticsSummary(preview: DiagnosticsPreview): string {
+  const parts = [
+    preview.count === 0 ? '오류 기록 없음' : `오류 기록 ${preview.count}건`,
+    `환경 정보 ${Object.keys(preview.env).length}항목`,
+  ]
+  if ('readFailStats' in preview.env) parts.push('판독 실패 통계 포함')
+  return parts.join(' · ')
+}
+
+export const receiptShareText = (receipt: string | null, displayId: string): string =>
+  receipt ? `접수 번호 ${receipt} (설치 ID ${displayId})` : `설치 ID ${displayId}`
+
+export const DISPLAY_ID_NOTICE =
+  '커뮤니티 등에 이 ID 를 알리면 이 ID 로 보낸 데이터가 본인과 연결될 수 있습니다. 프로그램을 다시 설치하거나 설정 폴더를 지우면 새 ID 가 만들어집니다. ' +
+  '보낸 데이터를 지우는 요청은 이 짧은 ID 가 아니라 위의 전체 설치 식별자로만 합니다.'

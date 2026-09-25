@@ -105,3 +105,39 @@ test('the real privacy document parses without leaving markdown markers behind',
   const flat = JSON.stringify(blocks)
   assert.ok(!flat.includes('"text":"#'))
 })
+
+import {
+  DISPLAY_ID_NOTICE,
+  diagnosticsSummary,
+  receiptShareText,
+  type DiagnosticsPreview,
+} from '../src/telemetry.ts'
+
+const previewBase: DiagnosticsPreview = {
+  displayId: 'LUMIA-7K3F-9QX2',
+  mode: 'release',
+  env: { appVersion: '0.1.3', os: 'Windows 11', readFailStats: { no_region: 2 } },
+  count: 3,
+  items: [],
+  endpointConfigured: true,
+  canSend: true,
+}
+
+test('diagnostics summary counts error records and environment items', () => {
+  assert.equal(diagnosticsSummary(previewBase), '오류 기록 3건 · 환경 정보 3항목 · 판독 실패 통계 포함')
+  assert.equal(
+    diagnosticsSummary({ ...previewBase, count: 0, env: { appVersion: '0.1.3' } }),
+    '오류 기록 없음 · 환경 정보 1항목',
+  )
+})
+
+test('receipt share text has the receipt and the short id, or just the id when there is no receipt', () => {
+  assert.equal(receiptShareText('R-20260925-K7M3QX', 'LUMIA-7K3F-9QX2'), '접수 번호 R-20260925-K7M3QX (설치 ID LUMIA-7K3F-9QX2)')
+  assert.equal(receiptShareText(null, 'LUMIA-7K3F-9QX2'), '설치 ID LUMIA-7K3F-9QX2')
+})
+
+test('the display id notice warns about sharing and reinstalling and says deletion needs the full id', () => {
+  assert.match(DISPLAY_ID_NOTICE, /본인과 연결/)
+  assert.match(DISPLAY_ID_NOTICE, /다시 설치/)
+  assert.match(DISPLAY_ID_NOTICE, /전체 설치 식별자/)
+})

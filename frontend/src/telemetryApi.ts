@@ -1,4 +1,4 @@
-import type { TelemetryPreview, TelemetryStatus } from './telemetry'
+import type { DiagnosticsPreview, DiagnosticsResult, TelemetryPreview, TelemetryStatus } from './telemetry'
 
 const BASE = '/api'
 
@@ -24,6 +24,12 @@ export const getTelemetryPreview = async (): Promise<TelemetryPreview> =>
 
 export const deleteSentData = async (): Promise<{ ok: boolean; deleted: boolean }> =>
   jsonOrThrow(await fetch(`${BASE}/telemetry/delete`, { method: 'POST' }), '삭제 요청')
+
+export const getDiagnosticsPreview = async (): Promise<DiagnosticsPreview> =>
+  jsonOrThrow(await fetch(`${BASE}/telemetry/diagnostics/preview`), '진단 내용 불러오기')
+
+export const sendDiagnostics = async (): Promise<DiagnosticsResult> =>
+  jsonOrThrow(await fetch(`${BASE}/telemetry/diagnostics/send`, { method: 'POST' }), '진단 정보 보내기')
 
 export const getPrivacyText = async (): Promise<string> =>
   (await jsonOrThrow<{ markdown: string }>(await fetch(`${BASE}/privacy`), '개인정보 처리 안내 불러오기')).markdown

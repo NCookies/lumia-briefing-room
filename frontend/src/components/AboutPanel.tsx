@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useAppInfo } from '../appInfo'
 import { RESOLUTION_TONE, type FirstRunInfo } from '../onboarding'
-import { DIAGNOSTICS_URL, getFirstRun } from '../onboardingApi'
+import { getFirstRun } from '../onboardingApi'
 import { DEFAULT_CHOICES, consentPatch, type ConsentChoices } from '../consent'
 import { getConsentChoices, saveConsentPatch } from '../consentApi'
 import { useLabelingState } from '../labelingContext'
 import { ConsentChoicesForm } from './ConsentChoicesForm'
+import { DiagnosticsPanel } from './DiagnosticsPanel'
 import { TelemetryPanel } from './TelemetryPanel'
 
 const TONE_CLASS = {
@@ -78,22 +79,7 @@ export function AboutPanel() {
         )}
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium text-zinc-200">진단 정보 내보내기</h3>
-        <p className="text-xs text-zinc-500">
-          로그·버전·녹화 해상도와 코덱·설정을 zip 하나로 묶습니다. 닉네임과 경로 속 사용자 이름은 지워지고,
-          영상이나 화면은 들어가지 않습니다. 자동으로 전송되지 않으니, 문제를 알릴 때 이 파일을 직접 첨부해 주세요.
-        </p>
-        <div>
-          <a
-            href={DIAGNOSTICS_URL}
-            download
-            className="inline-block rounded bg-sky-600 px-4 py-1.5 text-sm hover:bg-sky-500"
-          >
-            진단 정보 zip 받기
-          </a>
-        </div>
-      </section>
+      <DiagnosticsPanel />
     </div>
   )
 }
