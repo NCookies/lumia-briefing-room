@@ -8,7 +8,7 @@
 - [docs/plan-pipeline.md](plan-pipeline.md) — 파이프라인 자동화(SPEC 2단계) 구현 계획 및 진행 상태
 - [docs/plan-ui.md](plan-ui.md) — 열람 UI(SPEC 3단계) 구현 계획 및 진행 상태
 - [docs/plan-pvp.md](plan-pvp.md) — PvP 판별(SPEC 4단계) 구현 계획 및 진행 상태
-- [docs/plan-deploy.md](plan-deploy.md) — 공개 배포 계획. D1~D6·D10·D14 구현 완료, D7 은 파일 정리 완료·git 이력 정리 대기. D13 배포 자동화는 워크플로 구현 완료(수동 실행 통과, 태그 릴리스는 아직). 남은 것은 D9 자동 업데이트
+- [docs/plan-deploy.md](plan-deploy.md) — 공개 배포 계획. D1~D6·D10·D14 구현 완료, D7 은 파일 정리 완료·git 이력 정리 대기. D13 배포 자동화는 완료(v0.1.3 태그 릴리스까지 자동으로 성공). 남은 것은 D9 자동 업데이트
 - [docs/friend-guide.md](friend-guide.md) — **친구에게 설치기와 같이 주는 안내문**(설치·확인 항목·진단 파일 보내는 법)
 - [docs/plan-vod.md](plan-vod.md) — 다시보기(VOD) 클립(SPEC 5단계) 설계 및 진행 상태. 분석·클립 생성, API, UI 탭("다시보기")까지 구현됐다(아래 "실행 방법 8")
 
