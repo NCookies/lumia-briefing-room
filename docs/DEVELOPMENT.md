@@ -107,6 +107,7 @@ python -m lumia_briefing_room.cli.app \
 
 `--open-ui` 를 주지 않으면 UI 는 자동으로 열리지 않고 트레이 메뉴 "열기" 로 연다
 (`ui.startMinimized=false` 로 설정해도 시작 시 자동으로 열린다).
+`--start-server` 는 브라우저는 열지 않고 열람 서버만 먼저 띄운다 — 앱 안 업데이트 뒤 설치기가 앱을 다시 실행할 때 쓰며(`installer/lumia.iss` 의 `/RELAUNCH=1` 항목), 열려 있던 탭이 자동으로 새로고침돼 되살아나게 한다.
 
 **업데이트(D9)**: 트레이가 뜨면 `update.check` 가 켜진 경우에만 업데이트 확인 스레드가 시작 후·하루 1회 GitHub Releases 를 조회해 새 버전을 트레이 알림과 UI 배너로 알린다(꺼져 있으면 네트워크 0회). 꺼져 있어도 UI 옵션 → 정보·진단의 "업데이트 확인"·"업데이트"로 수동 확인·설치한다. 설치기 실행은 exe 로 빌드한 앱에서만 되고(개발 모드는 거부), 테스트는 `pytest tests/test_updater.py tests/test_update_routes.py`(로컬 HTTP 서버가 GitHub 를 흉내 내므로 인터넷 불필요). 상태 파일은 `%LOCALAPPDATA%\LumiaBriefingRoom\update_state.json`, 받은 설치기는 같은 폴더의 `updates\`.
 

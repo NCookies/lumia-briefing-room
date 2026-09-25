@@ -76,7 +76,7 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{#AppName} 실행"; Flags: nowait postinstall skipifsilent
 ; 앱 안 업데이트(plan-deploy.md D9)가 /SILENT /RELAUNCH=1 로 실행하면 끝난 뒤 앱을 다시 띄운다. 다른 무인 설치(/VERYSILENT 검증 등)는 띄우지 않는다.
-Filename: "{app}\{#AppExe}"; Flags: nowait; Check: RelaunchRequested
+Filename: "{app}\{#AppExe}"; Parameters: "--start-server"; Flags: nowait; Check: RelaunchRequested
 
 [Code]
 function RelaunchRequested: Boolean;

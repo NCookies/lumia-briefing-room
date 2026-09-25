@@ -91,7 +91,7 @@ def make_on_open(
     state: dict = {}
     start_lock = threading.Lock()
 
-    def on_open() -> None:
+    def ensure_server() -> None:
         with start_lock:
             if "server" not in state:
                 cfg = load_config(config_path)
@@ -104,8 +104,12 @@ def make_on_open(
                 serve_cli.wait_until_started(server)
                 state["server"] = server
                 state["thread"] = thread
+
+    def on_open() -> None:
+        ensure_server()
         open_browser(access_url(port))
 
+    on_open.ensure_server = ensure_server
     return on_open
 
 
@@ -220,13 +224,23 @@ def run_selftest_command(args) -> bool:
     return ok
 
 
+def build_app_parser():
+    parser = build_parser()
+    parser.add_argument("--open-ui", action="store_true", help="시작하자마자 열람 UI 를 연다")
+    parser.add_argument(
+        "--start-server",
+        action="store_true",
+        help="브라우저는 열지 않고 열람 서버만 먼저 띄운다(업데이트 뒤 재시작에서 열려 있던 탭이 되살아나게 한다)",
+    )
+    parser.add_argument("--selftest", action="store_true", help="번들 리소스를 점검하고 보고서를 남긴다")
+    parser.add_argument("--quiet", action="store_true", help="--selftest 보고서를 자동으로 열지 않는다")
+    return parser
+
+
 def main(argv: list[str] | None = None) -> None:
     startup.setup_logging()
     startup.install_excepthooks()
-    parser = build_parser()
-    parser.add_argument("--open-ui", action="store_true", help="시작하자마자 열람 UI 를 연다")
-    parser.add_argument("--selftest", action="store_true", help="번들 리소스를 점검하고 보고서를 남긴다")
-    parser.add_argument("--quiet", action="store_true", help="--selftest 보고서를 자동으로 열지 않는다")
+    parser = build_app_parser()
     args = parser.parse_args(argv)
 
     if args.selftest:
@@ -269,6 +283,8 @@ def _run_app(args, instance: SingleInstance) -> None:
     )
 
     instance.listen(on_open)
+    if args.start_server:
+        threading.Thread(target=on_open.ensure_server, daemon=True).start()
     if should_open_ui_on_start(cfg, open_ui=args.open_ui):
         threading.Thread(target=on_open, daemon=True).start()
 
