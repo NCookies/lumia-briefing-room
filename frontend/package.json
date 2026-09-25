@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "test": "node --experimental-strip-types --test tests/labeling.test.ts tests/grouping.test.ts tests/retention.test.ts tests/trimming.test.ts tests/timeline.test.ts tests/viewMode.test.ts tests/vodGrouping.test.ts tests/appInfo.test.ts tests/onboarding.test.ts tests/consent.test.ts tests/playback.test.ts tests/backfill.test.ts tests/telemetry.test.ts tests/patchNotes.test.ts tests/update.test.ts tests/emptyState.test.ts tests/activity.test.ts tests/playerLayout.test.ts",
+    "test": "node --experimental-strip-types --test tests/labeling.test.ts tests/grouping.test.ts tests/retention.test.ts tests/trimming.test.ts tests/timeline.test.ts tests/viewMode.test.ts tests/vodGrouping.test.ts tests/appInfo.test.ts tests/onboarding.test.ts tests/consent.test.ts tests/playback.test.ts tests/backfill.test.ts tests/telemetry.test.ts tests/patchNotes.test.ts tests/update.test.ts tests/emptyState.test.ts tests/activity.test.ts tests/playerLayout.test.ts tests/helpTip.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {
