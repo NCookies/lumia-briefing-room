@@ -17,8 +17,8 @@ def test_scrub_replaces_user_name_in_windows_paths():
 
 
 def test_scrub_is_case_insensitive_for_user_paths():
-    out = scrub_text(r"c:\users\tester\x", usernames=["tester"], nicknames=[])
-    assert "tester" not in out and "tester" not in out.lower().replace("<user>", "")
+    out = scrub_text(r"c:\users\TESTER\x", usernames=["tester"], nicknames=[])
+    assert "TESTER" not in out and "tester" not in out.lower().replace("<user>", "")
 
 
 def test_scrub_replaces_standalone_user_name_when_long_enough():

@@ -1,15 +1,15 @@
 # 수신 서버 인프라 계획 (OCI · Terraform · 도커)
 
 > 대상: [plan-deploy.md D10·§7-11](plan-deploy.md) (라벨·오류 로그 수신처), [SPEC §7.11](SPEC.md) (동의 기반 데이터 전송), [SPEC §6 v2 이후 후보](SPEC.md) (호스팅 공유).
-> 인프라 코드와 **구성·운영 방법의 상세는 별도 저장소 [infra-owner/infra]((infra repository)) (`infra`) 의 README** 에 있다. 이 문서는 계획·결정과 이 저장소와의 연결 지점만 다룬다. 각 단계를 끝낼 때 아래 체크박스와 "확인 필요"를 갱신한다.
+> 인프라 코드와 **구성·운영 방법의 상세는 별도 저장소 별도 인프라 저장소(`infra`, 이 저장소 옆 폴더)의 README** 에 있다. 이 문서는 계획·결정과 이 저장소와의 연결 지점만 다룬다. 각 단계를 끝낼 때 아래 체크박스와 "확인 필요"를 갱신한다.
 
 ## 0. 진행 상태
 
 - [x] 계획 수립 (이 문서)
-- [x] I1. 별도 저장소 생성 — `infra` (범용 이름, 다른 프로젝트 인프라도 여기서 관리). Terraform 상태는 로컬 파일. 서버는 Python FastAPI 로 결정
+- [x] I1. 별도 저장소 생성 — 인프라 저장소 (범용 이름, 다른 프로젝트 인프라도 여기서 관리). Terraform 상태는 로컬 파일. 서버는 Python FastAPI 로 결정
 - [x] I2. Terraform 으로 OCI 기본 인프라(VCN·게이트웨이·라우트 테이블·보안 목록·서브넷·VM) 구성 — **2026-09-25 `apply` 완료.** VM 은 `VM.Standard.E2.1.Micro`(A1 은 `LaunchInstance` 404 로 실패, [§7](#7-실제-구성-2026-09-25)). 로컬 상태 파일
 - [x] I3. 도커로 수신 API 컨테이너 배포 (1단계 저장: 파일) — caddy + receiver + watchtower, `https://server.example.invalid` 에서 동작. 실서버에서 토큰 없음 401·라벨 저장·삭제·`/docs` 404 확인. 자동 업데이트(ghcr + watchtower, **간격 5분 — 나중에 1~2시간으로 늘릴 TODO**)
-- [x] I3-b. **서버 전송 계약 확정·구현·배포 (2026-09-25)** — 계약 원본 `infra\contract`, 서버 스키마를 앱 실제 메타데이터와 대조해 확정, `POST /v1/diagnostics`(접수 번호), `mode=dev` 분리, 90일 자동 삭제, 접근 로그 IP 비활성, watchtower 2시간(`WATCHTOWER_POLL_INTERVAL`), 일별 집계, 다중 토큰. pytest 55개 통과. **실서버 배포·읽기 전용 스모크 완료**(caddy 설정 서버에서 `caddy validate`, `docker compose up -d`; 토큰 없는 `/v1/diagnostics`·`/v1/labels`·`DELETE` 401, `/docs` 404, `/healthz` 200, 재기동 후 컨테이너 로그에 클라이언트 IP 없음 — 라벨 등 데이터를 쓰는 요청은 하지 않았다). 이 저장소의 계약 테스트는 [D10 전송 계약](plan-deploy.md#d10-라벨오류-로그-전송--서버-전송-계약) 참고
+- [x] I3-b. **서버 전송 계약 확정·구현·배포 (2026-09-25)** — 계약 원본 infra 저장소의 `contract/`, 서버 스키마를 앱 실제 메타데이터와 대조해 확정, `POST /v1/diagnostics`(접수 번호), `mode=dev` 분리, 90일 자동 삭제, 접근 로그 IP 비활성, watchtower 2시간(`WATCHTOWER_POLL_INTERVAL`), 일별 집계, 다중 토큰. pytest 55개 통과. **실서버 배포·읽기 전용 스모크 완료**(caddy 설정 서버에서 `caddy validate`, `docker compose up -d`; 토큰 없는 `/v1/diagnostics`·`/v1/labels`·`DELETE` 401, `/docs` 404, `/healthz` 200, 재기동 후 컨테이너 로그에 클라이언트 IP 없음 — 라벨 등 데이터를 쓰는 요청은 하지 않았다). 이 저장소의 계약 테스트는 [D10 전송 계약](plan-deploy.md#d10-라벨오류-로그-전송--서버-전송-계약) 참고
 - [x] I3-c. **요청 제한·이상 요청 차단·Discord 알림 (2026-09-25 코드·로컬 도커 통합 테스트 완료, **실서버 반영 완료**)** — IP 별 메모리 제한(10분에 60회, 거부 15회 → 1시간 차단, 429), 알림은 IP 앞 두 자리만·시간당 10건 상한, 웹훅 URL 은 `.env` 로만. pytest 68개, caddy→receiver 실제 경로에서 차단·healthz 예외·로그에 클라이언트 IP 없음 확인. 실서버에서도 토큰 없는 요청 15회 뒤 429 를 확인(이 시험으로 제 IP 가 1시간 메모리 차단됨). **같은 날 발견·수정한 결함**: I3-b 의 "재기동 뒤 로그에 IP 없음" 확인은 부족했고, 서버 IP 로 직접 접속한 요청은 caddy 접근 로그에 IP 가 남고 있었다 → 전역 `log { exclude http.log.access }` 로 수정·재검증
 - [x] I4. **이 저장소 쪽 전송 클라이언트 연결 (2026-09-25, plan-deploy D10)** — 앱→서버 전송, 서버→로컬 가져오기(`tools/pull_labels.py`), 통합 테스트(`pytest -m integration`, 로컬 도커의 receiver 컨테이너)까지. 실서버에는 2026-09-25 새 이미지·`ADMIN_TOKEN` 을 반영했다(읽기 전용 스모크와 `pull_labels.py` 확인)
 - [x] I3-d. **라벨 내보내기 관리자 API (2026-09-25)** — `GET /v1/admin/labels`(관리자 토큰 `X-Admin-Token`, `ADMIN_TOKEN` 이 비면 404, dev/release 분리, (수신 시각·설치·클립 키) 커서 페이지, 응답 `cursor` 로 증분 수집). 로그·진단은 내보내지 않는다. 계약에 라벨 `source`(recording/vod) 추가
@@ -78,7 +78,7 @@
 
 ## 7. 실제 구성 (2026-09-25)
 
-설정 방법·운영 명령·문제 해결은 [infra 저장소 README]((infra repository)) 에 자세히 적었다. 여기에는 결정과 실측만 남긴다.
+설정 방법·운영 명령·문제 해결은 infra 저장소 README 에 자세히 적었다. 여기에는 결정과 실측만 남긴다.
 
 - **결정된 것**: 서버는 Python FastAPI, Terraform 상태는 로컬 파일, 인프라 저장소 이름은 범용 `infra`(다른 프로젝트·AWS 도 여기서 관리할 수 있게 나중에 `terraform/oci`·`terraform/aws` 로 분리), 도메인은 `server.example.invalid`(가비아 A 레코드 → VM 공인 IP, caddy 가 Let's Encrypt HTTPS 자동 발급), 인증은 공유 토큰(`X-Api-Token`) + 요청 본문 20MB 상한.
 - **A1 은 실패했다.** `VM.Standard.A1.Flex` 로 `apply` 하니 네트워크는 만들어졌지만 `LaunchInstance` 가 `404-NotAuthorizedOrNotFound` 였다. 원인은 확인하지 못했고(권한 문제는 아님), 콘솔 기본 shape 이던 `VM.Standard.E2.1.Micro`(x86, 1GB, Always Free)로 바꿔 성공했다. 이 계정은 이전 프로젝트에서 만들다 만 micro 가 1개 있어 한도가 `1 of 2` 였고, 이번 VM 으로 무료 micro 슬롯이 다 찼다.

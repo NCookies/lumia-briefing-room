@@ -129,7 +129,7 @@
 - [x] 게임 화면 이미지·라벨 제거: `_samples` 340장·`*_labels.jsonl` 3개를 추적에서 뺐다(개발 PC 파일은 그대로, `.gitignore` 로 무시). 예외 규칙 `!data/templates/**/*.png` 삭제. `test_shipped_templates` 의 라벨셋 자기 판독 테스트는 파일이 없으면 skip.
 - [x] **빌드 스크립트가 `data/` 를 통째로 번들에 넣던 문제를 고쳤다.** `_samples`·라벨이 설치본(이미 D8 에 나간 것 포함)에 들어 있었다. 이제 `characters.json` 과 `templates/*/*.npz` 만 넣고, `verify_bundle` 이 `_samples`·`*_labels.jsonl` 이 있으면 실패시킨다. 이 PC 에서 다시 빌드해 번들에 없음·`--selftest` 통과 확인(0.1.3, 토큰 없는 빌드).
 - [x] pystray LGPL 교체 가능성(§7-15): PyInstaller CLI 에는 옵션이 없어 `tools/pyi_hooks/hook-pystray.py`(`module_collection_mode = "py"`)로 `_internal/pystray/*.py` 로 풀었다. 작은 빌드로 풀린 `__init__.py` 를 고치면 실행 파일이 고친 파일을 읽는 것을 확인했고, 실제 빌드본에도 풀려 있다. `verify_bundle` 이 이를 확인한다.
-- [x] 시크릿 스캔: 현재 트리·이력에서 토큰·키 값은 나오지 않았다(서버 토큰은 빌드 때 환경변수로만 들어가고 `data/telemetry_endpoint.json` 은 gitignore). 개인 경로는 `scripts/probe/eval_signal_precision.py` 의 `C:/Users/<이름>/` 를 홈 폴더 기준으로 고쳤다(이력에는 남음). 이력의 저자는 가짜 주소 하나(`dev@lumia-briefing-room.local`). 테스트 픽스처의 이름·닉네임은 개인정보 제거 검증용 값이다.
+- [x] 시크릿 스캔: 현재 트리·이력에서 토큰·키 값은 나오지 않았다(서버 토큰은 빌드 때 환경변수로만 들어가고 `data/telemetry_endpoint.json` 은 gitignore). 개인 경로는 `scripts/probe/eval_signal_precision.py` 의 `C:/Users/<이름>/` 를 홈 폴더 기준으로 고쳤다(이력에는 남음). 이력의 저자는 가짜 주소 하나(`dev@lumia-briefing-room.local`). 테스트 픽스처의 이름·닉네임·스팀 계정 번호는 가짜 값으로 바꿨다(닉네임 `테스트닉`, 사용자 `tester`, 계정 `100000001`).
 - [x] 문서에 게임 화면 이미지 참조 없음, 추적 중인 이미지는 SVG 두 개뿐이었고(Vite 템플릿, 참조 안 됨) 삭제했다. 앱 아이콘은 `icon.py` 가 직접 그리는 파란 원+재생 삼각형이다. 공식 로고·UI 이미지 없음.
 - [x] README 분리: 루트 `README.md` = 사용자용(설치·SmartScreen·스팀 배경 녹화·지원 해상도·안티치트/개인정보·진단·연락처·비공식 고지), `docs/DEVELOPMENT.md` = 개발자용(기존 README 내용). `CLAUDE.md` 의 문서 갱신 규칙도 새 위치로 바꿨다.
 - [ ] **git 이력 정리(§7-6)** — 이력에 `_samples` 이미지가 남아 있다. 방식은 사용자가 고른다(새 저장소 이력 없이 시작 / `git filter-repo`). 실행 전 백업 필수.
@@ -164,7 +164,7 @@
 
 결정한 것: ① 오류 수집은 `app.log` 파싱 대신 구조화 핸들러 outbox ② 서버 관리자 API(`GET /v1/admin/labels`)로 `tools/pull_labels.py` 가 라벨을 가져온다 ③ 토큰은 빌드 때 환경변수로 번들에 주입 ④ 다시보기 클립 라벨도 보낸다(`source=vod`) ⑤ 삭제 요청 성공 시 전송을 끄고 로컬 전송 기록을 지운다 ⑥ `consent.version` 3(라벨·오류 로그만 다시 묻는다). **발견·수정한 것**: 로그 핸들러가 같은 파일에 두 번 붙어 모든 줄이 두 번 기록되던 문제, 테스트 실행이 실제 사용자의 `app.log` 에 트레이스백을 남기던 문제(테스트가 사용자 폴더를 임시 폴더로 바꿔 쓴다). **환경 정보의 런타임 측정값(2026-09-25 추가, 버전 0.1.2)**: `telemetry/runtime_stats.py` 가 프록시를 만들 때 쓴 인코더·걸린 시간(최근 20개 평균), 실시간 분석 시간 ÷ 게임 길이(`analysisTimeRatio`, 게임 중 부하 판단용 — plan-deploy §7-14), 분석에 하드웨어 디코딩을 썼는지(`hwaccel`, 측정 전에는 다시보기 분석 설정)를 `%LOCALAPPDATA%\LumiaBriefingRoom\runtime_stats.json` 에 스스로 기록하고, 프론트가 시작할 때 `POST /api/client-capabilities` 로 알리는 HEVC 재생 가능 여부(`hevcPlayable`)와 함께 환경 정보에 싣는다. **아직 모으지 않는 것**: 신호별 수치 `pvpSignalValues`(검출기가 결과에 담지 않는다).
 
-**계약의 원본은 infra 저장소의 [`contract/receiver.schema.json`]((infra repository))(`infra\contract`)** 이고, 이 저장소의 [`tests/contract/`](../tests/contract/receiver.schema.json)는 `tools/sync_contract.py` 로 복사한 것이다. 수락·거부 예시는 `tests/contract/fixtures/`. 서버 테스트와 [`tests/test_contract.py`](../tests/test_contract.py)가 같은 픽스처를 쓰므로 한쪽만 고치면 그쪽 테스트가 깨진다. 서버 API·운영은 infra README.
+**계약의 원본은 infra 저장소의 `contract/receiver.schema.json`(별도 인프라 저장소의 `contract/`)** 이고, 이 저장소의 [`tests/contract/`](../tests/contract/receiver.schema.json)는 `tools/sync_contract.py` 로 복사한 것이다. 수락·거부 예시는 `tests/contract/fixtures/`. 서버 테스트와 [`tests/test_contract.py`](../tests/test_contract.py)가 같은 픽스처를 쓰므로 한쪽만 고치면 그쪽 테스트가 깨진다. 서버 API·운영은 infra README.
 
 | 경로 | 보내는 것 | 응답 |
 |---|---|---|
