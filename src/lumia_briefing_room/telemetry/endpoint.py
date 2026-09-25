@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 
+from lumia_briefing_room.envfile import normalize_server_url
 from lumia_briefing_room import paths
 from lumia_briefing_room.telemetry.client import Endpoint
 
@@ -32,4 +33,4 @@ def load_endpoint(cfg, environ=None) -> Endpoint | None:
     url = cfg.telemetry.server_url or environ.get(URL_ENV) or bundled.get("url")
     if not isinstance(token, str) or not token.strip() or not isinstance(url, str) or not url.strip():
         return None
-    return Endpoint(url=url.strip().rstrip("/"), token=token.strip())
+    return Endpoint(url=normalize_server_url(url), token=token.strip())

@@ -104,3 +104,7 @@ def test_environment_never_raises_when_probes_fail(monkeypatch, tmp_path):
     except RuntimeError:
         raise AssertionError("환경 정보 수집이 예외를 밖으로 냈다")
     assert env["appVersion"]
+
+
+def test_a_bare_host_in_the_server_address_becomes_https(monkeypatch):
+    assert load_endpoint(cfg(), environ={"LUMIA_RECEIVER_URL": "r.example.com/", "LUMIA_RECEIVER_TOKEN": "t"}).url == "https://r.example.com"

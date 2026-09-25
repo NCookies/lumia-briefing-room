@@ -154,3 +154,13 @@ def test_credentials_come_from_the_env_file_when_not_in_the_environment(monkeypa
     monkeypatch.delenv("LUMIA_RECEIVER_URL", raising=False)
     assert admin_labels.read_credentials(env) == ("https://f.example", "from-file")
     assert "LUMIA_ADMIN_TOKEN" not in __import__("os").environ
+
+
+def test_a_token_that_cannot_be_a_header_is_a_503_not_a_crash(monkeypatch, tmp_path):
+    env = tmp_path / ".env"
+    env.write_text("LUMIA_ADMIN_TOKEN=abc주석\nLUMIA_RECEIVER_URL=https://r.example\n", encoding="utf-8")
+    monkeypatch.delenv("LUMIA_ADMIN_TOKEN", raising=False)
+    monkeypatch.delenv("LUMIA_RECEIVER_URL", raising=False)
+    monkeypatch.setattr(admin_labels, "ENV_FILE", env)
+    r = TestClient(create_app(Config())).get("/api/admin/summary")
+    assert r.status_code == 503 and "LUMIA_ADMIN_TOKEN" in r.json()["detail"] and "abc" not in r.text

@@ -29,6 +29,8 @@ def register_admin_routes(app: FastAPI, *, current_config) -> None:
             raise HTTPException(503, f"관리자 토큰이 없습니다. 저장소 루트 .env 에 {admin_labels.TOKEN_ENV} 를 넣고 앱을 다시 실행하세요")
         if not url:
             raise HTTPException(503, f"서버 주소가 없습니다. 저장소 루트 .env 에 {admin_labels.URL_ENV} 를 넣고 앱을 다시 실행하세요")
+        if not token.isascii() or not token.isprintable() or " " in token:
+            raise HTTPException(503, f"{admin_labels.TOKEN_ENV} 값이 올바르지 않습니다(한글·공백·줄 끝 설명이 섞였는지 .env 를 확인하세요)")
         return admin_labels.make_client(url, token)
 
     def load(mode: str, refresh: bool) -> list[dict]:

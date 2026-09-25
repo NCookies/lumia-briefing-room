@@ -12,7 +12,7 @@ from pathlib import Path
 import httpx
 
 from lumia_briefing_room import paths
-from lumia_briefing_room.envfile import load_env_file
+from lumia_briefing_room.envfile import load_env_file, normalize_server_url
 
 TOKEN_ENV = "LUMIA_ADMIN_TOKEN"
 URL_ENV = "LUMIA_RECEIVER_URL"
@@ -28,7 +28,7 @@ def read_credentials(env_file: Path | None = None) -> tuple[str, str]:
     """(서버 주소, 관리자 토큰). 환경변수가 `.env` 보다 우선하고, 이 프로세스의 환경변수는 건드리지 않는다."""
     env = dict(os.environ)
     load_env_file(env_file or ENV_FILE, env)
-    return env.get(URL_ENV, "").strip().rstrip("/"), env.get(TOKEN_ENV, "").strip()
+    return normalize_server_url(env.get(URL_ENV, "")), env.get(TOKEN_ENV, "").strip()
 
 
 def make_client(url: str, token: str) -> httpx.Client:
