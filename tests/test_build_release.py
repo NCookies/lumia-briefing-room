@@ -264,3 +264,41 @@ def test_verify_bundle_requires_the_endpoint_file_only_when_a_token_was_injected
     (out / "_internal" / "data").mkdir(parents=True, exist_ok=True)
     (out / "_internal" / "data" / "telemetry_endpoint.json").write_text("{}", encoding="utf-8")
     assert build_release.verify_bundle(out, expect_endpoint=True) == []
+
+
+def test_data_specs_never_include_the_labeled_sample_images_or_labels(tmp_path: Path):
+    root = _fake_tree(tmp_path)
+    for rel in ("data/templates/days/_samples/1_00.png", "data/templates/digits/2560x1440_samples/0_00.png", "data/templates/days/2560x1440_labels.jsonl"):
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text("x", encoding="utf-8")
+
+    specs = build_release.data_specs(root)
+    sources = [Path(source) for source, _ in specs]
+
+    assert root / "data" not in sources
+    assert not any("_samples" in str(s) or s.suffix == ".jsonl" for s in sources)
+    assert (str(root / "data" / "templates" / "days" / "2560x1440.npz"), "data/templates/days") in specs
+    assert (str(root / "data" / "characters.json"), "data") in specs
+
+
+def test_pystray_is_collected_as_loose_py_files_for_lgpl_replaceability(tmp_path: Path):
+    args = build_release.pyinstaller_args(_fake_tree(tmp_path), version="0.1.0", icon=tmp_path / "i.ico")
+    hooks = Path(args[args.index("--additional-hooks-dir") + 1])
+
+    assert "module_collection_mode" in (hooks / "hook-pystray.py").read_text(encoding="utf-8")
+
+
+def test_verify_bundle_rejects_sample_images_and_a_packed_pystray(tmp_path: Path):
+    out = _complete_bundle(tmp_path)
+    internal = out / "_internal"
+    for rel in ("data/templates/days/_samples/1_00.png", "data/templates/days/2560x1440_labels.jsonl"):
+        (internal / rel).parent.mkdir(parents=True, exist_ok=True)
+        (internal / rel).write_text("x", encoding="utf-8")
+
+    (internal / "pystray" / "__init__.py").unlink()
+
+    problems = build_release.verify_bundle(out)
+
+    assert any("_samples" in p for p in problems)
+    assert any("_labels.jsonl" in p for p in problems)
+    assert any("pystray" in p for p in problems)

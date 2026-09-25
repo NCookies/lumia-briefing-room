@@ -49,7 +49,10 @@ REQUIRED_IN_BUNDLE = (
     "docs/privacy.md",
     "vendor/ffmpeg/ffmpeg.exe",
     "vendor/ffmpeg/ffprobe.exe",
+    "pystray/__init__.py",
 )
+FORBIDDEN_IN_BUNDLE = ("data/templates/**/_samples", "data/templates/**/*_samples", "data/**/*_labels.jsonl")
+HOOKS_DIR = Path(__file__).resolve().parent / "pyi_hooks"
 
 
 class BuildError(Exception):
@@ -69,9 +72,17 @@ def data_specs(root: Path) -> list[tuple[str, str]]:
 
     ffmpeg 는 여기 넣지 않는다 — PyInstaller 가 datas 안의 .dll 을 바이너리로도 분류해
     `_internal` 루트에 한 벌 더 복사하는 바람에 149MB 가 통째로 중복됐다(실측). 빌드 뒤에 직접 복사한다.
+
+    특히 `data/` 를 통째로 넣지 않는다 — 개발 PC 에 있는 본보기 라벨셋 원본(`_samples`, 게임 화면 조각)과 `*_labels.jsonl` 이
+    설치본에 딸려 들어가기 때문이다(공개 저장소에서 뺀 것을 설치기로 다시 배포하게 된다).
     """
+    templates = [
+        (str(npz), f"data/templates/{npz.parent.name}")
+        for npz in sorted((root / "data" / "templates").glob("*/*.npz"))
+    ]
     return [
-        (str(root / "data"), "data"),
+        (str(root / "data" / "characters.json"), "data"),
+        *templates,
         (str(root / "src" / "lumia_briefing_room" / "profiles" / "builtin"), "lumia_briefing_room/profiles/builtin"),
         (str(root / "frontend" / "dist"), "frontend/dist"),
         (str(root / "docs" / "privacy.md"), "docs"),
@@ -141,6 +152,7 @@ def pyinstaller_args(root: Path, *, version: str, icon: Path, work_dir: Path | N
     ]
     for source, dest in data_specs(root):
         args += ["--add-data", f"{source}{SEP}{dest}"]
+    args += ["--additional-hooks-dir", str(HOOKS_DIR)]
     for name in HIDDEN_IMPORTS:
         args += ["--hidden-import", name]
     for name in COLLECT_DATA:
@@ -188,6 +200,9 @@ def verify_bundle(out_dir: Path, *, expect_endpoint: bool = False) -> list[str]:
     for rel in REQUIRED_IN_BUNDLE:
         if not (base / rel).exists():
             problems.append(f"번들에 빠졌다: {rel}")
+    for pattern in FORBIDDEN_IN_BUNDLE:
+        for found in sorted(base.glob(pattern)):
+            problems.append(f"번들에 있으면 안 된다(공개 배포 대상이 아님): {found.relative_to(base).as_posix()}")
     if expect_endpoint and not (base / ENDPOINT_FILE).exists():
         problems.append(f"번들에 빠졌다: {ENDPOINT_FILE} (토큰을 넣는 빌드인데 파일이 없다)")
     return problems
