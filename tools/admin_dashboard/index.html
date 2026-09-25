@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>루미아 관리자 대시보드</title>
+<style>
+  :root { color-scheme: light dark; --bg:#f6f7f9; --fg:#1b1f24; --card:#fff; --line:#d8dce2; --mute:#66707c; --accent:#2b6cb0; --warn:#b42318; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14171b; --fg:#e6e8eb; --card:#1d2126; --line:#333a42; --mute:#9aa4af; --accent:#63a4ec; --warn:#f97066; } }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--fg); font:14px system-ui,"Malgun Gothic",sans-serif; }
+  main { max-width:1100px; margin:0 auto; }
+  header { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; }
+  h1 { font-size:20px; margin:0; } h2 { font-size:15px; margin:0 0 8px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin:12px 0; }
+  .big { font-size:28px; font-weight:600; } .mute { color:var(--mute); font-size:12px; }
+  table { width:100%; border-collapse:collapse; } th,td { text-align:left; padding:4px 8px; border-bottom:1px solid var(--line); }
+  .scroll { overflow-x:auto; }
+  .bar { display:flex; align-items:center; gap:8px; margin:3px 0; } .bar i { display:block; height:10px; background:var(--accent); border-radius:2px; }
+  input,select,button { font:inherit; padding:5px 8px; border:1px solid var(--line); border-radius:6px; background:var(--card); color:var(--fg); }
+  button { cursor:pointer; } .err { color:var(--warn); margin:12px 0; } .mono { font-family:ui-monospace,Consolas,monospace; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>루미아 관리자 대시보드</h1>
+    <div class="row">
+      <select id="mode"><option value="release">release</option><option value="dev">dev</option></select>
+      <button id="refresh">새로고침</button>
+    </div>
+  </header>
+  <div id="error" class="err" hidden></div>
+  <section class="grid" id="stats"></section>
+  <section class="grid" id="charts"></section>
+  <section class="card">
+    <h2>설치별</h2>
+    <div class="scroll"><table id="installs"></table></div>
+  </section>
+  <section class="card" style="margin-top:12px">
+    <h2>라벨 검색</h2>
+    <div class="row">
+      <input id="q" placeholder="installId 앞부분 또는 clipKey" size="34">
+      <select id="kind"><option value="">전체</option><option value="combat">combat</option><option value="other">other</option></select>
+      <button id="prev">이전</button><button id="next">다음</button>
+      <span id="pageinfo" class="mute"></span>
+    </div>
+    <div class="scroll"><table id="labels"></table></div>
+  </section>
+</main>
+<script>
+const PAGE = 50;
+let offset = 0, total = 0;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const mode = () => $("mode").value;
+
+async function api(path, params) {
+  const res = await fetch(path + "?" + new URLSearchParams(params));
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.detail || "HTTP " + res.status);
+  return body;
+}
+
+function bars(title, data) {
+  const max = Math.max(1, ...Object.values(data));
+  const rows = Object.entries(data).map(([k, v]) =>
+    `<div class="bar"><span style="min-width:90px">${esc(k)}</span><i style="width:${(v / max) * 100}px"></i><span>${v}</span></div>`).join("");
+  return `<div class="card"><h2>${title}</h2>${rows || '<span class="mute">없음</span>'}</div>`;
+}
+
+async function loadSummary(refresh) {
+  const s = await api("/api/summary", { mode: mode(), refresh: refresh ? 1 : 0 });
+  $("stats").innerHTML =
+    `<div class="card"><div class="mute">라벨</div><div class="big">${s.total}</div></div>` +
+    `<div class="card"><div class="mute">설치</div><div class="big">${s.installs}</div></div>` +
+    `<div class="card"><div class="mute">마지막 수신</div><div>${esc(s.lastReceivedAt || "-")}</div></div>`;
+  $("charts").innerHTML = bars("라벨 종류", s.byLabel) + bars("앱 버전", s.byVersion) + bars("해상도", s.byResolution) + bars("수신 일자", s.byDay);
+  $("installs").innerHTML = "<tr><th>installId</th><th>라벨</th><th>combat</th><th>other</th><th>마지막 수신</th></tr>" +
+    s.perInstall.map((r) => `<tr><td class="mono">${esc(r.installId)}</td><td>${r.count}</td><td>${r.combat}</td><td>${r.other}</td><td>${esc(r.lastReceivedAt)}</td></tr>`).join("");
+}
+
+async function loadLabels() {
+  const r = await api("/api/labels", { mode: mode(), q: $("q").value, userLabel: $("kind").value, limit: PAGE, offset });
+  total = r.total;
+  $("pageinfo").textContent = total ? `${offset + 1}–${Math.min(offset + PAGE, total)} / ${total}` : "결과 없음";
+  $("labels").innerHTML = "<tr><th>수신</th><th>installId</th><th>clipKey</th><th>종류</th><th>버전</th><th>해상도</th></tr>" +
+    r.items.map((it) => `<tr><td>${esc(it.receivedAt)}</td><td class="mono">${esc(it.installId)}</td><td class="mono">${esc(it.label.clipKey)}</td><td>${esc(it.label.userLabel)}</td><td>${esc(it.appVersion)}</td><td>${esc(it.label.sourceWidth)}x${esc(it.label.sourceHeight)}</td></tr>`).join("");
+}
+
+async function run(refresh) {
+  $("error").hidden = true;
+  try { await loadSummary(refresh); await loadLabels(); }
+  catch (e) { $("error").textContent = e.message; $("error").hidden = false; }
+}
+
+$("refresh").onclick = () => { offset = 0; run(true); };
+$("mode").onchange = () => { offset = 0; run(false); };
+$("kind").onchange = () => { offset = 0; run(false); };
+let timer;
+$("q").oninput = () => { clearTimeout(timer); timer = setTimeout(() => { offset = 0; run(false); }, 250); };
+$("prev").onclick = () => { offset = Math.max(0, offset - PAGE); run(false); };
+$("next").onclick = () => { if (offset + PAGE < total) { offset += PAGE; run(false); } };
+run(false);
+</script>
+</body>
+</html>

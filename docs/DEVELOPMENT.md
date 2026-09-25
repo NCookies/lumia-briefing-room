@@ -295,6 +295,7 @@ python tools/eval_pvp.py pulled_labels                   # 가져온 라벨로 �
 ```
 
   다음 실행부터는 새로 온·고쳐서 다시 온 라벨만 받는다(`--full` 은 처음부터, `--mode dev` 는 개발 모드 데이터).
+- **관리자 대시보드** (내 PC 전용, 앱과 별개 진입점): `admin.bat`(= `python tools/admin_dashboard.py [--url URL] [--port 8100] [--no-open]`). 저장소 루트 `.env` 의 `LUMIA_ADMIN_TOKEN`·`LUMIA_RECEIVER_URL`(또는 같은 이름의 환경변수)을 읽어 서버의 `GET /v1/admin/labels` 로 라벨을 받아 `http://127.0.0.1:8100/` 에 라벨 수·종류·앱 버전·해상도·수신 일자·설치별 집계와 `installId`(앞부분)/`clipKey` 검색을 보여 준다. 토큰은 이 프로세스만 갖고 브라우저에는 넘기지 않는다. 프론트 빌드는 필요 없다(`tools/admin_dashboard/index.html` 한 장). 화면의 release/dev 선택이 서버의 `mode` 이고, "새로고침"을 눌러야 서버에서 다시 받는다. 서버 상태·오류 로그·진단 번들은 서버에 읽기 API 가 없어 아직 보여 주지 못한다([plan-infra §8](plan-infra.md)).
 
 ### 13. 릴리스 (GitHub Actions, D13)
 
@@ -334,6 +335,7 @@ git push origin v0.1.4
 | `tools/rescore_clips.py` | 저장된 클립 메타데이터의 교전 점수를 재검출 없이 다시 계산 |
 | `tools/eval_pvp.py` | UI 에서 찍은 교전/사냥 라벨로 점수를 평가 (가중치·임계 튜닝) |
 | `tools/eval_detect.py` | 라벨셋 대비 검출 정확도 리포트 |
+| `tools/admin_dashboard.py` (`admin.bat`) | 서버 라벨 관리자 대시보드(로컬 127.0.0.1:8100, 관리자 토큰 `LUMIA_ADMIN_TOKEN`, 릴리스에 안 들어감) |
 | `tools/pull_labels.py` | 서버에 쌓인 라벨을 로컬로 받아 `eval_pvp.py` 가 읽는 `.labels/` 형태로 저장 (관리자 토큰은 환경변수 `LUMIA_ADMIN_TOKEN`, 증분 수집, `--full`·`--mode dev`) |
 | `tools/release_tools.py` | 릴리스 파이프라인 보조(태그·버전·패치노트 확인, SHA-256 파일, 릴리스 본문, VirusTotal 업로드). 워크플로가 부른다 — 아래 "13" |
 | `tools/sync_contract.py` | 서버와 공유하는 전송 계약을 infra 저장소(infra 저장소의 `contract/`)에서 `tests/contract` 로 복사 (`--check` 는 차이만 확인, `--source` 로 경로 지정) |
