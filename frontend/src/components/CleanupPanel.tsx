@@ -120,8 +120,17 @@ export function CleanupPanel() {
         <p className="text-xs text-zinc-500">
           켜면 1시간마다 아래 기준을 넘은 클립을 자동으로 정리합니다. 끄면 클립과 휴지통의 파일이 자동으로 삭제되지 않습니다.
         </p>
+        {!on && (
+          <p className="rounded border border-zinc-600 bg-zinc-800/60 px-3 py-1.5 text-xs text-zinc-300">
+            자동 정리가 꺼져 있어 아래 정리 기준·삭제 방식·보호 설정은 적용되지 않습니다(회색으로 표시됩니다).
+          </p>
+        )}
       </section>
 
+      <fieldset
+        disabled={!on}
+        className={`flex flex-col gap-5 border-0 p-0 transition-opacity ${on ? '' : 'opacity-40 grayscale'}`}
+      >
       <section className="flex flex-col gap-2">
         <h3 className="text-sm font-medium text-zinc-200">정리 기준 (체크한 기준만 적용됩니다)</h3>
         <label className="flex items-center gap-2 text-sm text-zinc-300">
@@ -226,6 +235,11 @@ export function CleanupPanel() {
           ))}
         </div>
         <p className="text-xs text-zinc-500">선택한 태그가 붙은 클립은 정리하지 않습니다.</p>
+      </section>
+      </fieldset>
+
+      <section className="flex flex-col gap-2">
+        <h3 className="text-sm font-medium text-zinc-200">게임 기록</h3>
         <label className="flex items-center gap-2 text-sm text-zinc-300">
           <input
             type="checkbox"

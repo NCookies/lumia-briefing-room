@@ -4,10 +4,12 @@ import { LABEL_NOTE_MAX, clampLabelNote } from '../consent'
 export function LabelNoteInput({
   clipId,
   value,
+  disabled = false,
   onSave,
 }: {
   clipId: string
   value: string | null | undefined
+  disabled?: boolean
   onSave: (note: string | null) => void
 }) {
   const [draft, setDraft] = useState(value ?? '')
@@ -22,9 +24,12 @@ export function LabelNoteInput({
   return (
     <div className="flex flex-col gap-1">
       <textarea
-        className="w-full resize-none rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm"
+        className="w-full resize-none rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
         rows={2}
-        placeholder="라벨 메모 (선택) — 왜 이렇게 판단했는지 적어 주세요"
+        disabled={disabled}
+        placeholder={
+          disabled ? '라벨(교전 / 그 외)을 먼저 고르면 메모를 적을 수 있습니다' : '라벨 메모 (선택) — 왜 이렇게 판단했는지 적어 주세요'
+        }
         value={draft}
         maxLength={LABEL_NOTE_MAX}
         onChange={(e) => setDraft(clampLabelNote(e.target.value))}

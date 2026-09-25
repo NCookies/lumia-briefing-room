@@ -172,7 +172,7 @@ class RetentionConfig:
     max_total_gb: float | None = None
     max_count: int | None = None
     protect_pinned: bool = True
-    protect_tags: list[str] = field(default_factory=lambda: ["death"])
+    protect_tags: list[str] = field(default_factory=list)
     keep_game_records: bool = True
 
 

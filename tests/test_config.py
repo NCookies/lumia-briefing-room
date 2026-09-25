@@ -28,7 +28,7 @@ def test_default_config_matches_spec_defaults():
     assert cfg.encode.thumbnail.enabled is True
     assert cfg.retention.delete_mode == "trash"
     assert cfg.retention.trash_days == 30
-    assert cfg.retention.protect_tags == ["death"]
+    assert cfg.retention.protect_tags == []
     assert cfg.ui.auto_start is True
 
 
@@ -39,7 +39,7 @@ def test_to_camel_dict_uses_spec_key_names():
     assert d["filter"]["minDurationSec"] == 4
     assert d["clip"]["prerollSec"] == 5
     assert d["retention"]["trashDays"] == 30
-    assert d["retention"]["protectTags"] == ["death"]
+    assert d["retention"]["protectTags"] == []
 
 
 def test_path_fields_serialize_as_strings():

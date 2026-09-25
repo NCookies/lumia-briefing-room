@@ -26,6 +26,7 @@ import { GameTimeline } from './GameTimeline'
 import { VodSection } from './VodSection'
 import { VideoFormatHelp } from './VideoFormatHelp'
 import { LoadingBar } from './LoadingBar'
+import { LabelingHelp } from './LabelingHelp'
 import { emptyStateKind } from '../emptyState'
 import { loadViewMode, saveViewMode, type ViewMode } from '../viewMode'
 import { formatMatchResult, gameRecordId, groupByGame, totalSize, withResultImage, type GameGroup } from '../grouping'
@@ -528,8 +529,9 @@ export function ClipBrowser({
 
       <main className="flex-1 p-4">
         {labeling && !filter.trashed && total > 0 && (
-          <p className="mb-2 text-sm text-zinc-400">
+          <p className="mb-2 flex items-center gap-2 text-sm text-zinc-400">
             라벨 {labeled}/{total}
+            <LabelingHelp />
           </p>
         )}
         {loading && <LoadingBar label={source === 'vod' ? '클립 목록을 불러오는 중입니다…' : '클립 목록을 불러오는 중입니다…'} />}

@@ -50,7 +50,7 @@ def test_max_age_moves_old_unprotected_clips_to_trash(tmp_path):
     write_clip(clips, "pinned_old", days_ago=40, pinned=True)
     write_clip(clips, "death_old", days_ago=40, tags=["death"])
 
-    plan = run_cleanup(clips, tmp_path / "trash", cfg(max_age_days=30), now=NOW)
+    plan = run_cleanup(clips, tmp_path / "trash", cfg(max_age_days=30, protect_tags=["death"]), now=NOW)
 
     assert names(plan.to_trash) == ["old"]
     assert not (clips / "old.json").exists()
@@ -59,6 +59,18 @@ def test_max_age_moves_old_unprotected_clips_to_trash(tmp_path):
     assert (clips / "death_old.json").exists()
     trashed = json.loads((tmp_path / "trash" / "old.json").read_text(encoding="utf-8"))
     assert trashed["deletedAt"] is not None
+
+
+def test_by_default_only_pinned_clips_are_protected(tmp_path):
+    clips = tmp_path / "clips"
+    write_clip(clips, "old", days_ago=40)
+    write_clip(clips, "pinned_old", days_ago=40, pinned=True)
+    write_clip(clips, "death_old", days_ago=40, tags=["death"])
+
+    plan = run_cleanup(clips, tmp_path / "trash", cfg(max_age_days=30), now=NOW)
+
+    assert names(plan.to_trash) == ["death_old", "old"]
+    assert (clips / "pinned_old.json").exists()
 
 
 def test_max_count_keeps_the_newest(tmp_path):

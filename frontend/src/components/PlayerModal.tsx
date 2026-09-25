@@ -9,6 +9,8 @@ import { loadVolume, saveVolume } from '../volume'
 import { useLabelingUi } from '../labelingContext'
 import { LabelButtons } from './LabelButtons'
 import { LabelNoteInput } from './LabelNoteInput'
+import { LabelingHelp } from './LabelingHelp'
+import { playerWidthCss, shouldAutoAdvance, showEvidence } from '../playerLayout'
 import { ScoreChip } from './ScoreChip'
 import { TagBadge } from './TagBadge'
 import type { TrimRange } from '../trimming'
@@ -68,13 +70,13 @@ export function PlayerModal({
       const label = labelForKey(e.key)
       if (label === undefined) return
       onLabel(clip, label)
-      if (label === null) return
+      if (label === null || !shouldAutoAdvance({ tuning })) return
       const next = nextUnlabeledIndex(applyLabel(clips, clip.id, label), index)
       if (next !== null) onIndexChange(next)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [clips, clip, index, paused, trimming, labeling, onClose, onIndexChange, onLabel])
+  }, [clips, clip, index, paused, trimming, labeling, tuning, onClose, onIndexChange, onLabel])
 
   const startRename = () => {
     setDraftTitle(clip.title)
@@ -103,7 +105,7 @@ export function PlayerModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-2"
+      className="fixed inset-0 z-50 flex overflow-y-auto bg-black/90 p-2"
       onClick={onClose}
     >
       <button
@@ -131,11 +133,8 @@ export function PlayerModal({
         ›
       </button>
       <div
-        className={`flex flex-col gap-2 ${
-          trimming
-            ? 'w-[min(97vw,calc((100vh-16.5rem)*1.7778))]'
-            : 'w-[min(97vw,calc((100vh-8.5rem)*1.7778))]'
-        }`}
+        className="m-auto flex flex-col gap-2"
+        style={{ width: playerWidthCss({ labeling, trimming }) }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex flex-wrap items-center justify-between gap-2 text-zinc-100">
@@ -238,8 +237,13 @@ export function PlayerModal({
           />
         )}
 
-        {labeling && clip.userLabel !== null && (
-          <LabelNoteInput clipId={clip.id} value={clip.labelNote} onSave={(note) => onNote(clip, note)} />
+        {labeling && (
+          <LabelNoteInput
+            clipId={clip.id}
+            value={clip.labelNote}
+            disabled={clip.userLabel === null}
+            onSave={(note) => onNote(clip, note)}
+          />
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-zinc-300">
@@ -249,7 +253,7 @@ export function PlayerModal({
                 value={clip.userLabel}
                 onChange={(l) => {
                   onLabel(clip, l)
-                  if (l === null) return
+                  if (l === null || !shouldAutoAdvance({ tuning })) return
                   const next = nextUnlabeledIndex(applyLabel(clips, clip.id, l), index)
                   if (next !== null) onIndexChange(next)
                 }}
@@ -257,7 +261,8 @@ export function PlayerModal({
                 size="lg"
               />
             )}
-            {tuning && (
+            {labeling && <LabelingHelp />}
+            {showEvidence({ tuning, labeling }) && (
               <span className="text-xs text-zinc-500">
                 근거:{' '}
                 {(clip.pvpSignals ?? []).length

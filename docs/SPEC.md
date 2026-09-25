@@ -1341,7 +1341,7 @@ eplay\<캐릭터>` 처럼 폴더를 나눠 보관한다.
 | `retention.maxTotalGB` | `null` | 총 용량 상한. 넘으면 오래된 것부터 휴지통으로 |
 | `retention.maxCount` | `null` | 클립 개수 상한 |
 | `retention.protectPinned` | `true` | 고정한 클립은 자동 정리에서 제외 |
-| `retention.protectTags` | `["death"]` | 이 태그가 붙은 클립은 자동 정리에서 제외 |
+| `retention.protectTags` | `[]` | 이 태그가 붙은 클립은 자동 정리에서 제외. 기본은 **고정한 클립(`protectPinned`)만 보호**한다(2026-09-25 변경, 예전 기본은 `["death"]` — 이미 저장된 설정은 그대로다) |
 | `retention.keepGameRecords` | `true` | 클립이 다 지워진 경기의 요약(순위·모드·캐릭터·TK/K/A·결과표 이미지)을 `clips/.games/` 에 남겨 게임 목록에 "클립 삭제됨" 행으로 계속 보여준다. `false` 면 요약·결과표 이미지도 지운다 |
 | `export.copyMetadata` | `true` | 내보낼 때 JSON 사이드카도 함께 |
 | `export.copyThumbnail` | `true` | 썸네일도 함께 |
