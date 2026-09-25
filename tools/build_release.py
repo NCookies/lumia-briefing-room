@@ -81,8 +81,10 @@ def data_specs(root: Path) -> list[tuple[str, str]]:
         (str(npz), f"data/templates/{npz.parent.name}")
         for npz in sorted((root / "data" / "templates").glob("*/*.npz"))
     ]
+    endpoint = root / "data" / "telemetry_endpoint.json"
     return [
         (str(root / "data" / "characters.json"), "data"),
+        *([(str(endpoint), "data")] if endpoint.exists() else []),
         *templates,
         (str(root / "src" / "lumia_briefing_room" / "profiles" / "builtin"), "lumia_briefing_room/profiles/builtin"),
         (str(root / "frontend" / "dist"), "frontend/dist"),

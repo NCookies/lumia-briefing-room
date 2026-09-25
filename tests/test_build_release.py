@@ -308,3 +308,17 @@ def test_verify_bundle_rejects_sample_images_and_a_packed_pystray(tmp_path: Path
     assert any("_samples" in p for p in problems)
     assert any("_labels.jsonl" in p for p in problems)
     assert any("pystray" in p for p in problems)
+
+
+def test_endpoint_file_is_bundled_when_it_exists(tmp_path: Path):
+    root = _fake_tree(tmp_path)
+    build_release.write_endpoint_file(root, environ={"LUMIA_RECEIVER_TOKEN": "t", "LUMIA_RECEIVER_URL": "https://x.example"})
+
+    specs = build_release.data_specs(root)
+
+    assert (str(root / "data" / "telemetry_endpoint.json"), "data") in specs
+
+
+def test_endpoint_file_is_not_bundled_when_absent(tmp_path: Path):
+    root = _fake_tree(tmp_path)
+    assert not any(src.endswith("telemetry_endpoint.json") for src, _ in build_release.data_specs(root))
