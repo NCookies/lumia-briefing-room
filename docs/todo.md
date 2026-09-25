@@ -35,3 +35,8 @@
 - [x] 자동 업데이트를 꺼도 수동 확인·업데이트 가능 (대화 중 추가) → plan-deploy.md D9·D12, SPEC §7.11
 - [x] 진단 zip 첨부 대신 서버 전송 (대화 중 추가) → plan-deploy.md D14·D3·§7-11, plan-infra.md §3·§7, SPEC §7.11
 - [x] 진단 전송용 클라이언트 고유 ID(표시용 짧은 ID, 대화 중 추가) → plan-deploy.md D14·§7-21, SPEC §7.11 `telemetry.installId`, plan-infra.md §3
+- [x] 탭 이름 변경(내 녹화 → 스팀 녹화, 다시보기 → 영상 파일) → plan-ui.md §0, SPEC §2.14 머리
+- [x] 빈 목록 안내 화면(가운데 정렬, 과거 녹화 분석 버튼, 영상 경로 추가 버튼) → plan-ui.md §0
+- [x] 영상 파일 이름 구분(클립 유니크 ID `clipUid`, 파일 이름은 유지) → plan-ui.md §0·§4-6, SPEC 클립 메타데이터, plan-deploy.md §5, plan-infra.md §7
+- [x] 관리자 전용 대시보드(로컬 실행 전용, 추후) → plan-infra.md §8
+- [x] 영상 파일 탭 지원 확장자 `(?)` 도움말 (대화 중 추가) → plan-ui.md §0·§4-6, SPEC §2.14 머리
