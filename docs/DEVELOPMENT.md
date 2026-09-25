@@ -8,7 +8,7 @@
 - [docs/plan-pipeline.md](plan-pipeline.md) — 파이프라인 자동화(SPEC 2단계) 구현 계획 및 진행 상태
 - [docs/plan-ui.md](plan-ui.md) — 열람 UI(SPEC 3단계) 구현 계획 및 진행 상태
 - [docs/plan-pvp.md](plan-pvp.md) — PvP 판별(SPEC 4단계) 구현 계획 및 진행 상태
-- [docs/plan-deploy.md](plan-deploy.md) — 공개 배포 계획. D1~D6·D10·D14 구현 완료, D7 은 파일 정리 완료·git 이력 정리 대기. 남은 것은 D9 자동 업데이트, D13 배포 자동화
+- [docs/plan-deploy.md](plan-deploy.md) — 공개 배포 계획. D1~D6·D10·D14 구현 완료, D7 은 파일 정리 완료·git 이력 정리 대기. D13 배포 자동화는 워크플로 구현 완료(GitHub 러너 첫 실행 전). 남은 것은 D9 자동 업데이트
 - [docs/friend-guide.md](friend-guide.md) — **친구에게 설치기와 같이 주는 안내문**(설치·확인 항목·진단 파일 보내는 법)
 - [docs/plan-vod.md](plan-vod.md) — 다시보기(VOD) 클립(SPEC 5단계) 설계 및 진행 상태. 분석·클립 생성, API, UI 탭("다시보기")까지 구현됐다(아래 "실행 방법 8")
 
@@ -293,6 +293,23 @@ python tools/eval_pvp.py pulled_labels                   # 가져온 라벨로 �
 
   다음 실행부터는 새로 온·고쳐서 다시 온 라벨만 받는다(`--full` 은 처음부터, `--mode dev` 는 개발 모드 데이터).
 
+### 13. 릴리스 (GitHub Actions, D13)
+
+태그를 푸시하면 `.github/workflows/release.yml` 이 설치기를 만들어 GitHub Release 로 올린다. 사람이 하는 일은 아래뿐이다.
+
+```bash
+# 1) src/lumia_briefing_room/__init__.py 의 __version__ 을 올리고, CHANGELOG.md 에 그 버전 절을 쓴다 → 커밋·푸시
+# 2) 태그를 달아 푸시한다 (태그 = v + __version__)
+git tag v0.1.4
+git push origin v0.1.4
+```
+
+- 태그와 `__version__` 이 다르거나 CHANGELOG 에 그 버전 절이 없으면 **워크플로 첫 단계에서 실패**한다. 로컬 확인: `python tools/release_tools.py check-tag v0.1.4`.
+- 태그 없이 파이프라인만 시험하려면 Actions 탭 → release → **Run workflow**. 빌드·설치기·SHA-256 까지만 하고 Release 는 만들지 않으며, 설치기는 아티팩트(3일)로 남는다.
+- 결과 Release: 설치기(`LumiaBriefingRoom-<버전>-setup.exe`), `<설치기>.sha256`, 본문(CHANGELOG 절 + SHA-256 + VirusTotal 링크). 초안으로 만들었다가 마지막에 공개한다. VirusTotal 이 실패하면 링크만 빠진 채 공개되므로 Actions 로그를 확인한다.
+- 필요한 Secrets 는 README "릴리스 만들기" 참고. 로컬에서 흉내: `python tools/release_tools.py prepare v0.1.4` (설치기가 `dist/` 에 있어야 한다).
+- 러너에서의 Inno Setup 설치 방법·빌드 시간은 아직 실측 전이다([plan-deploy §7-19](plan-deploy.md)).
+
 ### 9. 브라우저 디버깅 (개발용)
 
 - **클라이언트 오류 로그**: 프론트가 `window.onerror` / `unhandledrejection` / `console.error` 를 `POST /api/client-log` 로 보내고, 서버가 `[client]` 접두로 로그 파일에 남긴다. 로그 파일은 `%LOCALAPPDATA%\LumiaBriefingRoom\logs\app.log` (서버 로그와 같은 파일, 2MB 회전). Claude Code 에 "브라우저 오류 봐줘" 라고 하면 이 파일을 읽는다. 프론트를 고쳤으면 `npm run build`.
@@ -314,6 +331,7 @@ python tools/eval_pvp.py pulled_labels                   # 가져온 라벨로 �
 | `tools/eval_pvp.py` | UI 에서 찍은 교전/사냥 라벨로 점수를 평가 (가중치·임계 튜닝) |
 | `tools/eval_detect.py` | 라벨셋 대비 검출 정확도 리포트 |
 | `tools/pull_labels.py` | 서버에 쌓인 라벨을 로컬로 받아 `eval_pvp.py` 가 읽는 `.labels/` 형태로 저장 (관리자 토큰은 환경변수 `LUMIA_ADMIN_TOKEN`, 증분 수집, `--full`·`--mode dev`) |
+| `tools/release_tools.py` | 릴리스 파이프라인 보조(태그·버전·패치노트 확인, SHA-256 파일, 릴리스 본문, VirusTotal 업로드). 워크플로가 부른다 — 아래 "13" |
 | `tools/sync_contract.py` | 서버와 공유하는 전송 계약을 infra 저장소(infra 저장소의 `contract/`)에서 `tests/contract` 로 복사 (`--check` 는 차이만 확인, `--source` 로 경로 지정) |
 
 가상환경을 활성화한 상태에서 실행할 것.

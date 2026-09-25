@@ -1,0 +1,128 @@
+name: release
+
+# v* 태그를 푸시하면 설치기를 만들어 GitHub Release 로 올리고 VirusTotal 검사 링크를 본문에 붙인다. (docs/plan-deploy.md D13)
+# 수동 실행(workflow_dispatch)은 빌드·설치기·SHA-256 까지만 하고 Release 는 만들지 않는다 — 태그 없이 파이프라인과 빌드 시간을 확인하는 용도.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      IS_TAG: ${{ github.ref_type == 'tag' }}
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 태그·버전·패치노트 확인
+        if: env.IS_TAG == 'true'
+        shell: bash
+        run: python tools/release_tools.py check-tag "$GITHUB_REF_NAME"
+
+      - name: 파이썬 의존성
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,build]"
+
+      - name: 릴리스 도구 테스트
+        run: python -m pytest tests/test_release_tools.py tests/test_build_release.py tests/test_build_installer.py -q
+
+      - name: 프론트 의존성
+        working-directory: frontend
+        run: npm ci
+
+      - name: ffmpeg(LGPL) 받기
+        run: python tools/fetch_ffmpeg.py
+
+      - name: OCR 모델 미리 받기
+        run: >
+          python -c "import numpy as np;
+          from lumia_briefing_room.detect.ocr import OcrReader;
+          r = OcrReader(); img = np.zeros((64, 256, 3), np.uint8);
+          r.read(img, lang='korean'); r.read(img, lang='ch')"
+
+      - name: 배포본 빌드
+        env:
+          LUMIA_RECEIVER_URL: ${{ secrets.LUMIA_RECEIVER_URL }}
+          LUMIA_RECEIVER_TOKEN: ${{ secrets.LUMIA_RECEIVER_TOKEN }}
+        run: python tools/build_release.py --skip-zip
+
+      - name: Inno Setup 준비
+        shell: pwsh
+        run: |
+          $iscc = @("$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if ($iscc) { "러너에 이미 있다: $iscc" } else { choco install innosetup -y --no-progress }
+
+      - name: 설치기 빌드
+        run: python tools/build_installer.py
+
+      - name: SHA-256 과 릴리스 본문
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if [ "$IS_TAG" != "true" ]; then tag="v$(python -c "import sys; sys.path.insert(0,'src'); from lumia_briefing_room import __version__ as v; print(v)")"; fi
+          python tools/release_tools.py prepare "$tag"
+
+      - name: 수동 실행 결과 보관
+        if: env.IS_TAG != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: |
+            dist/*-setup.exe
+            dist/*-setup.exe.sha256
+            dist/release-notes.md
+          retention-days: 3
+
+      - name: GitHub Release 초안 만들기
+        if: env.IS_TAG == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*-setup.exe dist/*-setup.exe.sha256 \
+            --title "$GITHUB_REF_NAME" --notes-file dist/release-notes.md --draft --verify-tag
+
+      - name: VirusTotal 검사
+        id: vt
+        if: env.IS_TAG == 'true'
+        continue-on-error: true
+        shell: bash
+        env:
+          VT_API_KEY: ${{ secrets.VT_API_KEY }}
+        run: |
+          url="$(python tools/release_tools.py virustotal)"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: 본문에 검사 링크를 붙이고 공개
+        if: env.IS_TAG == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VT_URL: ${{ steps.vt.outputs.url }}
+        run: |
+          python tools/release_tools.py finalize "$GITHUB_REF_NAME" --virustotal-url "$VT_URL"
+          gh release edit "$GITHUB_REF_NAME" --notes-file dist/release-notes.md --draft=false

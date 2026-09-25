@@ -62,6 +62,20 @@
 - 배포본에 포함된 FFmpeg(LGPL)·pystray(LGPL v3)·OCR 모델 등 제3자 구성 요소는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 를 보세요.
 - 이터널 리턴의 게임 화면·로고·이미지는 이 저장소에 포함하지 않으며 앱 아이콘도 직접 그린 것입니다.
 
+## 릴리스 만들기 (관리자용)
+
+v로 시작하는 태그를 푸시하면 GitHub Actions 가 빌드 → 설치기 → Release 업로드 → VirusTotal 검사 링크까지 자동으로 합니다. 태그와 코드의 `__version__` 이 같아야 하고 [CHANGELOG.md](CHANGELOG.md) 에 그 버전 절(패치노트)이 있어야 합니다. 절차는 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) 의 "13. 릴리스".
+
+**한 번만 설정** — 저장소 **Settings → Secrets and variables → Actions → New repository secret** 에서 세 개를 만듭니다. 값은 저장소에 커밋하지 않습니다.
+
+| 이름 | 값 |
+|---|---|
+| `VT_API_KEY` | [VirusTotal](https://www.virustotal.com) 에 가입한 뒤 프로필의 **API key** (무료 키로 충분합니다) |
+| `LUMIA_RECEIVER_URL` | 수신 서버 주소 (서버 저장소의 배포 값) |
+| `LUMIA_RECEIVER_TOKEN` | 수신 서버 API 토큰 (`terraform.tfvars` 의 `receiver_api_token`) |
+
+앞의 두 개가 없으면 서버 전송이 꺼진 빌드가 나가고, `VT_API_KEY` 가 없으면 Release 는 만들어지되 검사 링크만 빠집니다.
+
 ## 개발에 참여하려면
 
 소스에서 실행·빌드·테스트하는 방법과 설계 문서는 **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** 를 보세요.
