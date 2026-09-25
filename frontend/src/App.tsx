@@ -145,12 +145,7 @@ export default function App() {
         labels={activityLabels(tasks, backfillRunning ? `과거 녹화 분석 중 ${progressPercent(backfill)}%` : null)}
       />
 
-      <UpdateBanner
-        onOpenAbout={() => {
-          setSettingsTab('about')
-          setShowSettings(true)
-        }}
-      />
+      <UpdateBanner />
 
       {TABS.map((t) => (
         <div key={`${t.id}-${browserKey}`} className={tab === t.id ? 'flex flex-1 flex-col' : 'hidden'}>

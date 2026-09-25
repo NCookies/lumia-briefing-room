@@ -247,16 +247,24 @@ def test_new_version_is_notified_once(env):
     assert [r["version"] for r in env.notified] == [NEW, "0.3.0"]
 
 
-def test_status_shows_available_only_when_auto_check_is_on(env):
+def test_status_shows_a_known_newer_release_even_when_auto_check_is_off(env):
+    """수동 확인으로 알게 된 새 버전도 메인 화면 배너에 보여야 한다. 알림(트레이)만 자동 확인이 켜졌을 때 뜬다."""
     env.github.publish(NEW)
-    env.updater.check()
-    assert env.updater.status()["enabled"] is False
     assert env.updater.status()["available"] is None
-    env.set_check(True)
+    env.updater.check()
     status = env.updater.status()
-    assert status["enabled"] is True
+    assert status["enabled"] is False
     assert status["available"]["version"] == NEW
-    assert status["current"] == CURRENT
+    assert env.notified == []
+    env.set_check(True)
+    assert env.updater.status()["enabled"] is True
+    assert env.updater.status()["current"] == CURRENT
+
+
+def test_the_auto_check_loop_notices_a_newly_enabled_setting_within_a_minute():
+    from lumia_briefing_room.updater import LOOP_TICK
+
+    assert LOOP_TICK <= 60
 
 
 def test_status_forgets_release_once_it_is_installed(env, tmp_path):

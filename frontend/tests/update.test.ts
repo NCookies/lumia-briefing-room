@@ -12,9 +12,9 @@ const base: UpdateStatus = {
   install: { state: 'idle', downloaded: 0, total: 0, error: '' },
 }
 
-test('the banner shows only when auto check is on and a newer release is known', () => {
+test('the banner shows whenever a newer release is known, however it was found', () => {
   assert.equal(showUpdateBanner(base), true)
-  assert.equal(showUpdateBanner({ ...base, enabled: false }), false)
+  assert.equal(showUpdateBanner({ ...base, enabled: false }), true)
   assert.equal(showUpdateBanner({ ...base, available: null }), false)
 })
 

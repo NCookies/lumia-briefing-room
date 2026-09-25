@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAppInfo } from '../appInfo'
-import { installProgressText, isInstallBusy, releaseSummary, type CheckResult } from '../update'
+import { UPDATE_CHECKED_EVENT, installProgressText, isInstallBusy, releaseSummary, type CheckResult } from '../update'
 import { checkForUpdate } from '../updateApi'
 import { useUpdateInstall } from '../useUpdateInstall'
 import { ReleaseNotesDialog } from './ReleaseNotesDialog'
@@ -16,7 +16,10 @@ export function UpdatePanel() {
   const check = () => {
     setChecking(true)
     checkForUpdate()
-      .then(setResult)
+      .then((next) => {
+        setResult(next)
+        window.dispatchEvent(new Event(UPDATE_CHECKED_EVENT))
+      })
       .catch((e: Error) => setResult({ state: 'error', current: '', error: e.message }))
       .finally(() => setChecking(false))
   }

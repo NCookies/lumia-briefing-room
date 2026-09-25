@@ -26,7 +26,10 @@ export type CheckResult =
   | { state: 'latest'; current: string }
   | { state: 'error'; current: string; error: string }
 
-export const showUpdateBanner = (status: UpdateStatus): boolean => status.enabled && status.available !== null
+export const showUpdateBanner = (status: UpdateStatus): boolean => status.available !== null
+
+export const UPDATE_CHECKED_EVENT = 'lumia:update-checked'
+export const UPDATE_STATUS_POLL_MS = 30000
 
 export const isInstallBusy = (state: InstallState): boolean =>
   state === 'downloading' || state === 'verifying' || state === 'launching' || state === 'launched'

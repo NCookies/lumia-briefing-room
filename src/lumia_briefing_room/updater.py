@@ -33,7 +33,7 @@ API_URL = f"https://api.github.com/repos/{REPO}/releases/latest"
 DOWNLOAD_PREFIX = f"https://github.com/{REPO}/releases/download/"
 CHECK_INTERVAL = 24 * 3600.0
 RETRY_INTERVAL = 3600.0
-LOOP_TICK = 300.0
+LOOP_TICK = 30.0
 API_TIMEOUT = 10.0
 DOWNLOAD_TIMEOUT = httpx.Timeout(10.0, read=60.0)
 CHECKSUM_MAX_BYTES = 4096
@@ -281,7 +281,7 @@ class Updater:
         state = self._load_state()
         enabled = self._cfg().update.check
         release = ReleaseInfo.from_dict(state["latest"]) if state.get("latest") else None
-        available = release if enabled and release and is_newer(release.version, self.current) else None
+        available = release if release and is_newer(release.version, self.current) else None
         with self._lock:
             install = dict(self._install)
         return {
