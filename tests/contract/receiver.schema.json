@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://server.example.invalid/contract/receiver.schema.json",
+  "$id": "https://example.invalid/contract/receiver.schema.json",
   "title": "lumia receiver 전송 계약",
   "description": "앱이 서버로 보내는 페이로드. 원본은 이 파일이며 P:\\lumia_briefing_room 의 tests/contract 는 복사본이다. 서버는 여기 없는 필드를 받으면 조용히 버리지만, 앱은 여기 없는 필드를 보내면 안 된다(additionalProperties: false).",
   "$defs": {

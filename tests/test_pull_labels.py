@@ -156,6 +156,7 @@ def test_network_failure_is_a_clear_error_and_keeps_what_was_already_written(tmp
 def test_token_comes_from_the_environment_and_is_never_printed(tmp_path, monkeypatch, capsys):
     server = FakeServer([item("a" * 32)], admin="super-secret-admin")
     monkeypatch.setenv("LUMIA_ADMIN_TOKEN", "super-secret-admin")
+    monkeypatch.setenv("LUMIA_RECEIVER_URL", "https://r.example")
     code = pull_labels.main(["--out", str(tmp_path)], transport=httpx.MockTransport(server))
     out = capsys.readouterr()
     assert code == 0 and "super-secret-admin" not in out.out + out.err and "eval_pvp.py" in out.out
@@ -165,3 +166,10 @@ def test_missing_token_stops_with_a_hint(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("LUMIA_ADMIN_TOKEN", raising=False)
     code = pull_labels.main(["--out", str(tmp_path)])
     assert code == 2 and "LUMIA_ADMIN_TOKEN" in capsys.readouterr().err
+
+
+def test_missing_server_url_stops_with_a_hint(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("LUMIA_ADMIN_TOKEN", "x")
+    monkeypatch.delenv("LUMIA_RECEIVER_URL", raising=False)
+    code = pull_labels.main(["--out", str(tmp_path)])
+    assert code == 2 and "LUMIA_RECEIVER_URL" in capsys.readouterr().err

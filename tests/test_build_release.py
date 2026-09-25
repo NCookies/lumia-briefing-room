@@ -244,6 +244,12 @@ def test_endpoint_file_is_written_from_the_token_environment_variable(tmp_path: 
     assert json.loads(written.read_text(encoding="utf-8")) == {"token": "tok-1", "url": "https://x.example"}
 
 
+def test_endpoint_file_needs_both_the_url_and_the_token(tmp_path: Path):
+    root = _fake_tree(tmp_path)
+    assert build_release.write_endpoint_file(root, environ={"LUMIA_RECEIVER_TOKEN": "tok"}) is None
+    assert build_release.write_endpoint_file(root, environ={"LUMIA_RECEIVER_URL": "https://x.example"}) is None
+
+
 def test_endpoint_file_without_a_token_is_not_written_and_a_stale_one_is_removed(tmp_path: Path):
     root = _fake_tree(tmp_path)
     stale = root / "data" / "telemetry_endpoint.json"

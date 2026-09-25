@@ -7,7 +7,7 @@ from lumia_briefing_room import __version__
 from lumia_briefing_room.config import Config, dataclass_from_camel_dict
 from lumia_briefing_room.telemetry import endpoint as endpoint_module
 from lumia_briefing_room.telemetry import environment
-from lumia_briefing_room.telemetry.endpoint import DEFAULT_SERVER_URL, load_endpoint
+from lumia_briefing_room.telemetry.endpoint import load_endpoint
 from lumia_briefing_room.telemetry.state import TelemetryState
 
 CONTRACT = Path(__file__).resolve().parent / "contract"
@@ -24,12 +24,18 @@ def test_config_token_wins_over_environment_and_bundle(monkeypatch):
     assert found.token == "cfg" and found.url == "https://c.example"
 
 
-def test_environment_then_bundle_then_default_url(monkeypatch):
-    monkeypatch.setattr(endpoint_module, "bundled_endpoint", lambda: {"token": "bundled"})
+def test_environment_then_bundle_and_no_built_in_server_address(monkeypatch):
+    monkeypatch.setattr(endpoint_module, "bundled_endpoint", lambda: {"token": "bundled", "url": "https://b.example/"})
     assert load_endpoint(cfg(), environ={"LUMIA_RECEIVER_TOKEN": "env"}).token == "env"
     found = load_endpoint(cfg(), environ={})
-    assert found.token == "bundled" and found.url == DEFAULT_SERVER_URL
+    assert found.token == "bundled" and found.url == "https://b.example"
     assert load_endpoint(cfg(), environ={"LUMIA_RECEIVER_URL": "https://e.example"}).url == "https://e.example"
+
+
+def test_a_token_without_any_server_address_means_no_endpoint(monkeypatch):
+    monkeypatch.setattr(endpoint_module, "bundled_endpoint", lambda: {"token": "bundled"})
+    assert load_endpoint(cfg(), environ={"LUMIA_RECEIVER_TOKEN": "env"}) is None
+    assert not hasattr(endpoint_module, "DEFAULT_SERVER_URL")
 
 
 def test_no_token_anywhere_means_no_endpoint(monkeypatch):

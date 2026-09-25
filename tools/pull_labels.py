@@ -22,7 +22,6 @@ from pathlib import Path
 
 import httpx
 
-DEFAULT_URL = "https://server.example.invalid"
 TOKEN_ENV = "LUMIA_ADMIN_TOKEN"
 PAGE_LIMIT = 500
 LOCAL_LABELS = {"combat": "pvp", "other": "pve"}
@@ -105,13 +104,16 @@ def main(argv: list[str] | None = None, *, transport: httpx.BaseTransport | None
     parser = argparse.ArgumentParser(description="서버에 쌓인 라벨을 로컬로 가져온다")
     parser.add_argument("--out", type=Path, default=Path("pulled_labels"))
     parser.add_argument("--mode", choices=("release", "dev"), default="release")
-    parser.add_argument("--url", default=os.environ.get("LUMIA_RECEIVER_URL", DEFAULT_URL))
+    parser.add_argument("--url", default=os.environ.get("LUMIA_RECEIVER_URL"))
     parser.add_argument("--full", action="store_true", help="저장된 위치를 무시하고 처음부터 받는다")
     args = parser.parse_args(argv)
 
     token = os.environ.get(TOKEN_ENV, "").strip()
     if not token:
         print(f"관리자 토큰이 없습니다. 환경변수 {TOKEN_ENV} 에 서버 관리자 토큰을 넣고 다시 실행하세요", file=sys.stderr)
+        return 2
+    if not args.url:
+        print("서버 주소가 없습니다. --url 이나 환경변수(또는 .env) LUMIA_RECEIVER_URL 에 넣고 다시 실행하세요", file=sys.stderr)
         return 2
     client = httpx.Client(base_url=args.url.rstrip("/"), headers={"X-Admin-Token": token}, timeout=30.0, transport=transport)
     try:
@@ -128,4 +130,8 @@ def main(argv: list[str] | None = None, *, transport: httpx.BaseTransport | None
 
 
 if __name__ == "__main__":
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from envfile import load_env_file
+
+    load_env_file(Path(__file__).resolve().parents[1] / ".env")
     raise SystemExit(main())

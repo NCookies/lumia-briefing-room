@@ -282,11 +282,11 @@ python tools/build_installer.py          # → dist\LumiaBriefingRoom-<버전>-s
 - **진단 정보 보내기**(D14): 옵션 "정보·진단" 탭 맨 아래. 개인정보를 지운 로그 발췌(최근 오류 기록 100건, 정기 전송과 별개인 로컬 링 `%LOCALAPPDATA%\LumiaBriefingRoom\outbox\errors_recent.jsonl` 1MB)·환경 정보·판독 실패 통계를 미리보기로 보여 주고, 확인하면 **한 번만** 서버로 보내 접수 번호를 알려 준다(`telemetry.sendLogs` 와 무관, 자동 전송을 켜지 않음). 짧은 표시용 ID(`LUMIA-XXXX-XXXX`)를 복사할 수 있고 재설치하면 새로 만들어진다. 서버로 안 보내지면 같은 탭의 "진단 정보 zip 받기"로 파일로 저장해 보낸다(zip 은 대안으로 유지, `info.json` 에 표시용 ID 포함).
 - **미리보기·삭제**: 옵션 "정보·진단" 탭의 "보낼 내용 미리보기"(전송이 꺼져 있어도 볼 수 있고 네트워크를 쓰지 않는다), "보낸 데이터 삭제 요청"(서버의 내 데이터를 지우고 전송을 끈다).
 - **개발 모드**(소스 실행)는 기본적으로 서버에 보내지 않는다. 시험할 때만 설정 `telemetry.allowDevSend` 를 켜면 `mode=dev` 로 보내 서버가 운영 데이터와 다른 곳에 둔다. 서버 주소·토큰은 설정(`telemetry.serverUrl`·`apiToken`)이나 환경변수 `LUMIA_RECEIVER_URL`·`LUMIA_RECEIVER_TOKEN` 으로 줄 수 있다.
-- **서버 토큰은 git 에 없다.** 배포본을 만들 때 환경변수 `LUMIA_RECEIVER_TOKEN`(선택 `LUMIA_RECEIVER_URL`, 값은 infra 저장소 `terraform.tfvars` 의 `receiver_api_token`)을 주고 `build.bat` 을 돌리면 번들에 들어간다(`data/telemetry_endpoint.json`, 빌드 뒤 자동 삭제, gitignore). 토큰 없이 빌드하면 "서버 전송이 꺼진 빌드"라고 경고하고 전송 기능은 동작하지 않는다. `--selftest` 가 httpx·인증서·개인정보 안내 파일·토큰 유무를 점검한다.
+- **서버 주소와 토큰은 git 에 없다(코드에 기본 주소도 없다).** 저장소 루트에 `.env`(gitignore) 를 만들어 `LUMIA_RECEIVER_URL=https://…` 와 `LUMIA_RECEIVER_TOKEN=…`(값은 infra 저장소 `terraform.tfvars` 의 `receiver_api_token`)를 적거나 같은 이름의 환경변수를 주고 `build.bat` 을 돌리면 번들에 들어간다(`data/telemetry_endpoint.json`, 빌드 뒤 자동 삭제, gitignore). 이미 있는 환경변수가 `.env` 보다 우선한다. 둘 중 하나라도 없이 빌드하면 "서버 전송이 꺼진 빌드"라고 경고하고 전송 기능은 동작하지 않는다. `--selftest` 가 httpx·인증서·개인정보 안내 파일·토큰 유무를 점검한다.
 - **서버에 쌓인 라벨 가져오기** (분류기 튜닝용): 서버 관리자 토큰을 환경변수로 주고 실행한다.
 
 ```bash
-set LUMIA_ADMIN_TOKEN=...                    # 값은 infra 저장소 terraform.tfvars 의 admin_token. PowerShell: $env:LUMIA_ADMIN_TOKEN = "..."
+set LUMIA_ADMIN_TOKEN=...; set LUMIA_RECEIVER_URL=...                    # 값은 infra 저장소 terraform.tfvars 의 admin_token. PowerShell: $env:LUMIA_ADMIN_TOKEN = "..."
 python tools/pull_labels.py --out pulled_labels          # → pulled_labels/.labels/<clipKey>.json (pvp/pve 로 되돌림)
 python tools/eval_pvp.py pulled_labels                   # 가져온 라벨로 점수 평가
 ```

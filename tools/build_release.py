@@ -19,6 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from envfile import load_env_file  # noqa: E402
 from lumia_briefing_room import __version__  # noqa: E402
 from lumia_briefing_room.icon import save_ico  # noqa: E402
 
@@ -169,21 +170,20 @@ ENDPOINT_FILE = "data/telemetry_endpoint.json"
 
 
 def write_endpoint_file(root: Path, environ=None) -> Path | None:
-    """서버 토큰을 번들에 넣는다(저장소가 공개라 토큰은 git 에 없다). 환경변수 LUMIA_RECEIVER_TOKEN(·LUMIA_RECEIVER_URL)에서 읽고,
-    없으면 파일을 만들지 않으며 남아 있던 옛 파일도 지운다 — 이 빌드는 서버 전송이 꺼진 채로 나간다."""
+    """서버 주소·토큰을 번들에 넣는다(저장소가 공개라 둘 다 git 에 없다). 환경변수(또는 `.env`)의
+    LUMIA_RECEIVER_URL·LUMIA_RECEIVER_TOKEN 에서 읽고, 하나라도 없으면 파일을 만들지 않으며 남아 있던 옛 파일도 지운다
+    — 이 빌드는 서버 전송이 꺼진 채로 나간다."""
     import json
     import os
 
     environ = os.environ if environ is None else environ
     path = root / ENDPOINT_FILE
     token = (environ.get("LUMIA_RECEIVER_TOKEN") or "").strip()
-    if not token:
+    url = (environ.get("LUMIA_RECEIVER_URL") or "").strip()
+    if not token or not url:
         path.unlink(missing_ok=True)
         return None
-    data = {"token": token}
-    url = (environ.get("LUMIA_RECEIVER_URL") or "").strip()
-    if url:
-        data["url"] = url
+    data = {"token": token, "url": url}
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data), encoding="utf-8")
     return path
@@ -269,11 +269,12 @@ def main(argv: list[str] | None = None) -> int:
             build_frontend(ROOT)
 
         icon = save_ico(ROOT / "build" / "icon.ico")
+        load_env_file(ROOT / ".env")
         endpoint_file = write_endpoint_file(ROOT)
         if endpoint_file is None:
-            print("  경고: LUMIA_RECEIVER_TOKEN 이 없어 서버 전송이 꺼진 빌드다 (라벨·오류 로그 전송은 동작하지 않는다)")
+            print("  경고: LUMIA_RECEIVER_URL·LUMIA_RECEIVER_TOKEN 이 없어 서버 전송이 꺼진 빌드다 (라벨·오류 로그 전송은 동작하지 않는다)")
         else:
-            print("  서버 토큰을 번들에 넣는다")
+            print("  서버 주소·토큰을 번들에 넣는다")
         try:
             out_dir = run_pyinstaller(ROOT, version=version, icon=icon)
         finally:
