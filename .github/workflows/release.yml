@@ -37,15 +37,15 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: 태그·버전·패치노트 확인
-        if: env.IS_TAG == 'true'
-        shell: bash
-        run: python tools/release_tools.py check-tag "$GITHUB_REF_NAME"
-
       - name: 파이썬 의존성
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev,build]"
+
+      - name: 태그·버전·패치노트 확인
+        if: env.IS_TAG == 'true'
+        shell: bash
+        run: python tools/release_tools.py check-tag "$GITHUB_REF_NAME"
 
       - name: 릴리스 도구 테스트
         run: python -m pytest tests/test_release_tools.py tests/test_build_release.py tests/test_build_installer.py -q
