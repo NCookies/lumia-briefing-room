@@ -83,7 +83,8 @@ export function groupByVod<T extends VodClipLike>(
     }
   }
 
-  const ids = new Set<string>([...games.keys(), ...(includeEmpty ? known.keys() : [])])
+  const keptEmpty = includeEmpty ? vods.filter((v) => !(v.status === 'done' && v.clipCount === 0)).map((v) => v.id) : []
+  const ids = new Set<string>([...games.keys(), ...keptEmpty])
   const groups: VodGroup<T>[] = [...ids].map((vodId) => {
     const vod = known.get(vodId) ?? null
     const list = [...(games.get(vodId)?.values() ?? [])]

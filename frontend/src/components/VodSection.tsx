@@ -196,7 +196,7 @@ export function VodSection({
               ) : null}
               {clipCount > 0 && (
                 <button type="button" className="text-zinc-400 hover:text-rose-400" onClick={onTrashClips}>
-                  영상 클립 삭제
+                  전체 삭제
                 </button>
               )}
             </>

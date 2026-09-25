@@ -69,7 +69,7 @@ test('desc reverses games and pvp sorts by the best score, clips stay ascending'
 test('vods are ordered by name and clips of unknown vods still appear', () => {
   const groups = groupByVod(
     [clip('x', 'v9', 1)],
-    [vod({ id: 'v2', name: 'b.mp4' }), vod({ id: 'v1', name: 'A.mp4' })],
+    [vod({ id: 'v2', name: 'b.mp4', status: 'new' }), vod({ id: 'v1', name: 'A.mp4', status: 'new' })],
     'asc',
     true,
   )
@@ -80,11 +80,22 @@ test('vods are ordered by name and clips of unknown vods still appear', () => {
 })
 
 test('vods without clips are kept only when includeEmpty is set', () => {
-  const vods = [vod({ id: 'v1' }), vod({ id: 'v2', name: 'b.mp4' })]
+  const vods = [vod({ id: 'v1', clipCount: 1 }), vod({ id: 'v2', name: 'b.mp4', status: 'new' })]
   const clips = [clip('c', 'v1', 1)]
 
   assert.deepEqual(groupByVod(clips, vods, 'asc', true).map((g) => g.vodId), ['v1', 'v2'])
   assert.deepEqual(groupByVod(clips, vods, 'asc', false).map((g) => g.vodId), ['v1'])
+})
+
+test('an analyzed vod whose clips were all deleted disappears from the list', () => {
+  const vods = [
+    vod({ id: 'v1', clipCount: 0, status: 'done' }),
+    vod({ id: 'v2', name: 'b.mp4', clipCount: 0, status: 'new' }),
+    vod({ id: 'v3', name: 'c.mp4', clipCount: 0, status: 'interrupted' }),
+    vod({ id: 'v4', name: 'd.mp4', clipCount: 3, status: 'done' }),
+  ]
+
+  assert.deepEqual(groupByVod([], vods, 'asc', true).map((g) => g.vodId), ['v2', 'v3', 'v4'])
 })
 
 test('the game result comes from the first clip that has one', () => {
