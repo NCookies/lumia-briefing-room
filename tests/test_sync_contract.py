@@ -61,3 +61,14 @@ def test_bundled_copy_matches_the_infra_original_when_it_is_checked_out():
     assert sync_contract.contract_diff(source, sync_contract.DEFAULT_DEST) == [], (
         "계약 복사본이 원본과 다르다. `python tools/sync_contract.py` 로 갱신한다"
     )
+
+
+def test_the_schema_id_host_is_replaced_when_copying_and_ignored_when_comparing(tmp_path):
+    source, dest = tmp_path / "src", tmp_path / "dst"
+    source.mkdir()
+    (source / "receiver.schema.json").write_text('{\n  "$id": "https://real.host.example/contract/receiver.schema.json"\n}\n', encoding="utf-8")
+
+    assert sync_contract.sync_contract(source, dest) == ["receiver.schema.json"]
+    copied = (dest / "receiver.schema.json").read_text(encoding="utf-8")
+    assert "real.host.example" not in copied and "https://example.invalid/contract/receiver.schema.json" in copied
+    assert sync_contract.contract_diff(source, dest) == []

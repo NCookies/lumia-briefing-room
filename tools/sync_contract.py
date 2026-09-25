@@ -11,7 +11,7 @@ usage:
 from __future__ import annotations
 
 import argparse
-import shutil
+import re
 import sys
 from pathlib import Path
 
@@ -24,8 +24,16 @@ def _files(root: Path) -> dict[str, Path]:
     return {p.relative_to(root).as_posix(): p for p in sorted(root.rglob("*")) if p.is_file()}
 
 
+ID_HOST = re.compile(rb'("\$id"\s*:\s*"https?://)[^/"]+/')
+
+
+def _public(data: bytes) -> bytes:
+    """스키마 `$id` 의 서버 도메인은 공개 저장소에 두지 않는다 — 복사할 때 `example.invalid` 로 바꾸고 비교할 때도 무시한다."""
+    return ID_HOST.sub(rb"\1example.invalid/", data.replace(b"\r\n", b"\n"))
+
+
 def _same(a: Path, b: Path) -> bool:
-    return a.read_bytes().replace(b"\r\n", b"\n") == b.read_bytes().replace(b"\r\n", b"\n")
+    return _public(a.read_bytes()) == _public(b.read_bytes())
 
 
 def contract_diff(source: Path, dest: Path) -> list[str]:
@@ -44,7 +52,7 @@ def sync_contract(source: Path, dest: Path) -> list[str]:
         origin, target = source / rel, dest / rel
         if origin.is_file():
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(origin, target)
+            target.write_bytes(_public(origin.read_bytes()))
         else:
             target.unlink()
     for folder in sorted((p for p in dest.rglob("*") if p.is_dir()), reverse=True) if dest.is_dir() else []:
