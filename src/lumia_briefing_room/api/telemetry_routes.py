@@ -42,6 +42,28 @@ def register_telemetry_routes(app: FastAPI) -> None:
             raise HTTPException(502, "서버에 연결하지 못했습니다. 인터넷 연결을 확인하고 잠시 뒤 다시 시도해 주세요")
         raise HTTPException(502, f"서버가 요청을 처리하지 못했습니다 (HTTP {result.get('httpStatus')})")
 
+    zip_hint = " 그래도 안 되면 '진단 정보 zip 받기'로 파일을 저장해 보내 주세요."
+
+    @app.get("/api/telemetry/diagnostics/preview")
+    def get_diagnostics_preview():
+        return sender().diagnostics_preview()
+
+    @app.post("/api/telemetry/diagnostics/send")
+    def send_diagnostics():
+        result = sender().send_diagnostics()
+        if result["ok"]:
+            return result
+        reason = result["reason"]
+        if reason == "no-endpoint":
+            raise HTTPException(503, "이 빌드에는 서버 연결 정보가 없어 보낼 수 없습니다." + zip_hint)
+        if reason == "dev-blocked":
+            raise HTTPException(409, "개발 모드에서는 서버로 보내지 않습니다." + zip_hint)
+        if reason == "network":
+            raise HTTPException(502, "서버에 연결하지 못했습니다. 인터넷 연결을 확인하고 잠시 뒤 다시 시도해 주세요." + zip_hint)
+        if reason == "rejected":
+            raise HTTPException(502, f"서버가 이 내용을 받지 않았습니다 (HTTP {result.get('httpStatus')})." + zip_hint)
+        raise HTTPException(502, f"서버가 요청을 처리하지 못했습니다 (HTTP {result.get('httpStatus')})." + zip_hint)
+
     @app.get("/api/privacy")
     def get_privacy():
         try:

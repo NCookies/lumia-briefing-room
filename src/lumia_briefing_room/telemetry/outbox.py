@@ -16,6 +16,7 @@ from pathlib import Path
 from lumia_briefing_room.config import _default_local_appdata
 
 MAX_BYTES = 20 * 1024 * 1024
+RECENT_MAX_BYTES = 1024 * 1024
 FIELD_MAX = 12_000
 _LOCK = threading.RLock()
 _OWN_LOGGERS = ("lumia_briefing_room.telemetry",)
@@ -23,6 +24,10 @@ _OWN_LOGGERS = ("lumia_briefing_room.telemetry",)
 
 def default_outbox_path() -> Path:
     return _default_local_appdata() / "LumiaBriefingRoom" / "outbox" / "errors.jsonl"
+
+
+def default_recent_path() -> Path:
+    return default_outbox_path().with_name("errors_recent.jsonl")
 
 
 def entry_from_record(record: logging.LogRecord) -> dict:
@@ -116,14 +121,20 @@ class Outbox:
 
 
 class OutboxHandler(logging.Handler):
-    def __init__(self, outbox: Outbox):
+    """ERROR 이상을 outbox(정기 전송 뒤 지워짐)와, 있으면 최근 오류 기록(진단 정보용, 전송해도 남음)에 함께 쌓는다."""
+
+    def __init__(self, outbox: Outbox, recent: Outbox | None = None):
         super().__init__(level=logging.ERROR)
         self.outbox = outbox
+        self.recent = recent
 
     def emit(self, record: logging.LogRecord) -> None:
         if record.name.startswith(_OWN_LOGGERS):
             return
         try:
-            self.outbox.append(entry_from_record(record))
+            entry = entry_from_record(record)
+            self.outbox.append(entry)
+            if self.recent is not None:
+                self.recent.append(entry)
         except Exception:
             pass

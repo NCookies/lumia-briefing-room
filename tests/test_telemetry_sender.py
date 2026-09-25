@@ -42,6 +42,7 @@ class Env:
         self.clips.mkdir()
         self.vod.mkdir()
         self.outbox = Outbox(tmp_path / "outbox" / "errors.jsonl")
+        self.recent = Outbox(tmp_path / "outbox" / "errors_recent.jsonl")
         self.clock = Clock()
         self.calls: list[httpx.Request] = []
         self.responses: list = []
@@ -77,8 +78,14 @@ class Env:
             item = self.responses.pop(0) if len(self.responses) > 1 else self.responses[0]
             if isinstance(item, Exception):
                 raise item
-            return httpx.Response(item, json={"saved": 1} if item == 200 else {"detail": "x"})
-        return httpx.Response(200, json={"saved": 1})
+            return httpx.Response(item, json=self._ok(request) if item == 200 else {"detail": "x"})
+        return httpx.Response(200, json=self._ok(request))
+
+    @staticmethod
+    def _ok(request):
+        if request.url.path == "/v1/diagnostics":
+            return {"receiptId": "R-20260925-K7M3QX", "saved": len(json.loads(request.content)["entries"])}
+        return {"saved": 1}
 
     def sender(self, *, frozen=True):
         def factory(endpoint):
@@ -86,7 +93,7 @@ class Env:
             return ReceiverClient(endpoint, transport=httpx.MockTransport(self._handler))
 
         return TelemetrySender(
-            config_path=self.config_path, state_path=self.tmp / "state.json", outbox=self.outbox,
+            config_path=self.config_path, state_path=self.tmp / "state.json", outbox=self.outbox, recent=self.recent,
             client_factory=factory, clock=self.clock, frozen=frozen,
             collect_env=lambda cfg: {"appVersion": "0.1.1", "os": "Windows 11", "resolution": "2560x1440"},
             usernames=["tester"],

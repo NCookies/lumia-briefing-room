@@ -41,7 +41,7 @@ def setup_file_logging(path: Path | None = None) -> logging.Handler:
 
 def setup_outbox_logging(path: Path | None = None) -> logging.Handler:
     """ERROR 이상을 전송용 outbox 에 구조화해서 쌓는다. 전송이 꺼져 있어도 로컬에만 쌓이며 같은 파일에는 한 번만 붙인다."""
-    from lumia_briefing_room.telemetry.outbox import Outbox, OutboxHandler, default_outbox_path
+    from lumia_briefing_room.telemetry.outbox import RECENT_MAX_BYTES, Outbox, OutboxHandler, default_outbox_path
 
     path = Path(path) if path else default_outbox_path()
     handler = None
@@ -49,7 +49,8 @@ def setup_outbox_logging(path: Path | None = None) -> logging.Handler:
         logger = logging.getLogger(name)
         found = _existing(logger, OutboxHandler, lambda h: h.outbox.path == path)
         if found is None:
-            handler = handler or OutboxHandler(Outbox(path))
+            recent = Outbox(path.with_name("errors_recent.jsonl"), max_bytes=RECENT_MAX_BYTES)
+            handler = handler or OutboxHandler(Outbox(path), recent)
             found = handler
             logger.addHandler(found)
         handler = handler or found

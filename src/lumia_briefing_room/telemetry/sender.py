@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import threading
 import time
 import uuid
@@ -25,7 +26,7 @@ from lumia_briefing_room.telemetry.client import Endpoint, ReceiverClient, SendR
 from lumia_briefing_room.telemetry.collect import collect_labels
 from lumia_briefing_room.telemetry.endpoint import load_endpoint
 from lumia_briefing_room.telemetry.environment import collect_environment
-from lumia_briefing_room.telemetry.outbox import Outbox, default_outbox_path
+from lumia_briefing_room.telemetry.outbox import Outbox, default_outbox_path, default_recent_path
 from lumia_briefing_room.telemetry.payload import display_id
 from lumia_briefing_room.telemetry.scrub import scrub_entry
 from lumia_briefing_room.telemetry.state import TelemetryState, default_state_path
@@ -39,6 +40,8 @@ LOG_BATCH = 200
 BACKOFF_FIRST = 15 * 60.0
 BACKOFF_MAX = 6 * 3600.0
 PREVIEW_LIMIT = 100
+DIAG_ENTRIES = 100
+RECEIPT_PATTERN = re.compile(r"^R-\d{8}-[A-Z2-9]{6}$")
 _CONFIG_LOCK = threading.RLock()
 
 
@@ -77,6 +80,7 @@ class TelemetrySender:
         config_path: Path | None = None,
         state_path: Path | None = None,
         outbox: Outbox | None = None,
+        recent: Outbox | None = None,
         client_factory: Callable[[Endpoint], ReceiverClient] | None = None,
         clock: Callable[[], float] = time.time,
         frozen: bool | None = None,
@@ -86,6 +90,7 @@ class TelemetrySender:
         self.config_path = config_path
         self.state = TelemetryState(state_path or default_state_path())
         self.outbox = outbox or Outbox(default_outbox_path())
+        self.recent = recent or Outbox(default_recent_path())
         self._client_factory = client_factory or ReceiverClient
         self.clock = clock
         self.frozen = paths.is_frozen() if frozen is None else frozen
@@ -266,7 +271,65 @@ class TelemetrySender:
             "pendingLogs": len(self.outbox.read()),
             "lastLabelsSentAt": self.state.kind("labels")["lastSuccess"],
             "lastLogsSentAt": self.state.kind("logs")["lastSuccess"],
+            "lastDiagnosticReceipt": self.state.kind("diagnostics")["lastReceipt"],
+            "lastDiagnosticAt": self.state.kind("diagnostics")["lastSuccess"],
         }
+
+    # ── 진단 정보(사용자가 버튼으로 보내는 1회성 전송, plan-deploy D14) ──────────
+
+    def diagnostic_bundle(self) -> dict:
+        cfg = self._cfg()
+        install_id = ensure_install_id(self.config_path)
+        entries = (self.recent.read() or self.outbox.read())[-DIAG_ENTRIES:]
+        return {
+            "installId": install_id,
+            "schemaVersion": SCHEMA_VERSION,
+            "mode": self._mode(cfg),
+            "displayId": display_id(install_id),
+            "env": self._env(cfg),
+            "entries": self._scrubbed_entries(cfg, entries),
+        }
+
+    def diagnostics_preview(self) -> dict:
+        """보낼 진단 내용(개인정보를 지운 뒤)을 네트워크 없이 보여 준다. 전송 동의와 무관하다."""
+        cfg = self._cfg()
+        bundle = self.diagnostic_bundle()
+        configured = load_endpoint(cfg) is not None
+        return {
+            "displayId": bundle["displayId"],
+            "mode": bundle["mode"],
+            "env": bundle["env"],
+            "count": len(bundle["entries"]),
+            "items": bundle["entries"],
+            "endpointConfigured": configured,
+            "canSend": configured and self._can_send_in_mode(cfg),
+        }
+
+    def send_diagnostics(self) -> dict:
+        """사용자가 직접 누른 1회성 전송. `telemetry.sendLogs` 와 무관하고, 이 뒤로 자동 전송이 켜지지도 않는다."""
+        cfg = self._cfg()
+        endpoint = load_endpoint(cfg)
+        if endpoint is None:
+            return {"ok": False, "reason": "no-endpoint"}
+        if not self._can_send_in_mode(cfg):
+            return {"ok": False, "reason": "dev-blocked"}
+        bundle = self.diagnostic_bundle()
+        client = self._client_factory(endpoint)
+        try:
+            result = client.post("/v1/diagnostics", bundle)
+        finally:
+            try:
+                client.close()
+            except Exception:
+                pass
+        if result.outcome == "drop":
+            return {"ok": False, "reason": "rejected", "httpStatus": result.status}
+        if result.outcome != "ok":
+            return {"ok": False, "reason": "network" if result.status is None else "server", "httpStatus": result.status}
+        receipt = (result.data or {}).get("receiptId")
+        receipt = receipt if isinstance(receipt, str) and RECEIPT_PATTERN.match(receipt) else None
+        self.state.update("diagnostics", lastSuccess=self.clock(), lastReceipt=receipt)
+        return {"ok": True, "receiptId": receipt, "saved": len(bundle["entries"])}
 
     def delete_remote(self) -> dict:
         """보낸 데이터 삭제 요청. 사용자가 직접 누른 동작이라 전송 동의와 무관하다.

@@ -18,6 +18,7 @@ from lumia_briefing_room.logsetup import default_log_path
 from lumia_briefing_room.recording_info import find_latest_session
 from lumia_briefing_room.resolution_support import classify_resolution
 from lumia_briefing_room.steam_paths import discover_recording_root, normalize_recording_root
+from lumia_briefing_room.telemetry.payload import display_id
 
 
 def _recording_report(cfg: Config) -> dict:
@@ -94,6 +95,7 @@ def register_onboarding_routes(
             "python": sys.version.split()[0],
             "ffmpeg": str(ffmpeg) if ffmpeg else None,
             "consentVersion": cfg.consent.version,
+            "displayId": display_id(cfg.telemetry.install_id) if cfg.telemetry.install_id else None,
             "recording": _recording_report(cfg),
         }
         log_dir = app.state.log_dir or default_log_path().parent

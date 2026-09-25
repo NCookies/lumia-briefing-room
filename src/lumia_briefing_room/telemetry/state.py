@@ -12,7 +12,7 @@ from pathlib import Path
 
 from lumia_briefing_room.config import _default_local_appdata
 
-KINDS = ("labels", "logs")
+KINDS = ("labels", "logs", "diagnostics")
 _LOCK = threading.RLock()
 
 
@@ -21,7 +21,9 @@ def default_state_path() -> Path:
 
 
 def _fresh() -> dict:
-    return {kind: {"lastSuccess": None, "nextAttempt": 0.0, "failures": 0} for kind in KINDS} | {"digests": {}}
+    return {
+        kind: {"lastSuccess": None, "nextAttempt": 0.0, "failures": 0, "lastReceipt": None} for kind in KINDS
+    } | {"digests": {}}
 
 
 class TelemetryState:
