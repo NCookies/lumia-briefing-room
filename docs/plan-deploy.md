@@ -188,7 +188,7 @@
 
 결정한 것: ① 오류 수집은 `app.log` 파싱 대신 구조화 핸들러 outbox ② 서버 관리자 API(`GET /v1/admin/labels`)로 `tools/pull_labels.py` 가 라벨을 가져온다 ③ 토큰은 빌드 때 환경변수로 번들에 주입 ④ 다시보기 클립 라벨도 보낸다(`source=vod`) ⑤ 삭제 요청 성공 시 전송을 끄고 로컬 전송 기록을 지운다 ⑥ `consent.version` 3(라벨·오류 로그만 다시 묻는다). **발견·수정한 것**: 로그 핸들러가 같은 파일에 두 번 붙어 모든 줄이 두 번 기록되던 문제, 테스트 실행이 실제 사용자의 `app.log` 에 트레이스백을 남기던 문제(테스트가 사용자 폴더를 임시 폴더로 바꿔 쓴다). **환경 정보의 런타임 측정값(2026-09-25 추가, 버전 0.1.2)**: `telemetry/runtime_stats.py` 가 프록시를 만들 때 쓴 인코더·걸린 시간(최근 20개 평균), 실시간 분석 시간 ÷ 게임 길이(`analysisTimeRatio`, 게임 중 부하 판단용 — plan-deploy §7-14), 분석에 하드웨어 디코딩을 썼는지(`hwaccel`, 측정 전에는 다시보기 분석 설정)를 `%LOCALAPPDATA%\LumiaBriefingRoom\runtime_stats.json` 에 스스로 기록하고, 프론트가 시작할 때 `POST /api/client-capabilities` 로 알리는 HEVC 재생 가능 여부(`hevcPlayable`)와 함께 환경 정보에 싣는다. **아직 모으지 않는 것**: 신호별 수치 `pvpSignalValues`(검출기가 결과에 담지 않는다).
 
-**계약의 원본은 infra 저장소의 `contract/receiver.schema.json`(별도 인프라 저장소의 `contract/`)** 이고, 이 저장소의 [`tests/contract/`](../tests/contract/receiver.schema.json)는 `tools/sync_contract.py` 로 복사한 것이다. 수락·거부 예시는 `tests/contract/fixtures/`. 서버 테스트와 [`tests/test_contract.py`](../tests/test_contract.py)가 같은 픽스처를 쓰므로 한쪽만 고치면 그쪽 테스트가 깨진다. 서버 API·운영은 infra README.
+**계약의 원본은 이 저장소의 [`contract/receiver.schema.json`](../contract/receiver.schema.json)**(2026-09-26 infra 저장소에서 이관, 복사본 없음)이다. 수락·거부 예시는 `contract/fixtures/`. 서버 테스트(`server/receiver/tests/test_contract.py`)와 [`tests/test_contract.py`](../tests/test_contract.py)가 같은 파일을 쓰므로 한쪽만 고치면 그쪽 테스트가 깨진다. 서버 API·배포는 [server/README.md](../server/README.md), 인프라 운영은 infra 저장소 README.
 
 | 경로 | 보내는 것 | 응답 |
 |---|---|---|

@@ -1,7 +1,7 @@
 # 수신 서버 인프라 계획 (OCI · Terraform · 도커)
 
 > 대상: [plan-deploy.md D10·§7-11](plan-deploy.md) (라벨·오류 로그 수신처), [SPEC §7.11](SPEC.md) (동의 기반 데이터 전송), [SPEC §6 v2 이후 후보](SPEC.md) (호스팅 공유).
-> 인프라 코드와 **구성·운영 방법의 상세는 별도 저장소 별도 인프라 저장소(`infra`, 이 저장소 옆 폴더)의 README** 에 있다. 이 문서는 계획·결정과 이 저장소와의 연결 지점만 다룬다. 각 단계를 끝낼 때 아래 체크박스와 "확인 필요"를 갱신한다.
+> **수신 서버의 애플리케이션 코드(`server/receiver/`)와 전송 계약(`contract/`)은 이 저장소가 갖는다**([server/README.md](../server/README.md), 2026-09-26 infra 저장소에서 이관 — 서버 코드는 앱과 함께 바뀌므로). 인프라(Terraform·compose·Caddy·watchtower·DNS)와 **구성·운영 방법의 상세는 별도 인프라 저장소(`infra`, 이 저장소 옆 폴더)의 README** 에 있다. 이 문서는 계획·결정과 이 저장소와의 연결 지점을 다룬다. 각 단계를 끝낼 때 아래 체크박스와 "확인 필요"를 갱신한다.
 
 ## 0. 진행 상태
 
@@ -9,10 +9,11 @@
 - [x] I1. 별도 저장소 생성 — 인프라 저장소 (범용 이름, 다른 프로젝트 인프라도 여기서 관리). Terraform 상태는 로컬 파일. 서버는 Python FastAPI 로 결정
 - [x] I2. Terraform 으로 OCI 기본 인프라(VCN·게이트웨이·라우트 테이블·보안 목록·서브넷·VM) 구성 — **2026-09-25 `apply` 완료.** VM 은 `VM.Standard.E2.1.Micro`(A1 은 `LaunchInstance` 404 로 실패, [§7](#7-실제-구성-2026-09-25)). 로컬 상태 파일
 - [x] I3. 도커로 수신 API 컨테이너 배포 (1단계 저장: 파일) — caddy + receiver + watchtower, 서버 주소(`.env` 의 `LUMIA_RECEIVER_URL`) 에서 동작. 실서버에서 토큰 없음 401·라벨 저장·삭제·`/docs` 404 확인. 자동 업데이트(ghcr + watchtower, **간격 5분 — 나중에 1~2시간으로 늘릴 TODO**)
-- [x] I3-b. **서버 전송 계약 확정·구현·배포 (2026-09-25)** — 계약 원본 infra 저장소의 `contract/`, 서버 스키마를 앱 실제 메타데이터와 대조해 확정, `POST /v1/diagnostics`(접수 번호), `mode=dev` 분리, 90일 자동 삭제, 접근 로그 IP 비활성, watchtower 2시간(`WATCHTOWER_POLL_INTERVAL`), 일별 집계, 다중 토큰. pytest 55개 통과. **실서버 배포·읽기 전용 스모크 완료**(caddy 설정 서버에서 `caddy validate`, `docker compose up -d`; 토큰 없는 `/v1/diagnostics`·`/v1/labels`·`DELETE` 401, `/docs` 404, `/healthz` 200, 재기동 후 컨테이너 로그에 클라이언트 IP 없음 — 라벨 등 데이터를 쓰는 요청은 하지 않았다). 이 저장소의 계약 테스트는 [D10 전송 계약](plan-deploy.md#d10-라벨오류-로그-전송--서버-전송-계약) 참고
+- [x] I3-b. **서버 전송 계약 확정·구현·배포 (2026-09-25)** — 계약은 `contract/`(당시 infra 저장소, 지금은 이 저장소), 서버 스키마를 앱 실제 메타데이터와 대조해 확정, `POST /v1/diagnostics`(접수 번호), `mode=dev` 분리, 90일 자동 삭제, 접근 로그 IP 비활성, watchtower 2시간(`WATCHTOWER_POLL_INTERVAL`), 일별 집계, 다중 토큰. pytest 55개 통과. **실서버 배포·읽기 전용 스모크 완료**(caddy 설정 서버에서 `caddy validate`, `docker compose up -d`; 토큰 없는 `/v1/diagnostics`·`/v1/labels`·`DELETE` 401, `/docs` 404, `/healthz` 200, 재기동 후 컨테이너 로그에 클라이언트 IP 없음 — 라벨 등 데이터를 쓰는 요청은 하지 않았다). 이 저장소의 계약 테스트는 [D10 전송 계약](plan-deploy.md#d10-라벨오류-로그-전송--서버-전송-계약) 참고
 - [x] I3-c. **요청 제한·이상 요청 차단·Discord 알림 (2026-09-25 코드·로컬 도커 통합 테스트 완료, **실서버 반영 완료**)** — IP 별 메모리 제한(10분에 60회, 거부 15회 → 1시간 차단, 429), 알림은 IP 앞 두 자리만·시간당 10건 상한, 웹훅 URL 은 `.env` 로만. pytest 68개, caddy→receiver 실제 경로에서 차단·healthz 예외·로그에 클라이언트 IP 없음 확인. 실서버에서도 토큰 없는 요청 15회 뒤 429 를 확인(이 시험으로 제 IP 가 1시간 메모리 차단됨). **같은 날 발견·수정한 결함**: I3-b 의 "재기동 뒤 로그에 IP 없음" 확인은 부족했고, 서버 IP 로 직접 접속한 요청은 caddy 접근 로그에 IP 가 남고 있었다 → 전역 `log { exclude http.log.access }` 로 수정·재검증
 - [x] I4. **이 저장소 쪽 전송 클라이언트 연결 (2026-09-25, plan-deploy D10)** — 앱→서버 전송, 서버→로컬 가져오기(`tools/pull_labels.py`), 통합 테스트(`pytest -m integration`, 로컬 도커의 receiver 컨테이너)까지. 실서버에는 2026-09-25 새 이미지·`ADMIN_TOKEN` 을 반영했다(읽기 전용 스모크와 `pull_labels.py` 확인)
 - [x] I3-d. **라벨 내보내기 관리자 API (2026-09-25)** — `GET /v1/admin/labels`(관리자 토큰 `X-Admin-Token`, `ADMIN_TOKEN` 이 비면 404, dev/release 분리, (수신 시각·설치·클립 키) 커서 페이지, 응답 `cursor` 로 증분 수집). 로그·진단은 내보내지 않는다. 계약에 라벨 `source`(recording/vod) 추가
+- [x] I6. **수신 서버 코드·계약·서버 CI 를 이 저장소로 이관 (2026-09-26)** — `services/receiver`→`server/receiver`, `contract`→`contract`, `.github/workflows/receiver.yml`. 관련 커밋 14개를 이력째 옮겼다(서버 도메인은 `example.invalid` 로 치환). 앱 쪽 계약 복사본(`tests/contract`)과 `tools/sync_contract.py` 는 없앴다. infra 저장소에는 인프라만 남았다. **남은 것**: GitHub 패키지 `receiver` 의 Actions access 에 이 저장소 추가(1회), 이 저장소를 push 해 이미지 갱신 확인
 - [ ] I5. 파일 → DB 이전 (2단계 저장, [§4](#4-저장-계층-파일--db))
 
 ## 1. 왜 만드나
@@ -29,7 +30,7 @@
 | 클라우드 | OCI (Oracle Cloud Infrastructure) | 사용자 선택. 무료 한도·가용성은 [§6](#6-확인-필요-추측으로-메우지-않은-것) |
 | IaC | Terraform | 사용자 선택 |
 | 실행 방식 | 도커 컨테이너 | 이 프로젝트 외 다른 서버도 함께 올릴 예정이라 서비스별로 격리 |
-| 코드 위치 | **별도 저장소** | 다른 서버도 함께 쓰는 공용 인프라라 이 앱 저장소와 분리한다. 이 저장소에는 수신 API 계약과 연결 지점만 적는다 |
+| 코드 위치 | **수신 서버 코드는 이 앱 저장소(`server/receiver/`), 인프라는 별도 저장소** | (2026-09-26 변경) 처음엔 서버 코드도 공용 인프라 저장소에 뒀지만, 서버 API 는 앱과 함께 바뀌므로(전송 필드 허용 목록·계약·관리자 화면) 이 저장소가 갖는다. 별도 저장소에는 Terraform·compose·Caddy 등 인프라만 남긴다 |
 | 저장 | 1단계 파일, 2단계 DB | [§4](#4-저장-계층-파일--db). DB 종류는 아직 정하지 않았다 |
 | 전송 원칙 | 기존 원칙 그대로 | 동의한 항목만, 영상·화면 이미지·닉네임·경로 원문은 어떤 경우에도 받지 않는다([SPEC §7.8·§7.11](SPEC.md)) |
 
@@ -42,7 +43,7 @@
 - **전송 방식**: 앱이 하루 1회 묶음으로 보내고 실패하면 조용히 다음으로 미룬다(대기분 상한 예: 20MB — SPEC §7.11).
 - **진단 번들(plan-deploy D14)**: 사용자가 버튼으로 보내는 진단 정보(로그 발췌·환경 정보, 개인정보 제거 후)도 받는다. 서버는 접수 번호를 발급해 돌려주고 `installId` 로 묶는다. 화면에 보이는 짧은 표시용 ID 로도 문의를 검색할 수 있게 하되 삭제는 전체 `installId` 로만 받는다. 영상·이미지는 받지 않는다.
 - **서버가 해야 할 것(수신 API 최소 범위)**: 수신·크기 상한·스키마 검증·`installId` 별 삭제·진단 번들 접수 번호 발급. 조회·분석은 서버 밖(로컬 도구)에서 한다.
-- **API 명세와 버전**은 서버 저장소가 정한다. 원본은 infra 저장소 `contract/receiver.schema.json`(JSON Schema)과 `contract/fixtures/`(수락·거부·버림 예시)이고, 이 저장소의 `tests/contract/` 는 `tools/sync_contract.py` 로 복사한 것이다. 확정한 내용과 앱이 할 일은 [plan-deploy.md D10 전송 계약](plan-deploy.md#d10-라벨오류-로그-전송--서버-전송-계약).
+- **API 명세와 버전**은 이 저장소가 정한다. 원본은 `contract/receiver.schema.json`(JSON Schema)과 `contract/fixtures/`(수락·거부·버림 예시)이고, 앱 테스트(`tests/test_contract.py`)와 서버 테스트(`server/receiver/tests/test_contract.py`)가 같은 파일을 쓴다. 확정한 내용과 앱이 할 일은 [plan-deploy.md D10 전송 계약](plan-deploy.md#d10-라벨오류-로그-전송--서버-전송-계약).
 
 ## 4. 저장 계층: 파일 → DB
 
@@ -102,4 +103,4 @@
   - **구현(2026-09-26)**: 후보 (1) 로 정했다. 개발 모드 앱의 "관리자" 탭(`api/admin_routes.py`, 배포 모드에서는 404)이 관리자 토큰으로 서버의 읽기 API 를 대신 호출해 서버 상태·진단 번들·오류 로그(묶음 집계)·라벨을 보여 준다(토큰은 브라우저에 넘기지 않음, 별도 프로그램 없음). 서버 쪽은 infra 저장소에 `GET /v1/admin/status`·`/diagnostics`·`/diagnostics/{receiptId}`·`/logs`·`/logs/groups` 를 추가했다(**로컬 커밋, 서버 배포는 아직**). 설치판과 개발판은 `LUMIA_PROFILE`(`run-parallel.bat`)로 따로 띄워 전송을 실시간으로 볼 수 있다.
   - (구현 전 후보 목록, 참고) (1) 내 PC 에서 로컬로 띄우고 서버의 관리자 조회 API 를 별도 관리자 토큰으로 호출, (2) SSH 터널로 서버의 대시보드에 접속(서버는 `localhost` 바인드만), (3) 서버 데이터를 내려받아 로컬에서 조회(이미 `tools/pull_labels.py` 로 라벨을 가져오는 경로가 있다). 수신 API 와 같은 프로세스·같은 토큰을 쓰지 않는다(관리자 권한이 앱에 들어가는 토큰과 섞이면 안 된다).
   - 저장이 파일에서 DB 로 옮겨간 뒤([§4](#4-저장-계층-파일--db))에 만드는 편이 조회·집계가 쉽다.
-  - 만든다면 서버 저장소(`P:\infra`)에 둔다. 이 저장소에는 조회에 필요한 필드(`clipUid`, `installId`, 접수 번호)만 있으면 된다.
+  - 서버 쪽 읽기 API 는 이 저장소 `server/receiver/app/admin.py` 에 있다(2026-09-26 이관 뒤).

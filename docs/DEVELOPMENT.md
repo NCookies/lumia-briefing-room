@@ -33,9 +33,11 @@ pip install --no-deps rapidocr    # 결과 화면 OCR (아래 참고)
 pytest
 ```
 
-서버와 공유하는 **전송 계약 테스트**(`tests/test_contract.py`)는 `tests/contract/`(infra 저장소 `contract/` 의 복사본)를 쓴다. infra 저장소가 인프라 저장소 처럼 이 저장소 옆에 있으면 복사본이 원본과 같은지도 검사하고, 없으면 그 검사만 건너뛴다. 서버 쪽 계약이 바뀌었으면 `python tools/sync_contract.py` 로 복사본을 갱신하고(`--check` 는 차이만 확인) 테스트를 다시 돌린다. 앱의 클립 메타데이터에 필드를 추가하면 `tests/contract/app-metadata-fields.json` 에 전송/제외 분류가 없어 이 테스트가 깨진다 — 분류는 infra 저장소 원본에서 고치고 다시 복사한다.
+서버와 공유하는 **전송 계약**은 저장소 루트 `contract/`(JSON Schema `receiver.schema.json`, 수락·거부·버림 픽스처 `fixtures/`, 앱 필드 분류표 `app-metadata-fields.json`) 한 곳에만 있다. 앱 쪽 검증은 `tests/test_contract.py`, 서버 쪽 검증은 `server/receiver/tests/test_contract.py` 가 같은 파일을 쓰므로 계약을 고치면 두 쪽 테스트를 같이 돌린다(복사·동기화 도구는 없다). 앱의 클립 메타데이터에 필드를 추가하면 `contract/app-metadata-fields.json` 에 전송/제외 분류가 없어 앱 테스트가 깨진다 — 분류를 여기에 적는다(스키마에 실어 보내는 필드면 `server/receiver/app/schemas.py` 도 같이).
 
-**서버 통합 테스트**(`-m integration`)는 기본 `pytest` 에서 빠진다. 도커가 켜져 있고 infra 저장소가 이 저장소 옆(인프라 저장소)에 있으면 `pytest -m integration tests/test_integration_receiver.py` 로 receiver 컨테이너를 임시 토큰으로 띄워 앱의 전송 클라이언트(라벨·오류 로그 전송, 재전송 덮어쓰기, 삭제 요청, `pull_labels.py`, 개발 모드 분리)를 실제 서버 코드에 붙여 본다. 운영 서버에는 접속하지 않는다.
+**수신 서버 테스트**(`server/receiver`)는 앱 pytest 와 따로 돈다: `cd server/receiver && python -m venv .venv && .venv\Scripts\python -m pip install -r requirements-dev.txt && .venv\Scripts\python -m pytest`(앱 `.venv` 에도 fastapi 등이 있어 그걸로 `python -m pytest` 해도 된다). 서버 코드·API·배포는 [server/README.md](../server/README.md).
+
+**서버 통합 테스트**(`-m integration`)는 기본 `pytest` 에서 빠진다. 도커가 켜져 있으면 `pytest -m integration tests/test_integration_receiver.py` 로 이 저장소 `server/receiver` 를 이미지로 빌드해 임시 토큰으로 띄우고, 앱의 전송 클라이언트(라벨·오류 로그 전송, 재전송 덮어쓰기, 삭제 요청, `pull_labels.py`, 개발 모드 분리)를 실제 서버 코드에 붙여 본다. 운영 서버에는 접속하지 않는다.
 
 ffmpeg 를 찾을 수 없으면 ffmpeg 통합 테스트는 자동으로 skip 된다(제품 코드 실행에는 ffmpeg 가 필수지만, 순수 로직 테스트는 ffmpeg 없이도 전부 돈다). ffmpeg 위치를 지정하려면:
 
@@ -297,7 +299,7 @@ python tools/eval_pvp.py pulled_labels                   # 가져온 라벨로 �
 ```
 
   다음 실행부터는 새로 온·고쳐서 다시 온 라벨만 받는다(`--full` 은 처음부터, `--mode dev` 는 개발 모드 데이터).
-- **관리자 화면** (개발 모드 전용 "관리자" 탭, 별도 프로그램 없음): `run.bat`/`dev.bat` 으로 소스 실행하면 클립 탭 옆에 "관리자" 탭이 보인다(배포 빌드에는 탭도 API `/api/admin/*` 도 없다 — 서버가 요청마다 개발 모드인지 확인해 404). 저장소 루트 `.env` 의 `LUMIA_ADMIN_TOKEN`·`LUMIA_RECEIVER_URL`(또는 같은 이름의 환경변수)을 앱 프로세스가 읽어 서버의 관리자 읽기 API 를 대신 호출한다(토큰은 브라우저에 넘기지 않는다). 하위 탭: **서버 상태**(모드별 설치·라벨·로그·진단 수와 종류별 "마지막 수신 N분 전", 오늘 받은/거부한 요청, 디스크·차단 IP 수), **진단 번들**(접수 번호·표시용 ID `LUMIA-XXXX-XXXX`·installId 앞부분 검색, 행을 눌러 환경 정보와 로그 발췌 전문), **오류 로그**(같은 오류 묶음 집계 + 최신순 목록, 수준·문구 필터), **라벨**(집계와 `installId`/`clipKey` 검색). "5초마다 자동 새로고침"을 켜면 상태·진단·오류 로그가 실시간으로 갱신된다(라벨은 전량을 받아 오므로 수동). release/dev 선택이 서버의 `mode` 다. `.env` 는 요청 때마다 읽으므로 고친 뒤 앱을 다시 띄울 필요는 없지만 앱 코드가 바뀌면 다시 띄운다. 값 뒤 ` # 설명` 은 주석으로 잘라내고, 서버 주소에 `https://` 가 없으면 붙인다(앱의 라벨·오류 로그 전송도 같다). 토큰에 한글·공백이 섞이면 500 이 아니라 안내 문구가 든 503 이다. **서버(`P:\infra`)에 읽기 API 가 배포돼 있어야 한다**(라벨 외 탭은 서버가 옛 버전이면 "아직 서버에 배포되지 않았습니다" 오류).
+- **관리자 화면** (개발 모드 전용 "관리자" 탭, 별도 프로그램 없음): `run.bat`/`dev.bat` 으로 소스 실행하면 클립 탭 옆에 "관리자" 탭이 보인다(배포 빌드에는 탭도 API `/api/admin/*` 도 없다 — 서버가 요청마다 개발 모드인지 확인해 404). 저장소 루트 `.env` 의 `LUMIA_ADMIN_TOKEN`·`LUMIA_RECEIVER_URL`(또는 같은 이름의 환경변수)을 앱 프로세스가 읽어 서버의 관리자 읽기 API 를 대신 호출한다(토큰은 브라우저에 넘기지 않는다). 하위 탭: **서버 상태**(모드별 설치·라벨·로그·진단 수와 종류별 "마지막 수신 N분 전", 오늘 받은/거부한 요청, 디스크·차단 IP 수), **진단 번들**(접수 번호·표시용 ID `LUMIA-XXXX-XXXX`·installId 앞부분 검색, 행을 눌러 환경 정보와 로그 발췌 전문), **오류 로그**(같은 오류 묶음 집계 + 최신순 목록, 수준·문구 필터), **라벨**(집계와 `installId`/`clipKey` 검색). "5초마다 자동 새로고침"을 켜면 상태·진단·오류 로그가 실시간으로 갱신된다(라벨은 전량을 받아 오므로 수동). release/dev 선택이 서버의 `mode` 다. `.env` 는 요청 때마다 읽으므로 고친 뒤 앱을 다시 띄울 필요는 없지만 앱 코드가 바뀌면 다시 띄운다. 값 뒤 ` # 설명` 은 주석으로 잘라내고, 서버 주소에 `https://` 가 없으면 붙인다(앱의 라벨·오류 로그 전송도 같다). 토큰에 한글·공백이 섞이면 500 이 아니라 안내 문구가 든 503 이다. **서버에 읽기 API 가 배포돼 있어야 한다**(코드는 `server/receiver`, 이미지는 push 로 갱신)(라벨 외 탭은 서버가 옛 버전이면 "아직 서버에 배포되지 않았습니다" 오류).
 
 ### 13. 릴리스 (GitHub Actions, D13)
 
@@ -339,6 +341,5 @@ git push origin v0.1.4
 | `tools/eval_detect.py` | 라벨셋 대비 검출 정확도 리포트 |
 | `tools/pull_labels.py` | 서버에 쌓인 라벨을 로컬로 받아 `eval_pvp.py` 가 읽는 `.labels/` 형태로 저장 (관리자 토큰은 환경변수 `LUMIA_ADMIN_TOKEN`, 증분 수집, `--full`·`--mode dev`) |
 | `tools/release_tools.py` | 릴리스 파이프라인 보조(태그·버전·패치노트 확인, SHA-256 파일, 릴리스 본문, VirusTotal 업로드). 워크플로가 부른다 — 아래 "13" |
-| `tools/sync_contract.py` | 서버와 공유하는 전송 계약을 infra 저장소(infra 저장소의 `contract/`)에서 `tests/contract` 로 복사 (`--check` 는 차이만 확인, `--source` 로 경로 지정) |
 
 가상환경을 활성화한 상태에서 실행할 것.
