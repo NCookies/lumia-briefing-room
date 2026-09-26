@@ -334,7 +334,16 @@ git push origin v0.1.4
 - 태그 없이 파이프라인만 시험하려면 Actions 탭 → release → **Run workflow**. 빌드·설치기·SHA-256 까지만 하고 Release 는 만들지 않으며, 설치기는 아티팩트(3일)로 남는다.
 - 결과 Release: 설치기(`LumiaBriefingRoom-<버전>-setup.exe`), `<설치기>.sha256`, 본문(CHANGELOG 절 + SHA-256 + VirusTotal 링크). 초안으로 만들었다가 마지막에 공개한다. VirusTotal 이 실패하면 링크만 빠진 채 공개되므로 Actions 로그를 확인한다.
 - 패치노트는 루트 `CHANGELOG.md` 하나가 원본이다. 앱 옵션의 "패치노트 보기"(`GET /api/changelog`, 빌드에 `CHANGELOG.md` 동봉)와 Release 본문이 모두 이 파일에서 나오므로 릴리스 전에 그 버전 절을 쓴다.
-- 필요한 Secrets 는 README "릴리스 만들기" 참고. 로컬에서 흉내: `python tools/release_tools.py prepare v0.1.4` (설치기가 `dist/` 에 있어야 한다).
+- 로컬에서 흉내: `python tools/release_tools.py prepare v0.1.4` (설치기가 `dist/` 에 있어야 한다).
+- **한 번만 설정** — 저장소 **Settings → Secrets and variables → Actions → New repository secret** 에서 세 개를 만든다. 값은 저장소에 커밋하지 않는다.
+
+  | 이름 | 값 |
+  |---|---|
+  | `VT_API_KEY` | [VirusTotal](https://www.virustotal.com) 에 가입한 뒤 프로필의 **API key** (무료 키로 충분하다) |
+  | `LUMIA_RECEIVER_URL` | 수신 서버 주소 (서버 저장소의 배포 값) |
+  | `LUMIA_RECEIVER_TOKEN` | 수신 서버 API 토큰 (`terraform.tfvars` 의 `receiver_api_token`) |
+
+  `LUMIA_RECEIVER_URL`·`LUMIA_RECEIVER_TOKEN` 이 없으면 서버 전송이 꺼진 빌드가 나가고, `VT_API_KEY` 가 없으면 Release 는 만들어지되 검사 링크만 빠진다.
 - 러너 실측: Inno Setup 6.7.1 이 이미 설치돼 있고 전체 약 4분 반이다([plan-deploy §7-19](plan-deploy.md)).
 
 ### 9. 브라우저 디버깅 (개발용)
