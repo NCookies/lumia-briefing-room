@@ -179,6 +179,14 @@ def test_check_failures_become_error_state_not_exceptions(env, status, body):
     assert env.updater.check()["state"] == "error"
 
 
+@pytest.mark.parametrize("status", [403, 429])
+def test_rate_limited_check_asks_the_user_to_retry_later_without_http_codes(env, status):
+    env.github.routes["/repos/o/r/releases/latest"] = (status, b'{"message": "API rate limit exceeded"}')
+    result = env.updater.check()
+    assert result["state"] == "error"
+    assert "잠시 뒤" in result["error"] and "HTTP" not in result["error"]
+
+
 def test_check_survives_unreachable_server(tmp_path, github):
     env = Env(tmp_path, github)
     github.close()

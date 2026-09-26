@@ -252,6 +252,8 @@ class Updater:
             response.raise_for_status()
             payload = response.json()
         except httpx.HTTPStatusError as exc:
+            if exc.response.status_code in (403, 429):
+                raise UpdateError("확인 요청이 너무 많았어요. 잠시 뒤에 다시 시도해 주세요") from exc
             raise UpdateError(f"릴리스 정보를 받지 못했습니다 (HTTP {exc.response.status_code})") from exc
         except (httpx.HTTPError, ValueError) as exc:
             raise UpdateError("업데이트 서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요") from exc
