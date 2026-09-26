@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import re
 import subprocess
 import threading
@@ -20,6 +21,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
 import httpx
 
@@ -31,6 +33,9 @@ log = logging.getLogger("lumia_briefing_room.updater")
 REPO = "NCookies/lumia-briefing-room"
 API_URL = f"https://api.github.com/repos/{REPO}/releases/latest"
 DOWNLOAD_PREFIX = f"https://github.com/{REPO}/releases/download/"
+ENV_API_URL = "LUMIA_UPDATE_API_URL"
+ENV_DOWNLOAD_PREFIX = "LUMIA_UPDATE_DOWNLOAD_PREFIX"
+LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 CHECK_INTERVAL = 24 * 3600.0
 RETRY_INTERVAL = 3600.0
 LOOP_TICK = 30.0
@@ -43,6 +48,29 @@ _SHA256_LINE = re.compile(r"^([0-9a-fA-F]{64}) [ *](.+)$")
 
 class UpdateError(Exception):
     pass
+
+
+def _is_local(url: str) -> bool:
+    try:
+        return urlparse(url).hostname in LOCAL_HOSTS
+    except ValueError:
+        return False
+
+
+def resolve_endpoints(environ=None) -> tuple[str, str]:
+    """릴리스 조회·다운로드 주소. 평소에는 이 저장소의 GitHub 릴리스다.
+
+    로컬 시험 서버(`tools/fake_release_server.py`)로 전 과정을 릴리스 없이 시험할 수 있도록 환경변수 두 개가 **모두** 이 PC 자신
+    (127.0.0.1·localhost)을 가리킬 때만 주소를 바꾼다. 하나라도 빠졌거나 바깥 주소면 무시한다 — 업데이트 출처를 바깥으로 돌릴 수 없다.
+    """
+    environ = os.environ if environ is None else environ
+    api, prefix = environ.get(ENV_API_URL), environ.get(ENV_DOWNLOAD_PREFIX)
+    if api and prefix and _is_local(api) and _is_local(prefix):
+        log.warning("업데이트 시험 서버를 쓴다: %s", api)
+        return api, prefix
+    if api or prefix:
+        log.warning("업데이트 시험 주소는 두 값이 모두 이 PC 를 가리킬 때만 쓴다 — 무시했다")
+    return API_URL, DOWNLOAD_PREFIX
 
 
 def parse_version(text: str) -> tuple[int, int, int] | None:
@@ -166,8 +194,8 @@ class Updater:
         state_path: Path | None = None,
         download_dir: Path | None = None,
         current_version: str = __version__,
-        api_url: str = API_URL,
-        download_prefix: str = DOWNLOAD_PREFIX,
+        api_url: str | None = None,
+        download_prefix: str | None = None,
         clock: Callable[[], float] = time.time,
         launcher: Callable[[Path], None] | None = None,
         notify: Callable[[dict], None] | None = None,
@@ -178,8 +206,9 @@ class Updater:
         self.state_path = Path(state_path) if state_path else default_state_path()
         self.download_dir = Path(download_dir) if download_dir else default_download_dir()
         self.current = current_version
-        self.api_url = api_url
-        self.download_prefix = download_prefix
+        default_api, default_prefix = resolve_endpoints()
+        self.api_url = api_url or default_api
+        self.download_prefix = download_prefix or default_prefix
         self.clock = clock
         self._launcher = launcher
         self._notify = notify

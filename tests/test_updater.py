@@ -384,3 +384,35 @@ def test_installer_launch_breaks_away_from_the_kill_on_close_job():
     assert procs.installer_flags(platform="win32") & procs.CREATE_BREAKAWAY_FROM_JOB
     assert procs.JOB_OBJECT_LIMIT_BREAKAWAY_OK & procs.job_limit_flags()
     assert procs.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE & procs.job_limit_flags()
+
+
+def test_endpoints_default_to_the_repository_releases():
+    from lumia_briefing_room.updater import API_URL, DOWNLOAD_PREFIX, resolve_endpoints
+
+    assert resolve_endpoints({}) == (API_URL, DOWNLOAD_PREFIX)
+
+
+def test_a_local_test_server_can_replace_the_release_endpoints():
+    from lumia_briefing_room.updater import resolve_endpoints
+
+    env = {
+        "LUMIA_UPDATE_API_URL": "http://127.0.0.1:8770/repos/o/r/releases/latest",
+        "LUMIA_UPDATE_DOWNLOAD_PREFIX": "http://localhost:8770/download/",
+    }
+    assert resolve_endpoints(env) == (env["LUMIA_UPDATE_API_URL"], env["LUMIA_UPDATE_DOWNLOAD_PREFIX"])
+
+
+@pytest.mark.parametrize(
+    "env",
+    [
+        {"LUMIA_UPDATE_API_URL": "http://127.0.0.1:1/x"},
+        {"LUMIA_UPDATE_DOWNLOAD_PREFIX": "http://127.0.0.1:1/d/"},
+        {"LUMIA_UPDATE_API_URL": "https://evil.example/latest", "LUMIA_UPDATE_DOWNLOAD_PREFIX": "https://evil.example/d/"},
+        {"LUMIA_UPDATE_API_URL": "http://127.0.0.1:1/x", "LUMIA_UPDATE_DOWNLOAD_PREFIX": "https://evil.example/d/"},
+        {"LUMIA_UPDATE_API_URL": "http://127.0.0.1.evil.example/x", "LUMIA_UPDATE_DOWNLOAD_PREFIX": "http://127.0.0.1.evil.example/d/"},
+    ],
+)
+def test_test_endpoints_are_ignored_unless_both_point_at_this_pc(env):
+    from lumia_briefing_room.updater import API_URL, DOWNLOAD_PREFIX, resolve_endpoints
+
+    assert resolve_endpoints(env) == (API_URL, DOWNLOAD_PREFIX)

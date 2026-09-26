@@ -301,6 +301,24 @@ python tools/eval_pvp.py pulled_labels                   # 가져온 라벨로 �
   다음 실행부터는 새로 온·고쳐서 다시 온 라벨만 받는다(`--full` 은 처음부터, `--mode dev` 는 개발 모드 데이터).
 - **관리자 화면** (개발 모드 전용 "관리자" 탭, 별도 프로그램 없음): `run.bat`/`dev.bat` 으로 소스 실행하면 클립 탭 옆에 "관리자" 탭이 보인다(배포 빌드에는 탭도 API `/api/admin/*` 도 없다 — 서버가 요청마다 개발 모드인지 확인해 404). 저장소 루트 `.env` 의 `LUMIA_ADMIN_TOKEN`·`LUMIA_RECEIVER_URL`(또는 같은 이름의 환경변수)을 앱 프로세스가 읽어 서버의 관리자 읽기 API 를 대신 호출한다(토큰은 브라우저에 넘기지 않는다). 하위 탭: **서버 상태**(모드별 설치·라벨·로그·진단 수와 종류별 "마지막 수신 N분 전", 오늘 받은/거부한 요청, 디스크·차단 IP 수), **진단 번들**(접수 번호·표시용 ID `LUMIA-XXXX-XXXX`·installId 앞부분 검색, 행을 눌러 환경 정보와 로그 발췌 전문), **오류 로그**(같은 오류 묶음 집계 + 최신순 목록, 수준·문구 필터), **라벨**(집계와 `installId`/`clipKey` 검색). "5초마다 자동 새로고침"을 켜면 상태·진단·오류 로그가 실시간으로 갱신된다(라벨은 전량을 받아 오므로 수동). release/dev 선택이 서버의 `mode` 다. `.env` 는 요청 때마다 읽으므로 고친 뒤 앱을 다시 띄울 필요는 없지만 앱 코드가 바뀌면 다시 띄운다. 값 뒤 ` # 설명` 은 주석으로 잘라내고, 서버 주소에 `https://` 가 없으면 붙인다(앱의 라벨·오류 로그 전송도 같다). 토큰에 한글·공백이 섞이면 500 이 아니라 안내 문구가 든 503 이다. **서버에 읽기 API 가 배포돼 있어야 한다**(코드는 `server/receiver`, 이미지는 push 로 갱신)(라벨 외 탭은 서버가 옛 버전이면 "아직 서버에 배포되지 않았습니다" 오류).
 
+### 14. 앱 안 업데이트를 릴리스 없이 시험하기 (D9)
+
+공개 릴리스를 만들지 않고도 "업데이트 확인 → 받기 → 체크섬 검증 → 설치 창 → 앱 재시작 → 탭 새로고침" 전 과정을 이 PC 안에서 시험한다.
+
+```powershell
+# 1) 설치기를 새 버전인 것처럼 내려주는 가짜 릴리스 서버(앱의 현재 버전보다 큰 버전을 준다)
+python tools/fake_release_server.py dist\LumiaBriefingRoom-0.1.3-setup.exe --version 9.9.9 [--port 8770] [--notes-file notes.md]
+
+# 2) 앱(배포 exe)을 시험 주소와 함께 실행 — 서버가 출력하는 두 줄을 그대로 쓴다
+$env:LUMIA_UPDATE_API_URL = "http://127.0.0.1:8770/repos/test/app/releases/latest"
+$env:LUMIA_UPDATE_DOWNLOAD_PREFIX = "http://127.0.0.1:8770/download/"
+& "$env:LOCALAPPDATA\Programs\LumiaBriefingRoom\LumiaBriefingRoom.exe" --open-ui
+```
+
+- 두 환경변수가 **모두** `127.0.0.1`/`localhost` 를 가리킬 때만 적용된다(하나라도 빠졌거나 바깥 주소면 무시하고 진짜 GitHub 를 본다).
+- 내려주는 설치기 파일은 그대로 실행된다. 앱 버전 표기만 시험하려면 `__version__` 을 잠깐 낮춰 만든 빌드(0.1.3)를 쓴다.
+- 자동 테스트는 같은 서버 모듈로 돈다: `pytest tests/test_fake_release_server.py`.
+
 ### 13. 릴리스 (GitHub Actions, D13)
 
 태그를 푸시하면 `.github/workflows/release.yml` 이 설치기를 만들어 GitHub Release 로 올린다. 사람이 하는 일은 아래뿐이다.
