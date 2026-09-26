@@ -164,3 +164,60 @@ def test_a_token_that_cannot_be_a_header_is_a_503_not_a_crash(monkeypatch, tmp_p
     monkeypatch.setattr(admin_labels, "ENV_FILE", env)
     r = TestClient(create_app(Config())).get("/api/admin/summary")
     assert r.status_code == 503 and "LUMIA_ADMIN_TOKEN" in r.json()["detail"] and "abc" not in r.text
+
+
+class PassThroughServer:
+    def __init__(self, status=200):
+        self.requests, self.status = [], status
+
+    def __call__(self, request):
+        self.requests.append(request)
+        if self.status != 200:
+            return httpx.Response(self.status, json={})
+        return httpx.Response(200, json={"path": request.url.path, "params": dict(request.url.params)})
+
+
+def make_passthrough(**kw):
+    server = PassThroughServer(**kw)
+    client = httpx.Client(base_url="https://r.example", headers={"X-Admin-Token": "adm"}, transport=httpx.MockTransport(server))
+    app = create_app(Config())
+    app.state.admin_client = client
+    return TestClient(app), server
+
+
+@pytest.mark.parametrize(
+    "local,remote,params",
+    [
+        ("/api/admin/status", "/v1/admin/status", {}),
+        ("/api/admin/diagnostics", "/v1/admin/diagnostics", {"mode": "dev", "q": "LUMIA", "limit": "20", "offset": "40"}),
+        ("/api/admin/diagnostics/R-20260925-ABC234", "/v1/admin/diagnostics/R-20260925-ABC234", {"mode": "dev"}),
+        ("/api/admin/logs", "/v1/admin/logs", {"mode": "dev", "installId": A, "level": "ERROR", "q": "disk", "limit": "10", "offset": "0"}),
+        ("/api/admin/logs/groups", "/v1/admin/logs/groups", {"mode": "dev"}),
+    ],
+)
+def test_server_read_apis_are_forwarded_with_only_known_params_and_never_cached(local, remote, params):
+    c, server = make_passthrough()
+    noisy = {**params, "evil": "x"}
+    body = c.get(local, params=noisy).json()
+    assert body["path"] == remote and body["params"] == params
+    c.get(local, params=noisy)
+    assert len(server.requests) == 2
+
+
+def test_forwarded_apis_are_dev_only_and_validate_receipt_ids_locally():
+    c, server = make_passthrough()
+    assert c.get("/api/admin/diagnostics/not-a-receipt").status_code == 404
+    assert c.get("/api/admin/diagnostics/..%2Fsecret").status_code == 404
+    assert server.requests == []
+    app = create_app(Config(app=AppConfig(mode="release")))
+    app.state.admin_client = make_passthrough()[0].app.state.admin_client
+    r = TestClient(app)
+    for path in ("/api/admin/status", "/api/admin/diagnostics", "/api/admin/logs", "/api/admin/logs/groups", "/api/admin/diagnostics/R-20260925-ABC234"):
+        assert r.get(path).status_code == 404
+
+
+@pytest.mark.parametrize("status,text", [(401, "토큰"), (404, "꺼져"), (429, "너무 많"), (500, "HTTP 500")])
+def test_forwarded_server_errors_become_502(status, text):
+    c, _ = make_passthrough(status=status)
+    r = c.get("/api/admin/status")
+    assert r.status_code == 502 and text in r.json()["detail"]

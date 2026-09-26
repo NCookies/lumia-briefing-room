@@ -5,14 +5,22 @@
 
 from __future__ import annotations
 
+import re
 import threading
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 
 from lumia_briefing_room import admin_labels, paths
 from lumia_briefing_room.appmode import resolve_mode
 
 MAX_LIMIT = 500
+RECEIPT_PATTERN = re.compile(r"^R-\d{8}-[A-Z0-9]{6}$")
+FORWARD_PARAMS = {
+    "/v1/admin/status": (),
+    "/v1/admin/diagnostics": ("mode", "q", "limit", "offset"),
+    "/v1/admin/logs": ("mode", "installId", "level", "q", "limit", "offset"),
+    "/v1/admin/logs/groups": ("mode",),
+}
 MODE_PATTERN = "^(release|dev)$"
 
 
@@ -47,6 +55,37 @@ def register_admin_routes(app: FastAPI, *, current_config) -> None:
                     if getattr(app.state, "admin_client", None) is None:
                         http.close()
             return cache[mode]
+
+    def require_dev() -> None:
+        if resolve_mode(current_config().app.mode, frozen=paths.is_frozen()) != "dev":
+            raise HTTPException(404, "Not Found")
+
+    def forward(remote: str, request: Request, allowed: tuple[str, ...]) -> dict:
+        require_dev()
+        params = {k: v for k, v in request.query_params.items() if k in allowed}
+        http = client()
+        try:
+            return admin_labels.get_json(http, remote, params)
+        except admin_labels.AdminError as exc:
+            raise HTTPException(502, str(exc)) from exc
+        finally:
+            if getattr(app.state, "admin_client", None) is None:
+                http.close()
+
+    for remote, allowed in FORWARD_PARAMS.items():
+        local = remote.replace("/v1/admin", "/api/admin")
+
+        def handler(request: Request, remote=remote, allowed=allowed):
+            return forward(remote, request, allowed)
+
+        app.get(local)(handler)
+
+    @app.get("/api/admin/diagnostics/{receipt_id}")
+    def get_diagnostic(receipt_id: str, request: Request):
+        require_dev()
+        if not RECEIPT_PATTERN.match(receipt_id):
+            raise HTTPException(404, "Not Found")
+        return forward(f"/v1/admin/diagnostics/{receipt_id}", request, ("mode",))
 
     @app.get("/api/admin/summary")
     def get_summary(mode: str = Query("release", pattern=MODE_PATTERN), refresh: bool = False):

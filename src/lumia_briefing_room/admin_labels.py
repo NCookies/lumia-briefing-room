@@ -35,23 +35,27 @@ def make_client(url: str, token: str) -> httpx.Client:
     return httpx.Client(base_url=url, headers={"X-Admin-Token": token}, timeout=30.0)
 
 
-def fetch_page(client: httpx.Client, mode: str, after: str | None, limit: int = PAGE_LIMIT) -> dict:
-    params = {"mode": mode, "limit": limit}
-    if after:
-        params["after"] = after
+def get_json(client: httpx.Client, path: str, params: dict) -> dict:
     try:
-        response = client.get("/v1/admin/labels", params=params)
+        response = client.get(path, params=params)
     except httpx.HTTPError as exc:
         raise AdminError(f"서버에 연결하지 못했습니다 ({type(exc).__name__})") from exc
     if response.status_code == 401:
         raise AdminError("관리자 토큰이 맞지 않습니다")
     if response.status_code == 404:
-        raise AdminError("서버의 관리자 API 가 꺼져 있습니다(서버 .env 에 ADMIN_TOKEN 이 없다)")
+        raise AdminError("서버의 관리자 API 가 꺼져 있거나 이 기능이 아직 서버에 배포되지 않았습니다(서버 .env 의 ADMIN_TOKEN·최신 이미지 확인)")
     if response.status_code == 429:
         raise AdminError("요청이 너무 많아 서버가 잠시 막았습니다. 잠시 뒤에 다시 시도하세요")
     if response.status_code != 200:
         raise AdminError(f"서버가 오류를 돌려줬습니다 (HTTP {response.status_code})")
     return response.json()
+
+
+def fetch_page(client: httpx.Client, mode: str, after: str | None, limit: int = PAGE_LIMIT) -> dict:
+    params = {"mode": mode, "limit": limit}
+    if after:
+        params["after"] = after
+    return get_json(client, "/v1/admin/labels", params)
 
 
 def fetch_all(client: httpx.Client, mode: str) -> list[dict]:
