@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   RECORDING_STATE_TEXT,
+  canOfferFirstBackfill,
   RESOLUTION_TONE,
   SOURCE_TEXT,
   recordingState,
@@ -8,6 +9,7 @@ import {
 } from '../onboarding'
 import { DEFAULT_CHOICES, consentPatch, isPending, type ConsentChoices } from '../consent'
 import { saveConsentPatch } from '../consentApi'
+import { startBackfill } from '../backfillApi'
 import { completeFirstRun, getFirstRun, setClipsDir, setRecordingRoot } from '../onboardingApi'
 import { ConsentChoicesForm } from './ConsentChoicesForm'
 import { FolderPicker } from './FolderPicker'
@@ -65,12 +67,13 @@ function FolderEditor({
   )
 }
 
-export function FirstRunScreen({ onDone }: { onDone: () => void }) {
+export function FirstRunScreen({ onDone }: { onDone: (backfillStarted: boolean) => void }) {
   const { reload } = useLabelingState()
   const [choices, setChoices] = useState<ConsentChoices>(DEFAULT_CHOICES)
   const [info, setInfo] = useState<FirstRunInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState<'recording' | 'clips' | null>(null)
+  const [analyzePast, setAnalyzePast] = useState(true)
 
   const load = useCallback(() => {
     getFirstRun()
@@ -84,8 +87,15 @@ export function FirstRunScreen({ onDone }: { onDone: () => void }) {
     try {
       await saveConsentPatch(consentPatch(choices, info?.pendingItems ?? []))
       await completeFirstRun()
+      let started = false
+      if (info && analyzePast && canOfferFirstBackfill(info)) {
+        started = await startBackfill().then(
+          () => true,
+          () => false,
+        )
+      }
       reload()
-      onDone()
+      onDone(started)
     } catch (e) {
       setError((e as Error).message)
     }
@@ -224,12 +234,34 @@ export function FirstRunScreen({ onDone }: { onDone: () => void }) {
           </p>
         </section>
 
+        {canOfferFirstBackfill(info) && (
+          <section className="flex flex-col gap-2">
+            <h3 className="text-base font-medium">3. 과거 녹화 분석</h3>
+            <label className="flex cursor-pointer items-start gap-2 rounded border border-zinc-600 bg-zinc-900/60 p-3 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={analyzePast}
+                onChange={(e) => setAnalyzePast(e.target.checked)}
+              />
+              <span>
+                <b>시작하면서 스팀에 남아 있는 과거 녹화도 분석하기</b>
+                <span className="mt-1 block text-xs text-zinc-400">
+                  이미 녹화돼 있는 게임에서 교전 클립을 미리 만들어 둡니다. 게임 하나에 2~6분쯤 걸리고, 그동안 화면
+                  위쪽에 진행 상황이 표시됩니다. 언제든 취소할 수 있고, 나중에 위쪽의 &quot;과거 녹화 분석&quot; 버튼으로 해도
+                  됩니다.
+                </span>
+              </span>
+            </label>
+          </section>
+        )}
+
           </>
         )}
 
         {showConsent && (
           <section className="flex flex-col gap-2">
-            <h3 className="text-base font-medium">{showSetup ? '3. ' : ''}선택 기능</h3>
+            <h3 className="text-base font-medium">{showSetup ? `${canOfferFirstBackfill(info) ? 4 : 3}. ` : ''}선택 기능</h3>
             <p className="text-xs text-zinc-400">
               모두 처음에는 꺼져 있고, 켜야만 동작합니다. 옵션 → 정보·진단에서 언제든 바꿀 수 있습니다. 이 버전에서는
               아직 네트워크를 쓰는 기능이 동작하지 않으며, 켜 둔 선택은 해당 기능이 추가되는 버전부터 적용됩니다.

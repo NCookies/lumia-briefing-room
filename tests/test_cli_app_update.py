@@ -214,3 +214,33 @@ def test_no_second_window_when_the_old_tab_reloaded_itself():
 
     cli_app.open_after_update(FakeOpen(), wait_sec=5.0, poll_sec=0.5, sleep=lambda s: None)
     assert opened == []
+
+
+def test_first_run_notice_tells_where_the_app_lives_and_what_happens_next():
+    message, title = cli_app.first_run_notice()
+    assert title == "루미아 브리핑룸"
+    assert "브라우저" in message and "아이콘" in message
+
+
+def test_announce_first_run_notifies_only_while_the_first_run_screen_is_still_needed(tmp_path):
+    from lumia_briefing_room.config import Config
+    from lumia_briefing_room.consent import CONSENT_VERSION
+
+    shown = []
+    fresh = Config()
+    assert cli_app.announce_first_run(fresh, lambda message, title: shown.append((message, title))) is True
+    assert len(shown) == 1
+
+    answered = Config()
+    answered.consent.version = CONSENT_VERSION
+    assert cli_app.announce_first_run(answered, lambda message, title: shown.append((message, title))) is False
+    assert len(shown) == 1
+
+
+def test_announce_first_run_survives_a_failing_notification():
+    from lumia_briefing_room.config import Config
+
+    def boom(message, title):
+        raise RuntimeError("no tray")
+
+    assert cli_app.announce_first_run(Config(), boom) is True

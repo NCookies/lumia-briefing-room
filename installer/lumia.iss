@@ -56,6 +56,9 @@ WizardStyle=modern
 [Languages]
 Name: "korean"; MessagesFile: "compiler:Default.isl"
 
+[Messages]
+FinishedLabel={#AppName} 설치가 끝났습니다.%n%n프로그램이 자동으로 시작되고, 몇 초 뒤 브라우저에 첫 화면이 열립니다. 화면이 열리지 않으면 작업표시줄 오른쪽 아래(숨겨진 아이콘 ∧ 안)의 아이콘을 눌러 주세요.
+
 [Tasks]
 Name: "desktopicon"; Description: "바탕화면에 바로가기 만들기"; GroupDescription: "추가 작업:"; Flags: unchecked
 
@@ -74,7 +77,8 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopico
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "LumiaBriefingRoom"; Flags: uninsdeletevalue
 
 [Run]
-Filename: "{app}\{#AppExe}"; Description: "{#AppName} 실행"; Flags: nowait postinstall skipifsilent
+; 마침 화면의 "실행" 체크를 놓치면 아무 일도 안 일어난 것처럼 보이므로 묻지 않고 바로 띄운다(조용한 설치 제외).
+Filename: "{app}\{#AppExe}"; Flags: nowait skipifsilent
 ; 앱 안 업데이트(plan-deploy.md D9)가 /SILENT /RELAUNCH=1 로 실행하면 끝난 뒤 앱을 다시 띄운다. 다른 무인 설치(/VERYSILENT 검증 등)는 띄우지 않는다.
 Filename: "{app}\{#AppExe}"; Parameters: "--start-server"; Flags: nowait; Check: RelaunchRequested
 

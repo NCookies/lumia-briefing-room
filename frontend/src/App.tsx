@@ -102,7 +102,18 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen flex-col bg-zinc-900 text-zinc-100">
-      {firstRun && <FirstRunScreen onDone={() => setFirstRun(false)} />}
+      {firstRun && (
+        <FirstRunScreen
+          onDone={(backfillStarted) => {
+            setFirstRun(false)
+            if (backfillStarted) {
+              getBackfillStatus()
+                .then(setBackfill)
+                .catch(() => {})
+            }
+          }}
+        />
+      )}
       <header className="flex items-end justify-between border-b border-zinc-700 px-4 pt-3">
         <div className="flex items-end gap-6">
           <h1 className="pb-2 text-xl font-semibold">

@@ -232,6 +232,24 @@ def update_notice(release: dict) -> tuple[str, str]:
     return f"새 버전 {release['version']} 이 나왔습니다. 앱 옵션의 '정보·진단' 탭에서 업데이트할 수 있습니다.", "루미아 브리핑룸"
 
 
+def first_run_notice() -> tuple[str, str]:
+    return (
+        "루미아 브리핑룸이 실행됐습니다. 곧 브라우저에 첫 화면이 열립니다. 열리지 않으면 작업표시줄 오른쪽 아래(∧ 안)의 아이콘을 눌러 주세요.",
+        "루미아 브리핑룸",
+    )
+
+
+def announce_first_run(cfg, notify) -> bool:
+    """첫 실행 화면이 아직 필요하면 알림을 띄운다. 설치 직후 아무 반응이 없다고 오해하지 않게 한다."""
+    if not needs_first_run(cfg.consent.version):
+        return False
+    try:
+        notify(*first_run_notice())
+    except Exception:
+        log.info("첫 실행 알림을 띄우지 못했다", exc_info=False)
+    return True
+
+
 def start_update_checks(config_path, *, notify, updater=None):
     """`update.check` 가 켜져 있으면 시작 시와 하루 1회 새 버전을 확인해 알리는 스레드. 꺼져 있으면 네트워크를 쓰지 않는다. (plan-deploy.md D9)"""
     updater = updater or Updater(config_path=config_path, notify=notify)
@@ -358,6 +376,7 @@ def _run_app(args, instance: SingleInstance) -> None:
 
     def on_tray_ready(tray_icon) -> None:
         tray_icon.visible = True
+        announce_first_run(cfg, tray_icon.notify)
         start_update_checks(
             resolve_config_path(args.config),
             notify=lambda release: tray_icon.notify(*update_notice(release)),

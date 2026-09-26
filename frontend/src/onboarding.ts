@@ -45,3 +45,7 @@ export const SOURCE_TEXT: Record<'config' | 'auto', string> = {
   config: '설정에서 지정한 폴더',
   auto: '스팀 설정에서 자동으로 찾은 폴더',
 }
+
+export function canOfferFirstBackfill(info: FirstRunInfo): boolean {
+  return info.pendingItems.includes('setup') && info.ffmpegFound && recordingState(info.recording) === 'ok'
+}
