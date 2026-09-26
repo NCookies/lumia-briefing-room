@@ -12,6 +12,7 @@ import { IDLE_INSTALL, UpdateContext } from '../updateContext'
 import { ackUpdate, getUpdateStatus, startUpdateInstall } from '../updateApi'
 import { ReleaseNotesDialog } from './ReleaseNotesDialog'
 import { UpdateOverlay } from './UpdateOverlay'
+import { PatchNotesDialog } from './PatchNotesDialog'
 import { UpdatedDialog } from './UpdatedDialog'
 
 /** 새 버전과 설치 진행 상태를 화면 전체가 함께 쓴다. 창을 닫았다 열어도 진행도가 이어져 보이도록 서버의 상태를 읽어 온다. */
@@ -21,6 +22,7 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
   const [install, setInstall] = useState<InstallStatus>(IDLE_INSTALL)
   const [notes, setNotes] = useState<ReleaseInfo | null>(null)
   const [justUpdated, setJustUpdated] = useState<{ from: string; to: string } | null>(null)
+  const [patchNotes, setPatchNotes] = useState(false)
 
   const refresh = useCallback(() => {
     getUpdateStatus()
@@ -76,8 +78,14 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
             setJustUpdated(null)
             ackUpdate().catch(() => {})
           }}
+          onShowNotes={() => {
+            setJustUpdated(null)
+            ackUpdate().catch(() => {})
+            setPatchNotes(true)
+          }}
         />
       )}
+      {patchNotes && <PatchNotesDialog onClose={() => setPatchNotes(false)} />}
       {install.state === 'launched' && <UpdateOverlay version={release?.version ?? ''} />}
     </UpdateContext.Provider>
   )
