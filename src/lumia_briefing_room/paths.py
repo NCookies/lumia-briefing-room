@@ -5,12 +5,16 @@
 
 import logging
 import os
+import re
 import sys
 from pathlib import Path
 
 log = logging.getLogger("lumia_briefing_room.paths")
 
 RESOURCE_DIR_ENV = "LUMIA_RESOURCE_DIR"
+PROFILE_ENV = "LUMIA_PROFILE"
+APP_FOLDER = "LumiaBriefingRoom"
+_PROFILE_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,20}$")
 _SOURCE_ROOT = Path(__file__).resolve().parents[2]
 _warned: set[str] = set()
 
@@ -31,6 +35,18 @@ def resource_dir(*, frozen: bool | None = None, meipass: str | None = None, exec
     if meipass:
         return Path(meipass)
     return Path(executable or sys.executable).resolve().parent
+
+
+def profile() -> str:
+    """같은 PC 에서 앱을 둘 이상 따로 돌릴 때(개발판·설치판) 쓰는 이름. 비면 기본(분리 없음). 안전한 짧은 이름만 받는다."""
+    name = os.environ.get(PROFILE_ENV, "").strip()
+    return name if _PROFILE_PATTERN.match(name) else ""
+
+
+def app_folder_name() -> str:
+    """사용자별 폴더 이름(설정·로그·전송 상태·클립 기본 위치). 프로필이 있으면 `LumiaBriefingRoom-<프로필>`."""
+    name = profile()
+    return f"{APP_FOLDER}-{name}" if name else APP_FOLDER
 
 
 def data_dir() -> Path:

@@ -78,6 +78,8 @@ UI 를 보려면 먼저 `cd frontend && npm install && npm run build` 를 한 �
 
 **개발/배포 모드**: 소스로 실행하면 개발 모드, 빌드본이면 배포 모드다(`app.mode` 설정으로 `dev`/`release` 강제 가능). 배포 모드에서는 클립 ID·교전 점수 칩·점수 슬라이더를 숨긴다(라벨링 UI 는 라벨 전송을 켠 경우에만 보인다).
 
+**설치판과 개발판을 동시에 실행** (서버 전송이 실제로 되는지 실시간으로 볼 때): [run-parallel.bat](../run-parallel.bat) 은 환경변수 `LUMIA_PROFILE=dev` 를 주고 앱을 띄운다. 프로필이 있으면 설정(`%APPDATA%\LumiaBriefingRoom-dev\config.json`)·로그·전송 기록·outbox·업데이트 상태(`%LOCALAPPDATA%\LumiaBriefingRoom-dev`)·클립 기본 폴더(`Videos\LumiaBriefingRoom-dev`)·중복 실행 뮤텍스·트레이 이름이 기본과 따로라서 둘이 서로를 막거나 덮어쓰지 않고, 자동 시작 레지스트리는 건드리지 않는다. 처음 한 번은 첫 실행 화면이 뜨는 새 앱처럼 시작한다(기존 `run.bat` 의 설정·클립은 기본 폴더에 그대로 있고 설치판이 그걸 이어 쓴다). 웹 주소는 80번 포트를 먼저 잡은 쪽이 쓰고 다른 쪽은 8765 부터 잡는다. 이름은 영문·숫자·`_`·`-` 20자까지만 받고, 다른 이름을 쓰려면 `set LUMIA_PROFILE=이름` 뒤 `dev.bat` 등을 실행한다. 두 앱이 **같은 Player.log 를 보므로 같은 게임을 각자 클립으로 만든다**(폴더는 달라서 충돌하지 않는다) — 개발판에서 감시를 끄려면 트레이 메뉴의 "감시 중"을 끈다.
+
 ### 0-1. 개발용 — 코드 저장 시 자동 재시작 (`dev.bat`)
 
 [dev.bat](../dev.bat) (= `python tools/dev_run.py [cli.app 옵션]`)은 `src/` 아래 `.py` 를 저장할 때마다 앱(트레이 + 서버)을 껐다가 다시 띄운다.

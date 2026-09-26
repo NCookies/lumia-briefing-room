@@ -10,6 +10,7 @@ import os
 import threading
 from pathlib import Path
 
+from lumia_briefing_room import paths
 from lumia_briefing_room.config import _default_local_appdata
 
 KINDS = ("labels", "logs", "diagnostics")
@@ -17,7 +18,7 @@ _LOCK = threading.RLock()
 
 
 def default_state_path() -> Path:
-    return _default_local_appdata() / "LumiaBriefingRoom" / "telemetry_state.json"
+    return _default_local_appdata() / paths.app_folder_name() / "telemetry_state.json"
 
 
 def _fresh() -> dict:

@@ -9,6 +9,7 @@ from collections.abc import Callable
 import pystray
 from PIL import Image
 
+from lumia_briefing_room import paths
 from lumia_briefing_room.icon import app_icon_image
 
 
@@ -48,9 +49,9 @@ def build_icon(
     title: str = "루미아 브리핑룸",
 ) -> pystray.Icon:
     return pystray.Icon(
-        "LumiaBriefingRoom",
+        paths.app_folder_name(),
         icon=default_icon_image(),
-        title=title,
+        title=f"{title} ({paths.profile()})" if paths.profile() else title,
         menu=build_menu(
             on_open=on_open,
             on_toggle_watch=on_toggle_watch,

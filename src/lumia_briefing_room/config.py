@@ -80,15 +80,15 @@ def _default_userprofile() -> Path:
 
 def resolve_paths(cfg: PathsConfig) -> ResolvedPaths:
     """SPEC §7.1: 비워두면 기본 위치, thumbnails/proxies/trash 는 clips 하위."""
-    clips = cfg.clips or (_default_userprofile() / "Videos" / "LumiaBriefingRoom" / "clips")
+    clips = cfg.clips or (_default_userprofile() / "Videos" / paths.app_folder_name() / "clips")
     return ResolvedPaths(
-        temp=cfg.temp or (_default_local_appdata() / "Temp" / "LumiaBriefingRoom"),
+        temp=cfg.temp or (_default_local_appdata() / "Temp" / paths.app_folder_name()),
         clips=clips,
         thumbnails=cfg.thumbnails or (clips / ".thumbs"),
         proxies=cfg.proxies or (clips / ".proxy"),
         trash=cfg.trash or (clips / ".trash"),
         export_default=cfg.export_default or (_default_userprofile() / "Videos"),
-        vod_clips=cfg.vod_clips or (_default_userprofile() / "Videos" / "LumiaBriefingRoom" / "vod"),
+        vod_clips=cfg.vod_clips or (_default_userprofile() / "Videos" / paths.app_folder_name() / "vod"),
     )
 
 
@@ -257,7 +257,11 @@ class Config:
     consent: ConsentConfig = field(default_factory=ConsentConfig)
 
 
-DEFAULT_CONFIG_PATH = _default_appdata() / "LumiaBriefingRoom" / "config.json"
+def default_config_path() -> Path:
+    return _default_appdata() / paths.app_folder_name() / "config.json"
+
+
+DEFAULT_CONFIG_PATH = default_config_path()
 
 
 # ── camelCase JSON 직렬화 ──────────────────────────────────────────────

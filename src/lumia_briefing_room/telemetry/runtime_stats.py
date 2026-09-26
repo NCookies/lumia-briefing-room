@@ -13,6 +13,7 @@ import os
 import threading
 from pathlib import Path
 
+from lumia_briefing_room import paths
 from lumia_briefing_room.config import _default_local_appdata
 
 log = logging.getLogger("lumia_briefing_room.telemetry.runtime_stats")
@@ -22,7 +23,7 @@ _LOCK = threading.RLock()
 
 
 def default_stats_path() -> Path:
-    return _default_local_appdata() / "LumiaBriefingRoom" / "runtime_stats.json"
+    return _default_local_appdata() / paths.app_folder_name() / "runtime_stats.json"
 
 
 def _positive(value) -> float | None:

@@ -13,6 +13,7 @@ import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 
+from lumia_briefing_room import paths
 from lumia_briefing_room.config import _default_local_appdata
 
 MAX_BYTES = 20 * 1024 * 1024
@@ -23,7 +24,7 @@ _OWN_LOGGERS = ("lumia_briefing_room.telemetry",)
 
 
 def default_outbox_path() -> Path:
-    return _default_local_appdata() / "LumiaBriefingRoom" / "outbox" / "errors.jsonl"
+    return _default_local_appdata() / paths.app_folder_name() / "outbox" / "errors.jsonl"
 
 
 def default_recent_path() -> Path:

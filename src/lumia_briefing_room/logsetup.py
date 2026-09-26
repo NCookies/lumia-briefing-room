@@ -4,6 +4,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+from lumia_briefing_room import paths
 from lumia_briefing_room.config import _default_local_appdata
 
 FORMAT = "%(asctime)s %(levelname)s %(message)s"
@@ -11,7 +12,7 @@ LOGGERS = ("lumia_briefing_room", "uvicorn")
 
 
 def default_log_path() -> Path:
-    return _default_local_appdata() / "LumiaBriefingRoom" / "logs" / "app.log"
+    return _default_local_appdata() / paths.app_folder_name() / "logs" / "app.log"
 
 
 def _existing(logger: logging.Logger, kind: type, matches) -> logging.Handler | None:

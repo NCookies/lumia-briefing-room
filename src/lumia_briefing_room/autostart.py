@@ -68,7 +68,7 @@ def current_command() -> str:
 
 def apply_setting(cfg, *, app_name: str | None = None) -> None:
     """SPEC §7.7 `ui.autoStart` 를 실제 레지스트리 상태에 반영한다."""
-    if not is_supported():
+    if not is_supported() or paths.profile():
         return
     name = app_name or APP_NAME
     if cfg.ui.auto_start:

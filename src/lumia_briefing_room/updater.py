@@ -148,11 +148,11 @@ def parse_checksum(text: str, installer_name: str) -> str:
 
 
 def default_state_path() -> Path:
-    return _default_local_appdata() / "LumiaBriefingRoom" / "update_state.json"
+    return _default_local_appdata() / paths.app_folder_name() / "update_state.json"
 
 
 def default_download_dir() -> Path:
-    return _default_local_appdata() / "LumiaBriefingRoom" / "updates"
+    return _default_local_appdata() / paths.app_folder_name() / "updates"
 
 
 _IDLE_INSTALL = {"state": "idle", "downloaded": 0, "total": 0, "error": ""}

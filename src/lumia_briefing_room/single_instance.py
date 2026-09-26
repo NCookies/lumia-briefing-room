@@ -10,9 +10,16 @@ import threading
 from collections.abc import Callable
 from ctypes import wintypes
 
+from lumia_briefing_room import paths
+
 log = logging.getLogger("lumia_briefing_room.single_instance")
 
 DEFAULT_NAME = "LumiaBriefingRoom.SingleInstance"
+
+
+def default_name() -> str:
+    """프로필이 있으면 그 이름이 붙은 뮤텍스를 써서 기본 앱과 동시에 뜰 수 있다."""
+    return f"{paths.app_folder_name()}.SingleInstance"
 ERROR_ALREADY_EXISTS = 183
 EVENT_MODIFY_STATE = 0x0002
 WAIT_OBJECT_0 = 0
@@ -35,7 +42,8 @@ def _kernel32():
 
 
 class SingleInstance:
-    def __init__(self, name: str = DEFAULT_NAME):
+    def __init__(self, name: str | None = None):
+        name = name or default_name()
         self._mutex_name = f"Local\\{name}"
         self._event_name = f"Local\\{name}.OpenUI"
         self._mutex = None
