@@ -137,7 +137,7 @@
 
   <div style="margin-top:20px;padding:15px 18px;background:linear-gradient(90deg,#2a2210,#131d31);border-left:3px solid #ffb020;">
     <div style="font-size:11px;letter-spacing:3px;color:#ffb020;font-weight:800;">주의 · 파란 경고창</div>
-    <div style="font-size:14px;line-height:1.8;color:#cdd7e6;margin-top:6px;">설치할 때 <strong>Windows의 PC 보호</strong>(SmartScreen) 경고가 뜹니다. 개인이 만든 프로그램이라 코드 서명 인증서가 없어서 그렇습니다. <strong>추가 정보 &rarr; 실행</strong>을 누르면 진행됩니다. 백신이 오탐할 수 있으며, 릴리스 페이지에 파일 해시(SHA-256)와 VirusTotal 검사 결과 링크가 올라옵니다.</div>
+    <div style="font-size:14px;line-height:1.8;color:#cdd7e6;margin-top:6px;">설치할 때 <strong>Windows의 PC 보호</strong>(SmartScreen) 경고가 뜹니다. 개인이 만든 프로그램이라 코드 서명 인증서가 없어서 그렇습니다. <strong>추가 정보 &rarr; 실행</strong>을 누르면 진행됩니다. 백신이 오탐할 수 있으며, 릴리스 페이지에 파일 해시(SHA-256)와 VirusTotal 검사 결과 링크가 올라옵니다. <strong>Windows Defender가 설치 파일을 위협으로 탐지하는 경우</strong>의 대처법은 맨 아래 <strong>번외</strong>에 적어 두었습니다.</div>
   </div>
 
   <div style="margin-top:14px;font-size:14px;line-height:1.8;color:#a9b9d0;">업데이트는 앱의 <strong>옵션 &rarr; 정보·진단 &rarr; 업데이트 확인</strong>에서 합니다. 제거는 Windows 설정의 앱 목록에서 하며, 만들어진 클립은 지워지지 않고 남습니다(기본 위치: 내 비디오\LumiaBriefingRoom).</div>
@@ -281,6 +281,26 @@
   </div>
   <div style="height:1px;background:linear-gradient(90deg,rgba(0,0,0,0),#ffb020,rgba(0,0,0,0));margin:22px 0 14px;font-size:0;line-height:0;">&nbsp;</div>
   <div style="font-size:12px;line-height:1.8;color:#8fa3c0;">비공식 팬 제작 도구 · 이터널 리턴의 이름·상표·게임 화면의 권리는 각 권리자에게 있습니다.</div>
+</div>
+
+<div style="padding:34px 28px 30px;border-top:1px solid #2c3d5c;background:linear-gradient(165deg,#241a0a,#1a1408,#131009);">
+  <div style="font-size:12px;letter-spacing:4px;color:#ffb020;font-weight:800;">번외</div>
+  <div style="font-size:22px;line-height:1.3;font-weight:900;color:#f4f7fb;margin-top:4px;">Windows Defender가 위협으로 탐지할 수 있습니다</div>
+
+  <div style="font-size:14px;line-height:1.9;color:#cdd7e6;margin-top:14px;">설치하거나 실행할 때 Windows Defender(Windows 보안)가 <strong>&quot;Trojan:Win32/Wacatac.C!ml&quot;</strong> 같은 이름의 <strong>심각</strong> 위협으로 탐지해 파일을 격리할 수 있습니다. 설치 중이라면 <strong>&quot;Unable to execute file ... CreateProcess failed; code 225&quot;</strong> 오류창이 뜨기도 합니다. 저도 직접 겪었습니다. 놀라실 수 있어서 미리 적어 둡니다.</div>
+
+  <div style="margin-top:18px;padding:15px 18px;background:linear-gradient(90deg,#2a2210,#131d31);border-left:3px solid #ffb020;">
+    <div style="font-size:11px;letter-spacing:3px;color:#ffb020;font-weight:800;">이 프로그램은 악성코드가 아닙니다</div>
+    <div style="font-size:14px;line-height:1.8;color:#cdd7e6;margin-top:6px;">&#9679; <strong>VirusTotal</strong>의 여러 백신 엔진 검사를 통과했습니다(v0.1.5 확인). 릴리스마다 자동으로 검사하고, 결과 링크가 릴리스 페이지에 올라옵니다.<br>&#9679; <strong>소스 코드가 전부 공개</strong>되어 있고, 배포 파일은 공개된 코드를 GitHub에서 자동으로 빌드한 것입니다. 원하시면 직접 읽어 보거나 빌드하실 수 있습니다.<br>&#9679; 릴리스 페이지의 SHA-256 값과 받은 파일의 해시가 같은지 비교해 변조 여부를 확인할 수 있습니다.</div>
+  </div>
+
+  <div style="font-size:15px;font-weight:800;color:#ffb020;margin-top:22px;">왜 탐지되는 걸까요?</div>
+  <div style="font-size:14px;line-height:1.9;color:#cdd7e6;margin-top:6px;">정확한 이유는 Defender가 알려 주지 않아 추측입니다. 이름 끝의 <strong>!ml</strong>은 특정 악성코드와 일치했다는 뜻이 아니라, <strong>머신러닝이 &quot;악성 프로그램과 비슷해 보인다&quot;고 추정</strong>했다는 표시입니다. 이 프로그램은 다음처럼 악성 프로그램과 겹치는 동작이 있습니다.<br>&#9679; 백그라운드에서 계속 실행되며 스팀 녹화 폴더를 감시합니다.<br>&#9679; Windows 시작 시 자동으로 실행되도록 등록할 수 있습니다.<br>&#9679; 영상 처리를 위해 다른 프로그램(ffmpeg)을 실행하고, 새 버전을 받아 설치기를 실행합니다.<br>&#9679; 개인 개발자라 <strong>코드 서명 인증서가 없고</strong>, 아직 사용하는 사람이 적은 새 파일입니다.<br>이 조합 때문에 Windows가 의심하는 것으로 보고 있으며, 사용자가 늘고 코드 서명을 받게 되면 줄어들 것으로 예상합니다. 코드 서명 방법은 알아보고 있습니다.</div>
+
+  <div style="font-size:15px;font-weight:800;color:#ffb020;margin-top:22px;">탐지됐을 때 허용하는 방법</div>
+  <div style="font-size:14px;line-height:1.9;color:#cdd7e6;margin-top:6px;">코드를 직접 확인했거나 위 근거로 판단이 서신다면 다음과 같이 진행하세요.<br><strong>1.</strong> 작업표시줄 &rarr; <strong>Windows 보안</strong> &rarr; <strong>바이러스 및 위협 방지</strong> &rarr; <strong>보호 기록</strong>을 엽니다.<br><strong>2.</strong> 탐지된 항목(루미아 브리핑룸 관련)을 눌러 펼친 뒤, 작업 옵션에서 <strong>&quot;디바이스에서 허용&quot;</strong>을 고르고 <strong>작업 시작</strong>을 누릅니다.<br><strong>3.</strong> 설치가 중간에 실패했다면 <strong>설치 파일을 다시 실행</strong>합니다. 허용이 적용되기까지 잠시 걸려 바로는 같은 오류가 날 수 있으니, 몇 분 뒤 다시 시도해 보세요.<br>격리 후 <strong>제거</strong>를 눌렀다면 복원하거나, 새로 받은 설치 파일로 다시 설치하면 됩니다. 설정과 클립은 그대로 남습니다.</div>
+
+  <div style="font-size:13px;line-height:1.8;color:#a9b9d0;margin-top:16px;">믿기 어렵거나 찜찜하시면 설치하지 않으셔도 됩니다. 직접 빌드하는 방법은 저장소의 README에 있고, 의심스러운 점은 언제든 Issues로 물어봐 주세요.</div>
 </div>
 
 </div>
