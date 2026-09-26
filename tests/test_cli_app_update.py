@@ -235,6 +235,8 @@ def test_announce_first_run_notifies_only_while_the_first_run_screen_is_still_ne
     answered.consent.version = CONSENT_VERSION
     assert cli_app.announce_first_run(answered, lambda message, title: shown.append((message, title))) is False
     assert len(shown) == 1
+    assert cli_app.announce_first_run(answered, lambda message, title: shown.append((message, title)), open_ui=True) is True
+    assert len(shown) == 2
 
 
 def test_announce_first_run_survives_a_failing_notification():

@@ -239,9 +239,9 @@ def first_run_notice() -> tuple[str, str]:
     )
 
 
-def announce_first_run(cfg, notify) -> bool:
-    """첫 실행 화면이 아직 필요하면 알림을 띄운다. 설치 직후 아무 반응이 없다고 오해하지 않게 한다."""
-    if not needs_first_run(cfg.consent.version):
+def announce_first_run(cfg, notify, *, open_ui: bool = False) -> bool:
+    """첫 실행 화면이 필요하거나 화면을 열도록 시작했으면 알림을 띄운다. 설치 직후 아무 반응이 없다고 오해하지 않게 한다."""
+    if not (open_ui or needs_first_run(cfg.consent.version)):
         return False
     try:
         notify(*first_run_notice())
@@ -376,7 +376,7 @@ def _run_app(args, instance: SingleInstance) -> None:
 
     def on_tray_ready(tray_icon) -> None:
         tray_icon.visible = True
-        announce_first_run(cfg, tray_icon.notify)
+        announce_first_run(cfg, tray_icon.notify, open_ui=args.open_ui)
         start_update_checks(
             resolve_config_path(args.config),
             notify=lambda release: tray_icon.notify(*update_notice(release)),

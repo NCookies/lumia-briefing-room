@@ -134,11 +134,12 @@ def test_silent_uninstall_does_not_block_on_a_dialog():
     assert "not UninstallSilent" in ISS
 
 
-def test_installer_script_starts_the_app_after_an_interactive_install_without_asking():
-    """마침 화면의 "실행" 체크를 놓치면 아무 일도 안 일어난 것처럼 보인다 — 물어보지 않고 띄운다(조용한 설치는 제외)."""
-    launch = [line for line in _directives() if line.startswith('Filename: "{app}\{#AppExe}"') and "Parameters" not in line]
+def test_installer_script_starts_the_app_and_opens_its_screen_after_an_interactive_install():
+    """마침 화면의 "실행" 체크를 놓치거나 이미 첫 실행을 마친 PC 에서도 아무 일도 없어 보이지 않게, 물어보지 않고 화면까지 연다(조용한 설치는 제외)."""
+    launch = [line for line in _directives() if '--open-ui' in line]
     assert len(launch) == 1
     assert "skipifsilent" in launch[0] and "nowait" in launch[0] and "postinstall" not in launch[0]
+    assert launch[0].startswith('Filename: "{app}\{#AppExe}"')
 
 
 def test_installer_script_finish_page_says_the_app_is_starting_and_where_to_find_it():

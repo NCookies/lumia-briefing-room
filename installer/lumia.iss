@@ -77,8 +77,8 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopico
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "LumiaBriefingRoom"; Flags: uninsdeletevalue
 
 [Run]
-; 마침 화면의 "실행" 체크를 놓치면 아무 일도 안 일어난 것처럼 보이므로 묻지 않고 바로 띄운다(조용한 설치 제외).
-Filename: "{app}\{#AppExe}"; Flags: nowait skipifsilent
+; 마침 화면의 "실행" 체크를 놓치거나 이미 첫 실행을 마친 PC 에서도 아무 일도 안 일어난 것처럼 보이지 않게, 묻지 않고 띄우고 화면(--open-ui)도 연다(조용한 설치 제외).
+Filename: "{app}\{#AppExe}"; Parameters: "--open-ui"; Flags: nowait skipifsilent
 ; 앱 안 업데이트(plan-deploy.md D9)가 /SILENT /RELAUNCH=1 로 실행하면 끝난 뒤 앱을 다시 띄운다. 다른 무인 설치(/VERYSILENT 검증 등)는 띄우지 않는다.
 Filename: "{app}\{#AppExe}"; Parameters: "--start-server"; Flags: nowait; Check: RelaunchRequested
 
