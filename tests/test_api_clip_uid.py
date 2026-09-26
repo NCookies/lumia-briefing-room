@@ -60,3 +60,13 @@ def test_startup_backfill_takes_the_same_lock_the_api_uses(tmp_path):
 
 def test_startup_backfill_never_raises_when_folders_do_not_exist(tmp_path):
     assert backfill_clip_uids_locked(make_app(tmp_path)) == 0
+
+
+def test_api_requests_are_counted_so_the_app_can_tell_whether_a_page_is_alive(tmp_path):
+    app = make_app(tmp_path)
+    client = TestClient(app)
+    assert app.state.request_count == 0
+    client.get("/api/app-info")
+    client.get("/api/app-info")
+    client.get("/")
+    assert app.state.request_count == 2

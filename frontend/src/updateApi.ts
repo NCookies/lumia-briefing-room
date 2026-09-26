@@ -13,5 +13,9 @@ export const getUpdateStatus = async (): Promise<UpdateStatus> =>
 export const checkForUpdate = async (): Promise<CheckResult> =>
   jsonOrThrow(await fetch(`${BASE}/check`, { method: 'POST' }), '업데이트 확인')
 
+export const ackUpdate = async (): Promise<void> => {
+  await fetch(`${BASE}/ack`, { method: 'POST' })
+}
+
 export const startUpdateInstall = async (): Promise<UpdateStatus> =>
   jsonOrThrow(await fetch(`${BASE}/install`, { method: 'POST' }), '업데이트 시작')

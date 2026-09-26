@@ -9,6 +9,7 @@ import os
 import socket
 import sys
 import threading
+import time
 import webbrowser
 
 from lumia_briefing_room import autostart, paths, procs, selftest, startup
@@ -106,13 +107,35 @@ def make_on_open(
                 serve_cli.wait_until_started(server)
                 state["server"] = server
                 state["thread"] = thread
+                state["app"] = app
+
+    def client_hits() -> int:
+        app = state.get("app")
+        return getattr(getattr(app, "state", None), "request_count", 0) if app is not None else 0
 
     def on_open() -> None:
         ensure_server()
         open_browser(access_url(port))
 
     on_open.ensure_server = ensure_server
+    on_open.client_hits = client_hits
     return on_open
+
+
+def open_after_update(on_open, *, wait_sec: float = 8.0, poll_sec: float = 0.5, sleep=time.sleep) -> None:
+    """업데이트 뒤 서버를 띄우고, 열려 있던 탭이 스스로 돌아오지 않으면 브라우저 창을 직접 연다.
+
+    옛 탭은 서버가 되살아나면 스스로 새로고침하므로 그 요청이 들어오면 창을 또 열지 않는다(중복 방지).
+    """
+    on_open.ensure_server()
+    waited = 0.0
+    while waited < wait_sec:
+        if on_open.client_hits() > 0:
+            return
+        sleep(poll_sec)
+        waited += poll_sec
+    log.info("업데이트 뒤 열려 있던 화면이 없어 브라우저를 연다")
+    on_open()
 
 
 def make_watch_controller(args, *, auto_start: bool = True):
@@ -313,8 +336,14 @@ def _run_app(args, instance: SingleInstance) -> None:
     )
 
     instance.listen(on_open)
-    if args.start_server:
-        threading.Thread(target=on_open.ensure_server, daemon=True).start()
+    notice = Updater(config_path=resolve_config_path(args.config)).just_updated()
+    if notice or args.start_server:
+        if should_open_ui_on_start(cfg, open_ui=args.open_ui):
+            threading.Thread(target=on_open.ensure_server, daemon=True).start()
+        elif notice:
+            threading.Thread(target=open_after_update, args=(on_open,), daemon=True).start()
+        else:
+            threading.Thread(target=on_open.ensure_server, daemon=True).start()
     if should_open_ui_on_start(cfg, open_ui=args.open_ui):
         threading.Thread(target=on_open, daemon=True).start()
 

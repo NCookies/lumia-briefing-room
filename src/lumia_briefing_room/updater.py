@@ -319,7 +319,21 @@ class Updater:
             "lastChecked": state.get("lastCheck"),
             "available": available.to_dict() if available else None,
             "install": install,
+            "justUpdated": self.just_updated(),
         }
+
+    def just_updated(self) -> dict | None:
+        """앱 안 업데이트가 끝나고 새 버전이 처음 뜬 상태면 {"from", "to"}. 화면이 "업데이트 완료" 를 한 번 보이고 `acknowledge_update` 로 끈다."""
+        pending = self._load_state().get("pendingUpdate")
+        if not isinstance(pending, dict):
+            return None
+        origin = str(pending.get("from", ""))
+        if not is_newer(self.current, origin):
+            return None
+        return {"from": origin, "to": self.current}
+
+    def acknowledge_update(self) -> None:
+        self._save_state(pendingUpdate=None)
 
     # ── 설치 ─────────────────────────────────────────────────────────
 
@@ -371,6 +385,7 @@ class Updater:
             (self._launcher or launch_installer)(path)
         except OSError as exc:
             raise UpdateError(f"설치기를 실행하지 못했습니다: {exc}") from exc
+        self._save_state(pendingUpdate={"from": self.current, "to": release.version})
         self._set_install(state="launched")
         if self._on_launched is not None:
             self._on_launched()

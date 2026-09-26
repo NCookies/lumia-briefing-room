@@ -174,3 +174,43 @@ def test_the_silent_installer_pins_its_progress_window_on_top_of_the_browser():
     assert "SetWindowPos@user32.dll" in iss
     assert "WizardSilent" in iss
     assert "GetActiveWindow" in iss
+
+
+def test_a_browser_is_opened_after_an_update_when_no_page_came_back():
+    opened, sleeps = [], []
+
+    class FakeOpen:
+        ensure_calls = 0
+
+        def __call__(self):
+            opened.append(1)
+
+        def ensure_server(self):
+            self.ensure_calls += 1
+
+        def client_hits(self):
+            return 0
+
+    on_open = FakeOpen()
+    cli_app.open_after_update(on_open, wait_sec=2.0, poll_sec=0.5, sleep=sleeps.append)
+    assert opened == [1] and on_open.ensure_calls == 1
+    assert sum(sleeps) >= 2.0
+
+
+def test_no_second_window_when_the_old_tab_reloaded_itself():
+    opened = []
+
+    class FakeOpen:
+        hits = [0, 0, 3]
+
+        def __call__(self):
+            opened.append(1)
+
+        def ensure_server(self):
+            pass
+
+        def client_hits(self):
+            return self.hits.pop(0) if self.hits else 3
+
+    cli_app.open_after_update(FakeOpen(), wait_sec=5.0, poll_sec=0.5, sleep=lambda s: None)
+    assert opened == []

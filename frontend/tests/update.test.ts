@@ -10,6 +10,7 @@ const base: UpdateStatus = {
   lastChecked: null,
   available: release,
   install: { state: 'idle', downloaded: 0, total: 0, error: '' },
+  justUpdated: null,
 }
 
 test('the banner shows whenever a newer release is known, however it was found', () => {
@@ -56,4 +57,15 @@ test('the restart screen tells the user what to do once it takes longer than usu
   assert.match(hint, /시작 메뉴/)
   assert.match(hint, /트레이/)
   assert.ok(hint.length < 90)
+})
+
+import { updatedSummary } from '../src/update.ts'
+
+test('the just-updated notice names both versions', () => {
+  assert.equal(updatedSummary({ from: '0.1.3', to: '0.1.6' }), 'v0.1.3 → v0.1.6')
+})
+
+test('the banner status carries the just-updated notice', () => {
+  const status: UpdateStatus = { ...base, justUpdated: { from: '0.1.3', to: '0.1.6' } }
+  assert.deepEqual(status.justUpdated, { from: '0.1.3', to: '0.1.6' })
 })

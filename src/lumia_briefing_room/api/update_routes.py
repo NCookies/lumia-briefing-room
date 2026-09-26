@@ -31,6 +31,11 @@ def register_update_routes(app: FastAPI) -> None:
     def post_check():
         return updater().check()
 
+    @app.post("/api/update/ack")
+    def post_ack():
+        updater().acknowledge_update()
+        return {"ok": True}
+
     @app.post("/api/update/install")
     def post_install():
         started = updater().start_install()

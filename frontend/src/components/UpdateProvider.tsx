@@ -9,9 +9,10 @@ import {
   type ReleaseInfo,
 } from '../update'
 import { IDLE_INSTALL, UpdateContext } from '../updateContext'
-import { getUpdateStatus, startUpdateInstall } from '../updateApi'
+import { ackUpdate, getUpdateStatus, startUpdateInstall } from '../updateApi'
 import { ReleaseNotesDialog } from './ReleaseNotesDialog'
 import { UpdateOverlay } from './UpdateOverlay'
+import { UpdatedDialog } from './UpdatedDialog'
 
 /** 새 버전과 설치 진행 상태를 화면 전체가 함께 쓴다. 창을 닫았다 열어도 진행도가 이어져 보이도록 서버의 상태를 읽어 온다. */
 export function UpdateProvider({ children }: { children: ReactNode }) {
@@ -19,12 +20,14 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
   const [release, setRelease] = useState<ReleaseInfo | null>(null)
   const [install, setInstall] = useState<InstallStatus>(IDLE_INSTALL)
   const [notes, setNotes] = useState<ReleaseInfo | null>(null)
+  const [justUpdated, setJustUpdated] = useState<{ from: string; to: string } | null>(null)
 
   const refresh = useCallback(() => {
     getUpdateStatus()
       .then((status) => {
         setRelease(showUpdateBanner(status) ? status.available : null)
         setInstall(status.install)
+        setJustUpdated(status.justUpdated ?? null)
       })
       .catch(() => {})
   }, [])
@@ -63,6 +66,16 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
           busy={isInstallBusy(install.state)}
           onUpdate={start}
           onClose={() => setNotes(null)}
+        />
+      )}
+      {justUpdated && install.state !== 'launched' && (
+        <UpdatedDialog
+          from={justUpdated.from}
+          to={justUpdated.to}
+          onClose={() => {
+            setJustUpdated(null)
+            ackUpdate().catch(() => {})
+          }}
         />
       )}
       {install.state === 'launched' && <UpdateOverlay version={release?.version ?? ''} />}

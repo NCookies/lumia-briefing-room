@@ -19,6 +19,7 @@ export interface UpdateStatus {
   lastChecked: number | null
   available: ReleaseInfo | null
   install: InstallStatus
+  justUpdated: { from: string; to: string } | null
 }
 
 export type CheckResult =
@@ -52,6 +53,8 @@ export function installProgressText(install: InstallStatus): string {
       return ''
   }
 }
+
+export const updatedSummary = (n: { from: string; to: string }): string => `v${n.from} → v${n.to}`
 
 export const RESTART_SLOW_AFTER_SEC = 60
 

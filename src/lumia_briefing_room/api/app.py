@@ -165,6 +165,14 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     app.state.on_recording_root_changed = None
     lock = threading.RLock()
     app.state.lock = lock
+    app.state.request_count = 0
+
+    @app.middleware("http")
+    async def count_api_requests(request, call_next):
+        """열려 있는 화면(탭)이 서버를 부르고 있는지 앱이 알 수 있게 API 요청 수를 센다(업데이트 뒤 새 창을 띄울지 판단)."""
+        if request.url.path.startswith("/api/"):
+            request.app.state.request_count += 1
+        return await call_next(request)
     jobs: dict[str, dict] = {}
 
     def locked(fn):

@@ -416,3 +416,41 @@ def test_test_endpoints_are_ignored_unless_both_point_at_this_pc(env):
     from lumia_briefing_room.updater import API_URL, DOWNLOAD_PREFIX, resolve_endpoints
 
     assert resolve_endpoints(env) == (API_URL, DOWNLOAD_PREFIX)
+
+
+def test_a_finished_update_is_reported_once_by_the_new_version(env, tmp_path):
+    env.github.publish(NEW)
+    env.updater.install_sync()
+    assert env.updater.status()["justUpdated"] is None  # 아직 옛 버전이 돌고 있다
+
+    upgraded = Updater(
+        config_path=env.config_path, state_path=tmp_path / "update_state.json", current_version=NEW,
+        api_url=env.github.api_url, download_prefix=env.github.download_prefix,
+    )
+    assert upgraded.status()["justUpdated"] == {"from": CURRENT, "to": NEW}
+    assert upgraded.just_updated() == {"from": CURRENT, "to": NEW}
+
+    upgraded.acknowledge_update()
+    assert upgraded.status()["justUpdated"] is None
+    assert upgraded.just_updated() is None
+
+
+def test_a_failed_launch_leaves_no_update_notice(env):
+    env.github.publish(NEW)
+
+    def broken(path):
+        raise OSError("실행 거부")
+
+    env.updater._launcher = broken
+    env.updater.install_sync()
+    assert env.updater._load_state().get("pendingUpdate") is None
+
+
+def test_no_notice_when_the_version_did_not_change(env, tmp_path):
+    env.github.publish(NEW)
+    env.updater.install_sync()
+    same = Updater(
+        config_path=env.config_path, state_path=tmp_path / "update_state.json", current_version=CURRENT,
+        api_url=env.github.api_url, download_prefix=env.github.download_prefix,
+    )
+    assert same.status()["justUpdated"] is None

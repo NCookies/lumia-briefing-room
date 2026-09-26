@@ -78,3 +78,17 @@ def test_install_refuses_bad_checksum(client, github):
     install = client.get("/api/update/status").json()["install"]
     assert install["state"] == "failed"
     assert client.launched == []
+
+
+def test_ack_clears_the_just_updated_notice(client, github):
+    github.publish(NEW)
+    client.post("/api/update/install")
+    client.updater.wait_install(timeout=10)
+    upgraded = Updater(
+        config_path=client.updater.config_path, state_path=client.updater.state_path, current_version=NEW,
+        api_url=github.api_url, download_prefix=github.download_prefix,
+    )
+    client.app.state.updater = upgraded
+    assert client.get("/api/update/status").json()["justUpdated"] == {"from": CURRENT, "to": NEW}
+    assert client.post("/api/update/ack").json() == {"ok": True}
+    assert client.get("/api/update/status").json()["justUpdated"] is None
