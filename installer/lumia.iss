@@ -79,6 +79,30 @@ Filename: "{app}\{#AppExe}"; Description: "{#AppName} 실행"; Flags: nowait pos
 Filename: "{app}\{#AppExe}"; Parameters: "--start-server"; Flags: nowait; Check: RelaunchRequested
 
 [Code]
+function PinWindow(hWnd: LongInt; hWndInsertAfter: LongInt; X, Y, cx, cy: Integer; uFlags: Cardinal): Boolean; external 'SetWindowPos@user32.dll stdcall';
+function GetActiveWindow: LongInt; external 'GetActiveWindow@user32.dll stdcall';
+
+// 앱 안 업데이트(조용한 설치)는 브라우저가 앞에 있는 채로 시작돼 설치 진행 창이 뒤에 가려진다 — 포커스를 뺏지 않고 맨 위에 띄운다.
+// (실측: 창은 0.6초 만에 뜨지만 앞은 계속 브라우저였고, 이 처리를 하면 TOPMOST 로 보인다.)
+procedure ShowProgressOnTop;
+begin
+  if WizardSilent then
+  begin
+    PinWindow(GetActiveWindow, -1, 0, 0, 0, 0, $0003);
+    PinWindow(WizardForm.Handle, -1, 0, 0, 0, 0, $0003);
+  end;
+end;
+
+procedure InitializeWizard;
+begin
+  ShowProgressOnTop;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssInstall then ShowProgressOnTop;
+end;
+
 function RelaunchRequested: Boolean;
 begin
   Result := ExpandConstant('{param:RELAUNCH|0}') = '1';

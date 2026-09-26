@@ -53,7 +53,7 @@ export function installProgressText(install: InstallStatus): string {
   }
 }
 
-export const RESTART_SLOW_AFTER_SEC = 30
+export const RESTART_SLOW_AFTER_SEC = 60
 
 export function restartProbe(o: { sawDown: boolean; reachable: boolean }): { sawDown: boolean; reload: boolean } {
   if (!o.reachable) return { sawDown: true, reload: false }
@@ -62,5 +62,5 @@ export function restartProbe(o: { sawDown: boolean; reachable: boolean }): { saw
 
 export function restartHint(elapsedSec: number): string {
   if (elapsedSec < RESTART_SLOW_AFTER_SEC) return ''
-  return '보통 10~30초면 끝납니다. 이 화면이 그대로여도 업데이트는 이미 끝났을 수 있습니다. 작업 표시줄 오른쪽 ^ 안의 루미아 아이콘(트레이)을 누르거나, 시작 메뉴에서 "루미아 브리핑룸"을 실행하면 새 버전이 열립니다.'
+  return '오래 걸리면 트레이 아이콘을 누르거나 시작 메뉴에서 "루미아 브리핑룸"을 열어 보세요.'
 }

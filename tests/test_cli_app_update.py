@@ -165,3 +165,12 @@ def test_update_route_hands_the_deferred_launcher_to_the_updater(tmp_path, monke
     app.state.update_launcher = marker
     TestClient(app).get("/api/update/status")
     assert captured["launcher"] is marker
+
+
+def test_the_silent_installer_pins_its_progress_window_on_top_of_the_browser():
+    from pathlib import Path
+
+    iss = (Path(__file__).resolve().parents[1] / "installer" / "lumia.iss").read_text(encoding="utf-8-sig")
+    assert "SetWindowPos@user32.dll" in iss
+    assert "WizardSilent" in iss
+    assert "GetActiveWindow" in iss

@@ -39,15 +39,10 @@ export function UpdateOverlay({ version }: { version: string }) {
         <h1 className="text-xl font-semibold">루미아 브리핑룸</h1>
         <p className="text-base text-zinc-200">{version ? `v${version} 으로 ` : ''}업데이트하는 중입니다</p>
       </div>
-      <ol className="flex flex-col gap-1 text-sm text-zinc-400">
-        <li>✓ 새 버전을 받아 확인했습니다</li>
-        <li>· 앱을 종료하고 새 버전을 설치하고 있습니다</li>
-        <li>· 끝나면 앱이 자동으로 다시 시작됩니다</li>
-      </ol>
-      <p className="max-w-md text-xs text-zinc-500">
-        윈도우의 &quot;Setup - 루미아 브리핑룸&quot; 설치 진행 창이 잠깐 나타납니다. 이 화면은 새 버전이 시작되면 자동으로 새로고침되며, 닫아도 업데이트는 계속됩니다.
+      <p className="max-w-sm text-sm text-zinc-400">
+        화면에 뜬 <b className="font-medium text-zinc-200">설치 진행 창</b>에서 진행 상황을 볼 수 있습니다. 끝나면 앱이 다시 시작되고 이 화면도 자동으로 새로고침됩니다.
       </p>
-      {hint && <p className="max-w-md rounded border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">{hint}</p>}
+      {hint && <p className="max-w-sm text-xs text-zinc-500">{hint}</p>}
     </div>
   )
 }
