@@ -10,7 +10,7 @@ from lumia_briefing_room.telemetry import environment
 from lumia_briefing_room.telemetry.endpoint import load_endpoint
 from lumia_briefing_room.telemetry.state import TelemetryState
 
-CONTRACT = Path(__file__).resolve().parent / "contract"
+CONTRACT = Path(__file__).resolve().parents[1] / "contract"
 SCHEMA = json.loads((CONTRACT / "receiver.schema.json").read_text(encoding="utf-8"))
 
 

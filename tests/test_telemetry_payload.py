@@ -13,7 +13,7 @@ from lumia_briefing_room.telemetry.payload import (
     normalize_label_value,
 )
 
-CONTRACT = Path(__file__).resolve().parent / "contract"
+CONTRACT = Path(__file__).resolve().parents[1] / "contract"
 SCHEMA = json.loads((CONTRACT / "receiver.schema.json").read_text(encoding="utf-8"))
 FIELDS = json.loads((CONTRACT / "app-metadata-fields.json").read_text(encoding="utf-8"))
 INSTALL = "3f2b8c1e-5a4d-4e6f-9b7a-1c2d3e4f5a6b"

@@ -1,4 +1,4 @@
-"""서버와 공유하는 전송 계약(tests/contract, 원본은 infra 저장소)을 앱 쪽에서 검증한다.
+"""서버와 공유하는 전송 계약(저장소 루트 contract/)을 앱 쪽에서 검증한다. 서버 쪽 검증은 server/receiver/tests/test_contract.py.
 
 앱이 새 메타데이터 필드를 추가하면 여기서 깨져서 "보낼지 말지"를 계약 분류표에 적게 만든다.
 """
@@ -13,7 +13,7 @@ from jsonschema import Draft202012Validator
 from lumia_briefing_room.config import _to_camel
 from lumia_briefing_room.pipeline.metadata import ClipMetadata
 
-CONTRACT = Path(__file__).resolve().parent / "contract"
+CONTRACT = Path(__file__).resolve().parents[1] / "contract"
 SCHEMA = json.loads((CONTRACT / "receiver.schema.json").read_text(encoding="utf-8"))
 FIELDS = json.loads((CONTRACT / "app-metadata-fields.json").read_text(encoding="utf-8"))
 BATCH_DEFS = {"labels": "LabelBatch", "logs": "LogBatch", "diagnostics": "DiagnosticBundle"}

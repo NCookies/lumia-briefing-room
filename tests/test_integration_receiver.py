@@ -1,6 +1,6 @@
-"""실제 수신 서버 컨테이너(infra 저장소의 receiver 이미지)에 앱의 전송 클라이언트를 붙이는 통합 테스트.
+"""실제 수신 서버 컨테이너(이 저장소 server/receiver 로 만든 이미지)에 앱의 전송 클라이언트를 붙이는 통합 테스트.
 
-기본 실행에서는 빠진다. 도커가 켜져 있고 infra 저장소가 이 저장소 옆(`../infra`)에 있을 때:
+기본 실행에서는 빠진다. 도커가 켜져 있을 때:
 
     pytest -m integration tests/test_integration_receiver.py
 
@@ -23,7 +23,7 @@ from lumia_briefing_room.telemetry.sender import DAY, TelemetrySender
 
 pytestmark = pytest.mark.integration
 
-RECEIVER_DIR = Path(__file__).resolve().parents[2] / "infra" / "services" / "receiver"
+RECEIVER_DIR = Path(__file__).resolve().parents[1] / "server" / "receiver"
 UPLOAD_TOKEN = "it-upload-token"
 ADMIN_TOKEN = "it-admin-token"
 
@@ -37,7 +37,7 @@ def _docker_ok() -> bool:
 @pytest.fixture(scope="module")
 def server():
     if not RECEIVER_DIR.is_dir():
-        pytest.skip("infra 저장소(../infra)가 없다")
+        pytest.skip("server/receiver 가 없다")
     if not _docker_ok():
         pytest.skip("도커를 쓸 수 없다")
     tag = "lumia-receiver:integration"

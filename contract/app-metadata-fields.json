@@ -41,6 +41,7 @@
     "labeledAt": "labeledAt (라벨을 붙인 시각, 앱 API 가 라벨을 붙이거나 값을 바꿀 때 기록 — 같은 값을 다시 눌러도 그대로)"
   },
   "excluded": {
+    "clipUid": "서버가 아직 받지 않는 필드 — 서버에 clipUid 키와 legacyClipId 승격이 들어간 뒤 sent 로 옮긴다(plan-ui.md §0 clipUid)",
     "title": "수동 편집 가능해 닉네임이 섞일 수 있음",
     "sessionDir": "경로 원문(matchKey 로 대체)",
     "sessionStartUtc": "시청 시각",

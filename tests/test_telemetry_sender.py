@@ -12,7 +12,7 @@ from lumia_briefing_room.telemetry.client import ReceiverClient
 from lumia_briefing_room.telemetry.outbox import Outbox
 from lumia_briefing_room.telemetry.sender import DAY, TelemetrySender
 
-CONTRACT = Path(__file__).resolve().parent / "contract"
+CONTRACT = Path(__file__).resolve().parents[1] / "contract"
 SCHEMA = json.loads((CONTRACT / "receiver.schema.json").read_text(encoding="utf-8"))
 
 
