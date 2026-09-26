@@ -35,6 +35,10 @@ class RateLimiter:
     def tracked(self) -> int:
         return len(set(self._hits) | set(self._fails) | set(self._blocked))
 
+    def blocked_count(self) -> int:
+        now = self.clock()
+        return sum(1 for until in self._blocked.values() if until > now)
+
     def _trim(self, events: deque, now: float) -> None:
         while events and events[0] <= now - self.window_sec:
             events.popleft()

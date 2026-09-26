@@ -13,6 +13,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError
 
+from . import admin as admin_read
 from .alerts import Alerter, discord_sender, mask_ip
 from .config import Settings, load_settings
 from .ratelimit import RateLimiter
@@ -194,6 +195,47 @@ def create_app(settings: Settings | None = None, alerter: Alerter | None = None)
         labels, last, more = list_labels(settings.data_dir, mode, _decode_cursor(after), limit)
         cursor = _encode_cursor(last)
         return {"labels": labels, "next": cursor if more else None, "cursor": cursor}
+
+    @app.get("/v1/admin/status", dependencies=[Depends(require_admin)])
+    def admin_status():
+        return admin_read.server_status(
+            settings.data_dir, blocked_ips=limiter.blocked_count(), retention_days=settings.retention_days
+        )
+
+    @app.get("/v1/admin/diagnostics", dependencies=[Depends(require_admin)])
+    def admin_diagnostics(
+        mode: Literal["dev", "release"] = "release",
+        q: str = "",
+        limit: int = Query(50, ge=1, le=500),
+        offset: int = Query(0, ge=0),
+    ):
+        items, total = admin_read.list_diagnostics(settings.data_dir, mode, q, limit, offset)
+        return {"total": total, "items": items}
+
+    @app.get("/v1/admin/diagnostics/{receipt_id}", dependencies=[Depends(require_admin)])
+    def admin_diagnostic(receipt_id: str, mode: Literal["dev", "release"] = "release"):
+        record = admin_read.get_diagnostic(settings.data_dir, mode, receipt_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail="not found")
+        return record
+
+    @app.get("/v1/admin/logs/groups", dependencies=[Depends(require_admin)])
+    def admin_log_groups(mode: Literal["dev", "release"] = "release"):
+        return {"groups": admin_read.group_log_entries(settings.data_dir, mode)}
+
+    @app.get("/v1/admin/logs", dependencies=[Depends(require_admin)])
+    def admin_logs(
+        mode: Literal["dev", "release"] = "release",
+        installId: str = "",
+        level: str = "",
+        q: str = "",
+        limit: int = Query(100, ge=1, le=1000),
+        offset: int = Query(0, ge=0),
+    ):
+        items, total = admin_read.list_log_entries(
+            settings.data_dir, mode, install_id=installId, level=level, q=q, limit=limit, offset=offset
+        )
+        return {"total": total, "items": items}
 
     @app.delete("/v1/installs/{install_id}", dependencies=[Depends(require_token)])
     def delete_install(install_id: UUID):
