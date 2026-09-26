@@ -49,7 +49,11 @@ test('the page reloads only after the server went away and came back', () => {
   assert.deepEqual(restartProbe({ sawDown: true, reachable: true }), { sawDown: true, reload: true })
 })
 
-test('the restart screen tells the user what to do once it takes too long', () => {
+test('the restart screen tells the user what to do once it takes longer than usual', () => {
+  assert.ok(RESTART_SLOW_AFTER_SEC <= 45)
   assert.equal(restartHint(RESTART_SLOW_AFTER_SEC - 1), '')
-  assert.match(restartHint(RESTART_SLOW_AFTER_SEC), /시작 메뉴/)
+  const hint = restartHint(RESTART_SLOW_AFTER_SEC)
+  assert.match(hint, /시작 메뉴/)
+  assert.match(hint, /트레이/)
+  assert.match(hint, /이미 끝났을 수/)
 })

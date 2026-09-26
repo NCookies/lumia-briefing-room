@@ -45,7 +45,7 @@ export function UpdateOverlay({ version }: { version: string }) {
         <li>· 끝나면 앱이 자동으로 다시 시작됩니다</li>
       </ol>
       <p className="max-w-md text-xs text-zinc-500">
-        이 화면은 새 버전이 시작되면 자동으로 새로고침됩니다. 설치 진행 창이 따로 보일 수 있고, 이 화면을 닫아도 업데이트는 계속됩니다.
+        윈도우의 &quot;Setup - 루미아 브리핑룸&quot; 설치 진행 창이 잠깐 나타납니다. 이 화면은 새 버전이 시작되면 자동으로 새로고침되며, 닫아도 업데이트는 계속됩니다.
       </p>
       {hint && <p className="max-w-md rounded border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">{hint}</p>}
     </div>
