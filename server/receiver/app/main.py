@@ -111,6 +111,9 @@ def create_app(settings: Settings | None = None, alerter: Alerter | None = None)
     async def rate_limit(request: Request, call_next):
         if not request.url.path.startswith("/v1/"):
             return await call_next(request)
+        if request.url.path.startswith("/v1/admin/") and settings.admin_token:
+            if hmac.compare_digest(request.headers.get("x-admin-token", ""), settings.admin_token):
+                return await call_next(request)
         ip = client_ip(request)
         if not limiter.allow(ip):
             return JSONResponse(

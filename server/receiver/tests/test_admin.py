@@ -103,7 +103,7 @@ def test_bad_admin_attempts_count_toward_the_rate_limit(tmp_path):
     c = TestClient(create_app(settings))
     for _ in range(3):
         c.get("/v1/admin/labels", headers=admin("nope"))
-    assert c.get("/v1/admin/labels", headers=admin()).status_code == 429
+    assert c.get("/v1/admin/labels", headers=admin("nope")).status_code == 429
 
 
 def test_response_always_carries_a_cursor_for_incremental_pulls(tmp_path):

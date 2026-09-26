@@ -141,6 +141,34 @@ def test_healthz_is_never_limited(tmp_path):
     assert all(c.get("/healthz").status_code == 200 for _ in range(10))
 
 
+def admin_client(tmp_path, **kw):
+    settings = Settings(data_dir=tmp_path, api_tokens=(TOKEN,), max_body_bytes=100_000, admin_token="admin-secret", **kw)
+    return TestClient(create_app(settings, alerter=Alerter(None)))
+
+
+def test_valid_admin_token_is_exempt_from_the_request_limit_even_when_polling_fast(tmp_path):
+    c = admin_client(tmp_path, rate_limit_requests=5)
+    h = {"X-Forwarded-For": "203.0.113.1", "X-Admin-Token": "admin-secret"}
+    assert all(c.get("/v1/admin/status", headers=h).status_code == 200 for _ in range(50))
+
+
+def test_admin_token_still_works_when_the_address_is_already_blocked(tmp_path):
+    c = admin_client(tmp_path, rate_limit_failures=3)
+    ip = {"X-Forwarded-For": "203.0.113.2"}
+    for _ in range(3):
+        c.post("/v1/labels", json=label_body(uuid4()), headers={**ip, **headers("bad")})
+    assert c.post("/v1/labels", json=label_body(uuid4()), headers={**ip, **headers()}).status_code == 429
+    assert c.get("/v1/admin/status", headers={**ip, "X-Admin-Token": "admin-secret"}).status_code == 200
+
+
+def test_wrong_admin_token_is_still_counted_and_blocked(tmp_path):
+    c = admin_client(tmp_path, rate_limit_failures=3)
+    ip = {"X-Forwarded-For": "203.0.113.3", "X-Admin-Token": "wrong"}
+    for _ in range(3):
+        assert c.get("/v1/admin/status", headers=ip).status_code == 401
+    assert c.get("/v1/admin/status", headers=ip).status_code == 429
+
+
 def test_rate_limit_can_be_disabled(tmp_path):
     c = make_client(tmp_path, [], rate_limit_requests=0, rate_limit_failures=0)
     assert all(c.post("/v1/labels", json=label_body(uuid4()), headers=headers("bad")).status_code == 401 for _ in range(50))
