@@ -17,7 +17,7 @@ export const DEFAULT_APP_INFO: AppInfo = { version: '', mode: 'release', videoFo
 
 export function videoFormatHelpText(formats: VideoFormats): string {
   if (formats.supported.length === 0) return ''
-  const lines = [`지원하는 영상 형식: ${formats.supported.join(' ')} (방송 다시보기, OBS 등 녹화 프로그램 영상)`]
+  const lines = [`지원하는 영상 형식: ${formats.supported.join(' ')} (OBS 등 녹화 프로그램 영상)`]
   const unverified = formats.supported.filter((ext) => !formats.verified.includes(ext))
   lines.push(
     unverified.length === 0

@@ -76,7 +76,7 @@ export function VodSettingsPanel({ onClipsDirChanged }: { onClipsDirChanged: () 
           <VideoFormatHelp />
         </h3>
         <p className="text-xs text-zinc-500">
-          방송 다시보기나 OBS 등으로 녹화해 둔 영상 파일, 또는 그 영상들이 든 폴더를 추가합니다. 앱은 영상을 내려받거나 옮기거나 지우지 않고 읽기만 합니다.
+          OBS 등으로 녹화해 둔 영상 파일, 또는 그 영상들이 든 폴더를 추가합니다. 앱은 영상을 내려받거나 옮기거나 지우지 않고 읽기만 합니다.
         </p>
         <ul className="flex flex-col gap-1">
           {sources.length === 0 && <li className="text-sm text-zinc-500">추가한 경로가 없습니다</li>}
