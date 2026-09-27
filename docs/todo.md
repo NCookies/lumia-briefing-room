@@ -40,3 +40,8 @@
 - [x] 영상 파일 이름 구분(클립 유니크 ID `clipUid`, 파일 이름은 유지) → plan-ui.md §0·§4-6, SPEC 클립 메타데이터, plan-deploy.md §5, plan-infra.md §7
 - [x] 관리자 전용 대시보드(로컬 실행 전용, 추후) → plan-infra.md §8
 - [x] 영상 파일 탭 지원 확장자 `(?)` 도움말 (대화 중 추가) → plan-ui.md §0·§4-6, SPEC §2.14 머리
+- [x] 과거 녹화 분석 진행률이 50% 로 한 번에 뛰는 문제 → plan-backfill.md §0 B8·§7, roadmap.md P4
+- [x] 영상 파일 분석 후 원본 삭제 옵션(묻기/항상/안 함, 휴지통·영구 삭제 선택, 기본 휴지통) → plan-vod.md V7·§8-10·§2.1, SPEC §7.10·§7.8·§2.14
+- [x] 프로그램 설치 통계(GitHub 다운로드 수 + 동의한 사용자의 익명 신호) → plan-deploy.md D15, SPEC §7.11 `telemetry.sendUsage`, plan-infra.md §7
+- [x] dak.gg 파싱으로 내·팀원 캐릭터 읽기(추후 구현으로 기록, 조건·확인 필요만 정리) → plan-ui.md §7, SPEC §6 v2 이후 후보
+- [x] 코발트 프로토콜 지원 → plan.md §10(C0~C5), SPEC §2.9, roadmap.md P4
