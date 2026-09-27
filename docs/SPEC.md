@@ -1336,7 +1336,7 @@ eplay\<캐릭터>` 처럼 폴더를 나눠 보관한다.
 
 | 키 | 기본값 | 설명 |
 |---|---|---|
-| `retention.deleteMode` | `trash` | `trash`(휴지통으로) / `permanent`(즉시 삭제). **(계획)** 값이 `recycle`(Windows 휴지통, 기본) / `permanent` 로 바뀌고 클립 삭제 확인 창의 "휴지통으로 보내지 않고 영구 삭제하기" 체크박스와 같은 값이다 |
+| `retention.deleteMode` | `trash` | `trash`(휴지통으로) / `permanent`(즉시 삭제). **(계획)** 값이 `recycle`(Windows 휴지통) / `permanent` 로 바뀌고 **자동 정리의 기본은 `permanent`**(디스크 확보가 목적)다. 수동 삭제의 방식은 별도 키 `ui.deleteMode` 다 |
 | `retention.trashDays` | 30 | 휴지통 유예 기간. 지나면 실제 삭제. **(계획)** 앱 휴지통이 없어지면서 이 키도 없어진다 |
 | `retention.autoCleanEnabled` | `false` | 자동 정리 켜기 |
 | `retention.maxAgeDays` | `null` | N일 지난 클립을 휴지통으로 |
@@ -1360,6 +1360,7 @@ UI에서 제공할 동작:
 - **고정(pin)** — 자동 정리에서 보호
 - **내보내기** — 경로를 골라 복사 또는 이동. 자주 쓰는 경로는 즐겨찾기로 저장
 - **휴지통 비우기** — 유예 기간 전이라도 수동으로 **(계획: 앱 휴지통과 함께 사라짐)**
+- **삭제 예정 표시 (계획, 미구현 — plan-ui.md §0)** — 자동 정리가 켜져 있으면 다음 정리 때 지워질 클립을 목록에서 빨간 계열 테두리·"삭제 예정" 배지(이유 포함)로 미리 보여 준다. 선정은 정리 dry-run 과 같고 보호된 클립(고정·보호 태그)은 표시하지 않으며, 고정하면 표시가 사라진다
 - **일괄 작업** — 필터로 고른 전체에 한 번에 적용
 
 > **구현 (2026-09-21)**: 위 표의 `autoCleanEnabled`·`maxAgeDays`·`maxTotalGB`·`maxCount`·`trashDays`·`deleteMode`·`protect*` 가 실제로 동작한다(`pipeline/cleanup.py`). 이전에는 선택/삭제 함수만 있고 호출하는 곳이 없어 클립도 휴지통도 영원히 남았다. 앱이 1시간마다 설정 파일을 다시 읽어 실행하고, `POST /api/cleanup {dryRun}` 로 미리보기·즉시 실행한다. 클립 나이는 **경기 시각(`matchStartUtc`)** 기준이다(메타데이터 파일 수정 시각은 라벨링 때마다 바뀐다). 휴지통 이동은 같은 드라이브 안의 이동이라 디스크가 바로 비지는 않고 `trashDays` 뒤에 실제로 줄어든다. 클립이 다 사라진 경기의 결과표 이미지도 함께 지운다. 옵션 모달의 "자동 정리" 탭에서 설정한다.
@@ -1378,6 +1379,7 @@ UI에서 제공할 동작:
 | `ui.theme` | `dark` | |
 | `ui.startMinimized` | `true` | 트레이로 시작 |
 | `ui.autoStart` | `true` | 레지스트리 Run 키 등록. **(구현됨)** 옵션 → 일반에서 켜고 끄며, `PUT /api/config` 가 `ui.autoStart` 를 받으면 그 자리에서 레지스트리에 반영한다(설정 파일만 고치면 다음 로그인에 한 번 더 뜬다). 등록할 명령은 `autostart.current_command()` — 빌드본이면 exe 경로만, 소스 실행이면 `python -m lumia_briefing_room.cli.app` |
+| `ui.deleteMode` | `recycle` | **(계획, 미구현 — plan-ui §0)** 클립·게임을 수동으로 삭제할 때의 방식: `recycle`(Windows 휴지통) / `permanent`(영구 삭제). 삭제 확인 창의 "휴지통으로 보내지 않고 영구 삭제하기" 체크박스와 같은 값이다. 휴지통으로 보낼 때 확인 창은 "Windows 휴지통에서 되살릴 때는 클립의 파일(영상·정보·썸네일)을 모두 복원해야 이 앱에서 다시 볼 수 있다"고 안내한다 |
 | `ui.confirmDelete` | `true` | 클립·게임을 삭제(휴지통 이동)할 때 확인 창을 띄운다. 완전 삭제는 항상 확인. **(계획)** 확인 창은 `다시 묻지 않기` · `휴지통으로 보내지 않고 영구 삭제하기` 두 체크박스를 가지며 옵션에서도 같은 값을 바꾼다. 영구 삭제도 항상 확인하는 규칙은 없어지고, 영구 삭제 + 다시 묻지 않기 조합은 저장 전에 경고한다 |
 | `app.mode` | `auto` | `auto`(빌드본이면 `release`, 소스 실행이면 `dev`) / `dev` / `release`. **(구현됨)** `release` 에서는 튜닝용 화면(클립 ID, 교전 점수 칩·슬라이더)을 숨긴다. 라벨링 UI·클라이언트 오류 로그는 두 모드 모두 유지. 값은 `GET /api/app-info` 의 `mode` 로 프론트가 읽는다 |
 | `app.lowPriority` | `true` | 앱 전체(분석·자식 ffmpeg 포함)를 보통 이하 우선순위로 돌려 게임 프레임 저하를 줄인다. **(구현됨)** 앱을 닫거나 죽으면 자식 ffmpeg 도 작업 개체(Job Object)로 함께 종료된다 |
