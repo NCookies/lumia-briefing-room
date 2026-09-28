@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -458,18 +459,27 @@ def detect_source(
     k_templates: dict[int, np.ndarray] | None = None,
     a_templates: dict[int, np.ndarray] | None = None,
     cancel: threading.Event | None = None,
+    on_progress: Callable[[int, int | None], None] | None = None,
 ) -> MatchDetection:
-    """프레임 공급자 하나를 통째로 검출한다. 스팀 세그먼트든 영상 파일이든 같은 시계열 처리를 쓴다."""
+    """프레임 공급자 하나를 통째로 검출한다. 스팀 세그먼트든 영상 파일이든 같은 시계열 처리를 쓴다.
+
+    `on_progress(처리한 프레임 수, 전체 프레임 수)` 는 프레임마다 부른다. 전체 프레임 수는 소스가
+    `expected_frame_count()` 를 구현했을 때만 알 수 있고(예: `SteamSegmentSource`), 모르면 `None`
+    을 준다 — 게임 내부 진행률(plan-backfill B8)에 쓴다.
+    """
     profile = profile or ResolutionProfile.for_resolution(source.width, source.height)
     k_templates, a_templates = resolve_templates(profile, k_templates, a_templates)
     tk_templates = resolve_tk_templates(profile, k_templates)
     region_templates = resolve_region_templates(profile)
     day_templates = resolve_day_templates(profile)
 
+    expected_total_fn = getattr(source, "expected_frame_count", None)
+    expected_total = expected_total_fn() if expected_total_fn is not None else None
+
     states = []
     frames = source.frames()
     try:
-        for t, frame in frames:
+        for i, (t, frame) in enumerate(frames, start=1):
             if cancel is not None and cancel.is_set():
                 raise DetectionCancelled()
             states.append(
@@ -478,6 +488,8 @@ def detect_source(
                     tk_templates=tk_templates, region_templates=region_templates, day_templates=day_templates,
                 )
             )
+            if on_progress is not None:
+                on_progress(i, expected_total)
     finally:
         close = getattr(frames, "close", None)
         if close is not None:
@@ -496,11 +508,13 @@ def detect_match(
     a_templates: dict[int, np.ndarray] | None = None,
     hwaccel: str | None = None,
     cancel: threading.Event | None = None,
+    on_progress: Callable[[int, int | None], None] | None = None,
 ) -> MatchDetection:
     """매치 구간(세그먼트 범위) 하나를 통째로 검출한다. (plan.md §9-6)"""
     source = SteamSegmentSource(
         session, seg_range, stream=stream, ffmpeg_path=ffmpeg_path, hwaccel=hwaccel
     )
     return detect_source(
-        source, profile=profile, k_templates=k_templates, a_templates=a_templates, cancel=cancel
+        source, profile=profile, k_templates=k_templates, a_templates=a_templates, cancel=cancel,
+        on_progress=on_progress,
     )

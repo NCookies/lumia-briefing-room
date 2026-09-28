@@ -46,6 +46,10 @@ class SteamSegmentSource:
             session, stream, seg_range.first, seg_range.last
         )
 
+    def expected_frame_count(self) -> int:
+        """이 범위에서 실제로 나올 프레임 수(지워진 세그먼트는 뺀 값). 게임 내부 진행률 계산에 쓴다(plan-backfill B8)."""
+        return len(self._existing)
+
     def frames(self) -> Iterator[tuple[float, np.ndarray]]:
         duration = self._session.segment_duration_sec
         for seg_num, frame in extract_keyframe_frames(

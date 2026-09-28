@@ -54,6 +54,30 @@ def test_detect_source_no_gaps_is_complete():
     assert detect_source(src).source_incomplete is False
 
 
+def test_detect_source_reports_frame_progress_when_source_knows_its_total():
+    class CountedSource(ListSource):
+        def expected_frame_count(self):
+            return len(self._frames)
+
+    black = np.zeros((1440, 2560, 3), dtype=np.uint8)
+    src = CountedSource(2560, 1440, [(0.0, black), (1.0, black), (2.0, black)])
+    seen: list[tuple[int, int | None]] = []
+
+    detect_source(src, on_progress=lambda i, total: seen.append((i, total)))
+
+    assert seen == [(1, 3), (2, 3), (3, 3)]
+
+
+def test_detect_source_reports_none_total_when_source_does_not_know_its_count():
+    black = np.zeros((1440, 2560, 3), dtype=np.uint8)
+    src = ListSource(2560, 1440, [(0.0, black), (1.0, black)])
+    seen: list[tuple[int, int | None]] = []
+
+    detect_source(src, on_progress=lambda i, total: seen.append((i, total)))
+
+    assert seen == [(1, None), (2, None)]
+
+
 @requires_ffmpeg
 def test_steam_segment_source_yields_segment_start_times_and_gaps(tmp_path, make_synthetic_session):
     session_dir = make_synthetic_session(

@@ -119,3 +119,58 @@ def test_scanner_returns_nothing_for_a_session_it_cannot_read(tmp_path: Path):
     scanner = rt.SteamSessionScanner(tmp_path, Path("ffmpeg"), state_dir=tmp_path / "state")
 
     assert scanner.scan(broken, None, lambda fraction, message: None) == []
+
+
+def test_session_video_seconds_counts_segments_without_decoding(tmp_path: Path):
+    session_dir = tmp_path / "bg_1049590_20260923_095917"
+    session_dir.mkdir()
+    for n in range(1, 4):
+        (session_dir / f"chunk-stream0-{n:05d}.m4s").write_bytes(b"x")
+    (session_dir / "chunk-stream1-00001.m4s").write_bytes(b"x")  # 다른 스트림은 안 센다
+    (session_dir / "session.mpd").write_text(
+        """<?xml version="1.0" encoding="utf-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="dynamic"
+     availabilityStartTime="2026-09-23T09:59:17Z" timeShiftBufferDepth="PT2H0M0.0S">
+    <Period id="0" start="PT0.0S">
+        <AdaptationSet id="0" contentType="video" maxWidth="64" maxHeight="48">
+            <Representation id="0" mimeType="video/mp4" width="64" height="48">
+                <SegmentTemplate timescale="1000000" duration="3000000"
+                                 initialization="init-stream$RepresentationID$.m4s"
+                                 media="chunk-stream$RepresentationID$-$Number%05d$.m4s" startNumber="1"/>
+            </Representation>
+        </AdaptationSet>
+    </Period>
+</MPD>""",
+        encoding="utf-8",
+    )
+
+    assert rt.session_video_seconds(session_dir) == pytest.approx(9.0)
+
+
+def test_session_video_seconds_is_zero_for_a_folder_it_cannot_read():
+    assert rt.session_video_seconds(Path("does/not/exist")) == 0.0
+
+
+def test_scanner_session_video_seconds_delegates_to_the_module_helper(tmp_path: Path, monkeypatch):
+    scanner = rt.SteamSessionScanner(tmp_path, Path("ffmpeg"), state_dir=tmp_path / "state")
+    monkeypatch.setattr(rt, "session_video_seconds", lambda d: 42.0)
+
+    assert scanner.session_video_seconds(tmp_path / "whatever") == 42.0
+
+
+def test_process_window_forwards_on_progress_to_process_match(monkeypatch, tmp_path: Path):
+    process, calls = _process(monkeypatch, lambda: [])
+    seen = []
+
+    process(Path("bg_1049590_x"), _window(), tmp_path / "stage", None, on_progress=seen.append)
+    calls["on_progress"](0.5)
+
+    assert seen == [0.5]
+
+
+def test_process_window_on_progress_defaults_to_none(monkeypatch, tmp_path: Path):
+    process, calls = _process(monkeypatch, lambda: [])
+
+    process(Path("bg_1049590_x"), _window(), tmp_path / "stage", None)
+
+    assert calls["on_progress"] is None

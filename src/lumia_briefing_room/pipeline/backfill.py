@@ -13,12 +13,21 @@ import os
 import re
 import shutil
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Protocol
 
+from lumia_briefing_room.pipeline.backfill_progress import (
+    DEFAULT_SCAN_SPEEDUP,
+    AdaptiveGameDuration,
+    MonotonicProgress,
+    compute_workload,
+    estimate_game_count,
+    overall_fraction,
+)
 from lumia_briefing_room.pipeline.session_scan import GameWindow, ScanCancelled, window_key
 
 log = logging.getLogger("lumia_briefing_room.backfill")
@@ -36,12 +45,16 @@ class GameCancelled(Exception):
 class Scanner(Protocol):
     def list_sessions(self) -> list[Path]: ...
 
+    def session_video_seconds(self, session_dir: Path) -> float: ...
+
     def scan(
         self, session_dir: Path, cancel: threading.Event | None, on_progress: Callable[[float, str], None]
     ) -> list[GameWindow]: ...
 
 
-ProcessWindow = Callable[[Path, GameWindow, Path, threading.Event | None], list[Path]]
+ProcessWindow = Callable[
+    [Path, GameWindow, Path, threading.Event | None, Callable[[float], None] | None], list[Path]
+]
 
 
 @dataclass(frozen=True)
@@ -163,20 +176,28 @@ def run_backfill(
     known_starts: list[datetime],
     cancel: threading.Event | None = None,
     on_progress: Callable[[BackfillProgress], None] | None = None,
+    scan_speedup: float = DEFAULT_SCAN_SPEEDUP,
 ) -> BackfillResult:
+    """B8(plan-backfill.md §0): 진행률은 "예상 작업 시간" 비율로 계산하고(스캔=영상 길이÷배속,
+    분석=게임 수×게임당 평균 시간), 재계산으로 계산값이 줄어도 화면 표시값은 단조 증가만 한다."""
     result = BackfillResult()
     state = _State(state_dir / STATE_FILE)
     clean_staging(staging_root)
+    monotonic = MonotonicProgress()
+    adaptive = AdaptiveGameDuration()
 
     def cancelled() -> bool:
         return cancel is not None and cancel.is_set()
 
     def report(phase: str, fraction: float, message: str = "", **extra) -> None:
         if on_progress is not None:
-            on_progress(BackfillProgress(phase, min(1.0, max(0.0, fraction)), message, **extra))
+            on_progress(BackfillProgress(phase, monotonic.push(fraction), message, **extra))
 
     sessions = scanner.list_sessions()
     total_sessions = len(sessions)
+    video_seconds = {s: scanner.session_video_seconds(s) for s in sessions}
+    total_video_sec = sum(video_seconds.values())
+    scanned_video_sec = 0.0
     todo: list[tuple[str, Path, GameWindow]] = []
 
     for index, session_dir in enumerate(sessions, start=1):
@@ -184,9 +205,16 @@ def run_backfill(
             result.cancelled = True
             return result
 
-        def scan_progress(fraction: float, message: str, _i=index) -> None:
+        session_len = video_seconds[session_dir]
+
+        def scan_progress(fraction: float, message: str, _i=index, _len=session_len) -> None:
+            elapsed_video_sec = scanned_video_sec + _len * fraction
+            workload = compute_workload(
+                video_seconds=total_video_sec, speedup=scan_speedup,
+                game_count=estimate_game_count(total_video_sec), avg_game_sec=adaptive.estimate,
+            )
             report(
-                "scan", 0.5 * ((_i - 1 + fraction) / max(1, total_sessions)), message,
+                "scan", overall_fraction(elapsed_video_sec / scan_speedup, workload), message,
                 session_index=_i, session_total=total_sessions,
             )
 
@@ -197,6 +225,7 @@ def run_backfill(
             return result
         result.sessions_scanned += 1
         result.games_found += len(windows)
+        scanned_video_sec += session_len
 
         for window in windows:
             key = window_key(session_dir.name, window)
@@ -215,27 +244,47 @@ def run_backfill(
 
     todo.sort(key=lambda item: item[2].hud_start_utc)
     total_games = len(todo)
-    report("process", 0.5, f"게임 {total_games}개", session_total=total_sessions, games_total=total_games)
+
+    def analysis_workload():
+        # 스캔이 끝나 실제 게임 수를 알므로, 스캔 전의 세션 길이 추정 대신 이 값으로 다시 계산한다.
+        return compute_workload(
+            video_seconds=total_video_sec, speedup=scan_speedup,
+            game_count=total_games, avg_game_sec=adaptive.estimate,
+        )
+
+    scan_done_sec = total_video_sec / scan_speedup
+    report(
+        "process", overall_fraction(scan_done_sec, analysis_workload()), f"게임 {total_games}개",
+        session_index=total_sessions, session_total=total_sessions, games_total=total_games,
+    )
 
     for done, (key, session_dir, window) in enumerate(todo):
         if cancelled():
             result.cancelled = True
             return result
-        base = 0.5 + 0.5 * (done / max(1, total_games))
-        report(
-            "process", base, f"{window.hud_start_utc.astimezone().strftime('%m-%d %H:%M')} 게임",
-            session_total=total_sessions, games_done=done, games_total=total_games, clips=result.clips_created,
-        )
+
+        def game_progress(internal_fraction: float, _done=done) -> None:
+            elapsed = scan_done_sec + (_done + internal_fraction) * adaptive.estimate
+            report(
+                "process", overall_fraction(elapsed, analysis_workload()),
+                f"{window.hud_start_utc.astimezone().strftime('%m-%d %H:%M')} 게임",
+                session_index=total_sessions, session_total=total_sessions,
+                games_done=_done, games_total=total_games, clips=result.clips_created,
+            )
+
+        game_progress(0.0)
         staging = staging_root / _staging_name(key)
         shutil.rmtree(staging, ignore_errors=True)
         staging.mkdir(parents=True, exist_ok=True)
+        started_at = time.monotonic()
         try:
-            process_window(session_dir, window, staging, cancel)
+            process_window(session_dir, window, staging, cancel, game_progress)
         except GameCancelled:
             shutil.rmtree(staging, ignore_errors=True)
             result.cancelled = True
             return result
         except Exception:
+            adaptive.record(time.monotonic() - started_at)
             log.exception("과거 경기 분석 실패: %s", key)
             shutil.rmtree(staging, ignore_errors=True)
             state.failures[key] = state.failures.get(key, 0) + 1
@@ -243,6 +292,7 @@ def run_backfill(
             result.games_failed += 1
             continue
 
+        adaptive.record(time.monotonic() - started_at)
         result.clips_created += commit_staging(staging, clips_dir)
         shutil.rmtree(staging, ignore_errors=True)
         state.done.add(key)
@@ -251,7 +301,7 @@ def run_backfill(
         result.games_processed += 1
 
     report(
-        "done", 1.0, "", session_total=total_sessions, games_done=total_games,
+        "done", 1.0, "", session_index=total_sessions, session_total=total_sessions, games_done=total_games,
         games_total=total_games, clips=result.clips_created,
     )
     return result

@@ -65,18 +65,20 @@ export function formatEstimate(seconds: number): string {
   return `약 ${formatDuration(Math.ceil(seconds / 60) * 60)}`
 }
 
+function sessionRatio(status: BackfillStatus): string {
+  return status.sessionTotal ? `${status.sessionIndex}/${status.sessionTotal}` : ''
+}
+
 export function describeProgress(status: BackfillStatus): string {
   const extra = status.message ? [status.message] : []
+  const ratio = sessionRatio(status)
   if (status.phase === 'process') {
-    return [
-      '게임 분석 중',
-      `${(status.gamesDone ?? 0) + 1}/${status.gamesTotal ?? 0}`,
-      `클립 ${status.clips ?? 0}개`,
-      ...extra,
-    ].join(' · ')
+    const label = ratio ? `${ratio} 클립 만드는 중` : '클립 만드는 중'
+    const gameRatio = status.gamesTotal ? [`${(status.gamesDone ?? 0) + 1}/${status.gamesTotal}번째 게임`] : []
+    return [label, ...gameRatio, `클립 ${status.clips ?? 0}개`, ...extra].join(' · ')
   }
-  const session = status.sessionTotal ? [`세션 ${status.sessionIndex}/${status.sessionTotal}`] : []
-  return ['녹화를 살펴보는 중', ...session, ...extra].join(' · ')
+  const label = ratio ? `${ratio} 게임 찾는 중` : '게임 찾는 중'
+  return [label, ...extra].join(' · ')
 }
 
 export function describeResult(result: BackfillResult): string[] {

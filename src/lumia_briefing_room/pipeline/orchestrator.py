@@ -11,7 +11,7 @@ from lumia_briefing_room.config import ClipConfig, Config, resolve_paths
 from lumia_briefing_room.detect.match import detect_match
 from lumia_briefing_room.detect.pvp import score_interval
 from lumia_briefing_room.detect.result import ResultScreen
-from lumia_briefing_room.detect.types import CombatInterval
+from lumia_briefing_room.detect.types import CombatInterval, MatchDetection
 from lumia_briefing_room.pipeline.clip import ClipRange, cut_clip, make_thumbnail, resolve_clip_range
 from lumia_briefing_room.pipeline.filters import apply_filter
 from lumia_briefing_room.pipeline.metadata import build_metadata, write_metadata
@@ -166,6 +166,15 @@ def _save_result_image(result: ResultScreen | None, path: Path, clips_root: Path
     return stored_asset_path(path, clips_root)
 
 
+# 게임 하나를 처리하는 동안 각 단계가 차지하는 비중(plan-backfill.md B8 §7 확인 필요 3번 답).
+# 실측(2026-09-28, H:\steam video 실제 21분 경기, 클립 12개): 검출(detect_match) 24.8초,
+# 결과 화면 판독(find_result_after) 8.8초, 클립 컷·썸네일·메타데이터 21.6초, 전체 55.2초.
+# 경기 길이·클립 수에 따라 비율이 달라질 수 있어 고정값이지만(다른 경기로 검증 못함), 진행 막대가
+# 60~100초 동안 멈춘 듯 보이던 문제보다는 낫다.
+DETECTION_PROGRESS_FRACTION = 0.45
+RESULT_SCAN_PROGRESS_FRACTION = 0.61
+
+
 def process_match(
     session: RecordingSession,
     match_start: datetime,
@@ -181,20 +190,34 @@ def process_match(
     on_result: Callable[[ResultScreen], None] | None = None,
     cancel: threading.Event | None = None,
     result_search_from: datetime | None = None,
+    on_progress: Callable[[float], None] | None = None,
 ) -> list[Path]:
     """SPEC §3 다이어그램 전체: 매치 하나를 검출부터 메타데이터 저장까지 처리한다.
 
     반환값은 만들어진 메타데이터 JSON 경로 목록이다(클립 0개면 빈 리스트).
+    `on_progress(0~1)` 는 이 게임 하나의 내부 진행률이다(plan-backfill B8) — 검출 프레임 비율 →
+    결과 화면 판독 → 클립마다 컷·썸네일 순으로 올라간다.
     """
     seg_range = segment_time_range(session, match_start, match_end)
-    detection = detect_match(
+
+    def _frame_progress(done: int, total: int | None) -> None:
+        if on_progress is not None and total:
+            on_progress(min(1.0, done / total) * DETECTION_PROGRESS_FRACTION)
+
+    detection: MatchDetection = detect_match(
         session, seg_range, ffmpeg_path=ffmpeg_path,
         k_templates=k_templates, a_templates=a_templates, hwaccel=hwaccel, cancel=cancel,
+        on_progress=_frame_progress if on_progress is not None else None,
     )
 
     filtered = apply_filter(detection.intervals, cfg.filter, game_mode=game_mode)
     if not filtered:
+        if on_progress is not None:
+            on_progress(1.0)
         return []
+
+    if on_progress is not None:
+        on_progress(DETECTION_PROGRESS_FRACTION)
 
     resolved = resolve_paths(cfg.paths)
     clips_root, thumbnails_root = _resolve_clip_paths(cfg, clips_dir)
@@ -206,6 +229,8 @@ def process_match(
     if result is not None and on_result is not None:
         on_result(result)
     result_image_path = _save_result_image(result, thumbnails_root / result_image_name(match_start), clips_root)
+    if on_progress is not None:
+        on_progress(RESULT_SCAN_PROGRESS_FRACTION)
 
     written: list[Path] = []
     for i, plan in enumerate(plans, start=1):
@@ -251,5 +276,9 @@ def process_match(
         meta_path = clip_path.with_suffix(".json")
         write_metadata(meta, meta_path)
         written.append(meta_path)
+
+        if on_progress is not None:
+            remaining = 1.0 - RESULT_SCAN_PROGRESS_FRACTION
+            on_progress(RESULT_SCAN_PROGRESS_FRACTION + remaining * i / len(plans))
 
     return written

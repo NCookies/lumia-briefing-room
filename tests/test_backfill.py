@@ -6,6 +6,13 @@ from pathlib import Path
 import pytest
 
 from lumia_briefing_room.pipeline import backfill
+from lumia_briefing_room.pipeline.backfill_progress import (
+    DEFAULT_AVG_GAME_SEC,
+    DEFAULT_SCAN_SPEEDUP,
+    compute_workload,
+    estimate_game_count,
+    overall_fraction,
+)
 from lumia_briefing_room.pipeline.session_scan import GameWindow, ScanCancelled
 
 BASE = datetime(2026, 9, 23, 10, 0, 0, tzinfo=timezone.utc)
@@ -21,12 +28,16 @@ def _win(index: int, start_min: float, length_min: float = 10, *, cut=False, run
 
 
 class FakeScanner:
-    def __init__(self, sessions: dict[str, list[GameWindow]]):
+    def __init__(self, sessions: dict[str, list[GameWindow]], video_seconds: dict[str, float] | None = None):
         self.sessions = sessions
         self.scanned: list[str] = []
+        self.video_seconds = video_seconds or {}
 
     def list_sessions(self):
         return [Path(name) for name in sorted(self.sessions)]
+
+    def session_video_seconds(self, session_dir):
+        return self.video_seconds.get(session_dir.name, 0.0)
 
     def scan(self, session_dir, cancel, on_progress):
         self.scanned.append(session_dir.name)
@@ -43,7 +54,7 @@ class Recorder:
         self.cancel_after = cancel_after
         self.cancel = cancel
 
-    def __call__(self, session_dir, window, staging, cancel):
+    def __call__(self, session_dir, window, staging, cancel, on_progress=None):
         start = window.hud_start_utc
         self.calls.append((session_dir.name, start))
         if start.isoformat() in self.fail_on:
@@ -211,7 +222,7 @@ def test_cancel_in_the_middle_of_a_game_leaves_no_partial_clip(tmp_path: Path):
     scanner = FakeScanner({"bg_1049590_20260923_095917": [_win(1, 0), _win(2, 30)]})
     cancel = threading.Event()
 
-    def cancelling(session_dir, window, staging, cancel_event):
+    def cancelling(session_dir, window, staging, cancel_event, on_progress=None):
         (staging / "half.mp4").write_bytes(b"partial")
         cancel.set()
         raise backfill.GameCancelled()
@@ -258,6 +269,80 @@ def test_progress_covers_scan_and_processing_and_ends_at_one(tmp_path: Path):
     assert fractions[-1] == pytest.approx(1.0)
     assert {r.phase for r in reports} >= {"scan", "process", "done"}
     assert reports[-1].games_done == 2 and reports[-1].games_total == 2
+
+
+def test_scan_progress_is_weighted_by_each_sessions_video_length_not_evenly_by_session_count(tmp_path: Path):
+    """B8: 예전에는 세션 개수로 반씩 나눴다(세션이 길든 짧든 균등) — 이제는 실제 영상 길이 비율이어야 한다."""
+    scanner = FakeScanner(
+        {"bg_a": [], "bg_b": []}, video_seconds={"bg_a": 100.0, "bg_b": 300.0},
+    )
+
+    def scan_two_steps(session_dir, cancel, on_progress):
+        on_progress(0.5, "")
+        on_progress(1.0, "")
+        return []
+
+    scanner.scan = scan_two_steps
+    reports = []
+
+    _run(tmp_path, scanner, Recorder(), progress=reports.append)
+
+    scan_fractions = [r.fraction for r in reports if r.phase == "scan"]
+    total_video = 400.0
+    workload = compute_workload(
+        video_seconds=total_video, speedup=DEFAULT_SCAN_SPEEDUP,
+        game_count=estimate_game_count(total_video), avg_game_sec=DEFAULT_AVG_GAME_SEC,
+    )
+    expected = [
+        overall_fraction(elapsed / DEFAULT_SCAN_SPEEDUP, workload) for elapsed in (50.0, 100.0, 250.0, 400.0)
+    ]
+    assert scan_fractions == pytest.approx(expected)
+
+    delta_a = scan_fractions[1] - scan_fractions[0]  # bg_a 의 나머지 절반(50초 분량)
+    delta_b = scan_fractions[3] - scan_fractions[2]  # bg_b 의 나머지 절반(150초 분량, bg_a 의 3배)
+    assert delta_b == pytest.approx(delta_a * 3, rel=0.02)
+
+
+def test_adaptive_average_updates_after_each_game_and_is_used_for_the_next_ones_progress(
+    tmp_path: Path, monkeypatch
+):
+    """§7 확인 필요 1번: 게임당 평균 처리 시간을 이번 실행에서 실제로 걸린 시간으로 보정한다."""
+    scanner = FakeScanner({"bg_1049590_20260923_095917": [_win(1, 0), _win(2, 30)]})
+    process = Recorder()
+
+    # 첫 게임 처리에 200초가 걸린 것처럼(기본 상수 80초보다 훨씬 길게) 흉내낸다.
+    times = iter([0.0, 200.0, 200.0, 400.0])
+    monkeypatch.setattr(backfill.time, "monotonic", lambda: next(times))
+
+    reports = []
+    _run(tmp_path, scanner, process, progress=reports.append)
+
+    process_reports = [r for r in reports if r.phase == "process"]
+    game2_start = next(r for r in process_reports if r.games_done == 1 and r.fraction < 1.0)
+
+    # 둘째 게임 시작 시점엔 이동 평균이 200초로 보정돼 있어야 한다(영상 길이 0 이라 스캔 작업량도 0,
+    # 분석 작업량 = 게임 2개 × 200초 = 400, 이미 게임 1개 분량 200초를 썼으니 정확히 절반).
+    assert game2_start.fraction == pytest.approx(0.5)
+
+
+def test_game_internal_progress_moves_the_bar_during_a_single_game(tmp_path: Path):
+    """B8 (3): 게임 하나(60~100초)를 처리하는 동안에도 진행률이 여러 지점에서 움직여야 한다."""
+    scanner = FakeScanner({"bg_1049590_20260923_095917": [_win(1, 0)]})
+    base = Recorder()
+
+    def process(session_dir, window, staging, cancel, on_progress=None):
+        if on_progress is not None:
+            on_progress(0.0)
+            on_progress(0.5)
+        return base(session_dir, window, staging, cancel, on_progress)
+
+    reports = []
+    _run(tmp_path, scanner, process, progress=reports.append)
+
+    process_fractions = [r.fraction for r in reports if r.phase == "process"]
+    assert len(process_fractions) >= 3
+    assert process_fractions == sorted(process_fractions)
+    assert process_fractions[0] < process_fractions[-1]
 
 
 def test_collect_known_starts_reads_clips_trash_and_game_records(tmp_path: Path):

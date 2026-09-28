@@ -289,4 +289,82 @@ def test_read_result_failure_is_swallowed_in_both_modes(monkeypatch):
     monkeypatch.setattr(orch, "find_result_after", boom)
 
     assert orch._read_result(Session(), SegmentRange(1, 9), Path("ffmpeg"), None) is None
-    assert orch._read_result(Session(), SegmentRange(1, 9), Path("ffmpeg"), None, search_from=Session.start_utc) is None
+
+
+def test_process_match_reports_progress_through_detection_result_scan_and_cutting(tmp_path, monkeypatch):
+    """B8 (3): process_match 가 검출 프레임 진행률 → 결과 화면 판독 → 클립 컷을 순서대로,
+    뒤로 가지 않게 보고하는지 (실측 비중은 orchestrator.DETECTION_PROGRESS_FRACTION 등 참고)."""
+    from datetime import datetime, timezone
+
+    from lumia_briefing_room.pipeline import orchestrator as orch
+    from lumia_briefing_room.pipeline.clip import CutResult
+
+    class Session:
+        start_utc = datetime(2026, 9, 24, 6, 0, 0, tzinfo=timezone.utc)
+        segment_duration_sec = 3.0
+        width = 2560
+        height = 1440
+        directory = Path("bg_1049590_20260924_060000")
+
+    interval = ci(0.0, 10.0, {"kill"})
+
+    def fake_detect_match(session, seg_range, *, on_progress=None, **kwargs):
+        if on_progress is not None:
+            for i in (1, 2, 4):
+                on_progress(i, 4)
+        return orch.MatchDetection(
+            intervals=[interval], k_final=1, a_final=0, gaps=[],
+            source_incomplete=False, spectator_ranges=[], teammate_deaths=0,
+        )
+
+    monkeypatch.setattr(orch, "detect_match", fake_detect_match)
+    monkeypatch.setattr(orch, "_read_result", lambda *a, **kw: None)
+    monkeypatch.setattr(
+        orch, "cut_clip",
+        lambda *a, **kw: CutResult(segment_start=1, segment_end=4, duration_sec=10.0, source_incomplete=False),
+    )
+    monkeypatch.setattr(orch, "make_thumbnail", lambda *a, **kw: None)
+    monkeypatch.setattr(orch, "write_metadata", lambda meta, path: None)
+
+    seen: list[float] = []
+    written = orch.process_match(
+        Session(), Session.start_utc, Session.start_utc, Config(paths=PathsConfig(clips=tmp_path)),
+        ffmpeg_path=Path("ffmpeg"), clips_dir=tmp_path, on_progress=seen.append,
+    )
+
+    assert len(written) == 1
+    assert seen == sorted(seen)
+    assert seen[-1] == 1.0
+    assert any(0 < v < orch.DETECTION_PROGRESS_FRACTION for v in seen), seen
+    assert orch.DETECTION_PROGRESS_FRACTION in seen
+    assert orch.RESULT_SCAN_PROGRESS_FRACTION in seen
+
+
+def test_process_match_reports_completion_immediately_when_nothing_passes_the_filter(tmp_path, monkeypatch):
+    from datetime import datetime, timezone
+
+    from lumia_briefing_room.pipeline import orchestrator as orch
+
+    class Session:
+        start_utc = datetime(2026, 9, 24, 6, 0, 0, tzinfo=timezone.utc)
+        segment_duration_sec = 3.0
+        width = 2560
+        height = 1440
+        directory = Path("bg_1049590_20260924_060000")
+
+    def fake_detect_match(session, seg_range, *, on_progress=None, **kwargs):
+        return orch.MatchDetection(
+            intervals=[], k_final=0, a_final=0, gaps=[],
+            source_incomplete=False, spectator_ranges=[], teammate_deaths=0,
+        )
+
+    monkeypatch.setattr(orch, "detect_match", fake_detect_match)
+
+    seen: list[float] = []
+    written = orch.process_match(
+        Session(), Session.start_utc, Session.start_utc, Config(paths=PathsConfig(clips=tmp_path)),
+        ffmpeg_path=Path("ffmpeg"), clips_dir=tmp_path, on_progress=seen.append,
+    )
+
+    assert written == []
+    assert seen == [1.0]
