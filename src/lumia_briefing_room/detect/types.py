@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import numpy as np
+
 
 @dataclass(frozen=True)
 class FrameState:
@@ -47,6 +49,15 @@ class CombatInterval:
     game_day: int | None = None
     ultimate_delta: float | None = None
     team_combat_unreliable: bool = False
+
+
+@dataclass(frozen=True, eq=False)
+class PortraitCrops:
+    """캐릭터 선택/팀 소개 화면(SPEC §2.10·§2.12)에서 자른 초상화 3장. 이미지라 값 비교는 하지 않는다."""
+
+    me: np.ndarray
+    teammate1: np.ndarray
+    teammate2: np.ndarray
 
 
 @dataclass(frozen=True)

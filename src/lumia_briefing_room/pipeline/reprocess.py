@@ -69,6 +69,18 @@ def _delete_clip_files(meta_path: Path) -> None:
     meta_path.unlink(missing_ok=True)
 
 
+def _apply_locked_result(written: list[Path], locked_result: dict | None) -> None:
+    """사용자가 `manual` 로 잠근 순위·결과는 다시 분석해 새로 만든 클립에도 그대로 이어간다(SPEC §2.13 수동 보정)."""
+    for path in written:
+        try:
+            meta = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        meta["matchResult"] = locked_result
+        meta["matchResultSource"] = "manual"
+        path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def reprocess_game(
     *,
     clips_dir: Path,
@@ -88,6 +100,11 @@ def reprocess_game(
     old = _game_meta_paths(clips_dir, ref)
     if not old:
         raise ReprocessError("이 게임의 클립을 찾을 수 없습니다")
+
+    old_metas = [json.loads(p.read_text(encoding="utf-8")) for p in old]
+    locked_result = next(
+        (m.get("matchResult") for m in old_metas if m.get("matchResultSource") == "manual"), None
+    )
 
     session_dir = recording_root / ref.session_name
     if not session_dir.exists():
@@ -126,4 +143,7 @@ def reprocess_game(
         log.info("라벨 이관: %s", report)
     except Exception:
         log.exception("라벨 이관에 실패했다 - 새 클립은 라벨 없이 둔다")
+
+    if locked_result is not None:
+        _apply_locked_result(written, locked_result)
     return written

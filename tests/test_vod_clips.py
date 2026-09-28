@@ -95,9 +95,9 @@ def test_cut_vod_clip_can_drop_audio(vod_file, tmp_path):
 def result_screen():
     return ResultScreen(
         placement=2, total=7, match_type="rank", match_label="랭크", outcome="실험 종료",
-        nickname="스트리머", character="마르티나", character_raw="MARTIN",
+        nickname="스트리머",
         stats={"tk": 15, "kills": 6, "deaths": 1, "assists": 6},
-        teammates=[{"nickname": "a", "character": "레온"}], image=None,
+        image=None,
     )
 
 
@@ -137,7 +137,7 @@ def test_vod_metadata_shares_the_steam_clip_fields_the_ui_reads():
     assert meta["pvpScore"] == 1.0 and meta["pvpSignals"] == ["kill_delta"]
     assert meta["gameDay"] == 3 and meta["dayNight"] == "day"
     assert meta["phaseIndex"] == 4 and meta["reviveCost"] == "credit"
-    assert meta["myCharacter"] == "마르티나" and meta["teamCharacters"] == ["레온"]
+    assert meta["myCharacter"] is None and meta["teamCharacters"] == []
     assert meta["matchKills"] == 6 and meta["matchAssists"] == 6
     assert meta["matchResult"]["placement"] == 2
     assert meta["userLabel"] is None and meta["pinned"] is False and meta["deletedAt"] is None
@@ -156,3 +156,21 @@ def test_vod_metadata_has_a_unique_clip_uid():
     first, second = build(), build()
     assert len(first["clipUid"]) == 32 and "-" not in first["clipUid"]
     assert first["clipUid"] != second["clipUid"]
+
+
+def test_vod_metadata_carries_portrait_paths_and_defaults_to_empty():
+    meta = build()
+    assert meta["myCharacterPortraitPath"] is None
+    assert meta["teammatePortraitPaths"] == []
+
+    meta = build(
+        my_character_portrait_path=".thumbs/x_portrait_me.jpg",
+        teammate_portrait_paths=[".thumbs/x_portrait_teammate1.jpg"],
+    )
+    assert meta["myCharacterPortraitPath"] == ".thumbs/x_portrait_me.jpg"
+    assert meta["teammatePortraitPaths"] == [".thumbs/x_portrait_teammate1.jpg"]
+
+
+def test_vod_metadata_match_result_source_defaults_to_none_and_can_be_locked():
+    assert build()["matchResultSource"] is None
+    assert build(match_result_source="manual")["matchResultSource"] == "manual"

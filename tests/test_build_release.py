@@ -10,7 +10,6 @@ import build_release  # noqa: E402
 
 def _fake_tree(root: Path) -> Path:
     for rel in [
-        "data/characters.json",
         "data/templates/digits/2560x1440.npz",
         "data/templates/regions/2560x1440.npz",
         "data/templates/days/2560x1440.npz",
@@ -37,7 +36,7 @@ def test_data_specs_cover_every_runtime_resource(tmp_path: Path):
     specs = build_release.data_specs(root)
     destinations = {dest for _, dest in specs}
 
-    assert "data" in destinations
+    assert "data/templates/digits" in destinations
     assert "lumia_briefing_room/profiles/builtin" in destinations
     assert "frontend/dist" in destinations
     assert "docs" in destinations
@@ -166,7 +165,7 @@ def test_verify_bundle_reports_what_pyinstaller_dropped(tmp_path: Path):
 
     problems = build_release.verify_bundle(out)
 
-    assert any("characters.json" in p for p in problems)
+    assert any("templates/digits" in p for p in problems)
     assert any("ffmpeg" in p for p in problems)
 
 
@@ -285,7 +284,6 @@ def test_data_specs_never_include_the_labeled_sample_images_or_labels(tmp_path: 
     assert root / "data" not in sources
     assert not any("_samples" in str(s) or s.suffix == ".jsonl" for s in sources)
     assert (str(root / "data" / "templates" / "days" / "2560x1440.npz"), "data/templates/days") in specs
-    assert (str(root / "data" / "characters.json"), "data") in specs
 
 
 def test_pystray_is_collected_as_loose_py_files_for_lgpl_replaceability(tmp_path: Path):

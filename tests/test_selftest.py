@@ -14,7 +14,6 @@ def test_check_records_ok_and_detail():
 
 def test_resource_checks_pass_in_the_source_tree():
     results = _by_name(selftest.check_resources())
-    assert results["캐릭터 이름표"].ok is True
     assert results["K/A 숫자 본보기"].ok is True
     assert results["지역명 본보기"].ok is True
     assert results["일차 본보기"].ok is True
@@ -24,9 +23,8 @@ def test_resource_checks_fail_loudly_when_the_bundle_is_empty(tmp_path: Path, mo
     monkeypatch.setenv("LUMIA_RESOURCE_DIR", str(tmp_path))
     results = _by_name(selftest.check_resources())
 
-    assert results["캐릭터 이름표"].ok is False
     assert results["K/A 숫자 본보기"].ok is False
-    assert str(tmp_path) in results["캐릭터 이름표"].detail
+    assert str(tmp_path) in results["K/A 숫자 본보기"].detail
 
 
 def test_frontend_check_reports_missing_build(tmp_path: Path, monkeypatch):

@@ -54,7 +54,10 @@
     "pinned": "화면 상태",
     "deletedAt": "휴지통 상태",
     "teamCharacters": "팀원 정보 전송 안 함",
-    "matchResult": "닉네임·팀원·이미지 경로 포함"
+    "matchResult": "닉네임·이미지 경로 포함",
+    "myCharacterPortraitPath": "경로 원문(이미지, 로컬 전용 — plan-ui.md §0 캐릭터 초상화)",
+    "teammatePortraitPaths": "경로 원문(이미지, 로컬 전용 — plan-ui.md §0 캐릭터 초상화)",
+    "matchResultSource": "화면 상태(수동 보정 잠금 여부 — plan-ui.md §0 판독값 수동 보정)"
   },
   "appMissing": {
     "pvpSignalValues": "신호별 수치는 앱이 아직 저장하지 않음(D10 에서 추가)"

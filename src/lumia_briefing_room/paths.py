@@ -53,10 +53,6 @@ def data_dir() -> Path:
     return resource_dir() / "data"
 
 
-def characters_path() -> Path:
-    return data_dir() / "characters.json"
-
-
 def templates_dir(kind: str) -> Path:
     return data_dir() / "templates" / kind
 

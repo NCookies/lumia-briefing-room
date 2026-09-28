@@ -1,5 +1,5 @@
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
@@ -75,6 +75,9 @@ class ClipMetadata:
     match_result: dict | None = None
     match_end_utc: str | None = None
     clip_uid: str | None = None
+    my_character_portrait_path: str | None = None
+    teammate_portrait_paths: list[str] = field(default_factory=list)
+    match_result_source: str | None = None
 
 
 def match_result_dict(result: ResultScreen | None, image_path: str | None = None) -> dict | None:
@@ -87,21 +90,11 @@ def match_result_dict(result: ResultScreen | None, image_path: str | None = None
         "total": result.total,
         "outcome": result.outcome,
         "nickname": result.nickname,
-        "character": result.character,
-        "characterRaw": result.character_raw,
     }
     data.update(result.stats or {})
-    if result.teammates is not None:
-        data["teammates"] = result.teammates
     if image_path:
         data["imagePath"] = image_path
     return data
-
-
-def _teammate_names(result: ResultScreen | None) -> list[str]:
-    if result is None:
-        return []
-    return [t["character"] for t in result.teammates or [] if t.get("character")]
 
 
 def build_metadata(
@@ -124,6 +117,9 @@ def build_metadata(
     match_result: ResultScreen | None = None,
     result_image_path: str | None = None,
     match_end_utc: datetime | None = None,
+    my_character_portrait_path: str | None = None,
+    teammate_portrait_paths: list[str] | None = None,
+    match_result_source: str | None = None,
 ) -> ClipMetadata:
     day_night = interval.day_night
     phase = phase_index(game_day, day_night) if game_day is not None and day_night is not None else None
@@ -163,8 +159,8 @@ def build_metadata(
         day_night=day_night,
         phase_index=phase,
         revive_cost=revive_cost(phase) if phase is not None else None,
-        my_character=my_character or (match_result.character if match_result else None),
-        team_characters=team_characters or _teammate_names(match_result),
+        my_character=my_character,
+        team_characters=team_characters or [],
         pinned=False,
         deleted_at=None,
         match_kills=match_kills,
@@ -174,6 +170,9 @@ def build_metadata(
         match_result=match_result_dict(match_result, result_image_path),
         match_end_utc=_isoformat_z(match_end_utc) if match_end_utc else None,
         clip_uid=new_clip_uid(),
+        my_character_portrait_path=my_character_portrait_path,
+        teammate_portrait_paths=teammate_portrait_paths or [],
+        match_result_source=match_result_source,
     )
 
 
