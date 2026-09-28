@@ -482,6 +482,39 @@ def test_cleanup_does_nothing_when_disabled(client):
     assert (clips / "old.json").exists()
 
 
+def test_cleanup_preview_endpoint_returns_reason_and_due_date(client):
+    from lumia_briefing_room.pipeline.cleanup_registry import registry as cleanup_preview_registry
+
+    clips = client.app.state.clips_dir_for_test
+    _write_clip(clips, "old", matchStartUtc="2020-01-01T00:00:00Z")
+    _write_clip(clips, "new", matchStartUtc="2999-01-01T00:00:00Z")
+    _enable_cleanup(client, maxAgeDays=30)
+    cleanup_preview_registry.recompute_now()  # 디바운스를 기다리지 않고 바로 계산
+
+    resp = client.get("/api/cleanup/preview")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body) == {"old"}
+    assert body["old"]["reason"] == "age"
+    assert body["old"]["dueAt"] is not None
+
+
+def test_cleanup_preview_endpoint_recomputes_after_pin_removes_a_clip(client):
+    from lumia_briefing_room.pipeline.cleanup_registry import registry as cleanup_preview_registry
+
+    clips = client.app.state.clips_dir_for_test
+    _write_clip(clips, "old", matchStartUtc="2020-01-01T00:00:00Z")
+    _enable_cleanup(client, maxAgeDays=30)
+    cleanup_preview_registry.recompute_now()
+    assert set(client.get("/api/cleanup/preview").json()) == {"old"}
+
+    client.patch("/api/clips/old", json={"pinned": True})
+    cleanup_preview_registry.recompute_now()
+
+    assert client.get("/api/cleanup/preview").json() == {}
+
+
 def test_retention_limits_can_be_cleared_with_null(client):
     client.put("/api/config", json={"retention": {"maxAgeDays": 30}})
 

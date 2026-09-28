@@ -3,7 +3,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 
 from lumia_briefing_room.config import RetentionConfig
-from lumia_briefing_room.pipeline.cleanup import cleanup_loop, plan_cleanup, run_cleanup
+from lumia_briefing_room.pipeline.cleanup import cleanup_loop, cleanup_preview, plan_cleanup, run_cleanup
 
 NOW = datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc)
 
@@ -190,3 +190,46 @@ def test_make_cleanup_runner_reads_the_current_config_file_each_time(tmp_path):
 
     assert names(plan.to_delete) == ["old"]
     assert not (clips / "old.json").exists()
+
+
+def test_cleanup_preview_tags_age_reason_with_due_date(tmp_path):
+    clips = tmp_path / "clips"
+    write_clip(clips, "old", days_ago=40)
+    write_clip(clips, "fresh", days_ago=2)
+
+    preview = cleanup_preview(clips, cfg(max_age_days=30), now=NOW)
+
+    assert set(preview) == {"old"}
+    assert preview["old"]["reason"] == "age"
+    assert preview["old"]["dueAt"] == iso(10)  # matchStartUtc(40일 전) + 30일 = 10일 전
+
+
+def test_cleanup_preview_count_and_size_reasons_have_no_due_date(tmp_path):
+    clips = tmp_path / "clips"
+    write_clip(clips, "a", days_ago=3)
+    write_clip(clips, "b", days_ago=2)
+    write_clip(clips, "c", days_ago=1)
+
+    preview = cleanup_preview(clips, cfg(max_count=2), now=NOW)
+
+    assert set(preview) == {"a"}
+    assert preview["a"]["reason"] == "count"
+    assert preview["a"]["dueAt"] is None
+
+
+def test_cleanup_preview_disabled_returns_empty(tmp_path):
+    clips = tmp_path / "clips"
+    write_clip(clips, "old", days_ago=400)
+
+    preview = cleanup_preview(clips, RetentionConfig(auto_clean_enabled=False, max_age_days=1), now=NOW)
+
+    assert preview == {}
+
+
+def test_cleanup_preview_protected_clips_are_not_listed(tmp_path):
+    clips = tmp_path / "clips"
+    write_clip(clips, "old_pinned", days_ago=40, pinned=True)
+
+    preview = cleanup_preview(clips, cfg(max_age_days=30), now=NOW)
+
+    assert preview == {}

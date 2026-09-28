@@ -17,6 +17,7 @@ from lumia_briefing_room.detect.types import PortraitCrops
 from lumia_briefing_room.pipeline.filters import apply_filter
 from lumia_briefing_room.pipeline.metadata import build_metadata, write_metadata
 from lumia_briefing_room.pipeline.clip_assets import stored_asset_path
+from lumia_briefing_room.pipeline.cleanup_registry import registry as cleanup_preview_registry
 from lumia_briefing_room.pipeline.portrait_scan import (
     PORTRAIT_SLOTS,
     find_match_portraits,
@@ -318,4 +319,6 @@ def process_match(
             remaining = 1.0 - RESULT_SCAN_PROGRESS_FRACTION
             on_progress(RESULT_SCAN_PROGRESS_FRACTION + remaining * i / len(plans))
 
+    if written:
+        cleanup_preview_registry.notify_clips_changed()
     return written

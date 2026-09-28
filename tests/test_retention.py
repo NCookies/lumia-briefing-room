@@ -87,3 +87,41 @@ def test_select_for_auto_clean_no_limits_set_returns_nothing():
     cfg = RetentionConfig(auto_clean_enabled=True)
     now = datetime(2026, 1, 1, tzinfo=UTC)
     assert select_for_auto_clean(metas, cfg, now=lambda: now) == []
+
+
+def test_select_for_auto_clean_tags_reason_age():
+    metas = [_meta("a", age_days=40)]
+    cfg = RetentionConfig(auto_clean_enabled=True, max_age_days=30)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    selected = select_for_auto_clean(metas, cfg, now=lambda: now)
+    assert selected[0]["_reason"] == "age"
+
+
+def test_select_for_auto_clean_tags_reason_count():
+    metas = [_meta(str(i), age_days=i) for i in range(5)]
+    cfg = RetentionConfig(auto_clean_enabled=True, max_count=3)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    selected = select_for_auto_clean(metas, cfg, now=lambda: now)
+    assert {m["_reason"] for m in selected} == {"count"}
+
+
+def test_select_for_auto_clean_tags_reason_size():
+    metas = [
+        _meta("oldest", age_days=30, size_mb=600),
+        _meta("middle", age_days=20, size_mb=600),
+        _meta("newest", age_days=10, size_mb=600),
+    ]
+    cfg = RetentionConfig(auto_clean_enabled=True, max_total_gb=1.0)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    selected = select_for_auto_clean(metas, cfg, now=lambda: now)
+    assert {m["_reason"] for m in selected} == {"size"}
+
+
+def test_select_for_auto_clean_age_reason_takes_priority_over_count():
+    """나이·개수 기준 모두 걸리는 클립은 먼저 평가되는 나이 기준 이유를 받는다(중복 선정 방지)."""
+    metas = [_meta("a", age_days=40)]
+    cfg = RetentionConfig(auto_clean_enabled=True, max_age_days=30, max_count=0)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    selected = select_for_auto_clean(metas, cfg, now=lambda: now)
+    assert len(selected) == 1
+    assert selected[0]["_reason"] == "age"

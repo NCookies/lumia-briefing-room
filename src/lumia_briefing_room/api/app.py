@@ -50,6 +50,7 @@ from lumia_briefing_room.pipeline.game_records import (
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for
 from lumia_briefing_room.pipeline.label_note import normalize_label_note
 from lumia_briefing_room.pipeline.cleanup import plan_cleanup, remove_orphan_result_images, run_cleanup
+from lumia_briefing_room.pipeline.cleanup_registry import registry as cleanup_preview_registry
 from lumia_briefing_room.pipeline.clip_assets import (
     resolve_character_portrait,
     resolve_result_image,
@@ -250,6 +251,8 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         if "matchResultSource" in body and body["matchResultSource"] is None:
             meta["matchResultSource"] = None
         clip.meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+        if "pinned" in body:
+            cleanup_preview_registry.notify_clips_changed()
         return meta | {"id": clip_id}
 
     @app.delete("/api/clips/{clip_id}")
@@ -619,6 +622,15 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     def get_activity():
         return {"tasks": activity.registry.snapshot()}
 
+    @app.get("/api/cleanup/preview")
+    def get_cleanup_preview():
+        """다음 자동 정리 때 지워질 클립의 이유·예정 시각. (plan-ui.md §0 "자동 정리 삭제 예정 표시")
+
+        화면이 매번 요청할 때 dry-run 을 새로 돌리지 않고, cleanup_preview_registry 가
+        클립 변경 시점마다 미리 계산해 둔 결과를 그대로 읽기만 한다.
+        """
+        return cleanup_preview_registry.snapshot()
+
     @app.get("/api/app-info")
     def get_app_info():
         return {
@@ -647,6 +659,8 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         if "autoStart" in (body.get("ui") or {}):
             # 설정 파일만 고치면 다음 실행 때까지 레지스트리가 그대로라, 옵션에서 끈 뒤에도 한 번 더 자동 실행된다.
             autostart.apply_setting(new_cfg)
+        if "retention" in body:
+            cleanup_preview_registry.notify_clips_changed()
         return dataclass_to_camel_dict(new_cfg)
 
     move_job: dict = {"state": "idle", "doneBytes": 0, "totalBytes": 0, "moved": 0, "message": ""}
@@ -716,6 +730,9 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     register_admin_routes(app, current_config=current_config)
     register_update_routes(app)
     register_backfill_routes(app, current_config=current_config)
+
+    cleanup_preview_registry.configure(lambda: (resolve_paths(current_config().paths).clips, current_config().retention))
+    cleanup_preview_registry.recompute_now()
     return app
 
 

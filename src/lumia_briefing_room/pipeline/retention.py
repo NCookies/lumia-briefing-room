@@ -61,6 +61,7 @@ def select_for_auto_clean(
     if cfg.max_age_days is not None:
         for c in list(remaining):
             if c.age_days > cfg.max_age_days:
+                c.meta["_reason"] = "age"
                 selected.append(c)
                 remaining.remove(c)
 
@@ -71,6 +72,7 @@ def select_for_auto_clean(
             if excess <= 0:
                 break
             if c not in selected:
+                c.meta["_reason"] = "count"
                 selected.append(c)
                 if c in remaining:
                     remaining.remove(c)
@@ -83,6 +85,7 @@ def select_for_auto_clean(
         for c in kept:
             if total <= max_bytes:
                 break
+            c.meta["_reason"] = "size"
             selected.append(c)
             total -= c.size_bytes
 

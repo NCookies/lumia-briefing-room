@@ -15,6 +15,7 @@ from pathlib import Path
 
 from send2trash import send2trash as _send2trash
 
+from lumia_briefing_room.pipeline.cleanup_registry import registry as cleanup_preview_registry
 from lumia_briefing_room.pipeline.clip_assets import resolve_thumbnail
 from lumia_briefing_room.pipeline.game_records import record_game
 from lumia_briefing_room.pipeline.label_archive import archive_if_labeled
@@ -78,3 +79,4 @@ def delete_clip(
         permanently_delete(files)
     else:
         send_to_recycle_bin(files)
+    cleanup_preview_registry.notify_clips_changed()

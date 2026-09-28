@@ -11,7 +11,7 @@ import logging
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from lumia_briefing_room.api.clips import scan_clips, to_summary_dict
@@ -61,6 +61,34 @@ def plan_cleanup(clips_dir: Path, cfg: RetentionConfig, *, now: datetime | None 
     to_delete = [e["_path"] for e in selected]
     freed = sum(e["_size_bytes"] for e in selected)
     return CleanupPlan(to_delete, freed)
+
+
+def cleanup_preview(clips_dir: Path, cfg: RetentionConfig, *, now: datetime | None = None) -> dict[str, dict]:
+    """자동 정리 대상이 될 클립의 이유·예정 시각을 미리 계산한다. (plan-ui.md §0 "자동 정리 삭제 예정 표시")
+
+    실제 정리(run_cleanup)와 같은 선정 함수(select_for_auto_clean)를 그대로 써서 표시용 근사를
+    만들지 않는다. 나이 기준은 예정 시각(matchStartUtc + maxAgeDays)을 같이 돌려주고,
+    개수·용량 기준은 클립 집합이 바뀌면 대상이 달라지므로 예정 시각이 없다.
+    """
+    now = now or datetime.now(timezone.utc)
+    if not cfg.auto_clean_enabled:
+        return {}
+
+    entries = []
+    for clip in scan_clips(clips_dir):
+        entry = to_summary_dict(clip)
+        entry["_created_at"] = _game_time(clip.meta, clip.created_at)
+        entry["_clip_id"] = clip.id
+        entries.append(entry)
+
+    selected = select_for_auto_clean(entries, cfg, now=lambda: now)
+    preview: dict[str, dict] = {}
+    for e in selected:
+        due_at = None
+        if e["_reason"] == "age" and cfg.max_age_days is not None:
+            due_at = (e["_created_at"] + timedelta(days=cfg.max_age_days)).isoformat().replace("+00:00", "Z")
+        preview[e["_clip_id"]] = {"reason": e["_reason"], "dueAt": due_at}
+    return preview
 
 
 def remove_orphan_result_images(clips_dir: Path) -> list[Path]:
