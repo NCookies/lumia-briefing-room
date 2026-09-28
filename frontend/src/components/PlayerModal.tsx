@@ -104,19 +104,13 @@ export function PlayerModal({
     'fixed top-1/2 z-[60] flex h-24 w-14 -translate-y-1/2 items-center justify-center rounded-xl bg-zinc-800/80 text-4xl text-zinc-100 hover:bg-zinc-600 disabled:cursor-default disabled:opacity-20 disabled:hover:bg-zinc-800/80'
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex overflow-y-auto bg-black/90 p-2"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 flex overflow-y-auto bg-black/90 p-2">
       <button
         type="button"
         aria-label="이전 클립"
         className={`${NAV} left-2`}
         disabled={!hasPrev}
-        onClick={(e) => {
-          e.stopPropagation()
-          onIndexChange(index - 1)
-        }}
+        onClick={() => onIndexChange(index - 1)}
       >
         ‹
       </button>
@@ -125,17 +119,13 @@ export function PlayerModal({
         aria-label="다음 클립"
         className={`${NAV} right-2`}
         disabled={!hasNext}
-        onClick={(e) => {
-          e.stopPropagation()
-          onIndexChange(index + 1)
-        }}
+        onClick={() => onIndexChange(index + 1)}
       >
         ›
       </button>
       <div
         className="m-auto flex flex-col gap-2"
         style={{ width: playerWidthCss({ labeling, trimming }) }}
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex flex-wrap items-center justify-between gap-2 text-zinc-100">
           <div className="flex flex-wrap items-center gap-2">
