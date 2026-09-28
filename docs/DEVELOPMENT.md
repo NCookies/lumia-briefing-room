@@ -109,6 +109,8 @@ python -m lumia_briefing_room.cli.app \
   [--k-templates PATH] [--a-templates PATH] [--hwaccel d3d11va] [--open-ui]
 ```
 
+`--game-mode` 를 생략하면(기본값) 검출 결과(`Phase N` vs `N일 차` 판독 횟수)로 자동 판별한다(plan.md §10 C1-b) — 명시하면 그 값을 강제한다.
+
 `--open-ui` 를 주지 않으면 UI 는 자동으로 열리지 않고 트레이 메뉴 "열기" 로 연다
 (`ui.startMinimized=false` 로 설정해도 시작 시 자동으로 열린다).
 `--start-server` 는 브라우저는 열지 않고 열람 서버만 먼저 띄운다 — 앱 안 업데이트 뒤 설치기가 앱을 다시 실행할 때 쓰며(`installer/lumia.iss` 의 `/RELAUNCH=1` 항목), 열려 있던 탭이 자동으로 새로고침돼 되살아나게 한다.
