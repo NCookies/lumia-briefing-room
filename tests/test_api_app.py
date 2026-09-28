@@ -664,6 +664,38 @@ def test_reprocess_rejects_unknown_clip_and_missing_setup(client, reprocess_env,
     assert client.post("/api/games/reprocess", json={"clipId": "a"}).status_code == 503
 
 
+def test_reprocess_registers_an_activity_task_while_running(client, reprocess_env, monkeypatch):
+    """plan-ui.md §0 "다시 분석 중 진행 표시를 영상 파일 탭 수준으로 통일" — 헤더 공통 배너(activity.py)에도 뜬다."""
+    import threading
+    import time
+
+    from lumia_briefing_room.activity import registry
+
+    release = threading.Event()
+    seen: dict = {}
+
+    def fake(**kw):
+        seen["tasks"] = registry.snapshot()
+        release.wait(5)
+        return []
+
+    monkeypatch.setattr(reprocess_env, "reprocess_game", fake)
+
+    resp = client.post("/api/games/reprocess", json={"clipId": "a"})
+    assert resp.status_code == 202
+
+    deadline = time.time() + 3
+    while "tasks" not in seen and time.time() < deadline:
+        time.sleep(0.02)
+
+    assert seen.get("tasks") and seen["tasks"][0]["kind"] == "reprocess"
+    assert "다시 분석" in seen["tasks"][0]["label"]
+
+    release.set()
+    _wait_for_job(client, resp.json()["key"])
+    assert registry.snapshot() == []
+
+
 def test_deleting_a_labeled_clip_forever_keeps_its_label_and_evidence(client):
     clips = client.app.state.clips_dir_for_test
     _write_clip(clips, "a", userLabel="pvp", pvpSignals=["kill_delta"])
