@@ -16,9 +16,8 @@ from fastapi import FastAPI, HTTPException
 from lumia_briefing_room.api.clips import scan_clips
 from lumia_briefing_room.api.export import list_roots, list_subdirs, parent_of
 from lumia_briefing_room.config import Config, discover_ffmpeg, resolve_paths
-from lumia_briefing_room.pipeline.clip_assets import resolve_thumbnail
-from lumia_briefing_room.pipeline.label_archive import archive_dir_for, archive_if_labeled
-from lumia_briefing_room.pipeline.retention import restore_clip, trash_clip
+from lumia_briefing_room.pipeline.delete_helper import delete_clip
+from lumia_briefing_room.pipeline.label_archive import archive_dir_for
 from lumia_briefing_room.pipeline.vod_analyze import VodCancelled, VodProgress, analyze_vod
 from lumia_briefing_room.pipeline.vod_dates import is_valid_iso_date, resolve_video_date
 from lumia_briefing_room.pipeline.vod_store import load_index, vod_id
@@ -137,7 +136,7 @@ def register_vod_routes(
         status = index.get("status", "new")
         return "interrupted" if status == "analyzing" else status
 
-    def entry_for(vid: str, path: Path, index: dict | None, active: dict, trashed: dict, cfg: Config) -> dict:
+    def entry_for(vid: str, path: Path, index: dict | None, active: dict, cfg: Config) -> dict:
         exists = path.exists()
         stat = path.stat() if exists else None
         size = stat.st_size if stat else (index or {}).get("size")
@@ -171,7 +170,6 @@ def register_vod_routes(
             "games": (index or {}).get("games", []),
             "clipCount": active.get(vid, {}).get("count", 0),
             "clipBytes": active.get(vid, {}).get("bytes", 0),
-            "trashedCount": trashed.get(vid, {}).get("count", 0),
         }
 
     def collect() -> dict[str, tuple[Path, dict | None]]:
@@ -194,9 +192,9 @@ def register_vod_routes(
         with lock:
             cfg = current_config()
             base = root()
-            active, trashed = clip_stats(base), clip_stats(base / ".trash")
+            active = clip_stats(base)
             return [
-                entry_for(vid, path, index, active, trashed, cfg)
+                entry_for(vid, path, index, active, cfg)
                 for vid, (path, index) in sorted(collect().items(), key=lambda kv: kv[1][0].name.casefold())
             ]
 
@@ -281,36 +279,15 @@ def register_vod_routes(
     def vod_clip_paths(directory: Path, vid: str) -> list:
         return [c for c in scan_clips(directory) if c.meta.get("vodId") == vid]
 
-    @app.post("/api/vods/{vid}/trash")
-    def trash_vod(vid: str):
-        with lock:
-            base = root()
-            clips = vod_clip_paths(base, vid)
-            for clip in clips:
-                trash_clip(clip.meta_path, base / ".trash")
-        return {"id": vid, "count": len(clips)}
-
-    @app.post("/api/vods/{vid}/restore")
-    def restore_vod(vid: str):
-        with lock:
-            base = root()
-            clips = vod_clip_paths(base / ".trash", vid)
-            for clip in clips:
-                restore_clip(clip.meta_path, base)
-        return {"id": vid, "count": len(clips)}
-
     @app.delete("/api/vods/{vid}/clips")
     def delete_vod_clips(vid: str):
         with lock:
             base = root()
-            clips = vod_clip_paths(base / ".trash", vid)
+            clips = vod_clip_paths(base, vid)
+            archive_dir = archive_dir_for(base)
+            mode = current_config().ui.delete_mode
             for clip in clips:
-                archive_if_labeled(clip.meta_path, archive_dir_for(base))
-                for f in (clip.meta_path.with_suffix(".mp4"), clip.meta_path):
-                    f.unlink(missing_ok=True)
-                thumb = resolve_thumbnail(clip.meta_path, clip.meta)
-                if thumb is not None:
-                    thumb.unlink(missing_ok=True)
+                delete_clip(clip.meta_path, mode=mode, archive_dir=archive_dir)
         return {"id": vid, "count": len(clips)}
 
     @app.get("/api/fs/videos")

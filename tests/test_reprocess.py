@@ -24,7 +24,7 @@ def write_clip(root: Path, clip_id: str, *, start=REF.match_start, **meta):
     root.mkdir(parents=True, exist_ok=True)
     (root / f"{clip_id}.mp4").write_bytes(b"old-" + clip_id.encode())
     data = {"title": clip_id, "sessionDir": REF.session_name, "matchStartUtc": start, "thumbnailPath": None,
-            "deletedAt": None, **meta}
+            **meta}
     (root / f"{clip_id}.json").write_text(json.dumps(data), encoding="utf-8")
 
 
@@ -41,12 +41,12 @@ def fake_session(directory):
     return SimpleNamespace(directory=directory, start_utc=SESSION_START, segment_duration_sec=3.0)
 
 
-def call(tmp_path, *, process, boundaries=None, root=None, **kw):
+def call(tmp_path, *, process, boundaries=None, root=None, cfg=None, **kw):
     return reprocess_game(
-        clips_dir=tmp_path / "clips", trash_dir=tmp_path / "clips" / ".trash", ref=REF,
+        clips_dir=tmp_path / "clips", ref=REF,
         recording_root=root or make_recording(tmp_path), boundaries=boundaries if boundaries is not None
         else [MatchBoundary(start_utc=START, end_utc=END)],
-        cfg=Config(), ffmpeg_path=Path("ffmpeg"), process=process, load_session=fake_session, **kw,
+        cfg=cfg or Config(), ffmpeg_path=Path("ffmpeg"), process=process, load_session=fake_session, **kw,
     )
 
 
@@ -59,7 +59,7 @@ def test_find_match_end_matches_the_start_within_a_couple_of_seconds():
     assert find_match_end(START, [MatchBoundary(START, None)]) is None
 
 
-def test_reprocess_moves_old_clips_to_trash_then_runs_detection_for_the_logged_match(tmp_path):
+def test_reprocess_writes_new_clips_into_a_staging_dir_then_deletes_old_ones_on_success(tmp_path):
     clips = tmp_path / "clips"
     write_clip(clips, "a_01")
     write_clip(clips, "a_02")
@@ -68,18 +68,18 @@ def test_reprocess_moves_old_clips_to_trash_then_runs_detection_for_the_logged_m
 
     def process(session, start, end, cfg, *, ffmpeg_path, clips_dir):
         calls.append((start, end, clips_dir))
+        assert clips_dir != clips  # 실제 클립 폴더가 아니라 스테이징에 쓴다
         write_clip(clips_dir, "a_01", title="새 클립")
         return [clips_dir / "a_01.json"]
 
-    written = call(tmp_path, process=process)
+    written = call(tmp_path, process=process, cfg=Config())
 
     assert written == [clips / "a_01.json"]
-    assert calls == [(START, END, clips)]
+    assert calls[0][0] == START and calls[0][1] == END
     assert json.loads((clips / "a_01.json").read_text(encoding="utf-8"))["title"] == "새 클립"
-    trashed = json.loads((clips / ".trash" / "a_01.json").read_text(encoding="utf-8"))
-    assert trashed["title"] == "a_01" and trashed["deletedAt"] is not None
-    assert (clips / ".trash" / "a_02.json").exists()
+    assert not (clips / "a_02.json").exists()  # 기존 클립은 삭제됐다(기본: 휴지통)
     assert (clips / "other_01.json").exists()
+    assert not any((tmp_path / "clips" / ".staging").glob("**/*"))
 
 
 def test_reprocess_prefers_the_recorded_match_end_over_the_log(tmp_path):
@@ -88,12 +88,17 @@ def test_reprocess_prefers_the_recorded_match_end_over_the_log(tmp_path):
     write_clip(clips, "a_01", matchEndUtc=recorded_end)
     seen = []
 
-    call(tmp_path, process=lambda s, st, en, cfg, **kw: seen.append(en) or [], boundaries=[])
+    def process(session, start, end, cfg, *, ffmpeg_path, clips_dir):
+        seen.append(end)
+        write_clip(clips_dir, "a_01")
+        return [clips_dir / "a_01.json"]
+
+    call(tmp_path, process=process, boundaries=[])
 
     assert seen == [datetime(2026, 9, 21, 11, 23, 14, tzinfo=timezone.utc)]
 
 
-def test_reprocess_restores_the_old_clips_and_removes_partial_new_ones_when_processing_fails(tmp_path):
+def test_reprocess_keeps_old_clips_untouched_when_processing_fails(tmp_path):
     clips = tmp_path / "clips"
     write_clip(clips, "a_01")
     write_clip(clips, "a_02")
@@ -108,17 +113,17 @@ def test_reprocess_restores_the_old_clips_and_removes_partial_new_ones_when_proc
     assert json.loads((clips / "a_01.json").read_text(encoding="utf-8"))["title"] == "a_01"
     assert (clips / "a_01.mp4").read_bytes() == b"old-a_01"
     assert (clips / "a_02.json").exists()
-    assert not (clips / ".trash" / "a_01.json").exists()
+    assert not any((clips / ".staging").glob("**/*.json")) if (clips / ".staging").exists() else True
 
 
-def test_reprocess_replaces_a_same_named_clip_already_sitting_in_the_trash(tmp_path):
+def test_reprocess_keeps_old_clips_untouched_when_no_clips_are_found(tmp_path):
     clips = tmp_path / "clips"
     write_clip(clips, "a_01")
-    write_clip(clips / ".trash", "a_01", title="예전 휴지통 것", deletedAt="2026-09-20T00:00:00+00:00")
 
-    call(tmp_path, process=lambda *a, **k: [])
+    with pytest.raises(ReprocessError):
+        call(tmp_path, process=lambda *a, **k: [])
 
-    assert json.loads((clips / ".trash" / "a_01.json").read_text(encoding="utf-8"))["title"] == "a_01"
+    assert (clips / "a_01.json").exists()
 
 
 @pytest.mark.parametrize("problem", ["no_clips", "no_recording", "start_deleted", "no_end"])
@@ -143,7 +148,7 @@ def test_reprocess_refuses_without_touching_anything_when_it_cannot_run(tmp_path
         call(tmp_path, process=process, root=root, boundaries=boundaries)
 
     if problem != "no_clips":
-        assert (clips / "a_01.json").exists() and not (clips / ".trash").exists()
+        assert (clips / "a_01.json").exists()
 
 
 def test_reprocess_carries_labels_from_the_old_clips_to_overlapping_new_ones(tmp_path):
@@ -208,3 +213,37 @@ def test_reprocess_keeps_the_new_clips_when_label_migration_itself_fails(tmp_pat
     written = call(tmp_path, process=lambda s, st, en, cfg, **kw: [write_clip(kw["clips_dir"], "a_01") or kw["clips_dir"] / "a_01.json"])
 
     assert written == [clips / "a_01.json"] and (clips / "a_01.json").exists()
+
+
+def test_reprocess_permanent_mode_deletes_old_clip_files(tmp_path):
+    clips = tmp_path / "clips"
+    write_clip(clips, "a_01")
+    cfg = Config()
+    cfg.ui.delete_mode = "permanent"
+
+    def process(session, start, end, cfg, *, ffmpeg_path, clips_dir):
+        write_clip(clips_dir, "a_01", title="새 클립")
+        return [clips_dir / "a_01.json"]
+
+    call(tmp_path, process=process, cfg=cfg)
+
+    assert json.loads((clips / "a_01.json").read_text(encoding="utf-8"))["title"] == "새 클립"
+
+
+def test_reprocess_recycle_mode_sends_old_clip_files_to_recycle_bin(tmp_path, monkeypatch):
+    from lumia_briefing_room.pipeline import delete_helper
+
+    clips = tmp_path / "clips"
+    write_clip(clips, "a_01")
+    sent = []
+    monkeypatch.setattr(delete_helper, "_send2trash", lambda path: sent.append(Path(path).name))
+    cfg = Config()
+    cfg.ui.delete_mode = "recycle"
+
+    def process(session, start, end, cfg, *, ffmpeg_path, clips_dir):
+        write_clip(clips_dir, "a_01", title="새 클립")
+        return [clips_dir / "a_01.json"]
+
+    call(tmp_path, process=process, cfg=cfg)
+
+    assert set(sent) == {"a_01.json", "a_01.mp4"}

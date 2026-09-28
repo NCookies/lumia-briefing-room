@@ -31,7 +31,6 @@ export interface Vod {
   games: VodGameSummary[]
   clipCount: number
   clipBytes: number
-  trashedCount: number
   probing: boolean
 }
 

@@ -118,14 +118,14 @@ def test_validate_ranges_rejects_overlaps_and_sorts():
 
 
 @requires_ffmpeg
-def test_split_makes_one_new_clip_per_range_and_trashes_the_original(tmp_path):
+def test_split_makes_one_new_clip_per_range_and_deletes_the_original(tmp_path):
     from lumia_briefing_room.pipeline.trim import split_clip
 
     meta_path = write_clip(tmp_path, matchStartUtc="2026-01-01T00:00:00Z", tags=["x"], pvpScore=0.8, labelSource="user", labelNote="메모")
-    trash = tmp_path / ".trash"
 
     new_paths = split_clip(
-        meta_path, [(2.0, 6.0), (10.0, 15.0)], trash_dir=trash, ffmpeg_path=FFMPEG_PATH, thumbnail=ThumbnailConfig()
+        meta_path, [(2.0, 6.0), (10.0, 15.0)], ffmpeg_path=FFMPEG_PATH, thumbnail=ThumbnailConfig(),
+        delete_mode="permanent",
     )
 
     assert [p.stem for p in new_paths] == ["clip1-p1", "clip1-p2"]
@@ -139,7 +139,21 @@ def test_split_makes_one_new_clip_per_range_and_trashes_the_original(tmp_path):
         assert (tmp_path / m["thumbnailPath"]).exists()
         assert p.with_suffix(".mp4").exists()
     assert video_seconds(new_paths[1].with_suffix(".mp4")) == pytest.approx(5.0, abs=0.2)
-    assert not meta_path.exists() and (trash / "clip1.json").exists() and (trash / "clip1.mp4").exists()
+    assert not meta_path.exists() and not (tmp_path / "clip1.mp4").exists()
+
+
+@requires_ffmpeg
+def test_split_default_mode_sends_the_original_to_the_recycle_bin(tmp_path, monkeypatch):
+    from lumia_briefing_room.pipeline import delete_helper
+    from lumia_briefing_room.pipeline.trim import split_clip
+
+    meta_path = write_clip(tmp_path)
+    sent = []
+    monkeypatch.setattr(delete_helper, "_send2trash", lambda path: sent.append(Path(path).name))
+
+    split_clip(meta_path, [(2.0, 6.0)], ffmpeg_path=FFMPEG_PATH, thumbnail=ThumbnailConfig())
+
+    assert set(sent) == {"clip1.json", "clip1.mp4", "clip1.jpg"}
 
 
 @requires_ffmpeg
@@ -150,13 +164,12 @@ def test_failed_split_removes_new_pieces_and_keeps_the_original(tmp_path):
 
     with pytest.raises(OSError):
         split_clip(
-            meta_path, [(2.0, 6.0), (10.0, 15.0)], trash_dir=tmp_path / ".trash",
+            meta_path, [(2.0, 6.0), (10.0, 15.0)],
             ffmpeg_path=tmp_path / "no-such-ffmpeg.exe", thumbnail=ThumbnailConfig(),
         )
 
     assert meta_path.exists() and (tmp_path / "clip1.mp4").exists()
     assert sorted(p.name for p in tmp_path.glob("clip1-p*")) == []
-    assert not (tmp_path / ".trash").exists()
 
 
 @requires_ffmpeg
@@ -167,8 +180,8 @@ def test_split_avoids_existing_ids(tmp_path):
     (tmp_path / "clip1-p1.json").write_text("{}", encoding="utf-8")
 
     new_paths = split_clip(
-        meta_path, [(0.0, 4.0), (6.0, 10.0)], trash_dir=tmp_path / ".trash", ffmpeg_path=FFMPEG_PATH,
-        thumbnail=ThumbnailConfig(),
+        meta_path, [(0.0, 4.0), (6.0, 10.0)], ffmpeg_path=FFMPEG_PATH,
+        thumbnail=ThumbnailConfig(), delete_mode="permanent",
     )
 
     assert [p.stem for p in new_paths] == ["clip1-p2", "clip1-p3"]
@@ -180,15 +193,16 @@ def test_split_pieces_get_uids_derived_from_the_original_and_original_keeps_its_
 
     parent = "a" * 32
     meta_path = write_clip(tmp_path, clipUid=parent)
+    archive_dir = tmp_path / ".labels"
 
     new_paths = split_clip(
-        meta_path, [(0.0, 4.0), (6.0, 10.0)], trash_dir=tmp_path / ".trash", ffmpeg_path=FFMPEG_PATH,
-        thumbnail=ThumbnailConfig(),
+        meta_path, [(0.0, 4.0), (6.0, 10.0)], ffmpeg_path=FFMPEG_PATH,
+        thumbnail=ThumbnailConfig(), delete_mode="permanent", archive_dir=archive_dir,
     )
 
     uids = [json.loads(p.read_text(encoding="utf-8"))["clipUid"] for p in new_paths]
     assert uids == [f"{parent}-1", f"{parent}-2"]
-    assert json.loads((tmp_path / ".trash" / "clip1.json").read_text(encoding="utf-8"))["clipUid"] == parent
+    assert json.loads((archive_dir / "clip1.json").read_text(encoding="utf-8"))["clipUid"] == parent
 
 
 @requires_ffmpeg
@@ -197,8 +211,6 @@ def test_split_gives_an_original_without_uid_one_and_continues_after_existing_pi
 
     meta_path = write_clip(tmp_path)
     original_uid = "b" * 32
-    (tmp_path / ".trash").mkdir()
-    (tmp_path / ".trash" / "old.json").write_text(json.dumps({"clipUid": f"{original_uid}-1"}), encoding="utf-8")
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
     meta["clipUid"] = original_uid
     meta_path.write_text(json.dumps(meta), encoding="utf-8")
@@ -206,8 +218,8 @@ def test_split_gives_an_original_without_uid_one_and_continues_after_existing_pi
     (tmp_path / ".labels" / "gone.json").write_text(json.dumps({"clipUid": f"{original_uid}-3"}), encoding="utf-8")
 
     new_paths = split_clip(
-        meta_path, [(0.0, 4.0), (6.0, 10.0)], trash_dir=tmp_path / ".trash", ffmpeg_path=FFMPEG_PATH,
-        thumbnail=ThumbnailConfig(),
+        meta_path, [(0.0, 4.0), (6.0, 10.0)], ffmpeg_path=FFMPEG_PATH,
+        thumbnail=ThumbnailConfig(), delete_mode="permanent",
     )
 
     uids = [json.loads(p.read_text(encoding="utf-8"))["clipUid"] for p in new_paths]
@@ -221,7 +233,7 @@ def test_splitting_a_piece_appends_another_level(tmp_path):
     parent = "c" * 32 + "-2"
     meta_path = write_clip(tmp_path, clipUid=parent)
     new_paths = split_clip(
-        meta_path, [(0.0, 4.0)], trash_dir=tmp_path / ".trash", ffmpeg_path=FFMPEG_PATH, thumbnail=ThumbnailConfig(),
+        meta_path, [(0.0, 4.0)], ffmpeg_path=FFMPEG_PATH, thumbnail=ThumbnailConfig(), delete_mode="permanent",
     )
     assert json.loads(new_paths[0].read_text(encoding="utf-8"))["clipUid"] == parent + "-1"
 

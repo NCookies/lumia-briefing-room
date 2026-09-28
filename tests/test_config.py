@@ -26,10 +26,11 @@ def test_default_config_matches_spec_defaults():
     assert not hasattr(cfg.clip, "max_duration_sec")
     assert cfg.encode.proxy.enabled is False
     assert cfg.encode.thumbnail.enabled is True
-    assert cfg.retention.delete_mode == "trash"
-    assert cfg.retention.trash_days == 30
+    assert cfg.retention.delete_mode == "permanent"
     assert cfg.retention.protect_tags == []
     assert cfg.ui.auto_start is True
+    assert cfg.ui.confirm_delete is True
+    assert cfg.ui.delete_mode == "recycle"
 
 
 def test_to_camel_dict_uses_spec_key_names():
@@ -38,8 +39,9 @@ def test_to_camel_dict_uses_spec_key_names():
     assert d["watch"]["pollIntervalMs"] == 1000
     assert d["filter"]["minDurationSec"] == 4
     assert d["clip"]["prerollSec"] == 5
-    assert d["retention"]["trashDays"] == 30
+    assert d["retention"]["deleteMode"] == "permanent"
     assert d["retention"]["protectTags"] == []
+    assert d["ui"]["deleteMode"] == "recycle"
 
 
 def test_path_fields_serialize_as_strings():
@@ -101,7 +103,6 @@ def test_resolve_paths_fills_defaults_when_unset():
     assert resolved.clips.name == "clips"
     assert resolved.thumbnails == resolved.clips / ".thumbs"
     assert resolved.proxies == resolved.clips / ".proxy"
-    assert resolved.trash == resolved.clips / ".trash"
 
 
 def test_resolve_paths_respects_explicit_clips_dir():

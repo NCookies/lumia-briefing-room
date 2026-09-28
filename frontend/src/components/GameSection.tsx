@@ -7,11 +7,8 @@ import { PortraitRow } from './PortraitRow'
 interface Props {
   group: GameGroup<Clip>
   expanded: boolean
-  trashed: boolean
   onToggle: () => void
-  onTrashGame: () => void
-  onRestoreGame: () => void
-  onDeleteGameForever: () => void
+  onDeleteGame: () => void
   onReprocess: () => void
   reprocessing: boolean
   reprocessBusy: boolean
@@ -100,11 +97,8 @@ function MatchResultForm({ placement, outcome, locked, onSave, onUnlock, onCance
 export function GameSection({
   group,
   expanded,
-  trashed,
   onToggle,
-  onTrashGame,
-  onRestoreGame,
-  onDeleteGameForever,
+  onDeleteGame,
   onReprocess,
   reprocessing,
   reprocessBusy,
@@ -241,15 +235,6 @@ export function GameSection({
             <button type="button" className="text-zinc-400 hover:text-rose-400" onClick={onDeleteRecord}>
               기록 삭제
             </button>
-          ) : trashed ? (
-            <>
-              <button type="button" className="text-sky-400 hover:underline" onClick={onRestoreGame}>
-                게임 복구
-              </button>
-              <button type="button" className="text-rose-400 hover:underline" onClick={onDeleteGameForever}>
-                게임 완전 삭제
-              </button>
-            </>
           ) : (
             <>
               {!hideReprocess && (
@@ -263,7 +248,7 @@ export function GameSection({
                   {reprocessing ? '분석 중...' : '다시 분석'}
                 </button>
               )}
-              <button type="button" className="text-zinc-400 hover:text-rose-400" onClick={onTrashGame}>
+              <button type="button" className="text-zinc-400 hover:text-rose-400" onClick={onDeleteGame}>
                 게임 삭제
               </button>
             </>

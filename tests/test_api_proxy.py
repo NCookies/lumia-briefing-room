@@ -140,7 +140,7 @@ def test_stale_proxy_after_original_changes_is_not_served(client, monkeypatch):
     assert client.get("/api/clips/a/video", params={"proxy": 1}).status_code == 409
 
 
-def test_permanent_delete_and_empty_trash_remove_the_proxy(client, monkeypatch):
+def test_deleting_a_clip_removes_its_proxy(client, monkeypatch):
     monkeypatch.setattr(app_module, "create_proxy", _fake_create([]))
     monkeypatch.setattr(app_module, "discover_ffmpeg", lambda: Path("ffmpeg"))
     clips = client.app.state.clips_dir_for_test
@@ -148,26 +148,14 @@ def test_permanent_delete_and_empty_trash_remove_the_proxy(client, monkeypatch):
         _write_clip(clips, cid)
         client.post(f"/api/clips/{cid}/proxy")
         _wait_ready(client, cid)
-        client.post(f"/api/clips/{cid}/trash")
     assert (clips / ".proxy" / "a.mp4").exists()
 
     client.delete("/api/clips/a")
     assert not (clips / ".proxy" / "a.mp4").exists()
     assert (clips / ".proxy" / "b.mp4").exists()
 
-    client.post("/api/trash/empty")
+    client.delete("/api/clips/b")
     assert not (clips / ".proxy" / "b.mp4").exists()
-
-
-def test_proxy_of_a_trashed_clip_can_still_be_built(client, monkeypatch):
-    monkeypatch.setattr(app_module, "create_proxy", _fake_create([]))
-    monkeypatch.setattr(app_module, "discover_ffmpeg", lambda: Path("ffmpeg"))
-    clips = client.app.state.clips_dir_for_test
-    _write_clip(clips, "a")
-    client.post("/api/clips/a/trash")
-    assert client.post("/api/clips/a/proxy").status_code == 202
-    assert _wait_ready(client, "a")["state"] == "ready"
-    assert client.get("/api/clips/a/video", params={"proxy": 1}).content == b"proxy-bytes"
 
 
 @requires_ffmpeg

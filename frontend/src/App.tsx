@@ -10,10 +10,13 @@ import { UpdateBadge } from './components/UpdateBadge'
 import { ActivityBar } from './components/ActivityBar'
 import { activityLabels } from './activity'
 import { useActivity } from './useActivity'
-import { getConfirmDelete, setConfirmDelete } from './exportApi'
+import { LegacyTrashDialog } from './components/LegacyTrashDialog'
+import { getConfirmDelete, getDeleteMode, setConfirmDelete, setDeleteMode } from './exportApi'
+import type { DeleteMode } from './deleteConfirm'
 import { getFirstRun } from './onboardingApi'
 import { isBackfillActive, progressPercent, type BackfillStatus } from './backfill'
 import { getBackfillStatus } from './backfillApi'
+import { getLegacyTrashCount } from './legacyTrashApi'
 import { browserCanPlayHevc } from './playback'
 import { reportClientCapabilities } from './telemetryApi'
 
@@ -45,9 +48,11 @@ export default function App() {
   const [settingsTab, setSettingsTab] = useState<'general' | 'vod' | 'about'>('general')
   const [browserKey, setBrowserKey] = useState(0)
   const [confirmDelete, setConfirmDeleteState] = useState(true)
+  const [deleteMode, setDeleteModeState] = useState<DeleteMode>('recycle')
   const [firstRun, setFirstRun] = useState(false)
   const [showBackfill, setShowBackfill] = useState(false)
   const [backfill, setBackfill] = useState<BackfillStatus>({ state: 'idle' })
+  const [legacyTrashCount, setLegacyTrashCount] = useState(0)
 
   useEffect(() => {
     getFirstRun()
@@ -63,11 +68,20 @@ export default function App() {
     getConfirmDelete()
       .then(setConfirmDeleteState)
       .catch(() => {})
+    getDeleteMode()
+      .then(setDeleteModeState)
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
     getBackfillStatus()
       .then(setBackfill)
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    getLegacyTrashCount()
+      .then(setLegacyTrashCount)
       .catch(() => {})
   }, [])
 
@@ -89,6 +103,11 @@ export default function App() {
   const changeConfirmDelete = (value: boolean) => {
     setConfirmDeleteState(value)
     setConfirmDelete(value).catch(() => {})
+  }
+
+  const changeDeleteMode = (value: DeleteMode) => {
+    setDeleteModeState(value)
+    setDeleteMode(value).catch(() => {})
   }
 
   const selectTab = (next: Tab) => {
@@ -181,6 +200,8 @@ export default function App() {
             active={tab === t.id}
             confirmDelete={confirmDelete}
             onConfirmDeleteChange={changeConfirmDelete}
+            deleteMode={deleteMode}
+            onDeleteModeChange={changeDeleteMode}
             refreshTick={refreshTick}
             onBackfill={() => setShowBackfill(true)}
             backfillLabel={backfillRunning ? `과거 녹화 분석 중 ${progressPercent(backfill)}%` : '과거 녹화 분석'}
@@ -207,9 +228,22 @@ export default function App() {
         <SettingsModal
           confirmDelete={confirmDelete}
           onConfirmDeleteChange={changeConfirmDelete}
+          deleteMode={deleteMode}
+          onDeleteModeChange={changeDeleteMode}
           initialTab={settingsTab}
           onClose={() => setShowSettings(false)}
           onClipsDirChanged={() => setBrowserKey((k) => k + 1)}
+        />
+      )}
+
+      {legacyTrashCount > 0 && (
+        <LegacyTrashDialog
+          count={legacyTrashCount}
+          onDone={() => {
+            setLegacyTrashCount(0)
+            setBrowserKey((k) => k + 1)
+          }}
+          onLater={() => setLegacyTrashCount(0)}
         />
       )}
     </div>

@@ -48,18 +48,6 @@ def test_filter_pinned_only():
     assert [c.id for c in result] == ["a"]
 
 
-def test_filter_excludes_trashed_by_default():
-    clips = [cs("a", deletedAt=None), cs("b", deletedAt="2026-01-01T00:00:00+00:00")]
-    result = filter_clip_summaries(clips, ClipQuery())
-    assert [c.id for c in result] == ["a"]
-
-
-def test_filter_trashed_only():
-    clips = [cs("a", deletedAt=None), cs("b", deletedAt="2026-01-01T00:00:00+00:00")]
-    result = filter_clip_summaries(clips, ClipQuery(trashed_only=True))
-    assert [c.id for c in result] == ["b"]
-
-
 def test_combined_filters_are_and():
     clips = [
         cs("a", tags=["kill"], dayNight="day"),

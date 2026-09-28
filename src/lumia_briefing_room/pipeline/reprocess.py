@@ -1,21 +1,27 @@
-"""게임 하나를 원본 녹화에서 다시 분석한다. 기존 클립은 휴지통으로 옮기고, 실패하면 되돌린다."""
+"""게임 하나를 원본 녹화에서 다시 분석한다.
+
+새 클립은 임시 폴더(스테이징)에 만들고, 분석이 성공해 클립이 하나라도 나온 뒤에만
+기존 클립을 지우고 새 클립을 실제 위치로 옮긴다. 실패하거나 클립이 하나도 안 나오면
+스테이징만 지우고 기존 클립은 그대로 둔다(docs/plan-ui.md §0-(6))."""
 
 from __future__ import annotations
 
 import contextlib
 import json
 import logging
+import shutil
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
 from lumia_briefing_room.config import Config
-from lumia_briefing_room.pipeline.clip_assets import resolve_thumbnail
+from lumia_briefing_room.pipeline.delete_helper import delete_clip
+from lumia_briefing_room.pipeline.label_archive import archive_dir_for
 from lumia_briefing_room.pipeline.label_migrate import load_metas, migrate_labels
 from lumia_briefing_room.pipeline.orchestrator import process_match
 from lumia_briefing_room.pipeline.playerlog import MatchBoundary
-from lumia_briefing_room.pipeline.retention import restore_clip, trash_clip
 from lumia_briefing_room.video.segments import existing_segment_numbers, segment_number_at
 from lumia_briefing_room.video.session import RecordingSession
 
@@ -23,6 +29,7 @@ log = logging.getLogger(__name__)
 
 END_MATCH_TOLERANCE = timedelta(seconds=2)
 START_PROBE_SEGMENTS = 2
+STAGING_DIRNAME = ".staging"
 
 
 class ReprocessError(Exception):
@@ -58,15 +65,19 @@ def _game_meta_paths(directory: Path, ref: GameRef) -> list[Path]:
     return paths
 
 
-def _delete_clip_files(meta_path: Path) -> None:
-    try:
-        meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        meta = {}
-    for f in (meta_path.with_suffix(".mp4"), resolve_thumbnail(meta_path, meta)):
-        if f is not None:
-            f.unlink(missing_ok=True)
-    meta_path.unlink(missing_ok=True)
+def _move_staged_tree(staging: Path, dest_root: Path) -> list[Path]:
+    """스테이징 폴더의 파일을 상대 구조를 유지하며 실제 클립 폴더로 옮기고, 스테이징을 지운다."""
+    moved: list[Path] = []
+    for path in sorted(staging.rglob("*")):
+        if path.is_dir():
+            continue
+        rel = path.relative_to(staging)
+        dest = dest_root / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(path), str(dest))
+        moved.append(dest)
+    shutil.rmtree(staging, ignore_errors=True)
+    return moved
 
 
 def _apply_locked_result(written: list[Path], locked_result: dict | None) -> None:
@@ -84,7 +95,6 @@ def _apply_locked_result(written: list[Path], locked_result: dict | None) -> Non
 def reprocess_game(
     *,
     clips_dir: Path,
-    trash_dir: Path,
     ref: GameRef,
     recording_root: Path,
     boundaries: list[MatchBoundary],
@@ -94,7 +104,7 @@ def reprocess_game(
     load_session: Callable[[Path], RecordingSession] = RecordingSession.load,
     guard=None,
 ) -> list[Path]:
-    """`guard` 는 클립 파일을 옮기는 구간만 감싸는 락이다(오래 걸리는 분석 동안은 잡지 않는다)."""
+    """`guard` 는 기존 클립을 지우고 새 클립을 옮기는 구간만 감싸는 락이다(오래 걸리는 분석 동안은 잡지 않는다)."""
     guard = guard or contextlib.nullcontext()
 
     old = _game_meta_paths(clips_dir, ref)
@@ -112,6 +122,7 @@ def reprocess_game(
     session = load_session(session_dir)
 
     start = _parse(ref.match_start)
+    old_metas = load_metas(old)
     recorded_end = json.loads(old[0].read_text(encoding="utf-8")).get("matchEndUtc")
     end = _parse(recorded_end) if recorded_end else find_match_end(start, boundaries)
     if end is None:
@@ -121,29 +132,31 @@ def reprocess_game(
     if not existing_segment_numbers(session, 0, first, first + START_PROBE_SEGMENTS):
         raise ReprocessError("원본 녹화가 이미 삭제되어 다시 분석할 수 없습니다")
 
-    with guard:
-        for path in _game_meta_paths(trash_dir, ref):
-            if path.stem in {p.stem for p in old}:
-                _delete_clip_files(path)
-        trashed = [trash_clip(path, trash_dir) for path in old]
-
+    staging = clips_dir / STAGING_DIRNAME / uuid.uuid4().hex
+    staging.mkdir(parents=True, exist_ok=True)
     try:
-        written = process(session, start, end, cfg, ffmpeg_path=ffmpeg_path, clips_dir=clips_dir)
-    except Exception:
-        log.exception("다시 분석 실패 - 기존 클립을 되돌린다")
-        with guard:
-            for path in _game_meta_paths(clips_dir, ref):
-                _delete_clip_files(path)
-            for path in trashed:
-                restore_clip(path, clips_dir)
+        written = process(session, start, end, cfg, ffmpeg_path=ffmpeg_path, clips_dir=staging)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
         raise
 
+    if not written:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise ReprocessError("다시 분석했지만 이 게임에서 클립을 찾지 못했습니다. 기존 클립을 그대로 둡니다")
+
     try:
-        report = migrate_labels(load_metas(trashed), list(written))
+        report = migrate_labels(old_metas, list(written))
         log.info("라벨 이관: %s", report)
     except Exception:
         log.exception("라벨 이관에 실패했다 - 새 클립은 라벨 없이 둔다")
 
     if locked_result is not None:
         _apply_locked_result(written, locked_result)
-    return written
+
+    with guard:
+        archive_dir = archive_dir_for(clips_dir)
+        for path in old:
+            delete_clip(path, mode=cfg.ui.delete_mode, archive_dir=archive_dir)
+        final = _move_staged_tree(staging, clips_dir)
+
+    return sorted(p for p in final if p.suffix == ".json")

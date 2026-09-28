@@ -9,7 +9,6 @@ interface Props {
   vod: Vod | null
   job: AnalysisJob | null
   expanded: boolean
-  trashed: boolean
   gameCount: number
   clipCount: number
   visibleClipCount: number
@@ -20,9 +19,7 @@ interface Props {
   onCancel: () => void
   onRenameStreamer: (streamer: string) => void
   onEditDate: (date: string) => void
-  onTrashClips: () => void
-  onRestoreClips: () => void
-  onDeleteClipsForever: () => void
+  onDeleteClips: () => void
   children: ReactNode
 }
 
@@ -133,7 +130,6 @@ export function VodSection({
   vod,
   job,
   expanded,
-  trashed,
   gameCount,
   clipCount,
   visibleClipCount,
@@ -144,9 +140,7 @@ export function VodSection({
   onCancel,
   onRenameStreamer,
   onEditDate,
-  onTrashClips,
-  onRestoreClips,
-  onDeleteClipsForever,
+  onDeleteClips,
   children,
 }: Props) {
   const running = vod?.status === 'analyzing'
@@ -178,10 +172,10 @@ export function VodSection({
           </span>
         </button>
 
-        {!trashed && vod && <VideoDate value={vod.videoDate} onSave={onEditDate} />}
-        {!trashed && vod && <StreamerName value={vod.streamer} onSave={onRenameStreamer} />}
+        {vod && <VideoDate value={vod.videoDate} onSave={onEditDate} />}
+        {vod && <StreamerName value={vod.streamer} onSave={onRenameStreamer} />}
 
-        {vod && !trashed && (
+        {vod && (
           <span className={`rounded px-2 py-0.5 text-xs ${STATUS_STYLES[vod.status]}`}>
             {vodStatusLabel(vod.status)}
             {vod.status !== 'done' && vod.status !== 'new' && percent > 0 ? ` ${percent}%` : ''}
@@ -196,59 +190,46 @@ export function VodSection({
         </div>
 
         <div className="flex items-center gap-3 text-xs">
-          {trashed ? (
+          {running ? (
+            <button type="button" className="text-amber-300 hover:underline" onClick={onCancel}>
+              분석 취소
+            </button>
+          ) : vod && vod.status === 'done' ? (
             <>
-              <button type="button" className="text-sky-400 hover:underline" onClick={onRestoreClips}>
-                영상 클립 복구
+              <button
+                type="button"
+                className="text-zinc-400 hover:text-sky-300 disabled:opacity-50"
+                disabled={!canStart}
+                title={blockedReason || '저장된 분석 결과로 클립만 다시 만듭니다(설정의 클립 구간·필터를 바꾼 뒤)'}
+                onClick={() => onAnalyze({ rebuild: true })}
+              >
+                클립 다시 만들기
               </button>
-              <button type="button" className="text-rose-400 hover:underline" onClick={onDeleteClipsForever}>
-                영상 클립 완전 삭제
+              <button
+                type="button"
+                className="text-zinc-400 hover:text-sky-300 disabled:opacity-50"
+                disabled={!canStart}
+                title={blockedReason || '판독까지 처음부터 다시 분석합니다'}
+                onClick={() => onAnalyze({ force: true })}
+              >
+                다시 분석
               </button>
             </>
-          ) : (
-            <>
-              {running ? (
-                <button type="button" className="text-amber-300 hover:underline" onClick={onCancel}>
-                  분석 취소
-                </button>
-              ) : vod && vod.status === 'done' ? (
-                <>
-                  <button
-                    type="button"
-                    className="text-zinc-400 hover:text-sky-300 disabled:opacity-50"
-                    disabled={!canStart}
-                    title={blockedReason || '저장된 분석 결과로 클립만 다시 만듭니다(설정의 클립 구간·필터를 바꾼 뒤)'}
-                    onClick={() => onAnalyze({ rebuild: true })}
-                  >
-                    클립 다시 만들기
-                  </button>
-                  <button
-                    type="button"
-                    className="text-zinc-400 hover:text-sky-300 disabled:opacity-50"
-                    disabled={!canStart}
-                    title={blockedReason || '판독까지 처음부터 다시 분석합니다'}
-                    onClick={() => onAnalyze({ force: true })}
-                  >
-                    다시 분석
-                  </button>
-                </>
-              ) : vod ? (
-                <button
-                  type="button"
-                  className="rounded border border-sky-500/60 px-3 py-1 text-sky-300 hover:bg-sky-500/20 disabled:opacity-50"
-                  disabled={!canStart}
-                  title={blockedReason}
-                  onClick={() => onAnalyze({})}
-                >
-                  {vod.status === 'new' ? '분석 시작' : '이어서 분석'}
-                </button>
-              ) : null}
-              {clipCount > 0 && (
-                <button type="button" className="text-zinc-400 hover:text-rose-400" onClick={onTrashClips}>
-                  전체 삭제
-                </button>
-              )}
-            </>
+          ) : vod ? (
+            <button
+              type="button"
+              className="rounded border border-sky-500/60 px-3 py-1 text-sky-300 hover:bg-sky-500/20 disabled:opacity-50"
+              disabled={!canStart}
+              title={blockedReason}
+              onClick={() => onAnalyze({})}
+            >
+              {vod.status === 'new' ? '분석 시작' : '이어서 분석'}
+            </button>
+          ) : null}
+          {clipCount > 0 && (
+            <button type="button" className="text-zinc-400 hover:text-rose-400" onClick={onDeleteClips}>
+              전체 삭제
+            </button>
           )}
         </div>
       </div>

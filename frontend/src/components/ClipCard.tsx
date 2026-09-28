@@ -9,13 +9,10 @@ import { TagBadge } from './TagBadge'
 
 interface Props {
   clip: Clip
-  trashed: boolean
   onPlay: (clip: Clip) => void
   onTogglePin: (clip: Clip) => void
   onRename: (clip: Clip, title: string) => void
-  onTrash: (clip: Clip) => void
-  onRestore: (clip: Clip) => void
-  onDeleteForever: (clip: Clip) => void
+  onDelete: (clip: Clip) => void
   onLabel: (clip: Clip, label: UserLabel) => void
   onExport: (clip: Clip) => void
 }
@@ -33,13 +30,10 @@ const BORDER: Record<string, string> = {
 
 export function ClipCard({
   clip,
-  trashed,
   onPlay,
   onTogglePin,
   onRename,
-  onTrash,
-  onRestore,
-  onDeleteForever,
+  onDelete,
   onLabel,
   onExport,
 }: Props) {
@@ -147,51 +141,30 @@ export function ClipCard({
         </div>
 
         <div className="mt-auto flex items-center justify-between pt-1">
-          {trashed ? (
-            <div className="flex gap-2 text-xs">
-              <button
-                type="button"
-                className="text-sky-400 hover:underline"
-                onClick={() => onRestore(clip)}
-              >
-                복구
-              </button>
-              <button
-                type="button"
-                className="text-rose-400 hover:underline"
-                onClick={() => onDeleteForever(clip)}
-              >
-                완전 삭제
-              </button>
-            </div>
-          ) : (
-            <>
-              {labeling && <LabelButtons value={clip.userLabel} onChange={(l) => onLabel(clip, l)} onlyActive />}
-              <div className="flex gap-2 text-xs">
-                <button
-                  type="button"
-                  className="text-zinc-400 hover:text-sky-300"
-                  onClick={() => onExport(clip)}
-                >
-                  저장
-                </button>
-                <button
-                  type="button"
-                  className={clip.pinned ? 'text-amber-400' : 'text-zinc-400 hover:text-amber-300'}
-                  onClick={() => onTogglePin(clip)}
-                >
-                  {clip.pinned ? '고정됨' : '고정'}
-                </button>
-                <button
-                  type="button"
-                  className="text-zinc-400 hover:text-rose-400"
-                  onClick={() => onTrash(clip)}
-                >
-                  삭제
-                </button>
-              </div>
-            </>
-          )}
+          {labeling && <LabelButtons value={clip.userLabel} onChange={(l) => onLabel(clip, l)} onlyActive />}
+          <div className="flex gap-2 text-xs">
+            <button
+              type="button"
+              className="text-zinc-400 hover:text-sky-300"
+              onClick={() => onExport(clip)}
+            >
+              저장
+            </button>
+            <button
+              type="button"
+              className={clip.pinned ? 'text-amber-400' : 'text-zinc-400 hover:text-amber-300'}
+              onClick={() => onTogglePin(clip)}
+            >
+              {clip.pinned ? '고정됨' : '고정'}
+            </button>
+            <button
+              type="button"
+              className="text-zinc-400 hover:text-rose-400"
+              onClick={() => onDelete(clip)}
+            >
+              삭제
+            </button>
+          </div>
         </div>
       </div>
     </div>

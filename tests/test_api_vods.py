@@ -84,10 +84,9 @@ def test_recursive_flag_includes_subfolders_and_files_can_be_sources(env):
 def test_analyzed_vod_reports_status_games_and_live_clip_counts(env):
     client, a, b, vod_dir, *_ = env
     vid = vod_id(a)
-    c1 = write_vod_clip(vod_dir, vid, 1, 10)
+    write_vod_clip(vod_dir, vid, 1, 10)
     write_vod_clip(vod_dir, vid, 1, 90)
     write_vod_clip(vod_dir, vid, 2, 10)
-    client.post(f"/api/clips/{c1}/trash")
     save_index(vod_dir, {
         "id": vid, "path": str(a), "status": "done", "durationSec": 1234.0, "width": 1920, "height": 1080,
         "streamer": "인덱스 이름", "analyzedSec": 1234.0,
@@ -101,7 +100,7 @@ def test_analyzed_vod_reports_status_games_and_live_clip_counts(env):
     assert entry["status"] == "done" and entry["durationSec"] == 1234.0
     assert (entry["width"], entry["height"]) == (1920, 1080)
     assert len(entry["games"]) == 2 and entry["games"][0]["result"]["placement"] == 2
-    assert entry["clipCount"] == 2 and entry["trashedCount"] == 1 and entry["clipBytes"] == 200
+    assert entry["clipCount"] == 3 and entry["clipBytes"] == 300
     assert entry["streamer"] == "인덱스 이름"
 
 
@@ -343,23 +342,30 @@ def test_missing_ffmpeg_blocks_analysis(env, monkeypatch):
     assert client.post(f"/api/vods/{vod_id(a)}/analyze", json={}).status_code == 503
 
 
-def test_vod_wide_trash_restore_and_delete(env):
+def test_vod_wide_delete_removes_only_that_vods_clips(env):
     client, a, _, vod_dir, *_ = env
     vid = vod_id(a)
     ids = [write_vod_clip(vod_dir, vid, 1, 10), write_vod_clip(vod_dir, vid, 2, 10)]
     other = write_vod_clip(vod_dir, "otherid00001", 1, 10)
 
-    assert client.post(f"/api/vods/{vid}/trash").json()["count"] == 2
-    assert all((vod_dir / ".trash" / f"{i}.json").exists() for i in ids)
-    assert (vod_dir / f"{other}.json").exists()
-
-    assert client.post(f"/api/vods/{vid}/restore").json()["count"] == 2
-    assert all((vod_dir / f"{i}.json").exists() for i in ids)
-
-    client.post(f"/api/vods/{vid}/trash")
     assert client.delete(f"/api/vods/{vid}/clips").json()["count"] == 2
-    assert not list((vod_dir / ".trash").glob("*.json"))
+    assert not any((vod_dir / f"{i}.json").exists() for i in ids)
     assert (vod_dir / f"{other}.json").exists()
+
+
+def test_vod_wide_delete_uses_the_configured_delete_mode(env, monkeypatch):
+    from lumia_briefing_room.pipeline import delete_helper
+
+    client, a, _, vod_dir, *_ = env
+    vid = vod_id(a)
+    write_vod_clip(vod_dir, vid, 1, 10)
+    client.put("/api/config", json={"ui": {"deleteMode": "recycle"}})
+    sent = []
+    monkeypatch.setattr(delete_helper, "_send2trash", lambda path: sent.append(Path(path).name))
+
+    client.delete(f"/api/vods/{vid}/clips")
+
+    assert sent  # 실제로 지우는 대신 재활용 함수가 불렸다
 
 
 def test_fs_videos_lists_folders_and_only_video_files(env):

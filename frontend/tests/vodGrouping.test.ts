@@ -27,7 +27,6 @@ function vod(over: Partial<Vod> = {}): Vod {
     games: [],
     clipCount: 0,
     clipBytes: 0,
-    trashedCount: 0,
     probing: false,
     ...over,
   }

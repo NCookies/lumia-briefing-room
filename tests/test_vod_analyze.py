@@ -178,9 +178,10 @@ def test_second_run_on_a_done_vod_does_nothing(vod_file, tmp_path):
 
 
 @requires_ffmpeg
-def test_rebuild_reuses_cache_and_moves_old_clips_to_trash(vod_file, tmp_path):
+def test_rebuild_reuses_cache_and_replaces_old_clips(vod_file, tmp_path):
     first, cfg = run(tmp_path, vod_file)
     root = cfg.paths.vod_clips
+    old_duration = json.loads((root / f"{first['clips'][0]}.json").read_text(encoding="utf-8"))["durationSec"]
     calls = []
 
     def spy(frame, t):
@@ -193,11 +194,23 @@ def test_rebuild_reuses_cache_and_moves_old_clips_to_trash(vod_file, tmp_path):
 
     assert calls == []
     assert again["status"] == "done" and again["clips"] == first["clips"]
-    trashed = list((root / ".trash").rglob("vod_*.json"))
-    assert trashed
+    assert not any(root.glob(".staging/**/*"))
     new_meta = json.loads((root / f"{again['clips'][0]}.json").read_text(encoding="utf-8"))
-    old_meta = json.loads(trashed[0].read_text(encoding="utf-8"))
-    assert new_meta["durationSec"] > old_meta["durationSec"]
+    assert new_meta["durationSec"] > old_duration
+
+
+@requires_ffmpeg
+def test_rebuild_uses_the_configured_delete_mode_for_old_clips(vod_file, tmp_path, monkeypatch):
+    from lumia_briefing_room.pipeline import delete_helper
+
+    first, cfg = run(tmp_path, vod_file)
+    cfg.ui.delete_mode = "recycle"
+    sent = []
+    monkeypatch.setattr(delete_helper, "_send2trash", lambda path: sent.append(path))
+
+    analyze_vod(vod_file, cfg, ffmpeg_path=FFMPEG_PATH, read_frame=read_frame, find_result=no_result, rebuild=True)
+
+    assert sent  # 기존 클립 파일들이 휴지통 함수로 넘어갔다
 
 
 @requires_ffmpeg

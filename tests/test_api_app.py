@@ -26,7 +26,7 @@ def _write_clip(clips_dir: Path, clip_id: str, *, video: bytes = b"fake video by
 @pytest.fixture
 def client(tmp_path):
     clips_dir = tmp_path / "clips"
-    cfg = Config(paths=PathsConfig(clips=clips_dir, temp=tmp_path / "tmp"))
+    cfg = Config(paths=PathsConfig(clips=clips_dir, vod_clips=tmp_path / "vod", temp=tmp_path / "tmp"))
     config_path = tmp_path / "config.json"
     app = create_app(cfg, config_path=config_path)
     app.state.clips_dir_for_test = clips_dir  # 테스트 편의
@@ -60,17 +60,6 @@ def test_list_clips_filters_by_tag(client):
 
     ids = {c["id"] for c in resp.json()}
     assert ids == {"b"}
-
-
-def test_list_clips_excludes_trashed_by_default(client):
-    clips_dir = client.app.state.clips_dir_for_test
-    _write_clip(clips_dir, "a")
-    _write_clip(clips_dir, "b", deletedAt="2026-01-01T00:00:00+00:00")
-
-    resp = client.get("/api/clips")
-
-    ids = {c["id"] for c in resp.json()}
-    assert ids == {"a"}
 
 
 def test_get_one_clip(client):
@@ -114,48 +103,37 @@ def test_patch_missing_clip_404(client):
     assert resp.status_code == 404
 
 
-def test_trash_and_restore_roundtrip(client):
-    clips_dir = client.app.state.clips_dir_for_test
-    _write_clip(clips_dir, "a")
-
-    trash_resp = client.post("/api/clips/a/trash")
-    assert trash_resp.status_code == 200
-    assert not (clips_dir / "a.json").exists()
-    assert (clips_dir / ".trash" / "a.json").exists()
-
-    list_resp = client.get("/api/clips", params={"trashed": "true"})
-    assert [c["id"] for c in list_resp.json()] == ["a"]
-
-    restore_resp = client.post("/api/clips/a/restore")
-    assert restore_resp.status_code == 200
-    assert (clips_dir / "a.json").exists()
-
-
-def test_trash_missing_clip_404(client):
-    resp = client.post("/api/clips/nope/trash")
+def test_delete_missing_clip_404(client):
+    resp = client.delete("/api/clips/nope")
     assert resp.status_code == 404
 
 
-def test_delete_rejects_non_trashed_clip(client):
+def test_delete_permanent_mode_removes_the_clip_files(client):
     clips_dir = client.app.state.clips_dir_for_test
     _write_clip(clips_dir, "a")
-
-    resp = client.delete("/api/clips/a")
-
-    assert resp.status_code == 400
-    assert (clips_dir / "a.json").exists()
-
-
-def test_delete_removes_trashed_clip_permanently(client):
-    clips_dir = client.app.state.clips_dir_for_test
-    _write_clip(clips_dir, "a")
-    client.post("/api/clips/a/trash")
+    client.put("/api/config", json={"ui": {"deleteMode": "permanent"}})
 
     resp = client.delete("/api/clips/a")
 
     assert resp.status_code == 200
-    assert not (clips_dir / ".trash" / "a.json").exists()
-    assert not (clips_dir / ".trash" / "a.mp4").exists()
+    assert resp.json() == {"id": "a", "deleted": True}
+    assert not (clips_dir / "a.json").exists()
+    assert not (clips_dir / "a.mp4").exists()
+    assert not (clips_dir / ".thumbs" / "a.jpg").exists()
+
+
+def test_delete_default_mode_sends_the_clip_to_the_recycle_bin(client, monkeypatch):
+    from lumia_briefing_room.pipeline import delete_helper
+
+    clips_dir = client.app.state.clips_dir_for_test
+    _write_clip(clips_dir, "a")
+    sent = []
+    monkeypatch.setattr(delete_helper, "_send2trash", lambda path: sent.append(Path(path).name))
+
+    resp = client.delete("/api/clips/a")
+
+    assert resp.status_code == 200
+    assert set(sent) == {"a.json", "a.mp4", "a.jpg"}
 
 
 def test_video_full_request(client):
@@ -478,19 +456,19 @@ def test_cleanup_preview_counts_without_touching_files(client):
 
     assert resp.status_code == 200
     body = resp.json()
-    assert body["toTrash"] == 1 and body["toPurge"] == 0 and body["applied"] is False
+    assert body["toDelete"] == 1 and body["applied"] is False
     assert (clips / "old.json").exists()
 
 
-def test_cleanup_run_moves_old_clips_to_trash(client):
+def test_cleanup_run_deletes_old_clips(client):
     clips = client.app.state.clips_dir_for_test
     _write_clip(clips, "old", matchStartUtc="2020-01-01T00:00:00Z")
-    _enable_cleanup(client, maxAgeDays=30)
+    _enable_cleanup(client, maxAgeDays=30, deleteMode="permanent")
 
     body = client.post("/api/cleanup", json={}).json()
 
-    assert body["toTrash"] == 1 and body["applied"] is True
-    assert not (clips / "old.json").exists() and (clips / ".trash" / "old.json").exists()
+    assert body["toDelete"] == 1 and body["applied"] is True
+    assert not (clips / "old.json").exists()
 
 
 def test_cleanup_does_nothing_when_disabled(client):
@@ -500,7 +478,7 @@ def test_cleanup_does_nothing_when_disabled(client):
 
     body = client.post("/api/cleanup", json={}).json()
 
-    assert body["toTrash"] == 0
+    assert body["toDelete"] == 0
     assert (clips / "old.json").exists()
 
 
@@ -520,13 +498,12 @@ def test_list_clips_includes_size_bytes(client):
 
 def test_permanently_deleting_the_last_clip_of_a_game_removes_its_result_image(client, tmp_path):
     clips = client.app.state.clips_dir_for_test
+    client.put("/api/config", json={"ui": {"deleteMode": "permanent"}})
     image = clips / ".thumbs" / "20260920_100000_result.jpg"
     image.parent.mkdir(parents=True, exist_ok=True)
     image.write_bytes(b"j")
     _write_clip(clips, "a", matchResult={"imagePath": str(image)})
     _write_clip(clips, "b", matchResult={"imagePath": str(image)})
-    client.post("/api/clips/a/trash")
-    client.post("/api/clips/b/trash")
 
     client.delete("/api/clips/a")
     assert image.exists()
@@ -568,26 +545,14 @@ def test_trim_cuts_the_clip_and_returns_updated_metadata(client):
     assert body["id"] == "a" and body["sizeBytes"] == (clips / "a.mp4").stat().st_size
 
 
-def test_trashed_clip_still_serves_its_thumbnail_and_video(client):
-    clips = client.app.state.clips_dir_for_test
-    _write_clip(clips, "a", video=b"0123456789")
-    client.post("/api/clips/a/trash")
-
-    thumb = client.get("/api/clips/a/thumbnail")
-    video = client.get("/api/clips/a/video")
-
-    assert thumb.status_code == 200 and thumb.headers["content-type"] == "image/jpeg"
-    assert video.status_code == 200 and video.content == b"0123456789"
-
-
 def test_deleting_many_clips_at_once_all_succeed(client):
     import threading
 
     clips = client.app.state.clips_dir_for_test
+    client.put("/api/config", json={"ui": {"deleteMode": "permanent"}})
     ids = [f"c{i}" for i in range(8)]
     for clip_id in ids:
         _write_clip(clips, clip_id)
-        client.post(f"/api/clips/{clip_id}/trash")
     statuses = []
 
     def delete(clip_id):
@@ -598,7 +563,7 @@ def test_deleting_many_clips_at_once_all_succeed(client):
     [t.join() for t in threads]
 
     assert statuses == [200] * 8
-    assert client.get("/api/clips", params={"trashed": "true"}).json() == []
+    assert client.get("/api/clips").json() == []
 
 
 def test_confirm_delete_option_defaults_to_true_and_can_be_turned_off(client):
@@ -609,40 +574,12 @@ def test_confirm_delete_option_defaults_to_true_and_can_be_turned_off(client):
     assert client.get("/api/config").json()["ui"]["confirmDelete"] is False
 
 
-def test_empty_trash_deletes_every_trashed_clip_and_reports_the_size(client):
-    clips = client.app.state.clips_dir_for_test
-    image = clips / ".thumbs" / "20260920_100000_result.jpg"
-    image.parent.mkdir(parents=True, exist_ok=True)
-    image.write_bytes(b"j")
-    for clip_id in ("a", "b", "keep"):
-        _write_clip(clips, clip_id, video=b"x" * 100, matchResult={"imagePath": str(image)})
-    client.post("/api/clips/a/trash")
-    client.post("/api/clips/b/trash")
+def test_delete_mode_option_defaults_to_recycle_and_can_be_changed(client):
+    assert client.get("/api/config").json()["ui"]["deleteMode"] == "recycle"
 
-    body = client.post("/api/trash/empty").json()
+    client.put("/api/config", json={"ui": {"deleteMode": "permanent"}})
 
-    assert body == {"deleted": 2, "bytes": 200}
-    assert client.get("/api/clips", params={"trashed": "true"}).json() == []
-    assert not (clips / ".trash" / "a.mp4").exists() and not (clips / ".trash" / ".thumbs" / "a.jpg").exists()
-    assert (clips / "keep.json").exists()
-    assert image.exists()
-
-
-def test_empty_trash_removes_result_images_no_clip_uses_anymore(client):
-    clips = client.app.state.clips_dir_for_test
-    image = clips / ".thumbs" / "20260920_100000_result.jpg"
-    image.parent.mkdir(parents=True, exist_ok=True)
-    image.write_bytes(b"j")
-    _write_clip(clips, "a", matchResult={"imagePath": str(image)})
-    client.post("/api/clips/a/trash")
-
-    client.post("/api/trash/empty")
-
-    assert not image.exists()
-
-
-def test_empty_trash_when_already_empty_is_a_no_op(client):
-    assert client.post("/api/trash/empty").json() == {"deleted": 0, "bytes": 0}
+    assert client.get("/api/config").json()["ui"]["deleteMode"] == "permanent"
 
 
 def _wait_for_job(client, key, *, tries=100):
@@ -757,12 +694,10 @@ def test_reprocess_registers_an_activity_task_while_running(client, reprocess_en
     assert registry.snapshot() == []
 
 
-def test_deleting_a_labeled_clip_forever_keeps_its_label_and_evidence(client):
+def test_deleting_a_labeled_clip_keeps_its_label_and_evidence(client):
     clips = client.app.state.clips_dir_for_test
     _write_clip(clips, "a", userLabel="pvp", pvpSignals=["kill_delta"])
     _write_clip(clips, "b")
-    client.post("/api/clips/a/trash")
-    client.post("/api/clips/b/trash")
 
     client.delete("/api/clips/a")
     client.delete("/api/clips/b")
@@ -770,18 +705,6 @@ def test_deleting_a_labeled_clip_forever_keeps_its_label_and_evidence(client):
     kept = json.loads((clips / ".labels" / "a.json").read_text(encoding="utf-8"))
     assert kept["userLabel"] == "pvp" and kept["pvpSignals"] == ["kill_delta"]
     assert not (clips / ".labels" / "b.json").exists()
-
-
-def test_emptying_the_trash_keeps_only_the_labeled_clips_evidence(client):
-    clips = client.app.state.clips_dir_for_test
-    _write_clip(clips, "a", userLabel="pve")
-    _write_clip(clips, "b")
-    client.post("/api/clips/a/trash")
-    client.post("/api/clips/b/trash")
-
-    client.post("/api/trash/empty")
-
-    assert sorted(p.name for p in (clips / ".labels").glob("*.json")) == ["a.json"]
 
 
 def test_split_rejects_bad_ranges_and_unknown_clip(client):
@@ -793,7 +716,7 @@ def test_split_rejects_bad_ranges_and_unknown_clip(client):
     assert client.post("/api/clips/zzz/split", json={"ranges": [{"start": 0, "end": 5}, {"start": 6, "end": 9}]}).status_code == 404
 
 
-def test_split_creates_new_clips_and_trashes_the_original(client):
+def test_split_creates_new_clips_and_deletes_the_original(client):
     import subprocess
 
     from conftest import FFMPEG_PATH
@@ -816,7 +739,7 @@ def test_split_creates_new_clips_and_trashes_the_original(client):
     assert ids == ["a-p1", "a-p2"]
     listed = {c["id"] for c in client.get("/api/clips").json()}
     assert listed == {"a-p1", "a-p2"}
-    assert {c["id"] for c in client.get("/api/clips", params={"trashed": True}).json()} == {"a"}
+    assert not (clips / "a.json").exists()
 
 
 def test_patch_label_note_is_saved_trimmed_and_capped(client):
@@ -847,7 +770,6 @@ def test_clearing_the_label_clears_its_note(client):
 def test_label_note_is_kept_in_the_label_archive(client):
     clips = client.app.state.clips_dir_for_test
     _write_clip(clips, "a", userLabel="pve", labelNote="대치만 함")
-    client.post("/api/clips/a/trash")
 
     client.delete("/api/clips/a")
 
@@ -884,3 +806,49 @@ def test_a_label_without_a_recorded_time_gets_one_when_touched(client):
     clips_dir = client.app.state.clips_dir_for_test
     _write_clip(clips_dir, "a", userLabel="pvp")
     assert client.patch("/api/clips/a", json={"userLabel": "pvp"}).json()["labeledAt"]
+
+
+def test_legacy_trash_status_counts_leftover_clips_across_both_roots(tmp_path):
+    from lumia_briefing_room.config import PathsConfig
+
+    clips, vod = tmp_path / "clips", tmp_path / "vod"
+    cfg = Config(paths=PathsConfig(clips=clips, vod_clips=vod, temp=tmp_path / "tmp"))
+    app = create_app(cfg, config_path=tmp_path / "config.json")
+    test_client = TestClient(app)
+    _write_clip(clips / ".trash", "a")
+    _write_clip(vod / ".trash", "b")
+
+    assert test_client.get("/api/legacy-trash").json() == {"count": 2}
+
+
+def test_legacy_trash_status_is_zero_when_nothing_is_left(client):
+    assert client.get("/api/legacy-trash").json() == {"count": 0}
+
+
+def test_legacy_trash_migrate_restore_moves_clips_back_to_the_list(client):
+    clips_dir = client.app.state.clips_dir_for_test
+    _write_clip(clips_dir / ".trash", "a")
+
+    resp = client.post("/api/legacy-trash/migrate", json={"action": "restore"})
+
+    assert resp.json() == {"migrated": 1}
+    assert (clips_dir / "a.json").exists()
+    assert client.get("/api/legacy-trash").json() == {"count": 0}
+
+
+def test_legacy_trash_migrate_recycle_sends_clips_to_the_recycle_bin(client, monkeypatch):
+    from lumia_briefing_room.pipeline import delete_helper
+
+    clips_dir = client.app.state.clips_dir_for_test
+    _write_clip(clips_dir / ".trash", "a")
+    sent = []
+    monkeypatch.setattr(delete_helper, "_send2trash", lambda path: sent.append(Path(path).name))
+
+    resp = client.post("/api/legacy-trash/migrate", json={"action": "recycle"})
+
+    assert resp.json() == {"migrated": 1}
+    assert set(sent) == {"a.json", "a.mp4", "a.jpg"}
+
+
+def test_legacy_trash_migrate_rejects_unknown_action(client):
+    assert client.post("/api/legacy-trash/migrate", json={"action": "nope"}).status_code == 400

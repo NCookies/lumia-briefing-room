@@ -72,39 +72,19 @@ def test_clip_routes_find_vod_clips_by_id(env):
     assert client.get(f"/api/clips/{cid}").json()["title"] == "새 제목"
 
 
-def test_trash_restore_and_delete_stay_inside_the_vod_folder(env):
+def test_delete_stays_inside_the_vod_folder_and_only_touches_that_clip(env):
     client, steam, vod = env
     cid = "vod_x_g01_000010"
+    client.put("/api/config", json={"ui": {"deleteMode": "permanent"}})
 
-    assert client.post(f"/api/clips/{cid}/trash").status_code == 200
-    assert (vod / ".trash" / f"{cid}.json").exists()
-    assert not (steam / ".trash").exists()
-    assert ids(client.get("/api/clips", params={"source": "vod", "trashed": "true"})) == {cid}
-    assert ids(client.get("/api/clips", params={"source": "vod"})) == {"vod_x_g01_000090"}
-
-    assert client.post(f"/api/clips/{cid}/restore").status_code == 200
-    assert (vod / f"{cid}.json").exists()
-
-    client.post(f"/api/clips/{cid}/trash")
     assert client.delete(f"/api/clips/{cid}").status_code == 200
-    assert not (vod / ".trash" / f"{cid}.mp4").exists()
-
-
-def test_empty_trash_only_touches_the_requested_source(env):
-    client, steam, vod = env
-    client.post("/api/clips/steam_a/trash")
-    client.post("/api/clips/vod_x_g01_000010/trash")
-
-    resp = client.post("/api/trash/empty", params={"source": "vod"})
-
-    assert resp.json()["deleted"] == 1
-    assert (steam / ".trash" / "steam_a.json").exists()
-    assert not list((vod / ".trash").glob("*.json"))
-    assert client.post("/api/trash/empty").json()["deleted"] == 1
+    assert not (vod / f"{cid}.mp4").exists()
+    assert (steam / "steam_a.json").exists()
+    assert ids(client.get("/api/clips", params={"source": "vod"})) == {"vod_x_g01_000090"}
 
 
 def test_missing_clip_is_404(env):
     client, _, _ = env
 
     assert client.get("/api/clips/vod_nope").status_code == 404
-    assert client.post("/api/clips/vod_nope/trash").status_code == 404
+    assert client.delete("/api/clips/vod_nope").status_code == 404

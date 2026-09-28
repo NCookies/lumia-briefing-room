@@ -11,7 +11,7 @@ from lumia_briefing_room.pipeline.game_records import (
     record_game,
     records_dir_for,
 )
-from lumia_briefing_room.pipeline.retention import purge_expired, trash_clip
+from lumia_briefing_room.pipeline.delete_helper import delete_clip
 
 NOW = datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc)
 RESULT = {
@@ -100,13 +100,11 @@ def test_delete_and_clear_records(tmp_path):
     assert load_records(records) == []
 
 
-def test_purge_expired_records_game_when_records_dir_given(tmp_path):
+def test_delete_clip_records_game_when_records_dir_given(tmp_path):
     clips = tmp_path / "clips"
-    trash = clips / ".trash"
     meta = write_clip(clips, "a_01")
-    trash_clip(meta, trash, now=lambda: datetime(2026, 1, 1, tzinfo=timezone.utc))
 
-    purge_expired(trash, trash_days=30, now=lambda: NOW, records_dir=records_dir_for(clips))
+    delete_clip(meta, mode="permanent", records_dir=records_dir_for(clips))
 
     [rec] = load_records(records_dir_for(clips))
     assert rec["matchResult"]["placement"] == 3
@@ -117,7 +115,7 @@ def test_permanent_auto_delete_records_game(tmp_path):
     write_clip(clips, "a_01", start="2026-01-01T10:00:00Z")
     cfg = RetentionConfig(auto_clean_enabled=True, max_age_days=30, delete_mode="permanent")
 
-    run_cleanup(clips, clips / ".trash", cfg, now=NOW)
+    run_cleanup(clips, cfg, now=NOW)
 
     assert not (clips / "a_01.json").exists()
     assert len(load_records(records_dir_for(clips))) == 1
@@ -132,6 +130,6 @@ def test_keep_game_records_off_skips_and_clears_records(tmp_path):
         auto_clean_enabled=True, max_age_days=30, delete_mode="permanent", keep_game_records=False
     )
 
-    run_cleanup(clips, clips / ".trash", cfg, now=NOW)
+    run_cleanup(clips, cfg, now=NOW)
 
     assert load_records(records) == []

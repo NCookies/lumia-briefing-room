@@ -80,7 +80,6 @@ export interface Clip {
   teammatePortraitPaths?: string[]
   matchResultSource?: 'manual' | null
   pinned: boolean
-  deletedAt: string | null
   matchKills: number | null
   matchAssists: number | null
   matchTeamKills: number | null

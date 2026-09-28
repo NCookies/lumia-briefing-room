@@ -62,6 +62,21 @@ def ffmpeg_path() -> Path | None:
     return FFMPEG_PATH
 
 
+@pytest.fixture(autouse=True)
+def _no_real_recycle_bin(monkeypatch):
+    """`delete_helper.send_to_recycle_bin()` 이 실제 Windows 휴지통을 건드리지 않게 한다.
+
+    기본 삭제 방식이 휴지통이라 몰래 실행되는 테스트가 실제 PC 휴지통에 임시 파일을 쌓지
+    않도록, 파일을 그냥 지우는 가짜로 바꾼다(대부분의 테스트는 "파일이 사라졌다"만 확인하므로
+    영향이 없다). 휴지통 호출 자체를 확인하는 테스트는 각자 다시 monkeypatch 한다."""
+    from lumia_briefing_room.pipeline import delete_helper
+
+    def fake_send2trash(path):
+        Path(path).unlink(missing_ok=True)
+
+    monkeypatch.setattr(delete_helper, "_send2trash", fake_send2trash)
+
+
 @pytest.fixture
 def make_synthetic_session():
     """테스트가 tmp_path 와 함께 호출할 세션 빌더 함수를 넘긴다."""

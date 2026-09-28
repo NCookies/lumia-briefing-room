@@ -69,6 +69,17 @@ export async function setConfirmDelete(confirmDelete: boolean): Promise<void> {
   await jsonOrThrow(await postJson(`${BASE}/config`, { ui: { confirmDelete } }, 'PUT'), '설정 저장')
 }
 
+export async function getDeleteMode(): Promise<'recycle' | 'permanent'> {
+  const cfg = await jsonOrThrow<{ ui?: { deleteMode?: 'recycle' | 'permanent' } }>(
+    await fetch(`${BASE}/config`), '설정 불러오기',
+  )
+  return cfg.ui?.deleteMode ?? 'recycle'
+}
+
+export async function setDeleteMode(deleteMode: 'recycle' | 'permanent'): Promise<void> {
+  await jsonOrThrow(await postJson(`${BASE}/config`, { ui: { deleteMode } }, 'PUT'), '설정 저장')
+}
+
 export async function getProxyPrefetch(): Promise<boolean> {
   const cfg = await jsonOrThrow<{ encode?: { proxy?: { prefetch?: boolean } } }>(await fetch(`${BASE}/config`), '설정 불러오기')
   return cfg.encode?.proxy?.prefetch ?? true
