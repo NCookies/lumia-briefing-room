@@ -50,6 +50,8 @@ export function FilterBar({ value, onChange, variant = 'steam', viewMode, onView
 
   return (
     <div className="flex flex-wrap items-center gap-3 border-b border-zinc-700 bg-zinc-800/40 px-4 py-3">
+      <div className="flex items-center gap-2 text-sm text-zinc-400">
+        보기
       <div className="flex overflow-hidden rounded border border-zinc-600 text-sm" role="group" aria-label="보기 모드">
         {(['cards', 'timeline'] as const).map((mode) => (
           <button
@@ -62,6 +64,7 @@ export function FilterBar({ value, onChange, variant = 'steam', viewMode, onView
             {mode === 'cards' ? '카드' : '일자 타임라인'}
           </button>
         ))}
+      </div>
       </div>
 
       <select
@@ -99,7 +102,7 @@ export function FilterBar({ value, onChange, variant = 'steam', viewMode, onView
 
       {tuning && (
         <label className="flex items-center gap-2 text-sm text-zinc-300">
-          교전 점수 {Math.round(value.minPvpScore * 100)}% 이상
+          교전 점수 {value.minPvpScore === 0 ? '전체' : `${Math.round(value.minPvpScore * 100)}% 이상`}
           <input
             type="range"
             min={0}

@@ -63,8 +63,14 @@ export function PlayerModal({
         return
       }
       if (e.key === 'Escape') return onClose()
-      if (e.key === 'ArrowRight') return onIndexChange(Math.min(index + 1, clips.length - 1))
-      if (e.key === 'ArrowLeft') return onIndexChange(Math.max(index - 1, 0))
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        const video = videoRef.current
+        if (!video) return
+        e.preventDefault()
+        const delta = e.key === 'ArrowRight' ? 5 : -5
+        video.currentTime = Math.min(Math.max(video.currentTime + delta, 0), video.duration || Infinity)
+        return
+      }
 
       if (!labeling) return
       const label = labelForKey(e.key)
