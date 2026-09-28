@@ -18,10 +18,13 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from lumia_briefing_room.config import FilterConfig  # noqa: E402
 from lumia_briefing_room.detect.pvp import score_interval  # noqa: E402
 from lumia_briefing_room.detect.types import CombatInterval  # noqa: E402
+
+from eval_pvp import DEFAULT_STEAM_CLIPS_DIR, DEFAULT_VOD_CLIPS_DIR, resolve_clip_dirs  # noqa: E402
 
 
 def rescore_meta(meta: dict, weights: dict[str, float]) -> dict:
@@ -52,11 +55,22 @@ def rescore_folder(clips_dir: Path, weights: dict[str, float]) -> int:
     return changed
 
 
+def rescore_folders_for_source(
+    source: str, steam_dir: Path, vod_dir: Path, weights: dict[str, float]
+) -> int:
+    """`--source steam|vod|all` 에 맞는 폴더(들)만 다시 계산한다. 두 폴더는 완전히 분리돼 있어(plan-vod §2.2)
+    폴더 선택만으로 출처가 정확히 갈린다."""
+    return sum(rescore_folder(d, weights) for d in resolve_clip_dirs(source, steam_dir, vod_dir))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("clips_dir", nargs="?", type=Path, default=Path.home() / "Videos/LumiaBriefingRoom/clips")
+    parser.add_argument("clips_dir", nargs="?", type=Path, default=DEFAULT_STEAM_CLIPS_DIR, help="스팀 클립 폴더")
+    parser.add_argument("--vod-dir", type=Path, default=DEFAULT_VOD_CLIPS_DIR, help="다시보기 클립 폴더")
+    parser.add_argument("--source", choices=("steam", "vod", "all"), default="steam", help="다시 계산할 클립 출처")
     args = parser.parse_args()
-    changed = rescore_folder(args.clips_dir, FilterConfig().pvp_weights)
+    changed = rescore_folders_for_source(args.source, args.clips_dir, args.vod_dir, FilterConfig().pvp_weights)
+    print(f"출처: {args.source}")
     print(f"{changed}개 클립의 점수를 다시 계산했다")
 
 

@@ -4,7 +4,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
-from eval_pvp import evaluate_labels, load_clips  # noqa: E402
+from eval_pvp import (  # noqa: E402
+    clip_source,
+    evaluate_labels,
+    load_clips,
+    load_clips_for_source,
+    resolve_clip_dirs,
+)
 
 
 def m(label, score, rings=None, signals=None):
@@ -89,3 +95,50 @@ def test_load_clips_also_reads_the_label_archive_but_a_live_clip_with_the_same_i
     (archive / "gone.json").write_text(json.dumps({"userLabel": "pvp", "src": "archive"}), encoding="utf-8")
 
     assert sorted(c["src"] for c in load_clips(tmp_path)) == ["archive", "live"]
+
+
+def test_clip_source_defaults_to_steam_when_missing():
+    assert clip_source({}) == "steam"
+    assert clip_source({"source": "vod"}) == "vod"
+    assert clip_source({"source": "steam"}) == "steam"
+
+
+def test_resolve_clip_dirs_picks_folder_by_source():
+    steam_dir, vod_dir = Path("C:/steam"), Path("C:/vod")
+
+    assert resolve_clip_dirs("steam", steam_dir, vod_dir) == [steam_dir]
+    assert resolve_clip_dirs("vod", steam_dir, vod_dir) == [vod_dir]
+    assert resolve_clip_dirs("all", steam_dir, vod_dir) == [steam_dir, vod_dir]
+
+
+def test_load_clips_for_source_steam_only_reads_steam_folder_even_if_vod_folder_has_stray_files(tmp_path):
+    steam_dir, vod_dir = tmp_path / "clips", tmp_path / "vod"
+    steam_dir.mkdir()
+    vod_dir.mkdir()
+    (steam_dir / "a.json").write_text(json.dumps({"userLabel": "pvp"}), encoding="utf-8")
+    (vod_dir / "b.json").write_text(json.dumps({"userLabel": "pvp", "source": "vod"}), encoding="utf-8")
+
+    assert len(load_clips_for_source("steam", steam_dir, vod_dir)) == 1
+    assert len(load_clips_for_source("vod", steam_dir, vod_dir)) == 1
+    assert len(load_clips_for_source("all", steam_dir, vod_dir)) == 2
+
+
+def test_load_clips_for_source_filters_by_source_field_even_when_folders_are_mixed(tmp_path):
+    steam_dir, vod_dir = tmp_path / "clips", tmp_path / "vod"
+    steam_dir.mkdir()
+    vod_dir.mkdir()
+    # 실수로 vod 클립이 steam 폴더에 섞여도(source 필드로) 걸러진다
+    (steam_dir / "a.json").write_text(json.dumps({"userLabel": "pvp", "source": "vod"}), encoding="utf-8")
+
+    assert load_clips_for_source("steam", steam_dir, vod_dir) == []
+    assert len(load_clips_for_source("vod", steam_dir, vod_dir)) == 0
+    assert len(load_clips_for_source("all", steam_dir, vod_dir)) == 1
+
+
+def test_load_clips_for_source_missing_vod_folder_returns_empty_without_error(tmp_path):
+    steam_dir, vod_dir = tmp_path / "clips", tmp_path / "does_not_exist"
+    steam_dir.mkdir()
+    (steam_dir / "a.json").write_text(json.dumps({"userLabel": "pvp"}), encoding="utf-8")
+
+    assert load_clips_for_source("vod", steam_dir, vod_dir) == []
+    assert len(load_clips_for_source("all", steam_dir, vod_dir)) == 1
