@@ -27,6 +27,7 @@ export interface Vod {
   analyzedSec: number | null
   error: string | null
   streamer: string | null
+  videoDate: string | null
   games: VodGameSummary[]
   clipCount: number
   clipBytes: number

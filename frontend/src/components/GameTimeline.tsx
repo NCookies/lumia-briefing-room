@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { buildPhaseColumns } from '../timeline'
+import { buildPhaseColumns, elapsedGameSec } from '../timeline'
 import type { Clip } from '../types'
 
 interface Props {
@@ -8,8 +8,11 @@ interface Props {
   renderClip: (clip: Clip) => ReactNode
 }
 
+const ESTIMATED_TOOLTIP = '게임 시작 후 경과 시간으로 추정한 시점'
+
 export function GameTimeline({ clips, lead, renderClip }: Props) {
-  const columns = buildPhaseColumns(clips)
+  const withElapsed = clips.map((c) => ({ ...c, elapsedGameSec: elapsedGameSec(c) }))
+  const columns = buildPhaseColumns(withElapsed)
   const firstCredit = columns.findIndex((c) => c.zone === 'credit')
 
   return (
@@ -27,7 +30,19 @@ export function GameTimeline({ clips, lead, renderClip }: Props) {
               {col.clips.length > 0 ? `${col.clips.length}개` : '교전 없음'}
             </span>
           </div>
-          {col.clips.map((clip) => renderClip(clip))}
+          {col.clips.map(({ clip, estimated }) =>
+            estimated ? (
+              <div
+                key={clip.id}
+                className="rounded-lg border-2 border-dashed border-amber-500/50"
+                title={ESTIMATED_TOOLTIP}
+              >
+                {renderClip(clip)}
+              </div>
+            ) : (
+              <div key={clip.id}>{renderClip(clip)}</div>
+            ),
+          )}
         </div>
       ))}
     </div>

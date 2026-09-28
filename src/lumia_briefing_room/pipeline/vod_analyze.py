@@ -218,7 +218,7 @@ def analyze_vod(
         **index,
         "id": vod, "path": str(video_path), "size": video_path.stat().st_size,
         "durationSec": info.duration_sec, "width": info.width, "height": info.height,
-        "fps": info.fps, "streamer": streamer, "status": "analyzing", "error": None,
+        "fps": info.fps, "creationTime": info.creation_time, "streamer": streamer, "status": "analyzing", "error": None,
         "decodeDone": bool(index.get("decodeDone")) and not force and not stale,
         "analysisVersion": ANALYSIS_VERSION,
         "updatedAt": _now_iso(),

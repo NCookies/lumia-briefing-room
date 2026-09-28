@@ -140,12 +140,14 @@ def test_vod_config_defaults_are_safe():
     assert vod.min_game_sec == 60.0
     assert vod.hwaccel is None
     assert vod.streamers == {}
+    assert vod.video_dates == {}
 
 
 def test_vod_config_round_trips_through_camel_json(tmp_path):
     cfg = Config()
     cfg.vod.sources = ["H:/vod", "H:/other.mp4"]
     cfg.vod.streamers = {"3fa91c02b7de": "○○○"}
+    cfg.vod.video_dates = {"3fa91c02b7de": "2026-09-27"}
     cfg.paths.vod_clips = Path("D:/vod-out")
     path = tmp_path / "config.json"
 
@@ -155,9 +157,11 @@ def test_vod_config_round_trips_through_camel_json(tmp_path):
 
     assert raw["vod"]["sources"] == ["H:/vod", "H:/other.mp4"]
     assert raw["vod"]["gameGapSec"] == 30.0
+    assert raw["vod"]["videoDates"] == {"3fa91c02b7de": "2026-09-27"}
     assert Path(raw["paths"]["vodClips"]) == Path("D:/vod-out")
     assert loaded.vod.sources == ["H:/vod", "H:/other.mp4"]
     assert loaded.vod.streamers == {"3fa91c02b7de": "○○○"}
+    assert loaded.vod.video_dates == {"3fa91c02b7de": "2026-09-27"}
     assert loaded.paths.vod_clips == Path("D:/vod-out")
 
 

@@ -53,6 +53,31 @@ def test_probe_video_missing_file_raises(tmp_path):
 
 
 @requires_ffmpeg
+def test_probe_video_reads_creation_time_tag(tmp_path):
+    path = tmp_path / "vod_with_date.mp4"
+    subprocess.run(
+        [
+            str(FFMPEG_PATH), "-hide_banner", "-v", "error", "-y",
+            "-f", "lavfi", "-i", "testsrc=size=64x48:rate=10",
+            "-t", "1", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            "-metadata", "creation_time=2026-09-27T10:00:00.000000Z", str(path),
+        ],
+        check=True,
+    )
+
+    info = probe_video(path, ffprobe_path=FFPROBE_PATH)
+
+    assert info.creation_time == "2026-09-27T10:00:00.000000Z"
+
+
+@requires_ffmpeg
+def test_probe_video_creation_time_is_none_when_tag_missing(vod_file):
+    info = probe_video(vod_file, ffprobe_path=FFPROBE_PATH)
+
+    assert info.creation_time is None
+
+
+@requires_ffmpeg
 def test_vod_source_yields_one_frame_per_keyframe_with_original_times(vod_file):
     src = VodFileSource(vod_file, ffmpeg_path=FFMPEG_PATH, ffprobe_path=FFPROBE_PATH)
 

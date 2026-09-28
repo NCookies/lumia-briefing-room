@@ -201,6 +201,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         label: str | None = None,
         sort: str | None = None,
         source: str = "steam",
+        q: str | None = None,
     ):
         clips_dir = _source_root(app, source)
         target = (clips_dir / ".trash") if trashed else clips_dir
@@ -219,6 +220,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             trashed_only=trashed,
             min_pvp_score=minPvpScore,
             label=label,
+            title_query=q,
         )
         filtered = sort_clip_summaries(filter_clip_summaries(summaries, query), sort)
         return [_serialize(c) for c in filtered]
@@ -611,13 +613,19 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         job = {"state": "running", "message": "", "clips": 0}
         jobs[key] = job
         clips_dir = _clips_dir(app)
+        try:
+            match_start = datetime.fromisoformat(ref.match_start.replace("Z", "+00:00"))
+            label = f"게임 다시 분석 중 ({match_start.astimezone().strftime('%m/%d %H:%M')} 시작)"
+        except ValueError:
+            label = "게임 다시 분석 중"
 
         def run() -> None:
             try:
-                written = reprocess_game(
-                    clips_dir=clips_dir, trash_dir=clips_dir / ".trash", ref=ref, recording_root=recording_root,
-                    boundaries=read_boundaries(cfg), cfg=cfg, ffmpeg_path=ffmpeg, guard=lock,
-                )
+                with activity.registry.track("reprocess", label):
+                    written = reprocess_game(
+                        clips_dir=clips_dir, trash_dir=clips_dir / ".trash", ref=ref, recording_root=recording_root,
+                        boundaries=read_boundaries(cfg), cfg=cfg, ffmpeg_path=ffmpeg, guard=lock,
+                    )
                 job.update(state="done", clips=len(written))
             except ReprocessError as e:
                 job.update(state="error", message=str(e))

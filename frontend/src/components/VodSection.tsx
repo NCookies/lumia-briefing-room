@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { formatBytes } from '../retention'
 import { analysisBlockedReason, analysisPercent, formatDuration, vodStatusLabel, type Vod } from '../vodGrouping'
+import { formatDateChip } from '../vodDates'
 import type { AnalysisJob } from '../vodApi'
 
 interface Props {
@@ -18,6 +19,7 @@ interface Props {
   onAnalyze: (options: { force?: boolean; rebuild?: boolean }) => void
   onCancel: () => void
   onRenameStreamer: (streamer: string) => void
+  onEditDate: (date: string) => void
   onTrashClips: () => void
   onRestoreClips: () => void
   onDeleteClipsForever: () => void
@@ -83,6 +85,49 @@ function StreamerName({ value, onSave }: { value: string | null; onSave: (name: 
   )
 }
 
+function VideoDate({ value, onSave }: { value: string | null; onSave: (date: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  if (editing) {
+    return (
+      <form
+        className="flex items-center gap-1"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (draft) onSave(draft)
+          setEditing(false)
+        }}
+      >
+        <input
+          autoFocus
+          type="date"
+          className="rounded border border-zinc-600 bg-zinc-900 px-2 py-0.5 text-sm"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => e.key === 'Escape' && setEditing(false)}
+        />
+        <button type="submit" className="text-xs text-sky-400 hover:underline">
+          저장
+        </button>
+      </form>
+    )
+  }
+  return (
+    <button
+      type="button"
+      className="text-sm text-zinc-300 hover:text-sky-300"
+      title="영상 날짜가 다르면 여기서 고칠 수 있습니다"
+      onClick={() => {
+        setDraft(value ?? '')
+        setEditing(true)
+      }}
+    >
+      {value ? `${formatDateChip(value)} ✎` : '날짜 지정 ✎'}
+    </button>
+  )
+}
+
 export function VodSection({
   name,
   vod,
@@ -98,6 +143,7 @@ export function VodSection({
   onAnalyze,
   onCancel,
   onRenameStreamer,
+  onEditDate,
   onTrashClips,
   onRestoreClips,
   onDeleteClipsForever,
@@ -132,6 +178,7 @@ export function VodSection({
           </span>
         </button>
 
+        {!trashed && vod && <VideoDate value={vod.videoDate} onSave={onEditDate} />}
         {!trashed && vod && <StreamerName value={vod.streamer} onSave={onRenameStreamer} />}
 
         {vod && !trashed && (

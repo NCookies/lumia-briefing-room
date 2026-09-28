@@ -86,6 +86,34 @@ def test_filter_by_label():
     assert [c.id for c in filter_clip_summaries(clips, ClipQuery(label="unlabeled"))] == ["c", "d"]
 
 
+def test_filter_by_title_query_is_case_and_whitespace_insensitive():
+    clips = [cs("a", title="5일차 낮 Police Station KILL"), cs("b", title="8일차 밤 초원")]
+
+    result = filter_clip_summaries(clips, ClipQuery(title_query="  police   station kill "))
+
+    assert [c.id for c in result] == ["a"]
+
+
+def test_filter_by_title_query_substring_match():
+    clips = [cs("a", title="1일차 낮 초원 교전"), cs("b", title="2일차 밤 항구 교전")]
+
+    result = filter_clip_summaries(clips, ClipQuery(title_query="초원"))
+
+    assert [c.id for c in result] == ["a"]
+
+
+def test_filter_by_title_query_ignores_label_note():
+    clips = [cs("a", title="1일차 낮", labelNote="여기 초원 매복")]
+
+    assert filter_clip_summaries(clips, ClipQuery(title_query="초원")) == []
+
+
+def test_filter_by_title_query_blank_matches_everything():
+    clips = [cs("a", title="1일차 낮"), cs("b", title="2일차 밤")]
+
+    assert filter_clip_summaries(clips, ClipQuery(title_query="   ")) == clips
+
+
 def test_sort_by_pvp_score_descending_keeps_unscored_last():
     from lumia_briefing_room.api.filters import sort_clip_summaries
 

@@ -41,10 +41,12 @@ import {
   listVods,
   restoreVodClips,
   setStreamer,
+  setVideoDate,
   startAnalysis,
   trashVodClips,
   type AnalysisJob,
 } from '../vodApi'
+import { matchesDateFilter, uniqueVideoDates } from '../vodDates'
 import { formatDuration, formatGameRange, groupByVod, probeProgress, type Vod } from '../vodGrouping'
 
 export type ClipSource = 'steam' | 'vod'
@@ -69,7 +71,9 @@ const filterActive = (f: FilterState): boolean =>
   f.dayNight !== '' ||
   f.gameMode !== '' ||
   f.label !== '' ||
-  f.minPvpScore > 0
+  f.minPvpScore > 0 ||
+  f.q.trim() !== '' ||
+  f.dates.length > 0
 
 interface Props {
   source: ClipSource
@@ -116,19 +120,33 @@ export function ClipBrowser({
   const [viewMode, setViewMode] = useState<ViewMode>(() => loadViewMode(source))
   const ask = useConfirm()
 
+  const [debouncedQuery, setDebouncedQuery] = useState(filter.q)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(filter.q), 300)
+    return () => clearTimeout(timer)
+  }, [filter.q])
+
+  const appliedFilter = useMemo(() => ({ ...filter, q: debouncedQuery }), [filter, debouncedQuery])
+
+  const {
+    tags: filterTags, dayNight: filterDayNight, gameMode: filterGameMode, pinnedOnly: filterPinnedOnly,
+    trashed: filterTrashed, minPvpScore: filterMinPvpScore, label: filterLabel,
+  } = filter
+
   const reload = useCallback((silent = false) => {
     if (!silent) {
       setLoading(true)
       setError(null)
     }
     listClips({
-      tags: filter.tags,
-      dayNight: filter.dayNight || undefined,
-      gameMode: filter.gameMode || undefined,
-      pinned: filter.pinnedOnly || undefined,
-      trashed: filter.trashed,
-      minPvpScore: filter.minPvpScore || undefined,
-      label: filter.label || undefined,
+      tags: filterTags,
+      dayNight: filterDayNight || undefined,
+      gameMode: filterGameMode || undefined,
+      pinned: filterPinnedOnly || undefined,
+      trashed: filterTrashed,
+      minPvpScore: filterMinPvpScore || undefined,
+      label: filterLabel || undefined,
+      q: debouncedQuery || undefined,
       source,
     })
       .then(setClips)
@@ -136,14 +154,17 @@ export function ClipBrowser({
         if (!silent) setError(e.message)
       })
       .finally(() => setLoading(false))
-    if (source === 'steam' && !filterActive(filter)) {
+    if (source === 'steam' && !filterActive(appliedFilter)) {
       listGameRecords()
         .then(setRecords)
         .catch(() => setRecords([]))
     } else {
       setRecords([])
     }
-  }, [filter, source])
+  }, [
+    filterTags, filterDayNight, filterGameMode, filterPinnedOnly, filterTrashed, filterMinPvpScore, filterLabel,
+    debouncedQuery, source, appliedFilter,
+  ])
 
   useEffect(() => {
     if (active) reload()
@@ -342,6 +363,11 @@ export function ClipBrowser({
       .then(reloadVods)
       .catch((e: Error) => setActionError(e.message))
 
+  const handleEditVideoDate = (vod: Vod, date: string) =>
+    setVideoDate(vod.id, date)
+      .then(reloadVods)
+      .catch((e: Error) => setActionError(e.message))
+
   const vodAction = (action: () => Promise<unknown>) =>
     runAndReload(async () => {
       await action()
@@ -421,9 +447,15 @@ export function ClipBrowser({
     [source, clips, records, filter.sort],
   )
   const vodGroups = useMemo(
-    () => (source === 'vod' ? groupByVod(clips, vods, filter.sort, !filter.trashed) : []),
-    [source, clips, vods, filter.sort, filter.trashed],
+    () =>
+      source === 'vod'
+        ? groupByVod(clips, vods, filter.sort, !filter.trashed).filter((vg) =>
+            matchesDateFilter(vg.vod?.videoDate ?? null, filter.dates),
+          )
+        : [],
+    [source, clips, vods, filter.sort, filter.trashed, filter.dates],
   )
+  const dateOptions = useMemo(() => (source === 'vod' ? uniqueVideoDates(vods) : []), [source, vods])
   const groups = useMemo(
     () => (source === 'steam' ? steamGroups : vodGroups.flatMap((v) => v.games)),
     [source, steamGroups, vodGroups],
@@ -523,7 +555,7 @@ export function ClipBrowser({
     error: error !== null,
     empty: listEmpty,
     trashed: filter.trashed,
-    filtered: !filter.trashed && filterActive(filter),
+    filtered: !filter.trashed && filterActive(appliedFilter),
     vodTotal: vods.length,
   })
 
@@ -538,6 +570,7 @@ export function ClipBrowser({
           setViewMode(mode)
           saveViewMode(source, mode)
         }}
+        dateOptions={dateOptions}
       />
 
       <main className="flex-1 p-4">
@@ -655,6 +688,7 @@ export function ClipBrowser({
                   onAnalyze={(options) => vg.vod && handleAnalyze(vg.vod, options)}
                   onCancel={() => vg.vod && handleCancelAnalysis(vg.vod)}
                   onRenameStreamer={(name) => vg.vod && handleRenameStreamer(vg.vod, name)}
+                  onEditDate={(date) => vg.vod && handleEditVideoDate(vg.vod, date)}
                   onTrashClips={() => handleTrashVod(vg.vodId, vg.name, vg.vod?.clipCount ?? visible)}
                   onRestoreClips={() => vodAction(() => restoreVodClips(vg.vodId))}
                   onDeleteClipsForever={() => handleDeleteVodForever(vg.vodId, vg.name)}

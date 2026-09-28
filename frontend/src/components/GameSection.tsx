@@ -123,7 +123,9 @@ export function GameSection({
   const canCorrect = Boolean(onCorrectMatchResult) && !trashed && !group.recordId
 
   return (
-    <section className="overflow-hidden rounded-lg border border-zinc-700 bg-zinc-800/60">
+    <section
+      className={`overflow-hidden rounded-lg border bg-zinc-800/60 ${reprocessing ? 'border-sky-500/60' : 'border-zinc-700'}`}
+    >
       <div className="flex items-stretch">
         <div className={`w-1.5 shrink-0 ${barColor(result?.placement)}`} />
         <div
@@ -276,6 +278,15 @@ export function GameSection({
           {expanded ? '▴' : '▾'}
         </button>
       </div>
+
+      {reprocessing && (
+        <div className="border-t border-zinc-700 bg-sky-950/30 px-4 py-2">
+          <div className="h-1.5 overflow-hidden rounded bg-zinc-700">
+            <div className="indeterminate-bar h-full rounded bg-sky-500" />
+          </div>
+          <p className="mt-1 text-xs text-sky-300">다시 분석하는 중입니다. 원본 녹화에서 클립을 새로 만들고 있습니다.</p>
+        </div>
+      )}
 
       {expanded && (
         <div

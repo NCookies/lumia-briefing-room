@@ -40,6 +40,10 @@ export async function setStreamer(id: string, streamer: string): Promise<void> {
   await jsonOrThrow(await send(`${BASE}/vods/${id}`, 'PATCH', { streamer }), '스트리머 이름 저장')
 }
 
+export async function setVideoDate(id: string, date: string): Promise<void> {
+  await jsonOrThrow(await send(`${BASE}/vods/${id}`, 'PATCH', { date }), '영상 날짜 저장')
+}
+
 export async function startAnalysis(id: string, options: { force?: boolean; rebuild?: boolean } = {}): Promise<void> {
   await jsonOrThrow(await send(`${BASE}/vods/${id}/analyze`, 'POST', options), '분석 시작')
 }
