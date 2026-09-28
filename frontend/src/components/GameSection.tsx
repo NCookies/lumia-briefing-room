@@ -114,7 +114,7 @@ export function GameSection({
   const result = group.result
   const kda = formatKda(result)
   const [editing, setEditing] = useState(false)
-  const canCorrect = Boolean(onCorrectMatchResult) && !trashed && !group.recordId
+  const canCorrect = Boolean(onCorrectMatchResult) && !group.recordId
 
   return (
     <section
