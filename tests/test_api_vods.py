@@ -302,6 +302,32 @@ def test_force_and_rebuild_flags_are_passed_through(env, monkeypatch):
     assert fake.calls[0] == ("a.mp4", True, False) and fake.calls[1] == ("a.mp4", False, True)
 
 
+def test_delete_source_flag_is_passed_through_to_analyze_vod(env, monkeypatch):
+    client, a, *_ = env
+    vid = vod_id(a)
+    captured = []
+
+    def spy(path, cfg, **kw):
+        captured.append(kw.get("delete_source"))
+        return {"status": "done", "games": [], "clips": []}
+
+    monkeypatch.setattr(vods_module, "analyze_vod", spy)
+
+    client.post(f"/api/vods/{vid}/analyze", json={"deleteSource": True})
+    wait_for(client, vid, "done")
+
+    assert captured == [True]
+
+
+def test_delete_source_must_be_a_boolean(env):
+    client, a, *_ = env
+    vid = vod_id(a)
+
+    resp = client.post(f"/api/vods/{vid}/analyze", json={"deleteSource": "yes"})
+
+    assert resp.status_code == 400
+
+
 def test_cancel_stops_the_running_analysis(env, monkeypatch):
     client, a, *_ = env
     fake = FakeAnalyze()

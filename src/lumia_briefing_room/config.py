@@ -209,6 +209,8 @@ class VodConfig:
     hwaccel: str | None = None
     streamers: dict[str, str] = field(default_factory=dict)
     video_dates: dict[str, str] = field(default_factory=dict)  # vodId -> 사용자가 고친 날짜(YYYY-MM-DD), plan-vod.md V8
+    delete_source_after: str = "ask"  # "ask" | "always" | "never", plan-vod.md V7
+    delete_source_mode: str = "trash"  # "trash" | "permanent", plan-vod.md V7
 
 
 @dataclass

@@ -35,7 +35,7 @@ from lumia_briefing_room.pipeline.orchestrator import (
     default_title,
 )
 from lumia_briefing_room.pipeline.portrait_scan import PORTRAIT_SLOTS, find_vod_portraits, save_portrait_image
-from lumia_briefing_room.pipeline.delete_helper import delete_clip
+from lumia_briefing_room.pipeline.delete_helper import delete_clip, permanently_delete, send_to_recycle_bin
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for
 from lumia_briefing_room.pipeline.vod_clips import build_vod_metadata, cut_vod_clip, vod_clip_id
 from lumia_briefing_room.pipeline.vod_detect import detect_games
@@ -199,12 +199,18 @@ def analyze_vod(
     find_result: FindResult | None = None,
     find_portraits: FindPortraits | None = None,
     source_factory: SourceFactory | None = None,
+    delete_source: bool | None = None,
 ) -> dict:
     """다시보기 영상 하나를 분석해 게임별 교전 클립을 만든다.
 
     판독(디코딩)은 캐시에 이어 쓰므로 취소·종료 뒤 다시 부르면 저장된 시각부터 이어간다.
     이미 끝난 영상은 아무것도 안 한다. force 는 캐시까지 지우고 처음부터, rebuild 는 캐시로 클립만 다시 만든다.
-    다시 만들 때 새 클립을 전부 만든 뒤에만 기존 클립을 지운다(설정한 삭제 방식). 원본 영상은 읽기만 한다.
+    다시 만들 때 새 클립을 전부 만든 뒤에만 기존 클립을 지운다(설정한 삭제 방식). 원본 영상은 기본적으로 읽기만 한다.
+
+    `delete_source` 는 분석이 성공하고 클립이 1개 이상 나왔을 때 원본 영상 파일을 지울지
+    정한다(plan-vod.md V7). `None` 이면 이전 호출에서 저장해 둔 값(`index["deleteSourceOnSuccess"]`,
+    기본 False)을 그대로 따른다 — 취소된 분석을 다시 부르는 등 이번 호출에서 값을 다시 넘기지
+    않아도 처음에 고른 선택이 이어진다.
     """
     video_path = Path(video_path)
     root = clips_dir or resolve_paths(cfg.paths).vod_clips
@@ -238,6 +244,7 @@ def analyze_vod(
         "decodeDone": bool(index.get("decodeDone")) and not force and not stale,
         "analysisVersion": ANALYSIS_VERSION,
         "updatedAt": _now_iso(),
+        "deleteSourceOnSuccess": delete_source if delete_source is not None else index.get("deleteSourceOnSuccess", False),
     }
     save_index(root, index)
 
@@ -271,8 +278,23 @@ def analyze_vod(
 
     index.update(status="done", updatedAt=_now_iso())
     save_index(root, index)
+    if index.get("deleteSourceOnSuccess") and len(index["clips"]) >= 1:
+        _delete_source_video(video_path, mode=cfg.vod.delete_source_mode)
     report("done", 1.0, games=len(index["games"]), clips=len(index["clips"]))
     return index
+
+
+def _delete_source_video(path: Path, *, mode: str) -> None:
+    """분석이 끝난 뒤 사용자가 선택한 경우에만 원본 영상 파일 하나를 지운다. (plan-vod.md V7)
+
+    폴더나 다른 파일은 건드리지 않고, 방금 분석한 이 경로 하나만 지운다.
+    """
+    if not path.exists():
+        return
+    if mode == "permanent":
+        permanently_delete([path])
+    else:
+        send_to_recycle_bin([path])
 
 
 def _decode(

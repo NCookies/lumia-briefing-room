@@ -118,6 +118,74 @@ def test_index_records_video_facts_and_game_summary(vod_file, tmp_path):
 
 
 @requires_ffmpeg
+def test_deletes_source_video_when_requested_and_clips_were_made(vod_file, tmp_path):
+    index, _ = run(tmp_path, vod_file, find_result=lambda v, s, n: screen(), delete_source=True)
+
+    assert index["status"] == "done" and len(index["clips"]) >= 1
+    assert not vod_file.exists()
+
+
+@requires_ffmpeg
+def test_keeps_source_video_when_not_requested(vod_file, tmp_path):
+    index, _ = run(tmp_path, vod_file, find_result=lambda v, s, n: screen(), delete_source=False)
+
+    assert index["status"] == "done"
+    assert vod_file.exists()
+
+
+@requires_ffmpeg
+def test_does_not_delete_source_video_when_no_clips_were_made(vod_file, tmp_path):
+    def never_ingame(frame, t):
+        return FrameState(
+            t=round(t), combat=None, face_value=None, face_sat=None,
+            k=None, a=None, day_night=None, spectating=None, game_day=None, team_combat=None,
+        )
+
+    index, _ = run(
+        tmp_path, vod_file, find_result=lambda v, s, n: screen(), delete_source=True,
+        read_frame=never_ingame,
+    )
+
+    assert index["games"] == [] and index["clips"] == []
+    assert vod_file.exists()
+
+
+@requires_ffmpeg
+def test_recycle_mode_sends_source_video_to_the_recycle_bin_instead_of_deleting(vod_file, tmp_path, monkeypatch):
+    from lumia_briefing_room.pipeline import delete_helper
+
+    sent = []
+    monkeypatch.setattr(delete_helper, "_send2trash", lambda path: sent.append(path))
+    cfg = make_cfg(tmp_path)
+    cfg.vod.delete_source_mode = "trash"
+
+    run(tmp_path, vod_file, cfg=cfg, find_result=lambda v, s, n: screen(), delete_source=True)
+
+    assert sent == [str(vod_file)]
+
+
+@requires_ffmpeg
+def test_delete_source_decision_persists_in_the_index_for_a_later_resumed_call(vod_file, tmp_path):
+    cfg = make_cfg(tmp_path)
+    cfg.vod.delete_source_mode = "permanent"
+    cancel = threading.Event()
+    cancel.set()
+    with pytest.raises(VodCancelled):
+        analyze_vod(
+            vod_file, cfg, ffmpeg_path=FFMPEG_PATH, read_frame=read_frame,
+            find_result=no_result, cancel=cancel, delete_source=True,
+        )
+    index = load_index(cfg.paths.vod_clips, vod_id(vod_file))
+    assert index["deleteSourceOnSuccess"] is True
+    assert vod_file.exists()
+
+    index2, _ = run(tmp_path, vod_file, cfg=cfg, find_result=lambda v, s, n: screen())
+
+    assert index2["status"] == "done"
+    assert not vod_file.exists()
+
+
+@requires_ffmpeg
 def test_progress_is_reported_and_reaches_the_end(vod_file, tmp_path):
     seen = []
 

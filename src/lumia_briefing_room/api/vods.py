@@ -240,6 +240,9 @@ def register_vod_routes(
             message="시작하는 중", cancel=cancel,
         )
         force, rebuild = bool(body.get("force")), bool(body.get("rebuild"))
+        delete_source = body.get("deleteSource")
+        if delete_source is not None and not isinstance(delete_source, bool):
+            raise HTTPException(400, "deleteSource 는 true/false 여야 합니다")
 
         def on_progress(p: VodProgress) -> None:
             job.update(phase=p.phase, fraction=p.fraction, games=p.games, clips=p.clips, message=p.message)
@@ -248,7 +251,7 @@ def register_vod_routes(
             try:
                 analyze_vod(
                     path, cfg, ffmpeg_path=ffmpeg, force=force, rebuild=rebuild,
-                    on_progress=on_progress, cancel=cancel,
+                    on_progress=on_progress, cancel=cancel, delete_source=delete_source,
                 )
                 job.update(state="done", fraction=1.0, message="")
             except VodCancelled:

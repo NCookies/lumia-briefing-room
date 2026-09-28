@@ -39,13 +39,16 @@ import {
   cancelAnalysis,
   deleteVodClips,
   getAnalysis,
+  getDeleteSourceAfter,
   listVods,
+  setDeleteSourceAfter,
   setStreamer,
   setVideoDate,
   startAnalysis,
   type AnalysisJob,
 } from '../vodApi'
 import { matchesDateFilter, uniqueVideoDates } from '../vodDates'
+import { resolvedDeleteSource } from '../vodDeleteSource'
 import { formatDuration, formatGameRange, groupByVod, probeProgress, type Vod } from '../vodGrouping'
 
 export type ClipSource = 'steam' | 'vod'
@@ -337,10 +340,23 @@ export function ClipBrowser({
       confirmLabel: options.force ? '다시 분석' : options.rebuild ? '다시 만들기' : '분석 시작',
     })
     if (!result.ok) return
+
+    let deleteSource = resolvedDeleteSource(await getDeleteSourceAfter())
+    if (deleteSource === null) {
+      const choice = await ask({
+        message: '클립 추출이 끝나면 원본 영상 파일을 삭제할까요?',
+        confirmLabel: '삭제',
+        allowSkip: true,
+        danger: true,
+      })
+      deleteSource = choice.ok
+      if (choice.skipNext) await setDeleteSourceAfter(choice.ok ? 'always' : 'never')
+    }
+
     setActionError(null)
     setNotice(null)
     try {
-      await startAnalysis(vod.id, options)
+      await startAnalysis(vod.id, { ...options, deleteSource })
       reloadVods()
     } catch (e) {
       setActionError((e as Error).message)

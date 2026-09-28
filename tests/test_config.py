@@ -142,6 +142,8 @@ def test_vod_config_defaults_are_safe():
     assert vod.hwaccel is None
     assert vod.streamers == {}
     assert vod.video_dates == {}
+    assert vod.delete_source_after == "ask"
+    assert vod.delete_source_mode == "trash"
 
 
 def test_vod_config_round_trips_through_camel_json(tmp_path):
@@ -149,6 +151,8 @@ def test_vod_config_round_trips_through_camel_json(tmp_path):
     cfg.vod.sources = ["H:/vod", "H:/other.mp4"]
     cfg.vod.streamers = {"3fa91c02b7de": "○○○"}
     cfg.vod.video_dates = {"3fa91c02b7de": "2026-09-27"}
+    cfg.vod.delete_source_after = "always"
+    cfg.vod.delete_source_mode = "permanent"
     cfg.paths.vod_clips = Path("D:/vod-out")
     path = tmp_path / "config.json"
 
@@ -159,10 +163,14 @@ def test_vod_config_round_trips_through_camel_json(tmp_path):
     assert raw["vod"]["sources"] == ["H:/vod", "H:/other.mp4"]
     assert raw["vod"]["gameGapSec"] == 30.0
     assert raw["vod"]["videoDates"] == {"3fa91c02b7de": "2026-09-27"}
+    assert raw["vod"]["deleteSourceAfter"] == "always"
+    assert raw["vod"]["deleteSourceMode"] == "permanent"
     assert Path(raw["paths"]["vodClips"]) == Path("D:/vod-out")
     assert loaded.vod.sources == ["H:/vod", "H:/other.mp4"]
     assert loaded.vod.streamers == {"3fa91c02b7de": "○○○"}
     assert loaded.vod.video_dates == {"3fa91c02b7de": "2026-09-27"}
+    assert loaded.vod.delete_source_after == "always"
+    assert loaded.vod.delete_source_mode == "permanent"
     assert loaded.paths.vod_clips == Path("D:/vod-out")
 
 
