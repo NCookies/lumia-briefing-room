@@ -1,15 +1,16 @@
 import type { ReactNode } from 'react'
-import { buildPhaseColumns } from '../timeline'
+import { buildCobaltPhaseColumns, buildPhaseColumns } from '../timeline'
 import type { Clip } from '../types'
 
 interface Props {
   clips: Clip[]
   lead?: ReactNode
   renderClip: (clip: Clip) => ReactNode
+  gameMode?: string | null
 }
 
-export function GameTimeline({ clips, lead, renderClip }: Props) {
-  const columns = buildPhaseColumns(clips)
+export function GameTimeline({ clips, lead, renderClip, gameMode }: Props) {
+  const columns = gameMode === 'cobalt' ? buildCobaltPhaseColumns(clips) : buildPhaseColumns(clips)
   const firstCredit = columns.findIndex((c) => c.zone === 'credit')
 
   return (

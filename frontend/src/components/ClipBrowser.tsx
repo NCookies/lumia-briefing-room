@@ -29,7 +29,15 @@ import { LoadingBar } from './LoadingBar'
 import { LabelingHelp } from './LabelingHelp'
 import { emptyStateKind } from '../emptyState'
 import { loadViewMode, saveViewMode, type ViewMode } from '../viewMode'
-import { formatMatchResult, gameRecordId, groupByGame, totalSize, withResultImage, type GameGroup } from '../grouping'
+import {
+  formatMatchResult,
+  gameRecordId,
+  groupByGame,
+  resultImageRef,
+  totalSize,
+  withResultImage,
+  type GameGroup,
+} from '../grouping'
 import { applyLabel, applyNote, progress } from '../labeling'
 import { useLabelingUi } from '../labelingContext'
 import { formatBytes } from '../retention'
@@ -37,15 +45,24 @@ import type { Clip, GameRecord, UserLabel } from '../types'
 import {
   cancelAnalysis,
   deleteVodClipsForever,
+  deleteVodGame,
   getAnalysis,
   listVods,
   restoreVodClips,
   setStreamer,
   startAnalysis,
   trashVodClips,
+  vodGameResultImageUrl,
   type AnalysisJob,
 } from '../vodApi'
 import { formatDuration, formatGameRange, groupByVod, probeProgress, type Vod } from '../vodGrouping'
+
+function resolveResultImageUrl(group: { recordId?: string; clips: { id: string }[]; key: string; number: number }): string {
+  const ref = resultImageRef(group)
+  if (ref.kind === 'record') return gameRecordImageUrl(ref.id)
+  if (ref.kind === 'clip') return resultImageUrl(ref.id)
+  return vodGameResultImageUrl(ref.vodId, ref.index)
+}
 
 export type ClipSource = 'steam' | 'vod'
 
@@ -66,7 +83,6 @@ const filterActive = (f: FilterState): boolean =>
   f.trashed ||
   f.pinnedOnly ||
   f.tags.length > 0 ||
-  f.dayNight !== '' ||
   f.gameMode !== '' ||
   f.label !== '' ||
   f.minPvpScore > 0
@@ -123,7 +139,6 @@ export function ClipBrowser({
     }
     listClips({
       tags: filter.tags,
-      dayNight: filter.dayNight || undefined,
       gameMode: filter.gameMode || undefined,
       pinned: filter.pinnedOnly || undefined,
       trashed: filter.trashed,
@@ -257,7 +272,13 @@ export function ClipBrowser({
 
   const handleTrashGame = async (group: GameGroup<Clip>) => {
     if (await confirmTrash(`${gameLabel(group)}의 클립을 모두 삭제하시겠습니까?\n삭제한 클립은 휴지통에서 복구할 수 있습니다.`)) {
-      await runAndReload(() => runAll(group.clips, trashClip))
+      await runAndReload(async () => {
+        // VOD 는 클립이 0개인 게임도 있다(교전은 못 뽑았지만 결과 화면은 읽은 경우,
+        // plan.md §10-6) - 클립 기준 삭제(runAll)로는 지울 방법이 없어 게임 요약 자체를
+        // 지우는 전용 API 를 쓴다(실사용 보고: "게임 삭제"를 눌러도 목록에서 안 없어짐).
+        if (source === 'vod') await deleteVodGame(group.key.split('|')[0], group.number)
+        else await runAll(group.clips, trashClip)
+      })
     }
   }
 
@@ -341,7 +362,7 @@ export function ClipBrowser({
   const handleTrashVod = async (id: string, name: string, count: number) => {
     if (
       await confirmTrash(
-        `"${name}" 영상의 클립 ${count}개를 모두 삭제하시겠습니까?\n삭제한 클립은 휴지통에서 복구할 수 있습니다. 영상 파일은 지우지 않습니다.`,
+        `"${name}" 영상의 클립 ${count}개를 모두 삭제하고 분석 결과를 "분석 안 함"으로 되돌리시겠습니까?\n삭제한 클립은 휴지통에서 복구할 수 있습니다. 영상 파일은 지우지 않습니다.`,
       )
     ) {
       await vodAction(() => trashVodClips(id))
@@ -423,7 +444,7 @@ export function ClipBrowser({
     () =>
       withResultImage(groups).map((g) => ({
         key: g.key,
-        imageUrl: g.recordId ? gameRecordImageUrl(g.recordId) : resultImageUrl(g.clips[0].id),
+        imageUrl: resolveResultImageUrl(g),
         caption: [`게임 ${g.number}`, formatMatchResult(g.result)].filter(Boolean).join(' · '),
       })),
     [groups],
@@ -458,9 +479,10 @@ export function ClipBrowser({
   const timeline = viewMode === 'timeline'
 
   const renderGame = (group: GameGroup<Clip>) => {
-    const lead = group.result?.imagePath ? (
+    const imageUrl = resolveResultImageUrl(group)
+    const lead = group.result?.imagePath && imageUrl ? (
       <ResultCard
-        imageUrl={group.recordId ? gameRecordImageUrl(group.recordId) : resultImageUrl(group.clips[0].id)}
+        imageUrl={imageUrl}
         result={group.result}
         onOpen={() => setResultViewKey(group.key)}
       />
@@ -491,7 +513,7 @@ export function ClipBrowser({
               }
             >
               {timeline ? (
-                <GameTimeline clips={group.clips} lead={lead} renderClip={renderClipCard} />
+                <GameTimeline clips={group.clips} lead={lead} renderClip={renderClipCard} gameMode={group.gameMode} />
               ) : (
                 <>
                   {lead}
@@ -525,6 +547,14 @@ export function ClipBrowser({
           setViewMode(mode)
           saveViewMode(source, mode)
         }}
+        onRefresh={
+          source === 'vod'
+            ? () => {
+                reload()
+                reloadVods()
+              }
+            : undefined
+        }
       />
 
       <main className="flex-1 p-4">
@@ -629,7 +659,7 @@ export function ClipBrowser({
                   trashed={trashedView}
                   gameCount={trashedView ? vg.games.length : (vg.vod?.games.length ?? vg.games.length)}
                   clipCount={trashedView ? visible : (vg.vod?.clipCount ?? visible)}
-                  visibleClipCount={visible}
+                  visibleGameCount={vg.games.length}
                   clipBytes={trashedView ? visibleBytes : (vg.vod?.clipBytes ?? visibleBytes)}
                   analysisBusy={runningVodId !== null}
                   onToggle={() =>

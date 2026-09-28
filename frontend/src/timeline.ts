@@ -33,3 +33,24 @@ export function buildPhaseColumns<T extends PhaseClip>(clips: T[]): PhaseColumn<
   if (unknown.length > 0) columns.push({ phaseIndex: null, label: '시점 알 수 없음', zone: null, clips: unknown })
   return columns
 }
+
+export interface CobaltPhaseClip {
+  cobaltPhase: number | null
+}
+
+/** 코발트 프로토콜은 낮/밤·일차가 없어 Phase 번호로만 칸을 나눈다(사용자 요청, 2026-09-28). */
+export function buildCobaltPhaseColumns<T extends CobaltPhaseClip>(clips: T[]): PhaseColumn<T>[] {
+  const known = clips.filter((c) => c.cobaltPhase !== null)
+  const columns: PhaseColumn<T>[] = []
+  if (known.length > 0) {
+    const values = known.map((c) => c.cobaltPhase as number)
+    const first = Math.min(...values)
+    const last = Math.max(...values)
+    for (let p = first; p <= last; p++) {
+      columns.push({ phaseIndex: p, label: `Phase ${p}`, zone: null, clips: known.filter((c) => c.cobaltPhase === p) })
+    }
+  }
+  const unknown = clips.filter((c) => c.cobaltPhase === null)
+  if (unknown.length > 0) columns.push({ phaseIndex: null, label: '시점 알 수 없음', zone: null, clips: unknown })
+  return columns
+}

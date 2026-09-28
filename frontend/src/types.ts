@@ -75,6 +75,7 @@ export interface Clip {
   labelConflict?: boolean
   gameDay: number | null
   dayNight: 'day' | 'night' | null
+  cobaltPhase: number | null
   phaseIndex: number | null
   reviveCost: 'free' | 'credit' | null
   myCharacter: string | null

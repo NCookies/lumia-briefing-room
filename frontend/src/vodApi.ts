@@ -64,6 +64,12 @@ export async function deleteVodClipsForever(id: string): Promise<number> {
   return (await jsonOrThrow<{ count: number }>(await send(`${BASE}/vods/${id}/clips`, 'DELETE'), '완전 삭제')).count
 }
 
+// 클립이 없는 게임(교전은 못 뽑았지만 결과 화면은 읽은 경우, plan.md §10-6)도 지울 수
+// 있어야 한다 - 클립 ID 기준 삭제 경로로는 지울 방법이 없다.
+export async function deleteVodGame(vodId: string, gameIndex: number): Promise<void> {
+  await jsonOrThrow(await send(`${BASE}/vods/${vodId}/games/${gameIndex}`, 'DELETE'), '게임 삭제')
+}
+
 export async function pickVideoFiles(initial = ''): Promise<string[]> {
   const { paths } = await jsonOrThrow<{ paths: string[] }>(
     await send(`${BASE}/fs/pick-videos`, 'POST', { initial }),
@@ -91,4 +97,10 @@ export async function getVodSettings(): Promise<VodSettings & { vodClips: string
 
 export async function saveVodSettings(patch: { vod?: Partial<VodSettings>; paths?: { vodClips?: string } }): Promise<void> {
   await jsonOrThrow(await send(`${BASE}/config`, 'PUT', patch), '설정 저장')
+}
+
+// 클립이 없는 게임(교전은 못 뽑았지만 결과 화면은 읽은 경우, plan.md §10-6)의 결과표
+// 이미지 - 클립 ID 로 찾는 resultImageUrl 을 못 쓴다.
+export function vodGameResultImageUrl(vodId: string, gameIndex: number): string {
+  return `${BASE}/vods/${vodId}/games/${gameIndex}/result-image`
 }

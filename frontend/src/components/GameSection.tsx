@@ -65,7 +65,16 @@ export function GameSection({
           aria-expanded={expanded}
         >
           <div className="w-24">
-            {result ? (
+            {group.gameMode === 'cobalt' && (
+              <div className="mb-1 inline-block rounded border border-indigo-500 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-300">
+                코발트
+              </div>
+            )}
+            {result && group.gameMode === 'cobalt' ? (
+              <div className={`text-xl font-bold ${result.outcome === '승리' ? 'text-emerald-400' : 'text-zinc-200'}`}>
+                {result.outcome ?? '결과 미확인'}
+              </div>
+            ) : result ? (
               <>
                 <div className={`text-xl font-bold ${result.placement === 1 ? 'text-emerald-400' : 'text-zinc-200'}`}>
                   #{result.placement}

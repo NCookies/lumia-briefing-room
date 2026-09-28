@@ -10,6 +10,7 @@ export interface VodGameSummary {
   confidence?: number
   kFinal?: number | null
   aFinal?: number | null
+  gameMode?: string | null
   result: MatchResult | null
   clipIds: string[]
 }
@@ -42,6 +43,7 @@ export interface VodClipLike {
   gameEndOffsetSec?: number
   pvpScore: number | null
   matchResult?: MatchResult | null
+  gameMode?: string | null
 }
 
 export interface VodGroup<T> {
@@ -71,12 +73,14 @@ export function groupByVod<T extends VodClipLike>(
     if (existing) {
       existing.clips.push(clip)
       existing.result ??= clip.matchResult ?? null
+      existing.gameMode ??= clip.gameMode ?? null
     } else {
       perVod.set(index, {
         key: `${clip.vodId}|${index}`,
         number: index,
         matchStartUtc: '',
         result: clip.matchResult ?? null,
+        gameMode: clip.gameMode ?? null,
         clips: [clip],
         startSec: clip.gameStartOffsetSec,
         endSec: clip.gameEndOffsetSec,
@@ -84,7 +88,36 @@ export function groupByVod<T extends VodClipLike>(
     }
   }
 
-  const keptEmpty = includeEmpty ? vods.filter((v) => !(v.status === 'done' && v.clipCount === 0)).map((v) => v.id) : []
+  // 클립이 0개인 게임도 결과(승패·스탯·팀원)는 이미 다 읽어 뒀을 수 있다(예: 코발트
+  // 다시보기가 오버레이 때문에 교전은 못 뽑아도 결과 화면은 읽는 경우, plan.md §10-6
+  // 실사용 보고 - "게임 6개인데 화면엔 아무것도 안 뜬다"). 클립에서만 게임 행을 만들면
+  // 이런 결과가 통째로 안 보이므로, `vod.games` 요약에서 클립이 없는 게임도 행으로 만든다.
+  if (includeEmpty) {
+    for (const vod of vods) {
+      const perVod = games.get(vod.id) ?? new Map<number, GameGroup<T>>()
+      games.set(vod.id, perVod)
+      for (const g of vod.games) {
+        if (perVod.has(g.index)) continue
+        perVod.set(g.index, {
+          key: `${vod.id}|${g.index}`,
+          number: g.index,
+          matchStartUtc: '',
+          result: g.result,
+          gameMode: g.gameMode ?? null,
+          clips: [],
+          startSec: g.startSec,
+          endSec: g.endSec,
+        })
+      }
+    }
+  }
+
+  // 클립이 0개인 이유(게임을 못 찾음 / 게임은 찾았지만 클립을 지움)를 구분해서
+  // 숨기려다 보니 조건이 복잡해지고, 그 조건에 걸리면 "다시 분석" 버튼도 같이
+  // 사라져 되돌릴 방법이 없었다(실사용 보고, 2026-09-27). 숨기지 않는다 — 보기
+  // 싫은 항목은 사용자가 직접 지운다(영상 삭제). 대신 목록은 새로고침 버튼으로
+  // 언제든 다시 읽는다(`ClipBrowser.tsx`).
+  const keptEmpty = includeEmpty ? vods.map((v) => v.id) : []
   const ids = new Set<string>([...games.keys(), ...keptEmpty])
   const groups: VodGroup<T>[] = [...ids].map((vodId) => {
     const vod = known.get(vodId) ?? null
@@ -92,10 +125,6 @@ export function groupByVod<T extends VodClipLike>(
     for (const g of list) g.clips.sort(byId)
     list.sort((a, b) => a.number - b.number)
     if (sort === 'desc') list.reverse()
-    if (sort === 'pvp') {
-      const best = (g: GameGroup<T>) => Math.max(...g.clips.map((c) => c.pvpScore ?? -1))
-      list.sort((a, b) => best(b) - best(a) || a.number - b.number)
-    }
     return { vodId, name: vod?.name ?? vodId, vod, games: list }
   })
 
