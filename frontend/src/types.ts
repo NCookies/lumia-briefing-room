@@ -15,9 +15,6 @@ export interface MatchResult {
   total: number
   outcome: string | null
   nickname: string | null
-  character?: string | null
-  characterRaw?: string | null
-  teammates?: { nickname: string; character: string | null }[] | null
   imagePath?: string | null
   tk?: number | null
   kills?: number | null
@@ -79,6 +76,9 @@ export interface Clip {
   reviveCost: 'free' | 'credit' | null
   myCharacter: string | null
   teamCharacters: string[]
+  myCharacterPortraitPath?: string | null
+  teammatePortraitPaths?: string[]
+  matchResultSource?: 'manual' | null
   pinned: boolean
   deletedAt: string | null
   matchKills: number | null

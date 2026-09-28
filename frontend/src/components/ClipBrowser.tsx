@@ -263,6 +263,16 @@ export function ClipBrowser({
 
   const handleRestoreGame = (group: GameGroup<Clip>) => runAndReload(() => runAll(group.clips, restoreClip))
 
+  const handleCorrectMatchResult = (group: GameGroup<Clip>, values: { placement: number; outcome: string }) =>
+    runAndReload(() =>
+      runAll(group.clips, (id) => patchClip(id, { matchResult: values }).then(() => undefined)),
+    )
+
+  const handleUnlockMatchResult = (group: GameGroup<Clip>) =>
+    runAndReload(() =>
+      runAll(group.clips, (id) => patchClip(id, { matchResultSource: null }).then(() => undefined)),
+    )
+
   useEffect(() => {
     if (reprocessKey === null) return
     const timer = setInterval(() => {
@@ -481,6 +491,9 @@ export function ClipBrowser({
               reprocessing={reprocessGame === group.key}
               reprocessBusy={reprocessKey !== null}
               hideReprocess={source === 'vod'}
+              matchResultLocked={group.clips[0]?.matchResultSource === 'manual'}
+              onCorrectMatchResult={(values) => handleCorrectMatchResult(group, values)}
+              onUnlockMatchResult={() => handleUnlockMatchResult(group)}
               timeLabel={
                 source === 'vod' && group.startSec !== undefined
                   ? {
