@@ -260,6 +260,22 @@ def test_progress_covers_scan_and_processing_and_ends_at_one(tmp_path: Path):
     assert reports[-1].games_done == 2 and reports[-1].games_total == 2
 
 
+def test_process_phase_starts_from_the_estimated_time_share_not_a_flat_half(tmp_path: Path):
+    """실사용 사고(2026-09-27, plan-backfill.md B8): 스캔 뒤 진행률이 고정 50% 로 뛰어
+    "곧 끝난다"고 기대하게 만들었다 - 실측 상수(세션당 스캔 ~107초, 게임당 처리 ~80초)로
+    계산한 비율로 넘어가야 한다. 세션 1개·게임 6개면 process_time_est(480) 이
+    scan_time_est(107.5) 를 크게 웃돌아 process 시작점이 50% 보다 한참 낮아야 한다."""
+    scanner = FakeScanner({"bg_1049590_20260923_095917": [_win(i, i * 10) for i in range(1, 7)]})
+    reports = []
+
+    _run(tmp_path, scanner, Recorder(), progress=reports.append)
+
+    process_start = next(r.fraction for r in reports if r.phase == "process")
+    expected = backfill.AVG_SESSION_SCAN_SEC / (backfill.AVG_SESSION_SCAN_SEC + 6 * backfill.AVG_GAME_PROCESS_SEC)
+    assert process_start == pytest.approx(expected)
+    assert process_start < 0.3
+
+
 def test_collect_known_starts_reads_clips_trash_and_game_records(tmp_path: Path):
     clips = tmp_path / "clips"
     (clips / ".trash").mkdir(parents=True)

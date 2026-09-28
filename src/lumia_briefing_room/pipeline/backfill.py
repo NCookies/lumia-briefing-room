@@ -27,6 +27,15 @@ KNOWN_TOLERANCE_SEC = 120.0
 MAX_ATTEMPTS = 3
 STATE_FILE = "backfill.json"
 STAGING_PREFIX = "game_"
+# 진행률을 "예상 작업 시간" 비율로 계산한다(plan-backfill.md B8 - 2026-09-27 마무리).
+# 스캔은 세션 하나 훑는 데 평균 이만큼 걸리고(실측: 28배속, 2세션 130분 분량이 215초 →
+# 세션당 ~107초), 경기 분석은 경기 하나에 이만큼 걸린다(실측: 60~100초, 중간값). 스캔
+# 단계가 끝나기 전에는 최종 경기 수를 몰라 정확한 비율을 못 구하므로, 스캔이 진행되는
+# 동안은 이 비율의 근사치(SCAN_SHARE_ESTIMATE)로 표시하다가, 스캔이 끝나 경기 수를 알게
+# 되면 실측 상수로 다시 계산한 비율로 넘어간다 - 예전처럼 고정 50%로 뛰지 않는다.
+AVG_SESSION_SCAN_SEC = 107.5
+AVG_GAME_PROCESS_SEC = 80.0
+SCAN_SHARE_ESTIMATE = 0.2
 
 
 class GameCancelled(Exception):
@@ -186,7 +195,7 @@ def run_backfill(
 
         def scan_progress(fraction: float, message: str, _i=index) -> None:
             report(
-                "scan", 0.5 * ((_i - 1 + fraction) / max(1, total_sessions)), message,
+                "scan", SCAN_SHARE_ESTIMATE * ((_i - 1 + fraction) / max(1, total_sessions)), message,
                 session_index=_i, session_total=total_sessions,
             )
 
@@ -215,13 +224,16 @@ def run_backfill(
 
     todo.sort(key=lambda item: item[2].hud_start_utc)
     total_games = len(todo)
-    report("process", 0.5, f"게임 {total_games}개", session_total=total_sessions, games_total=total_games)
+    scan_time_est = total_sessions * AVG_SESSION_SCAN_SEC
+    process_time_est = total_games * AVG_GAME_PROCESS_SEC
+    scan_share = scan_time_est / (scan_time_est + process_time_est) if (scan_time_est + process_time_est) else 0.0
+    report("process", scan_share, f"게임 {total_games}개", session_total=total_sessions, games_total=total_games)
 
     for done, (key, session_dir, window) in enumerate(todo):
         if cancelled():
             result.cancelled = True
             return result
-        base = 0.5 + 0.5 * (done / max(1, total_games))
+        base = scan_share + (1 - scan_share) * (done / max(1, total_games))
         report(
             "process", base, f"{window.hud_start_utc.astimezone().strftime('%m-%d %H:%M')} 게임",
             session_total=total_sessions, games_done=done, games_total=total_games, clips=result.clips_created,
