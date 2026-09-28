@@ -70,6 +70,7 @@ UI 를 보려면 먼저 `cd frontend && npm install && npm run build` 를 한 �
 - **취소·이어하기**: 언제든 취소할 수 있다(프레임 사이에서 바로 멈춘다). 이미 끝낸 경기의 클립은 그대로 남고, 다시 시작하면 훑은 곳부터 이어서 한다(판독은 `%LOCALAPPDATA%\Temp\LumiaBriefingRoom\backfill` 에 캐시). 경기 하나는 임시 폴더에 다 만든 뒤 클립 폴더로 옮기므로 도중에 멈추거나 컴퓨터가 꺼져도 깨진 클립이 목록에 뜨지 않는다(json 을 마지막에 옮긴다).
 - **건너뛰는 경기**: 이미 클립이 있거나 게임 기록·휴지통에 있는 경기, `Player.log` 로 아는 경기(아직 처리 전인 것도 — 곧 감시가 만든다), 앞부분이 스팀 링버퍼에 지워진 경기, 아직 진행 중인 경기. 끝난 뒤 요약에 개수가 나온다.
 - **이터널 리턴 세션만**(폴더 이름의 앱 ID 1049590) 오래된 것부터 본다. 창을 닫아도 분석은 계속되고 헤더 버튼에 진행률이 표시된다.
+- **진행률**(B8, 2026-09-28): 스캔 0~50%·게임 분석 50~100% 로 고정 반반 나누지 않는다. 스캔 작업량(영상 길이 ÷ 배속)과 분석 작업량(게임 수 × 게임당 평균 처리 시간)의 시간 비율로 계산해, 게임이 여러 개면 스캔이 끝나도 퍼센트가 훌쩍 뛰지 않는다. 게임당 평균 시간은 이번 실행에서 실제로 걸린 시간의 이동 평균으로 스스로 보정되고, 게임 하나를 처리하는 동안에도(검출 → 결과 화면 판독 → 클립 컷) 퍼센트가 계속 움직인다. 재계산으로 계산값이 줄어도 화면 표시는 뒤로 가지 않는다(단조 증가). 문구도 "1/2 게임 찾는 중" → "2/2 클립 만드는 중 · 3/9번째 게임" 처럼 단계를 알려 준다.
 - 명령줄은 없다(앱 안에서만).
 
 **자동 시작**: 옵션 → 일반 → "윈도우에 로그인할 때 자동으로 실행" 으로 켜고 끈다(`ui.autoStart`, 기본 켬). 끄면 레지스트리 값(`HKCU\...\Run\LumiaBriefingRoom`)이 **그 자리에서** 지워진다 — 설정 파일만 고치면 다음 로그인에 한 번 더 뜬다. 앱이 시작할 때도 설정대로 다시 맞춘다.
@@ -205,8 +206,10 @@ python -m lumia_briefing_room.cli.detect_match \
 야생동물·보스만 상대했으면 "사냥", 판단이 안 되면 안 찍고 넘어간다. 자세한 표는 [plan-pvp.md §4-0](plan-pvp.md).
 
 ```bash
-python tools/eval_pvp.py          # 라벨로 점수를 평가: 오탐, 적 링 분포, 임계별 정밀도/재현율
-python tools/rescore_clips.py     # 가중치를 고친 뒤 점수를 다시 계산 (사용자 라벨은 보존)
+python tools/eval_pvp.py                  # 라벨로 점수를 평가: 오탐, 적 링 분포, 임계별 정밀도/재현율 (기본: 스팀 클립만)
+python tools/rescore_clips.py             # 가중치를 고친 뒤 점수를 다시 계산 (사용자 라벨은 보존, 기본: 스팀 클립만)
+python tools/eval_pvp.py --source vod     # 다시보기(VOD) 클립 라벨만 평가 (--source steam|vod|all, 기본 steam)
+python tools/rescore_clips.py --source all  # 스팀+다시보기 클립을 모두 다시 계산
 ```
 
 ### 8. 다시보기(VOD) 영상 분석 — 스트리머 방송에서 교전 클립 뽑기
@@ -363,8 +366,8 @@ git push origin v0.1.4
 | `tools/build_regions.py` | 라벨셋 → 지역명 본보기(npz) |
 | `tools/migrate_labels.py` | 클립을 새 경계로 다시 만들 때 옛 클립의 교전/사냥 라벨을 시간이 겹치는 새 클립으로 이관 |
 | `tools/backfill_day.py` | 이미 만든 클립의 일차·제목을 재처리 없이 채움 (클립 영상의 HUD 에서 읽음) |
-| `tools/rescore_clips.py` | 저장된 클립 메타데이터의 교전 점수를 재검출 없이 다시 계산 |
-| `tools/eval_pvp.py` | UI 에서 찍은 교전/사냥 라벨로 점수를 평가 (가중치·임계 튜닝) |
+| `tools/rescore_clips.py` | 저장된 클립 메타데이터의 교전 점수를 재검출 없이 다시 계산 (`--source steam\|vod\|all`, 기본 `steam`) |
+| `tools/eval_pvp.py` | UI 에서 찍은 교전/사냥 라벨로 점수를 평가 (가중치·임계 튜닝, `--source steam\|vod\|all`, 기본 `steam`) |
 | `tools/eval_detect.py` | 라벨셋 대비 검출 정확도 리포트 |
 | `tools/pull_labels.py` | 서버에 쌓인 라벨을 로컬로 받아 `eval_pvp.py` 가 읽는 `.labels/` 형태로 저장 (관리자 토큰은 환경변수 `LUMIA_ADMIN_TOKEN`, 증분 수집, `--full`·`--mode dev`) |
 | `tools/release_tools.py` | 릴리스 파이프라인 보조(태그·버전·패치노트 확인, SHA-256 파일, 릴리스 본문, VirusTotal 업로드). 워크플로가 부른다 — 아래 "13" |

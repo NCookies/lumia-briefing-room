@@ -11,8 +11,8 @@
 | [plan-pipeline.md](plan-pipeline.md) | 자동화(2단계) | ✅ 완료 | 없음 (3-2 `session.mpd` 상태만 실사용 관찰) |
 | [plan-ui.md](plan-ui.md) | 열람 UI(3단계) | ✅ 거의 완료 | 판독값 수동 보정(설계만), pywebview `.localhost` 실측, Playwright HEVC 재생 확인 |
 | [plan-pvp.md](plan-pvp.md) | PvP 판별(4단계) | ✅ 구현, 튜닝 진행 | 라벨 확인, 증거 없는 교전용 신호, 후순위 신호들 |
-| [plan-vod.md](plan-vod.md) | 다시보기(5단계) | ✅ V0~V5 | V6(평가 도구 `--source`), 다른 스트리머 검증 |
-| [plan-backfill.md](plan-backfill.md) | 과거 녹화 분석 | ✅ B0~B7 | 다른 PC·4시간 규모 검증 |
+| [plan-vod.md](plan-vod.md) | 다시보기(5단계) | ✅ V0~V6 | 다른 스트리머 검증 |
+| [plan-backfill.md](plan-backfill.md) | 과거 녹화 분석 | ✅ B0~B8 | 다른 PC·4시간 규모 검증 |
 | [plan-deploy.md](plan-deploy.md) | 배포 | 🔶 D1~D6 완료 | **D7·D8·D9·D10·D11·D12·D13·D14** — 지금 주 작업 |
 | [plan-infra.md](plan-infra.md) + [server/](../server/README.md) + 인프라 저장소 | 수신 서버 | 🔶 I1~I3 + 전송 계약 구현·배포 | I4(클라이언트 연결), I5(DB), 운영 위험 |
 | [SPEC.md](SPEC.md) | 설계 결정 | — | §6 "0.5단계 — 남은 확인" 체크박스가 오래됨(§5 참고) |
@@ -69,7 +69,7 @@
 | 잘린 경기(링버퍼에 앞부분이 지워진) 처리, 4시간 규모 | [backfill §6](plan-backfill.md) | 친구 PC |
 | 게임 중 분석 부하 → 프레임 저하 | [deploy §7-14](plan-deploy.md) | 친구에게 체감 질문 |
 | 정식 라벨셋·파라미터 확정 | [plan §9-8](plan.md), [plan-pvp](plan-pvp.md) | D10 라벨이 쌓이면 대체 |
-| VOD V6 (평가 도구 `--source`) | [plan-vod §0](plan-vod.md) | 라벨 활용 |
+| ~~VOD V6 (평가 도구 `--source`)~~ ✅ 2026-09-28 완료 | [plan-vod §0](plan-vod.md) | 라벨 활용. `--source steam\|vod\|all` 구현·TDD 완료. 이 PC 는 라벨이 없어 실제 평가 수치는 못 얻음(plan-pvp §5-4) |
 | 활성 효과 아이콘, 전멸 배너, 네임플레이트, 캐릭터별 특성 | [plan-pvp §0](plan-pvp.md) | 후순위, 신호가 필요할 때 |
 | 게임 패치 대비 데이터만 받는 업데이트 | [deploy D9](plan-deploy.md) | 패치로 HUD 가 바뀌면 검출이 깨진다. 실제 위험이라 D9 뒤에 |
 | pywebview `.localhost` 실측 | [ui §4-3](plan-ui.md) | 트레이 경로는 기본 브라우저라 영향 작음 |
@@ -80,7 +80,7 @@
 | **일자 타임라인 시점 미상 클립을 경과 시간으로 배치** | [ui §0·§4-8](plan-ui.md) | 같은 피드백. 페이즈 길이가 고정인지 실측 필요 |
 | **영상 파일 탭 날짜별 보기(V8)** | [vod V8·§8-11](plan-vod.md) | 같은 피드백. 파일에서 날짜를 얻을 수 있는지 확인 필요 |
 | 태그 필터·정렬 작동 의심 조사 | [ui §4-8](plan-ui.md) | 재현 못 함. 버그인지 안내 부족인지 먼저 확인 |
-| **과거 녹화 분석 진행률 보정(B8)** — 스캔 50% 고정 → 예상 작업 시간 비율 | [backfill §0·§7](plan-backfill.md) | 스캔 뒤 50% 로 뛰어 "곧 끝난다"고 기대하게 된다는 사용자 보고. 작고 화면 체감이 커서 먼저 |
+| ~~과거 녹화 분석 진행률 보정(B8)~~ ✅ 2026-09-28 완료 — 스캔 50% 고정 → 예상 작업 시간 비율 | [backfill §0·§7](plan-backfill.md) | 스캔 뒤 50% 로 뛰어 "곧 끝난다"고 기대하게 된다는 사용자 보고. 워크로드 기반 계산·단조 증가·이동 평균·게임 내부 진행률까지 구현. VOD 분석(`vod_analyze.py`)의 결과 화면·클립 컷 단계에도 비슷한 증상이 남아 있음을 발견(§7) — 후순위로 남김 |
 | **영상 파일 분석 후 원본 삭제 옵션(V7)** — 묻기/항상/안 함, 기본 휴지통 | [vod V7](plan-vod.md), SPEC §7.10 | 다시보기 원본 "삭제 안 함" 원칙을 사용자 선택으로 바꾼다. 휴지통 구현 방식 확인 필요 |
 | 설치·사용자 수 통계(D15) — **현 상태 유지**(새 동의 항목 없음) | [deploy D15](plan-deploy.md) | 앱은 그대로. 필요하면 GitHub 다운로드 수 조회 도구·서버의 `installId` 수 집계만 |
 | **코발트 프로토콜 지원(C0~C5)** | [plan.md §10](plan.md), SPEC §2.9 | 모드가 `battle_royale` 로 고정이고 게임 경계가 일차 판독에 기대 코발트에서 안 될 가능성. 코발트 녹화 확보가 선결 |

@@ -16,6 +16,7 @@ from lumia_briefing_room.config import Config
 from lumia_briefing_room.detect.match import DetectionCancelled
 from lumia_briefing_room.detect.types import FrameState
 from lumia_briefing_room.pipeline.backfill import GameCancelled
+from lumia_briefing_room.pipeline.backfill_progress import DEFAULT_SCAN_SPEEDUP
 from lumia_briefing_room.pipeline.clip import ClipCutError
 from lumia_briefing_room.pipeline.nickname import learn_nickname
 from lumia_briefing_room.pipeline.orchestrator import process_match
@@ -36,9 +37,26 @@ log = logging.getLogger("lumia_briefing_room.backfill")
 
 MAX_SEGMENT_NUMBER = 10**7
 DEFAULT_SEGMENT_SEC = 3.0
-# 실측(2세션 약 130분 분량, 경기 5판 처리 포함 292초)의 약 27배속에서 여유를 둔 값. 다른 PC 는 다를 수 있어 안내에는 "대략"이라고 쓴다.
-ESTIMATE_SPEEDUP = 25.0
+# backfill_progress.DEFAULT_SCAN_SPEEDUP 의 별칭 — 실측 근거는 그쪽 주석 참고. run_backfill(B8) 도
+# 같은 값을 쓰므로 backfill_progress 를 단일 출처로 둔다.
+ESTIMATE_SPEEDUP = DEFAULT_SCAN_SPEEDUP
 _VIDEO_CHUNK = re.compile(r"^chunk-stream0-(\d{5})\.m4s$")
+
+
+def session_video_seconds(session_dir: Path) -> float:
+    """디코딩 없이 아는 세션 영상 길이(세그먼트 개수 × 세그먼트 길이). 스캔 진행률 가중치에 쓴다(plan-backfill B8)."""
+    try:
+        seg_sec = RecordingSession.load(session_dir).segment_duration_sec
+    except (SessionParseError, OSError, ValueError, TypeError):
+        seg_sec = DEFAULT_SEGMENT_SEC
+    count = 0
+    try:
+        for entry in session_dir.iterdir():
+            if _VIDEO_CHUNK.match(entry.name):
+                count += 1
+    except OSError:
+        pass
+    return count * seg_sec
 
 
 def staging_config(cfg: Config) -> Config:
@@ -70,6 +88,9 @@ class SteamSessionScanner:
 
     def list_sessions(self) -> list[Path]:
         return list_session_dirs(self._root)
+
+    def session_video_seconds(self, session_dir: Path) -> float:
+        return session_video_seconds(session_dir)
 
     def scan(
         self, session_dir: Path, cancel: threading.Event | None, on_progress: Callable[[float, str], None]
@@ -111,11 +132,12 @@ def make_process_window(
     a_templates: dict | None,
     hwaccel: str | None,
     config_path: Path | None,
-) -> Callable[[Path, GameWindow, Path, threading.Event | None], list[Path]]:
+) -> Callable[[Path, GameWindow, Path, threading.Event | None, Callable[[float], None] | None], list[Path]]:
     staged = staging_config(cfg)
 
     def process(
-        session_dir: Path, window: GameWindow, staging: Path, cancel: threading.Event | None
+        session_dir: Path, window: GameWindow, staging: Path, cancel: threading.Event | None,
+        on_progress: Callable[[float], None] | None = None,
     ) -> list[Path]:
         session = RecordingSession.load(session_dir)
         try:
@@ -125,6 +147,7 @@ def make_process_window(
                 k_templates=k_templates, a_templates=a_templates, hwaccel=hwaccel,
                 clips_dir=staging, cancel=cancel, result_search_from=window.hud_end_utc,
                 on_result=lambda r: learn_nickname(config_path, r.nickname),
+                on_progress=on_progress,
             )
         except DetectionCancelled as exc:
             raise GameCancelled() from exc

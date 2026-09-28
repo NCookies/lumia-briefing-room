@@ -19,6 +19,30 @@ from pathlib import Path
 
 CONFIRMED_SIGNALS = {"kill_delta", "assist_delta", "death", "teammate_death"}
 
+DEFAULT_STEAM_CLIPS_DIR = Path.home() / "Videos/LumiaBriefingRoom/clips"
+DEFAULT_VOD_CLIPS_DIR = Path.home() / "Videos/LumiaBriefingRoom/vod"
+
+
+def clip_source(clip: dict) -> str:
+    """클립 메타데이터의 출처. 스팀 클립은 `source` 필드가 아예 없다(SPEC, plan-vod §2.3)."""
+    return clip.get("source") or "steam"
+
+
+def resolve_clip_dirs(source: str, steam_dir: Path, vod_dir: Path) -> list[Path]:
+    if source == "steam":
+        return [steam_dir]
+    if source == "vod":
+        return [vod_dir]
+    return [steam_dir, vod_dir]
+
+
+def load_clips_for_source(source: str, steam_dir: Path, vod_dir: Path) -> list[dict]:
+    """`--source steam|vod|all` 에 맞는 폴더를 읽고, 폴더가 섞였어도 `source` 필드로 한 번 더 거른다."""
+    clips = [c for d in resolve_clip_dirs(source, steam_dir, vod_dir) for c in load_clips(d)]
+    if source == "all":
+        return clips
+    return [c for c in clips if clip_source(c) == source]
+
 
 def auc(positive: list[float], negative: list[float]) -> float | None:
     """양성이 음성보다 클 확률. 0.5 = 구분 못함, 1.0 = 완벽."""
@@ -95,9 +119,14 @@ def evaluate_labels(clips: list[dict]) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("clips_dir", nargs="?", type=Path, default=Path.home() / "Videos/LumiaBriefingRoom/clips")
-    report = evaluate_labels(load_clips(parser.parse_args().clips_dir))
+    parser.add_argument("clips_dir", nargs="?", type=Path, default=DEFAULT_STEAM_CLIPS_DIR, help="스팀 클립 폴더")
+    parser.add_argument("--vod-dir", type=Path, default=DEFAULT_VOD_CLIPS_DIR, help="다시보기 클립 폴더")
+    parser.add_argument("--source", choices=("steam", "vod", "all"), default="steam", help="평가할 클립 출처")
+    args = parser.parse_args()
+    clips = load_clips_for_source(args.source, args.clips_dir, args.vod_dir)
+    report = evaluate_labels(clips)
 
+    print(f"출처: {args.source}")
     print(f"라벨 {report['labeled']}개 (교전 {report['pvp']} / 사냥 {report['pve']})")
     if report["confirmed_but_pve"]:
         print(f"⚠ 확정 증거가 있는데 사냥이라 라벨된 클립 {report['confirmed_but_pve']}개 — 검출기 오탐 확인 필요")

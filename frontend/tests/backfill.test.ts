@@ -50,15 +50,20 @@ test('progress percent is clamped and rounded', () => {
 })
 
 test('progress text tells the scan phase from the game phase', () => {
-  assert.equal(describeProgress(running({ phase: 'scan', message: '77분 지점' })), '녹화를 살펴보는 중 · 세션 1/2 · 77분 지점')
+  assert.equal(describeProgress(running({ phase: 'scan', message: '77분 지점' })), '1/2 게임 찾는 중 · 77분 지점')
   assert.equal(
-    describeProgress(running({ phase: 'process', gamesDone: 2, gamesTotal: 5, clips: 14, message: '09-24 15:55 게임' })),
-    '게임 분석 중 · 3/5 · 클립 14개 · 09-24 15:55 게임',
+    describeProgress(
+      running({
+        phase: 'process', sessionIndex: 2, sessionTotal: 2, gamesDone: 2, gamesTotal: 9, clips: 14,
+        message: '09-24 15:55 게임',
+      }),
+    ),
+    '2/2 클립 만드는 중 · 3/9번째 게임 · 클립 14개 · 09-24 15:55 게임',
   )
 })
 
 test('progress text before anything is known is calm', () => {
-  assert.equal(describeProgress(running({ phase: 'scan', sessionIndex: 0, sessionTotal: 0, message: '' })), '녹화를 살펴보는 중')
+  assert.equal(describeProgress(running({ phase: 'scan', sessionIndex: 0, sessionTotal: 0, message: '' })), '게임 찾는 중')
 })
 
 test('the finished summary names what was made and what was skipped and why', () => {
