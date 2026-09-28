@@ -18,7 +18,7 @@ export function PortraitRow({ clip }: Props) {
       {SLOTS.map(({ slot, label, hasPath }) => (
         <div
           key={slot}
-          className="aspect-[9/5] h-10 shrink-0 overflow-hidden rounded border border-zinc-700 bg-zinc-900"
+          className="aspect-[157/77] h-10 shrink-0 overflow-hidden rounded border border-zinc-700 bg-zinc-900"
           title={label}
         >
           {clip && hasPath(clip) && (
