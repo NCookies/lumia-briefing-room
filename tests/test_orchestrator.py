@@ -8,6 +8,7 @@ from lumia_briefing_room.pipeline.orchestrator import (
     _plan_clips,
     _resolve_clip_paths,
     default_title,
+    next_phase_clip_index,
 )
 
 
@@ -30,6 +31,36 @@ def test_default_title_night():
 
 def test_default_title_unknown():
     assert default_title(None) == "알 수 없음 교전"
+
+
+def test_default_title_uses_cobalt_phase_instead_of_unknown():
+    """코발트 프로토콜은 낮/밤·일차가 없어 day_night=None 이 되고, 예전엔 "알 수 없음
+    교전"이 됐다(실사용 보고, 2026-09-28) - 이미 읽고 있는 Phase 번호를 대신 쓴다."""
+    assert default_title(None, cobalt_phase=2) == "Phase 2 교전"
+    assert default_title(None, "경찰서", cobalt_phase=2) == "Phase 2 경찰서 교전"
+    assert default_title(None, cobalt_phase=2, characters=["우쮸"]) == "Phase 2 교전 · 우쮸"
+
+
+def test_default_title_game_day_wins_over_cobalt_phase_if_both_given():
+    assert default_title("day", game_day=3, cobalt_phase=2) == "3일차 낮 교전"
+
+
+def test_default_title_never_shows_day_night_for_cobalt_even_if_it_was_read():
+    """실사용 보고(2026-09-28): "Phase 3 낮 교전"처럼 코발트인데 낮/밤이 붙어 나왔다.
+    day_night 는 모드와 무관하게 매 프레임 읽으므로(§2.7) 코발트 화면에서 우연히 뭔가
+    읽힐 수 있다 - cobalt_phase 가 있으면 day_night 값과 무관하게 절대 안 보여준다."""
+    assert default_title("day", cobalt_phase=3) == "Phase 3 교전"
+    assert default_title("night", cobalt_phase=3) == "Phase 3 교전"
+
+
+def test_default_title_appends_a_clip_index_for_cobalt_only():
+    """§10-13 이후 코발트 한 게임에 목숨마다 클립이 생겨 같은 Phase 에서 여러 번 죽으면
+    제목이 겹친다 - clip_index 로 뒤에 번호를 붙여 구분한다(사용자 요청, 2026-09-28)."""
+    assert default_title(None, cobalt_phase=1, clip_index=1) == "Phase 1 교전 - 1"
+    assert default_title(None, cobalt_phase=1, clip_index=2) == "Phase 1 교전 - 2"
+    assert default_title(None, cobalt_phase=1, characters=["우쮸"], clip_index=1) == "Phase 1 교전 · 우쮸 - 1"
+    # 배틀로얄은 번호를 안 붙인다 - 배지·킬 이벤트로 이미 짧게 나뉘어 겹칠 일이 없다.
+    assert default_title("day", game_day=3, clip_index=1) == "3일차 낮 교전"
 
 
 def test_aggregate_interval_unions_tags():
@@ -63,6 +94,29 @@ def test_aggregate_single_interval_passthrough():
     assert agg == a
 
 
+def test_aggregate_interval_keeps_the_known_cobalt_phase():
+    a = ci(0, 10, {"kill"})
+    b = ci(15, 25, {"assist"})
+    b = CombatInterval(**{**b.__dict__, "cobalt_phase": 2})
+    assert _aggregate_interval([a, b]).cobalt_phase == 2
+    assert _aggregate_interval([b, a]).cobalt_phase == 2
+
+
+def test_next_phase_clip_index_resets_when_the_phase_changes():
+    """실사용 보고(2026-09-28, 스크린샷): "Phase 2 교전 - 3"처럼 게임 전체 순번이 붙어
+    있었다 - Phase 가 바뀌면 그 Phase 안에서 다시 1부터 세야 한다."""
+    counts: dict[int | None, int] = {}
+    assert next_phase_clip_index(counts, 1) == 1
+    assert next_phase_clip_index(counts, 1) == 2
+    assert next_phase_clip_index(counts, 2) == 1
+    assert next_phase_clip_index(counts, 3) == 1
+    assert next_phase_clip_index(counts, 3) == 2
+    assert next_phase_clip_index(counts, 3) == 3
+    # 같은 Phase 로 돌아오면(코발트에선 안 일어나지만) 이어서 센다 - 새로 만나는
+    # 값마다 독립적인 카운터이지, "가장 최근 Phase"만 특별 취급하지 않는다.
+    assert next_phase_clip_index(counts, 1) == 3
+
+
 def test_plan_clips_keeps_separate_when_far_apart():
     cfg = ClipConfig(preroll_sec=5, postroll_sec=8, merge_gap_sec=10)
     intervals = [ci(0, 10, {"kill"}), ci(200, 210, {"assist"})]
@@ -85,6 +139,31 @@ def test_plan_clips_merges_close_intervals_into_one():
 def test_plan_clips_empty_input():
     cfg = ClipConfig()
     assert _plan_clips([], cfg) == []
+
+
+def test_plan_clips_cobalt_mode_skips_preroll_postroll_so_short_death_gaps_stay_separate():
+    """실사용 사고(2026-09-28): 코발트 구간(§10-13, 부활~사망)은 죽어있는 시간만큼만
+    떨어져 있는데(실측 15~21초), preroll+postroll(기본 5+8=13초)을 더하면 남는 간격이
+    mergeGapSec(기본 10초) 밑으로 내려가 옆 구간과 다시 합쳐져 게임 전체가 클립 하나로
+    뭉쳐버렸다. 코발트는 preroll/postroll 을 아예 안 더해야 이 간격이 안 줄어든다."""
+    cfg = ClipConfig(preroll_sec=5, postroll_sec=8, merge_gap_sec=10)
+    intervals = [ci(183, 282, {"kill", "death"}), ci(297, 414, {"assist", "death"})]
+
+    battle_royale_plans = _plan_clips(intervals, cfg, game_mode="battle_royale")
+    assert len(battle_royale_plans) == 1  # 옛 동작: preroll/postroll 로 간격이 줄어 합쳐진다
+
+    cobalt_plans = _plan_clips(intervals, cfg, game_mode="cobalt")
+    assert len(cobalt_plans) == 2
+    assert (cobalt_plans[0].range.start, cobalt_plans[0].range.end) == (183, 282)
+    assert (cobalt_plans[1].range.start, cobalt_plans[1].range.end) == (297, 414)
+
+
+def test_resolve_clip_range_cobalt_mode_uses_the_interval_bounds_exactly():
+    cfg = ClipConfig(preroll_sec=5, postroll_sec=8)
+    from lumia_briefing_room.pipeline.clip import resolve_clip_range
+
+    iv = ci(100, 200, {"death"})
+    assert resolve_clip_range(iv, cfg, game_mode="cobalt") == ClipRange(start=100, end=200, preroll_source="combat")
 
 
 def test_resolve_clip_paths_thumbnails_follow_explicit_clips_dir_override():

@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { formatBytes } from '../retention'
 import { analysisBlockedReason, analysisPercent, formatDuration, vodStatusLabel, type Vod } from '../vodGrouping'
 import { formatDateChip } from '../vodDates'
@@ -11,7 +12,7 @@ interface Props {
   expanded: boolean
   gameCount: number
   clipCount: number
-  visibleClipCount: number
+  visibleGameCount: number
   clipBytes: number
   analysisBusy: boolean
   onToggle: () => void
@@ -37,6 +38,112 @@ const STATUS_STYLES: Record<string, string> = {
   cancelled: 'bg-amber-500/20 text-amber-300',
   error: 'bg-rose-500/20 text-rose-300',
   done: 'bg-emerald-500/20 text-emerald-300',
+}
+
+const MENU_WIDTH = 288
+
+function ReanalyzeMenu({
+  disabled,
+  blockedReason,
+  onAnalyze,
+}: {
+  disabled: boolean
+  blockedReason: string
+  onAnalyze: (options: { force?: boolean; rebuild?: boolean }) => void
+}) {
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+  const buttonRef = useRef<HTMLButtonElement | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
+
+  const open = pos !== null
+
+  useEffect(() => {
+    if (!open) return
+    const onDocMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node
+      if (buttonRef.current?.contains(target) || menuRef.current?.contains(target)) return
+      setPos(null)
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPos(null)
+    }
+    document.addEventListener('mousedown', onDocMouseDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onDocMouseDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
+
+  const toggle = () => {
+    if (open) {
+      setPos(null)
+      return
+    }
+    const rect = buttonRef.current?.getBoundingClientRect()
+    if (!rect) return
+    setPos({ top: rect.bottom + 4, left: Math.max(8, rect.right - MENU_WIDTH) })
+  }
+
+  const choose = (options: { force?: boolean; rebuild?: boolean }) => {
+    setPos(null)
+    onAnalyze(options)
+  }
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        className="text-zinc-400 hover:text-sky-300 disabled:opacity-50"
+        disabled={disabled}
+        title={blockedReason}
+        aria-expanded={open}
+        onClick={toggle}
+      >
+        다시 분석
+      </button>
+      {open &&
+        pos &&
+        createPortal(
+          // VodSection 이 overflow-hidden 이라 안에 그대로 두면 잘린다 - body 에 직접 붙인다.
+          <div
+            ref={menuRef}
+            role="menu"
+            className="fixed z-50 rounded border border-zinc-600 bg-zinc-800 p-3 text-left text-xs shadow-lg"
+            style={{ top: pos.top, left: pos.left, width: MENU_WIDTH }}
+          >
+            <p className="mb-2 text-zinc-400">저장된 판독 결과가 있습니다. 어떻게 다시 만들까요?</p>
+            <button
+              type="button"
+              role="menuitem"
+              className="mb-1.5 block w-full rounded border border-zinc-600 px-2 py-1.5 text-left hover:border-sky-500 hover:bg-zinc-700"
+              onClick={() => choose({ rebuild: true })}
+            >
+              <span className="block font-semibold text-sky-300">캐시 재사용 (빠름)</span>
+              <span className="block text-zinc-400">
+                화면 판독은 그대로 두고 클립만 다시 만듭니다. 필터·클립 구간 설정을 바꿨을 때 씁니다.
+              </span>
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="mb-1.5 block w-full rounded border border-zinc-600 px-2 py-1.5 text-left hover:border-sky-500 hover:bg-zinc-700"
+              onClick={() => choose({ force: true })}
+            >
+              <span className="block font-semibold text-amber-300">처음부터 다시 (느림)</span>
+              <span className="block text-zinc-400">
+                화면 판독부터 다시 합니다. 원본 영상이 바뀌었거나 판독 결과가 의심될 때 씁니다.
+              </span>
+            </button>
+            <button type="button" className="mt-0.5 text-zinc-500 hover:text-zinc-300" onClick={() => setPos(null)}>
+              취소
+            </button>
+          </div>,
+          document.body,
+        )}
+    </>
+  )
 }
 
 function StreamerName({ value, onSave }: { value: string | null; onSave: (name: string) => void }) {
@@ -132,7 +239,7 @@ export function VodSection({
   expanded,
   gameCount,
   clipCount,
-  visibleClipCount,
+  visibleGameCount,
   clipBytes,
   analysisBusy,
   onToggle,
@@ -195,26 +302,7 @@ export function VodSection({
               분석 취소
             </button>
           ) : vod && vod.status === 'done' ? (
-            <>
-              <button
-                type="button"
-                className="text-zinc-400 hover:text-sky-300 disabled:opacity-50"
-                disabled={!canStart}
-                title={blockedReason || '저장된 분석 결과로 클립만 다시 만듭니다(설정의 클립 구간·필터를 바꾼 뒤)'}
-                onClick={() => onAnalyze({ rebuild: true })}
-              >
-                클립 다시 만들기
-              </button>
-              <button
-                type="button"
-                className="text-zinc-400 hover:text-sky-300 disabled:opacity-50"
-                disabled={!canStart}
-                title={blockedReason || '판독까지 처음부터 다시 분석합니다'}
-                onClick={() => onAnalyze({ force: true })}
-              >
-                다시 분석
-              </button>
-            </>
+            <ReanalyzeMenu disabled={!canStart} blockedReason={blockedReason} onAnalyze={onAnalyze} />
           ) : vod ? (
             <button
               type="button"
@@ -255,9 +343,9 @@ export function VodSection({
 
       {expanded && (
         <div className="flex flex-col gap-3 border-t border-zinc-700 p-3">
-          {visibleClipCount === 0 && (
+          {visibleGameCount === 0 && (
             <p className="px-1 text-center text-sm text-zinc-500">
-              {vod?.status === 'done' ? '조건에 맞는 클립이 없습니다' : '아직 클립이 없습니다. 분석을 시작하면 게임별로 만들어집니다.'}
+              {vod?.status === 'done' ? '조건에 맞는 게임이 없습니다' : '아직 클립이 없습니다. 분석을 시작하면 게임별로 만들어집니다.'}
             </p>
           )}
           {children}

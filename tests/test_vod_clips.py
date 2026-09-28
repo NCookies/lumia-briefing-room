@@ -104,6 +104,7 @@ def result_screen():
 def build(**kw):
     args = dict(
         title="3일차 낮 교전", vod_id="3fa91c02b7de", vod_file="H:/vod/a.mp4", streamer="○○○",
+        game_mode="battle_royale",
         game_index=3, game_start=90.0, game_end=900.0, width=1920, height=1080,
         interval=interval(), clip_range=ClipRange(95.0, 138.0, "combat"), duration_sec=43.0,
         thumbnail_path="thumbs/x.jpg", pvp=PvpScore(score=1.0, signals=["kill_delta"]),
@@ -120,6 +121,7 @@ def test_vod_metadata_marks_source_and_carries_position_fields():
     assert meta["vodId"] == "3fa91c02b7de"
     assert meta["vodFile"] == "H:/vod/a.mp4"
     assert meta["streamer"] == "○○○"
+    assert meta["gameMode"] == "battle_royale"
     assert meta["vodGameIndex"] == 3
     assert meta["gameStartOffsetSec"] == 90.0 and meta["gameEndOffsetSec"] == 900.0
     assert meta["videoOffsetSec"] == 95.0 and meta["durationSec"] == 43.0
@@ -150,6 +152,11 @@ def test_vod_metadata_without_result_screen_or_streamer():
     assert meta["matchResult"] is None
     assert meta["streamer"] is None
     assert meta["myCharacter"] is None and meta["teamCharacters"] == []
+
+
+def test_vod_metadata_carries_the_inferred_game_mode():
+    meta = build(game_mode="cobalt")
+    assert meta["gameMode"] == "cobalt"
 
 
 def test_vod_metadata_has_a_unique_clip_uid():

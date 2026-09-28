@@ -29,7 +29,7 @@ _SPECS: dict[str, tuple[str, object]] = {
     "teamWipe": (_STR, 32), "enemyRingMean": (_FLOAT, (None, None)), "ultimateDelta": (_FLOAT, (None, None)),
     "killDelta": (_INT, (None, None)), "assistDelta": (_INT, (None, None)), "died": (_BOOL, None),
     "detectorConfidence": (_FLOAT, (None, None)), "region": (_STR, 64), "gameDay": (_INT, (None, None)),
-    "dayNight": (_STR, 16), "phaseIndex": (_INT, (None, None)), "reviveCost": (_STR, 16),
+    "dayNight": (_STR, 16), "cobaltPhase": (_INT, (None, None)), "phaseIndex": (_INT, (None, None)), "reviveCost": (_STR, 16),
     "myCharacter": (_STR, 64), "matchKills": (_INT, (0, None)), "matchAssists": (_INT, (0, None)),
     "matchTeamKills": (_INT, (0, None)), "labelConflict": (_BOOL, None),
 }

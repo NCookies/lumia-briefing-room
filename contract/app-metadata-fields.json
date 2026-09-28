@@ -13,6 +13,7 @@
     "region",
     "gameDay",
     "dayNight",
+    "cobaltPhase",
     "phaseIndex",
     "reviveCost",
     "durationSec",

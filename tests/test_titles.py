@@ -42,3 +42,24 @@ def test_retitle_drops_teammates_from_an_old_title_and_never_touches_custom_titl
 
     assert retitle(old)["title"] == "5일차 낮 경찰서 교전 · 마커스"
     assert retitle(custom) is custom
+
+
+def cobalt_meta(**kw):
+    base = {
+        "title": "Phase 2 교전", "dayNight": None, "region": None, "gameDay": None, "cobaltPhase": 2,
+        "myCharacter": None, "teamCharacters": [],
+    }
+    base.update(kw)
+    return base
+
+
+def test_is_auto_title_recognizes_cobalt_phase_titles():
+    assert is_auto_title(cobalt_meta())
+    assert is_auto_title(cobalt_meta(title="Phase 2 교전 · 우쮸"))
+    assert not is_auto_title(cobalt_meta(title="내가 붙인 제목"))
+
+
+def test_retitle_keeps_the_cobalt_phase_after_adding_a_character():
+    new = retitle(cobalt_meta(myCharacter="우쮸"))
+
+    assert new["title"] == "Phase 2 교전 · 우쮸"

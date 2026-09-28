@@ -12,7 +12,7 @@ def test_build_parser_defaults():
     args = parser.parse_args(
         ["/tmp/session", "2026-09-19T13:07:47+00:00", "2026-09-19T13:08:00+00:00"]
     )
-    assert args.game_mode == "battle_royale"
+    assert args.game_mode is None  # 생략하면 검출 결과로 자동 판별한다(plan.md §10 C1-b)
     assert args.config is None
 
 

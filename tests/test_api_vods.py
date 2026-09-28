@@ -104,6 +104,37 @@ def test_analyzed_vod_reports_status_games_and_live_clip_counts(env):
     assert entry["streamer"] == "인덱스 이름"
 
 
+def test_vod_game_result_image_serves_the_stored_thumbnail_by_index(env):
+    client, a, _, vod_dir, *_ = env
+    vid = vod_id(a)
+    (vod_dir / ".thumbs").mkdir(parents=True)
+    (vod_dir / ".thumbs" / f"{vid}_g01_result.jpg").write_bytes(b"\xff\xd8fake-jpeg")
+    save_index(vod_dir, {
+        "id": vid, "path": str(a), "status": "done",
+        "games": [{"index": 1, "startSec": 0.0, "endSec": 10.0,
+                   "result": {"placement": 1, "imagePath": ".thumbs/" + vid + "_g01_result.jpg"}, "clipIds": []}],
+        "clips": [],
+    })
+
+    resp = client.get(f"/api/vods/{vid}/games/1/result-image")
+
+    assert resp.status_code == 200 and resp.content == b"\xff\xd8fake-jpeg"
+
+
+def test_vod_game_result_image_404s_without_an_image_or_game(env):
+    client, a, _, vod_dir, *_ = env
+    vid = vod_id(a)
+    save_index(vod_dir, {
+        "id": vid, "path": str(a), "status": "done",
+        "games": [{"index": 1, "startSec": 0.0, "endSec": 10.0, "result": None, "clipIds": []}],
+        "clips": [],
+    })
+
+    assert client.get(f"/api/vods/{vid}/games/1/result-image").status_code == 404
+    assert client.get(f"/api/vods/{vid}/games/99/result-image").status_code == 404
+    assert client.get(f"/api/vods/does-not-exist/games/1/result-image").status_code == 404
+
+
 def test_interrupted_analysis_is_reported_when_no_job_is_running(env):
     client, a, _, vod_dir, *_ = env
     save_index(vod_dir, {"id": vod_id(a), "path": str(a), "status": "analyzing", "analyzedSec": 300.0,
@@ -392,6 +423,83 @@ def test_vod_wide_delete_uses_the_configured_delete_mode(env, monkeypatch):
     client.delete(f"/api/vods/{vid}/clips")
 
     assert sent  # 실제로 지우는 대신 재활용 함수가 불렸다
+
+
+def test_vod_wide_delete_also_clears_the_games_summary_so_the_row_resets(env):
+    """실사용 보고(2026-09-27): "전체 삭제" 뒤에도 게임 목록이 안 사라져 다시 통째로
+    분석하려 해도 목록에 옛 게임 행이 계속 남았다 - 클립만 지우고 게임 요약은 그대로
+    두면 클립 0개 행이 영원히 안 없어진다."""
+    client, a, _, vod_dir, *_ = env
+    vid = vod_id(a)
+    write_vod_clip(vod_dir, vid, 1, 10)
+    save_index(vod_dir, {
+        "id": vid, "path": str(a), "status": "done", "decodeDone": True, "analyzedSec": 100.0,
+        "games": [{"index": 1, "startSec": 0.0, "endSec": 10.0, "result": None, "clipIds": [f"vod_{vid}_g01_000010"]}],
+        "clips": [f"vod_{vid}_g01_000010"],
+    })
+
+    client.delete(f"/api/vods/{vid}/clips")
+
+    entry = by_id(client.get("/api/vods"))[vid]
+    assert entry["status"] == "new" and entry["games"] == []
+    from lumia_briefing_room.pipeline.vod_store import load_index as _load_index
+    saved = _load_index(vod_dir, vid)
+    assert saved["decodeDone"] is True and saved["analyzedSec"] == 100.0
+
+
+def test_delete_vod_game_removes_it_and_deletes_its_clips(env, monkeypatch):
+    from lumia_briefing_room.pipeline import delete_helper
+
+    client, a, _, vod_dir, *_ = env
+    vid = vod_id(a)
+    cid = write_vod_clip(vod_dir, vid, 1, 10)
+    save_index(vod_dir, {
+        "id": vid, "path": str(a), "status": "done",
+        "games": [
+            {"index": 1, "startSec": 0.0, "endSec": 10.0, "result": None, "clipIds": [cid]},
+            {"index": 2, "startSec": 20.0, "endSec": 30.0, "result": None, "clipIds": []},
+        ],
+        "clips": [cid],
+    })
+    sent = []
+    monkeypatch.setattr(delete_helper, "_send2trash", lambda path: sent.append(Path(path).name))
+
+    resp = client.delete(f"/api/vods/{vid}/games/1")
+
+    assert resp.status_code == 200 and resp.json()["deletedClips"] == 1
+    assert sent  # 설정된 삭제 방식(기본 recycle)으로 실제 클립 파일이 지워졌다
+    entry = by_id(client.get("/api/vods"))[vid]
+    assert [g["index"] for g in entry["games"]] == [2]
+
+
+def test_delete_vod_game_works_with_zero_clips(env):
+    """클립이 없는 게임(교전은 못 뽑았지만 결과 화면은 읽은 경우, plan.md §10-6)도
+    지울 수 있어야 한다 - 클립 기준 삭제 경로로는 지울 방법이 없었다."""
+    client, a, _, vod_dir, *_ = env
+    vid = vod_id(a)
+    save_index(vod_dir, {
+        "id": vid, "path": str(a), "status": "done",
+        "games": [{"index": 1, "startSec": 0.0, "endSec": 10.0, "result": None, "clipIds": []}],
+        "clips": [],
+    })
+
+    resp = client.delete(f"/api/vods/{vid}/games/1")
+
+    assert resp.status_code == 200 and resp.json()["deletedClips"] == 0
+    assert by_id(client.get("/api/vods"))[vid]["games"] == []
+
+
+def test_delete_vod_game_404s_for_unknown_game_or_vod(env):
+    client, a, _, vod_dir, *_ = env
+    vid = vod_id(a)
+    save_index(vod_dir, {
+        "id": vid, "path": str(a), "status": "done",
+        "games": [{"index": 1, "startSec": 0.0, "endSec": 10.0, "result": None, "clipIds": []}],
+        "clips": [],
+    })
+
+    assert client.delete(f"/api/vods/{vid}/games/99").status_code == 404
+    assert client.delete(f"/api/vods/does-not-exist/games/1").status_code == 404
 
 
 def test_fs_videos_lists_folders_and_only_video_files(env):

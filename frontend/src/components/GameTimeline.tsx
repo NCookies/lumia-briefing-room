@@ -1,18 +1,19 @@
 import type { ReactNode } from 'react'
-import { buildPhaseColumns, elapsedGameSec } from '../timeline'
+import { buildCobaltPhaseColumns, buildPhaseColumns, elapsedGameSec } from '../timeline'
 import type { Clip } from '../types'
 
 interface Props {
   clips: Clip[]
   lead?: ReactNode
   renderClip: (clip: Clip) => ReactNode
+  gameMode?: string | null
 }
 
 const ESTIMATED_TOOLTIP = '게임 시작 후 경과 시간으로 추정한 시점'
 
-export function GameTimeline({ clips, lead, renderClip }: Props) {
+export function GameTimeline({ clips, lead, renderClip, gameMode }: Props) {
   const withElapsed = clips.map((c) => ({ ...c, elapsedGameSec: elapsedGameSec(c) }))
-  const columns = buildPhaseColumns(withElapsed)
+  const columns = gameMode === 'cobalt' ? buildCobaltPhaseColumns(clips) : buildPhaseColumns(withElapsed)
   const firstCredit = columns.findIndex((c) => c.zone === 'credit')
 
   return (

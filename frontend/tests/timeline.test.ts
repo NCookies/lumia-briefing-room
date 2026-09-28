@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { buildPhaseColumns, elapsedGameSec, estimatePhaseIndex, phaseLabel, PHASE_LENGTH_SEC } from '../src/timeline.ts'
+import {
+  buildCobaltPhaseColumns,
+  buildPhaseColumns,
+  elapsedGameSec,
+  estimatePhaseIndex,
+  phaseLabel,
+  PHASE_LENGTH_SEC,
+} from '../src/timeline.ts'
 
 test('phaseLabel counts days from 1 with day then night', () => {
   assert.equal(phaseLabel(0), '1일차 낮')
@@ -126,4 +133,23 @@ test('buildPhaseColumns only falls back to the trailing unknown column when elap
 
 test('PHASE_LENGTH_SEC falls within the measured 2.5~3 minute range', () => {
   assert.ok(PHASE_LENGTH_SEC >= 150 && PHASE_LENGTH_SEC <= 180)
+})
+
+test('buildCobaltPhaseColumns labels columns by Phase number, no day/night or revive zone', () => {
+  const cols = buildCobaltPhaseColumns([
+    { id: 'a', cobaltPhase: 1 },
+    { id: 'b', cobaltPhase: 3 },
+    { id: 'c', cobaltPhase: 3 },
+  ])
+  assert.deepEqual(
+    cols.map((c) => [c.label, c.clips.length, c.zone]),
+    [['Phase 1', 1, null], ['Phase 2', 0, null], ['Phase 3', 2, null]],
+  )
+})
+
+test('buildCobaltPhaseColumns puts clips without a phase in a trailing unknown column', () => {
+  const cols = buildCobaltPhaseColumns([{ cobaltPhase: null }, { cobaltPhase: 1 }])
+  assert.deepEqual(cols.map((c) => c.label), ['Phase 1', '시점 알 수 없음'])
+  assert.equal(buildCobaltPhaseColumns([{ cobaltPhase: null }]).length, 1)
+  assert.deepEqual(buildCobaltPhaseColumns([]), [])
 })

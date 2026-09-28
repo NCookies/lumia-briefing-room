@@ -7,6 +7,8 @@ usage:
     python -m lumia_briefing_room.cli.watch --recording-root "H:\\steam video\\video"
         [--config PATH] [--ffmpeg PATH] [--game-mode battle_royale|cobalt]
         [--k-templates PATH] [--a-templates PATH] [--hwaccel NAME] [--player-log-dir PATH]
+
+--game-mode 를 생략하면 검출 결과로 자동 판별한다(plan.md §10 C1-b).
 """
 
 import argparse
@@ -55,7 +57,7 @@ def make_processor(
     cfg: Config,
     ffmpeg_path: Path,
     *,
-    game_mode: str,
+    game_mode: str | None,
     k_templates: dict | None,
     a_templates: dict | None,
     hwaccel: str | None,
@@ -98,7 +100,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ffmpeg", type=Path, default=None)
     parser.add_argument("--recording-root", type=Path, default=None)
     parser.add_argument("--player-log-dir", type=Path, default=None)
-    parser.add_argument("--game-mode", default="battle_royale")
+    parser.add_argument("--game-mode", default=None, choices=["battle_royale", "cobalt"])
     parser.add_argument("--k-templates", type=Path, default=None)
     parser.add_argument("--a-templates", type=Path, default=None)
     parser.add_argument("--hwaccel", type=str, default=None)

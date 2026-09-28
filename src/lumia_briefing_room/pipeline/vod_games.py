@@ -18,10 +18,17 @@ class GameSpan:
 
 
 def is_ingame(state: FrameState) -> bool:
-    """인게임 HUD(낮밤 아이콘·일차)가 읽히거나, 관전이 아닌 채 K 가 읽히면 게임 안이다. 로비·로딩·결과 화면은 셋 다 비어 있다."""
+    """인게임 HUD(낮밤 아이콘·일차·코발트 Phase)가 읽히거나, 관전이 아닌 채 K 가 읽히면 게임 안이다.
+
+    로비·로딩·결과 화면은 전부 비어 있다. `cobalt_phase`(plan.md §10 C2)는 배틀로얄의
+    `game_day` 와 같은 역할을 코발트 프로토콜에서 한다 - 이 스트리머의 다시보기에서는
+    `k`/`spectating` 판독이 UI 스케일 차이로 신뢰할 수 없었는데(plan-vod.md §8-4), Phase
+    판독은 이 문제와 무관해 독립적인 신호로 쓸 수 있다(§10-1·§10-2).
+    """
     return (
         state.day_night is not None
         or state.game_day is not None
+        or state.cobalt_phase is not None
         or (state.k is not None and state.spectating is False)
     )
 

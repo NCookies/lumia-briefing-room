@@ -7,6 +7,7 @@ import {
   formatMatchResult,
   gameRecordId,
   groupByGame,
+  resultImageRef,
   totalSize,
   withResultImage,
 } from '../src/grouping.ts'
@@ -52,27 +53,6 @@ test('groupByGame separates same start time in different sessions', () => {
   assert.equal(groups.length, 2)
 })
 
-test('groupByGame pvp orders games by their best score and keeps clips oldest first', () => {
-  const groups = groupByGame(
-    [
-      c('a2', 't1', 's', 0.9),
-      c('a1', 't1', 's', 0.2),
-      c('b1', 't2', 's', 0.5),
-      c('c1', 't0', 's', null),
-    ],
-    'pvp',
-  )
-  assert.deepEqual(
-    groups.map((g) => g.clips.map((x) => x.id)),
-    [['a1', 'a2'], ['b1'], ['c1']],
-  )
-})
-
-test('groupByGame pvp breaks score ties by oldest game first', () => {
-  const groups = groupByGame([c('b', 't2', 's', 0.5), c('a', 't1', 's', 0.5)], 'pvp')
-  assert.deepEqual(groups.map((g) => g.clips[0].id), ['a', 'b'])
-})
-
 test('groupByGame numbers games from the oldest regardless of direction', () => {
   const groups = groupByGame(clips, 'desc')
   assert.deepEqual(groups.map((g) => g.number), [2, 1])
@@ -114,6 +94,11 @@ test('formatMatchResult shows an escape outcome but no character name(초상화�
   assert.equal(formatMatchResult(result({ placement: 3, outcome: '탈출 성공' })), '랭크 · 3위 · 탈출 성공')
 })
 
+test('formatMatchResult shows win/lose text for cobalt protocol instead of a placement, no character name', () => {
+  assert.equal(formatMatchResult(result({ outcome: '승리', matchType: 'unknown' })), '승리')
+  assert.equal(formatMatchResult(result({ outcome: '패배', matchType: 'unknown' })), '패배')
+})
+
 test('formatKda joins TK/K/A and needs all three', () => {
   assert.equal(formatKda(result({ tk: 13, kills: 3, assists: 6 })), '13 / 3 / 6')
   assert.equal(formatKda(result({ tk: 2, kills: 0, assists: 0 })), '2 / 0 / 0')
@@ -149,6 +134,22 @@ test('withResultImage keeps only games that have a saved result screenshot, in t
   assert.deepEqual(withResultImage(groups).map((g) => g.clips[0].id), ['c', 'a'])
 })
 
+test('resultImageRef picks record, then clip, then falls back to the vod game summary', () => {
+  // 실사용 사고(2026-09-27): 이 분기를 호출부마다 따로 적다가 clips[0] 이 없는
+  // 경우(코발트처럼 교전은 못 뽑았어도 결과 화면은 읽은 VOD 게임)를 두 번 놓쳐서
+  // 앱 전체가 죽었다 - 한 곳에 모아 테스트로 고정한다.
+  assert.deepEqual(resultImageRef({ recordId: 'r1', clips: [{ id: 'c1' }], key: 'v1|2', number: 2 }), {
+    kind: 'record',
+    id: 'r1',
+  })
+  assert.deepEqual(resultImageRef({ clips: [{ id: 'c1' }], key: 'v1|2', number: 2 }), { kind: 'clip', id: 'c1' })
+  assert.deepEqual(resultImageRef({ clips: [], key: 'v1|2', number: 2 }), {
+    kind: 'vodGame',
+    vodId: 'v1',
+    index: 2,
+  })
+})
+
 const record = (id: string, matchStartUtc: string, sessionDir = 's1') => ({
   id,
   sessionDir,
@@ -175,12 +176,17 @@ test('groupByGame ignores a record whose game still has clips', () => {
   assert.equal(groups[0].recordId, undefined)
 })
 
-test('groupByGame pvp sort puts clip-less games last without NaN ordering', () => {
-  const scored = [c('a', '2026-09-20T12:00:00Z', 's1', 0.2)]
-  const groups = groupByGame(scored, 'pvp', [record('r1', '2026-09-20T11:00:00Z')])
-  assert.deepEqual(groups.map((g) => g.recordId ?? null), [null, 'r1'])
-})
-
 test('gameRecordId matches the server key', () => {
   assert.equal(gameRecordId('sess a', '2026-09-01T10:00:00Z'), 'sess_a__2026-09-01T10_00_00Z')
+})
+
+test('groupByGame carries the game mode from its clips', () => {
+  const cobalt = { ...c('a', 't1', 's'), gameMode: 'cobalt' }
+  const groups = groupByGame([cobalt], 'asc')
+  assert.equal(groups[0].gameMode, 'cobalt')
+})
+
+test('groupByGame falls back to the game record mode when there are no clips', () => {
+  const groups = groupByGame([], 'asc', [{ ...record('r1', '2026-09-20T12:00:00Z'), gameMode: 'cobalt' }])
+  assert.equal(groups[0].gameMode, 'cobalt')
 })

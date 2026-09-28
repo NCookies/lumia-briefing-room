@@ -4,7 +4,7 @@ import pytest
 from lumia_briefing_room.detect.glyph import build_template
 from lumia_briefing_room.detect.match import analyze_frame, detect_match, finalize_match
 from lumia_briefing_room.detect.types import FrameState
-from lumia_briefing_room.profiles.models import ResolutionProfile
+from lumia_briefing_room.profiles.models import ResolutionProfile, Roi
 from lumia_briefing_room.video.frames import crop_roi
 from lumia_briefing_room.video.segments import SegmentRange
 from lumia_briefing_room.video.session import RecordingSession
@@ -113,6 +113,180 @@ def test_analyze_frame_reads_tk_with_resized_k_templates(render_digit, compose):
 
     assert state.tk == 5
     assert state.a is None
+
+
+def _digit_templates(rng_seed, height, width, render_digit, compose):
+    rng = np.random.default_rng(rng_seed)
+    templates = {}
+    for digit in range(10):
+        alpha = render_digit(digit, height=height, width=width)
+        samples = [
+            compose(alpha, tuple(int(x) for x in rng.integers(0, 150, size=3)))
+            for _ in range(15)
+        ]
+        templates[digit] = build_template(np.stack(samples))
+    return templates
+
+
+def _paint_digit_at_native_scale(frame, native_roi, ref_height, ref_width, digit, render_digit, compose):
+    """본보기는 기준 해상도(예: k_value 36x24)로 만들어지는데, `render_digit` 은 캔버스
+    크기와 무관하게 고정된 절대 글자 크기로 그린다(conftest.py) - 기준 크기로 그린 뒤
+    ROI 의 실제(네이티브) 크기로 줄여 붙여야 `_crop_for_reference`가 다시 키웠을 때
+    본보기와 같은 상대적 위치·크기가 된다(실제 압축 영상을 원본 해상도로 찍은 것과
+    같은 축소를 흉내낸다)."""
+    import cv2
+
+    ref_patch = compose(render_digit(digit, height=ref_height, width=ref_width), (60, 40, 90))
+    native_patch = cv2.resize(
+        ref_patch, (native_roi.width, native_roi.height), interpolation=cv2.INTER_CUBIC
+    )
+    frame[native_roi.y0 : native_roi.y1, native_roi.x0 : native_roi.x1] = native_patch
+
+
+def test_analyze_frame_reads_k_and_a_from_the_cobalt_hud_position(render_digit, compose):
+    """코발트 프로토콜은 같은 스트리머의 배틀로얄 녹화 대비 TK/K/A 가 ~80px 왼쪽에 있다
+    (실측, 2026-09-27, plan.md §10-3 후속) - 배틀로얄 자리가 비어 있으면 코발트 자리를
+    기준 해상도 크기로 키워 다시 읽는다. 본보기는 기준 해상도(2560x1440) 본보기(k_value
+    등)를 그대로 쓴다(실제 운영 코드가 쓰는 것과 같은 본보기)."""
+    ref_profile = ResolutionProfile.builtin(2560, 1440)
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    k_ref_roi = ref_profile.rois["k_value"]
+    a_ref_roi = ref_profile.rois["a_value"]
+    k_templates = _digit_templates(3, k_ref_roi.height, k_ref_roi.width, render_digit, compose)
+    a_templates = _digit_templates(4, a_ref_roi.height, a_ref_roi.width, render_digit, compose)
+
+    frame = np.full((1080, 1920, 3), 80, dtype=np.uint8)
+    _paint_digit_at_native_scale(
+        frame, profile.rois["cobalt_k_value"], k_ref_roi.height, k_ref_roi.width, 7, render_digit, compose
+    )
+    _paint_digit_at_native_scale(
+        frame, profile.rois["cobalt_a_value"], a_ref_roi.height, a_ref_roi.width, 9, render_digit, compose
+    )
+
+    state = analyze_frame(frame, profile, t=0.0, k_templates=k_templates, a_templates=a_templates)
+
+    assert state.k == 7
+    assert state.a == 9
+
+
+def test_analyze_frame_reads_tk_from_the_cobalt_hud_position(render_digit, compose):
+    from lumia_briefing_room.detect.match import resolve_tk_templates
+
+    ref_profile = ResolutionProfile.builtin(2560, 1440)
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    k_ref_roi = ref_profile.rois["k_value"]
+    k_templates = _digit_templates(3, k_ref_roi.height, k_ref_roi.width, render_digit, compose)
+    tk_templates = resolve_tk_templates(profile, k_templates)
+    tk_ref_roi = ref_profile.rois["tk_value"]
+
+    frame = np.full((1080, 1920, 3), 80, dtype=np.uint8)
+    _paint_digit_at_native_scale(
+        frame, profile.rois["cobalt_tk_value"], tk_ref_roi.height, tk_ref_roi.width, 5, render_digit, compose
+    )
+
+    state = analyze_frame(frame, profile, t=0.0, tk_templates=tk_templates)
+
+    assert state.tk == 5
+
+
+def test_analyze_frame_battle_royale_position_wins_over_cobalt_when_both_present(render_digit, compose):
+    """두 자리 모두 판독되면(있을 수 없는 상황이지만 방어적으로) 배틀로얄 자리를 우선한다 -
+    코발트 자리는 그 자리에 실제로 숫자가 없을 때만 보는 대체 경로다."""
+    ref_profile = ResolutionProfile.builtin(2560, 1440)
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    k_ref_roi = ref_profile.rois["k_value"]
+    k_templates = _digit_templates(3, k_ref_roi.height, k_ref_roi.width, render_digit, compose)
+
+    frame = np.full((1080, 1920, 3), 80, dtype=np.uint8)
+    _paint_digit_at_native_scale(
+        frame, profile.rois["k_value"], k_ref_roi.height, k_ref_roi.width, 2, render_digit, compose
+    )
+    _paint_digit_at_native_scale(
+        frame, profile.rois["cobalt_k_value"], k_ref_roi.height, k_ref_roi.width, 8, render_digit, compose
+    )
+
+    state = analyze_frame(frame, profile, t=0.0, k_templates=k_templates)
+
+    assert state.k == 2
+
+
+def test_analyze_frame_k_stays_none_when_neither_hud_position_has_a_digit(render_digit, compose):
+    ref_profile = ResolutionProfile.builtin(2560, 1440)
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    k_ref_roi = ref_profile.rois["k_value"]
+    k_templates = _digit_templates(3, k_ref_roi.height, k_ref_roi.width, render_digit, compose)
+
+    frame = np.full((1080, 1920, 3), 80, dtype=np.uint8)
+
+    assert analyze_frame(frame, profile, t=0.0, k_templates=k_templates).k is None
+
+
+def test_calibrate_counter_position_finds_a_shifted_k_value(render_digit, compose):
+    """실사용 보고(2026-09-28): 같은 해상도(1920x1080)인데도 영상마다 TK/K/A 칸 위치가
+    달랐다(스트리머 VOD의 코발트 vs 배틀로얄). 매번 사람이 좌표를 실측해 하드코딩하는
+    대신, 기본 자리가 안 맞으면 그 주변 넓은 영역에서 자동으로 찾는다(plan.md §10-13)."""
+    from lumia_briefing_room.detect.match import calibrate_counter_position
+
+    ref_profile = ResolutionProfile.builtin(2560, 1440)
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    k_ref_roi = ref_profile.rois["k_value"]
+    k_templates = _digit_templates(3, k_ref_roi.height, k_ref_roi.width, render_digit, compose)
+
+    k_roi = profile.rois["k_value"]
+    dx, dy = -80, -3
+    shifted = Roi(k_roi.x0 + dx, k_roi.y0 + dy, k_roi.x1 + dx, k_roi.y1 + dy)
+
+    frames = []
+    for _ in range(4):
+        frame = np.full((1080, 1920, 3), 80, dtype=np.uint8)
+        _paint_digit_at_native_scale(frame, shifted, k_ref_roi.height, k_ref_roi.width, 5, render_digit, compose)
+        frames.append(frame)
+
+    new_profile = calibrate_counter_position(profile, frames, k_templates)
+
+    assert (new_profile.rois["k_value"].x0, new_profile.rois["k_value"].y0) == (k_roi.x0 + dx, k_roi.y0 + dy)
+    # a_value/tk_value 도 같은 만큼 통째로 옮겨진다 - 세 칸은 같은 줄에 나란히 있다.
+    a_roi, tk_roi = profile.rois["a_value"], profile.rois["tk_value"]
+    assert new_profile.rois["a_value"].x0 == a_roi.x0 + dx
+    assert new_profile.rois["tk_value"].x0 == tk_roi.x0 + dx
+    # 이 프로필로 같은 자리를 다시 읽으면 이제 정상적으로 읽힌다.
+    state = analyze_frame(frames[0], new_profile, t=0.0, k_templates=k_templates)
+    assert state.k == 5
+
+
+def test_calibrate_counter_position_is_a_no_op_when_default_position_already_works(render_digit, compose):
+    ref_profile = ResolutionProfile.builtin(2560, 1440)
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    k_ref_roi = ref_profile.rois["k_value"]
+    k_templates = _digit_templates(3, k_ref_roi.height, k_ref_roi.width, render_digit, compose)
+
+    from lumia_briefing_room.detect.match import calibrate_counter_position
+
+    k_roi = profile.rois["k_value"]
+    frames = []
+    for _ in range(4):
+        frame = np.full((1080, 1920, 3), 80, dtype=np.uint8)
+        _paint_digit_at_native_scale(frame, k_roi, k_ref_roi.height, k_ref_roi.width, 5, render_digit, compose)
+        frames.append(frame)
+
+    new_profile = calibrate_counter_position(profile, frames, k_templates)
+
+    assert new_profile is profile
+
+
+def test_calibrate_counter_position_gives_up_on_blank_frames(render_digit, compose):
+    from lumia_briefing_room.detect.match import calibrate_counter_position
+
+    ref_profile = ResolutionProfile.builtin(2560, 1440)
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    k_ref_roi = ref_profile.rois["k_value"]
+    k_templates = _digit_templates(3, k_ref_roi.height, k_ref_roi.width, render_digit, compose)
+
+    frames = [np.full((1080, 1920, 3), 80, dtype=np.uint8) for _ in range(4)]
+
+    new_profile = calibrate_counter_position(profile, frames, k_templates)
+
+    assert new_profile is profile
 
 
 def test_finalize_match_tags_kill():
@@ -849,6 +1023,54 @@ def test_analyze_frame_game_day_is_none_without_hud_or_templates():
     assert analyze_frame(_frame_with_minimap(profile, alive=True), profile, t=0.0).game_day is None
 
 
+def _phase_templates(profile):
+    from lumia_briefing_room.detect.region import build_region_template, region_score
+
+    roi = profile.rois["phase_digit"]
+    rng = np.random.default_rng(13)
+    patch = np.full((roi.height, roi.width, 3), 30, np.uint8)
+    ink = rng.random((roi.height - 4, roi.width - 4)) > 0.5
+    patch[2 : roi.height - 2, 2 : roi.width - 2][ink] = (200, 120, 40)
+    return {"2": build_region_template([region_score(patch)])}, patch
+
+
+def test_analyze_frame_reads_cobalt_phase_from_the_top_hud():
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    templates, patch = _phase_templates(profile)
+    frame = _alive_frame(profile)
+    roi = profile.rois["phase_digit"]
+    frame[roi.y0 : roi.y1, roi.x0 : roi.x1] = patch
+
+    state = analyze_frame(frame, profile, t=0.0, phase_templates=templates)
+
+    assert state.cobalt_phase == 2
+
+
+def test_analyze_frame_cobalt_phase_is_none_without_templates_or_roi():
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    templates, patch = _phase_templates(profile)
+    frame = _alive_frame(profile)
+    roi = profile.rois["phase_digit"]
+    frame[roi.y0 : roi.y1, roi.x0 : roi.x1] = patch
+
+    assert analyze_frame(frame, profile, t=0.0).cobalt_phase is None
+
+    # 실측 코발트 ROI 가 없는 해상도를 흉내낸다 - 1920x1080·2560x1440 둘 다 이제
+    # phase_digit 을 실측해 둬서(2026-09-28) 진짜 "ROI 없는" 빌트인 프로필이 없다.
+    no_phase_profile = ResolutionProfile(
+        width=2560, height=1440,
+        rois={k: v for k, v in profile.rois.items() if k != "phase_digit"},
+        measured=True,
+    )
+    assert "phase_digit" not in no_phase_profile.rois
+    assert (
+        analyze_frame(
+            _alive_frame(no_phase_profile), no_phase_profile, t=0.0, phase_templates=templates
+        ).cobalt_phase
+        is None
+    )
+
+
 def _day_state(t, combat, day):
     return FrameState(
         t=t, combat=combat, face_value=111.0, face_sat=26.0, k=0, a=0,
@@ -869,6 +1091,123 @@ def test_finalize_match_game_day_is_none_when_never_read():
     states = [_day_state(0.0, False, None), _day_state(3.0, True, None), _day_state(6.0, True, None)]
 
     assert finalize_match(states).intervals[0].game_day is None
+
+
+def _phase_state(t, combat, phase, *, dead=False):
+    face = (34.0, 13.0) if dead else (111.0, 26.0)
+    return FrameState(
+        t=t, combat=combat, face_value=face[0], face_sat=face[1], k=0, a=0,
+        day_night="day", spectating=False, cobalt_phase=phase,
+    )
+
+
+def test_finalize_match_uses_the_most_common_cobalt_phase_in_the_interval():
+    """코발트는 배지가 아니라 사망 구간으로 구간을 나눈다(§10-13) - 여기서는 사망으로
+    첫 구간의 경계를 만들어 그 구간 안 phase 최빈값이 맞는지 본다."""
+    states = [
+        _phase_state(0.0, False, 1), _phase_state(3.0, True, 2), _phase_state(6.0, True, 2),
+        _phase_state(9.0, True, None), _phase_state(12.0, True, 3, dead=True), _phase_state(15.0, False, 3, dead=True),
+        _phase_state(18.0, False, 4),
+    ]
+
+    assert finalize_match(states).intervals[0].cobalt_phase == 2
+
+
+def test_finalize_match_cobalt_phase_is_none_when_never_read():
+    states = [_phase_state(0.0, False, None), _phase_state(3.0, True, None), _phase_state(6.0, True, None)]
+
+    assert finalize_match(states).intervals[0].cobalt_phase is None
+
+
+def test_infer_game_mode_picks_battle_royale_when_day_reads_win():
+    from lumia_briefing_room.detect.match import infer_game_mode
+
+    states = [_day_state(0.0, True, 3), _day_state(1.0, True, 4), _phase_state(2.0, True, 1)]
+
+    assert infer_game_mode(states) == "battle_royale"
+
+
+def test_infer_game_mode_picks_cobalt_when_phase_reads_win():
+    from lumia_briefing_room.detect.match import infer_game_mode
+
+    states = [_phase_state(0.0, True, 0), _phase_state(1.0, True, 1), _day_state(2.0, True, 3)]
+
+    assert infer_game_mode(states) == "cobalt"
+
+
+def test_infer_game_mode_defaults_to_battle_royale_when_neither_reads():
+    from lumia_briefing_room.detect.match import infer_game_mode
+
+    assert infer_game_mode([_day_state(0.0, True, None), _day_state(1.0, True, None)]) == "battle_royale"
+
+
+def test_finalize_match_reports_the_inferred_game_mode():
+    states = [_phase_state(0.0, True, 0), _phase_state(1.0, True, 1), _phase_state(2.0, True, 1)]
+
+    assert finalize_match(states).game_mode == "cobalt"
+
+
+def test_finalize_match_game_mode_defaults_to_battle_royale_for_empty_states():
+    assert finalize_match([]).game_mode == "battle_royale"
+
+
+def _cobalt_state(t, *, dead=False, k=0, a=0):
+    face = (34.0, 13.0) if dead else (111.0, 26.0)
+    return FrameState(
+        t=t, combat=None, face_value=face[0], face_sat=face[1], k=k, a=a,
+        day_night=None, spectating=False, cobalt_phase=1,
+    )
+
+
+def test_finalize_match_cobalt_mode_treats_each_alive_span_as_one_interval():
+    """사용자 결정(2026-09-28): 코발트는 야생동물도 없고 이동도 거의 없이 계속 교전의
+    연속이라, 개별 킬/배지 이벤트로 잘게 쪼개는 대신 부활~다음 사망까지를 통째로 클립
+    하나로 만든다 - 사망 중일 때만 클립 대상에서 뺀다."""
+    times = [float(t) for t in range(0, 60, 2)]
+    dead_ranges = [(14.0, 20.0), (40.0, 46.0)]
+    is_dead = lambda t: any(a <= t <= b for a, b in dead_ranges)
+
+    states = [_cobalt_state(t, dead=is_dead(t)) for t in times]
+
+    det = finalize_match(states)
+
+    assert det.game_mode == "cobalt"
+    assert len(det.intervals) == 3
+    ivs = sorted(det.intervals, key=lambda iv: iv.start)
+    assert ivs[0].start == times[0] and ivs[0].end < 14.0
+    assert 20.0 < ivs[1].start and ivs[1].end < 40.0
+    assert 46.0 < ivs[2].start and ivs[2].end == times[-1]
+    # 사망으로 끝난 구간엔 death 태그가 붙고, 게임이 그냥 끝나는 마지막 구간엔 안 붙는다.
+    assert ivs[0].died is True and "death" in ivs[0].tags
+    assert ivs[1].died is True and "death" in ivs[1].tags
+    assert ivs[2].died is False
+
+
+def test_finalize_match_cobalt_mode_still_tags_kills_and_assists_within_a_span():
+    times = [float(t) for t in range(0, 20, 2)]
+    k_values = {t: (1 if t >= 10 else 0) for t in times}
+    a_values = {t: (1 if t >= 14 else 0) for t in times}
+    states = [_cobalt_state(t, k=k_values[t], a=a_values[t]) for t in times]
+
+    det = finalize_match(states)
+
+    assert len(det.intervals) == 1
+    iv = det.intervals[0]
+    assert iv.k_delta == 1 and iv.a_delta == 1
+    assert {"kill", "assist"} <= iv.tags
+
+
+def test_finalize_match_battle_royale_mode_is_unaffected_by_the_cobalt_branch():
+    """코발트 분기를 추가해도 배틀로얄(기존 배지·킬 이벤트 기반) 경로는 그대로여야 한다."""
+    times = [0, 3, 6, 9, 12]
+    combat_on = {3, 6, 9}
+    states = [fs(t, t in combat_on) for t in times]
+
+    det = finalize_match(states)
+
+    assert det.game_mode == "battle_royale"
+    assert len(det.intervals) == 1
+    assert (det.intervals[0].start, det.intervals[0].end) == (3, 9)
 
 
 def _team_frame(profile, *, ring_slot=None, dead_slot=None, alive=True):

@@ -60,11 +60,16 @@ test('groupByVod puts clips under their vod and game, games ascending by default
   assert.equal(groups[0].games[0].endSec, 1900)
 })
 
-test('desc reverses games and pvp sorts by the best score, clips stay ascending', () => {
+test('groupByVod carries the game mode from its clips', () => {
+  const groups = groupByVod([clip('c1', 'v1', 1, { gameMode: 'cobalt' })], [vod()], 'asc', true)
+
+  assert.equal(groups[0].games[0].gameMode, 'cobalt')
+})
+
+test('desc reverses games, clips stay ascending', () => {
   const clips = [clip('a', 'v1', 1, { pvpScore: 0.2 }), clip('b', 'v1', 2, { pvpScore: 0.9 }), clip('c', 'v1', 3, { pvpScore: 0.5 })]
 
   assert.deepEqual(groupByVod(clips, [vod()], 'desc', true)[0].games.map((g) => g.number), [3, 2, 1])
-  assert.deepEqual(groupByVod(clips, [vod()], 'pvp', true)[0].games.map((g) => g.number), [2, 3, 1])
 })
 
 test('vods are ordered by name and clips of unknown vods still appear', () => {
@@ -88,15 +93,55 @@ test('vods without clips are kept only when includeEmpty is set', () => {
   assert.deepEqual(groupByVod(clips, vods, 'asc', false).map((g) => g.vodId), ['v1'])
 })
 
-test('an analyzed vod whose clips were all deleted disappears from the list', () => {
+test('an analyzed vod with zero clips still stays in the list (no auto-hiding)', () => {
+  // 실사용 사고(2026-09-27): "분석 완료 + 클립 0개"를 숨기는 조건이 "게임을 못
+  // 찾음"과 "게임은 찾았는데 클립을 지움"을 구분 못 해, 못 찾은 영상까지 사라져
+  // 다시 분석할 방법이 없었다. 조건을 더 세분화하는 대신 아예 숨기지 않기로
+  // 했다 - 보기 싫으면 사용자가 직접 지운다.
   const vods = [
-    vod({ id: 'v1', clipCount: 0, status: 'done' }),
+    vod({ id: 'v1', clipCount: 0, status: 'done', games: [] }),
     vod({ id: 'v2', name: 'b.mp4', clipCount: 0, status: 'new' }),
     vod({ id: 'v3', name: 'c.mp4', clipCount: 0, status: 'interrupted' }),
     vod({ id: 'v4', name: 'd.mp4', clipCount: 3, status: 'done' }),
   ]
 
-  assert.deepEqual(groupByVod([], vods, 'asc', true).map((g) => g.vodId), ['v2', 'v3', 'v4'])
+  assert.deepEqual(groupByVod([], vods, 'asc', true).map((g) => g.vodId), ['v1', 'v2', 'v3', 'v4'])
+})
+
+test('games with no clips still show up as rows using the vod summary (plan.md §10-6)', () => {
+  // 실사용 사고: 코발트 다시보기가 교전은 못 뽑았어도(오버레이 문제, §10-3) 결과
+  // 화면(승패·스탯·팀원)은 6판 다 읽었는데, 클립 기준으로만 게임 행을 만들다 보니
+  // "게임 6개"라고 세면서 화면엔 아무 행도 안 보였다.
+  const win = { matchType: 'unknown', matchLabel: '', placement: 1, total: 2, outcome: '승리', nickname: '우쮸' }
+  const vods = [
+    vod({
+      id: 'v1',
+      status: 'done',
+      games: [
+        { index: 1, startSec: 0, endSec: 500, gameMode: 'cobalt', result: win, clipIds: [] },
+        { index: 2, startSec: 600, endSec: 1000, gameMode: 'cobalt', result: null, clipIds: [] },
+      ],
+    }),
+  ]
+
+  const groups = groupByVod([], vods, 'asc', true)
+
+  assert.equal(groups[0].games.length, 2)
+  assert.deepEqual(groups[0].games[0].clips, [])
+  assert.equal(groups[0].games[0].result, win)
+  assert.equal(groups[0].games[0].gameMode, 'cobalt')
+  assert.deepEqual([groups[0].games[0].startSec, groups[0].games[0].endSec], [0, 500])
+})
+
+test('a game with both a live clip and a zero-clip summary entry is not duplicated', () => {
+  const vods = [
+    vod({ id: 'v1', status: 'done', games: [{ index: 1, startSec: 0, endSec: 500, result: null, clipIds: ['c1'] }] }),
+  ]
+
+  const groups = groupByVod([clip('c1', 'v1', 1)], vods, 'asc', true)
+
+  assert.equal(groups[0].games.length, 1)
+  assert.equal(groups[0].games[0].clips.length, 1)
 })
 
 test('the game result comes from the first clip that has one', () => {

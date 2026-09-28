@@ -12,6 +12,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 
 from lumia_briefing_room.api.clips import scan_clips
 from lumia_briefing_room.api.export import list_roots, list_subdirs, parent_of
@@ -20,7 +21,7 @@ from lumia_briefing_room.pipeline.delete_helper import delete_clip
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for
 from lumia_briefing_room.pipeline.vod_analyze import VodCancelled, VodProgress, analyze_vod
 from lumia_briefing_room.pipeline.vod_dates import is_valid_iso_date, resolve_video_date
-from lumia_briefing_room.pipeline.vod_store import load_index, vod_id
+from lumia_briefing_room.pipeline.vod_store import load_index, save_index, vod_id
 from lumia_briefing_room.video.vod import VideoInfo, find_ffprobe, probe_video
 from lumia_briefing_room.video_formats import VIDEO_EXTENSIONS
 
@@ -204,6 +205,21 @@ def register_vod_routes(
             raise HTTPException(404, "다시보기 영상을 찾을 수 없습니다")
         return found
 
+    @app.get("/api/vods/{vid}/games/{game_index}/result-image")
+    def vod_game_result_image(vid: str, game_index: int):
+        """클립이 없는 게임(교전을 못 뽑았지만 결과 화면은 읽은 경우, plan.md §10-6)도
+        결과표 이미지를 보여준다 - 클립 ID 로 찾는 `/api/clips/{id}/result-image` 를 못 쓴다."""
+        _, index = require(vid)
+        game = next((g for g in (index or {}).get("games", []) if g.get("index") == game_index), None)
+        image_path = ((game or {}).get("result") or {}).get("imagePath")
+        if not image_path:
+            raise HTTPException(404, "결과 화면 이미지가 없습니다")
+        base = root().resolve()
+        full = (base / image_path).resolve()
+        if base not in full.parents or not full.exists():
+            raise HTTPException(404, "결과 화면 이미지가 없습니다")
+        return FileResponse(full, media_type="image/jpeg")
+
     @app.patch("/api/vods/{vid}")
     def patch_vod(vid: str, body: dict):
         require(vid)
@@ -284,6 +300,10 @@ def register_vod_routes(
 
     @app.delete("/api/vods/{vid}/clips")
     def delete_vod_clips(vid: str):
+        """"전체 삭제" - 클립을 지우고 분석 결과(게임 목록)도 지워 "분석 안 함" 상태로
+        되돌린다. 클립만 지우면 클립 0개짜리 게임 요약 행이 목록에 계속 남아 "완전히
+        지웠다가 다시 만들고 싶은데 목록에서 안 없어진다"는 실사용 보고가 있었다
+        (2026-09-27) - 클립 없는 게임 요약은 그 자체로 남겨 둘 이유가 없다."""
         with lock:
             base = root()
             clips = vod_clip_paths(base, vid)
@@ -291,7 +311,40 @@ def register_vod_routes(
             mode = current_config().ui.delete_mode
             for clip in clips:
                 delete_clip(clip.meta_path, mode=mode, archive_dir=archive_dir)
+            index = load_index(base, vid)
+            if index is not None:
+                # decodeDone/analyzedSec 은 그대로 둔다 - 프레임 판독 캐시는 영상 자체가
+                # 안 바뀌면 그대로 유효하므로, 다음 "분석 시작"이 처음부터 다시 디코드하지
+                # 않고 캐시를 그대로 써서 게임·클립만 빠르게 다시 만들게 한다.
+                index.update(games=[], clips=[], status="new", error=None)
+                save_index(base, index)
         return {"id": vid, "count": len(clips)}
+
+    @app.delete("/api/vods/{vid}/games/{game_index}")
+    def delete_vod_game(vid: str, game_index: int):
+        """게임 하나만 지운다 - 클립을 지우고 게임 요약도 목록에서 없앤다(스팀 쪽 "게임
+        삭제"가 기록도 같이 지우는 것과 같은 원칙). 클립이 0개인 게임(교전을 못 뽑았지만
+        결과 화면은 읽은 경우, plan.md §10-6)도 이걸로 지워야 목록에서 사라진다 -
+        클립이 없어 기존 클립 삭제 경로가 아무것도 안 했다."""
+        with lock:
+            base = root()
+            index = load_index(base, vid)
+            if index is None:
+                raise HTTPException(404, "분석 기록이 없습니다")
+            games = index.get("games", [])
+            game = next((g for g in games if g.get("index") == game_index), None)
+            if game is None:
+                raise HTTPException(404, "그런 게임이 없습니다")
+            clip_ids = set(game.get("clipIds", []))
+            clips = [c for c in vod_clip_paths(base, vid) if c.id in clip_ids]
+            archive_dir = archive_dir_for(base)
+            mode = current_config().ui.delete_mode
+            for clip in clips:
+                delete_clip(clip.meta_path, mode=mode, archive_dir=archive_dir)
+            index["games"] = [g for g in games if g.get("index") != game_index]
+            index["clips"] = [c for c in index.get("clips", []) if c not in clip_ids]
+            save_index(base, index)
+        return {"id": vid, "index": game_index, "deletedClips": len(clips)}
 
     @app.get("/api/fs/videos")
     def fs_videos(path: str = ""):

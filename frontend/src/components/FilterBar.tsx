@@ -11,7 +11,6 @@ const ALL_TAGS: ClipTag[] = ['kill', 'assist', 'death', 'teammate_death', 'no_re
 
 export interface FilterState {
   tags: ClipTag[]
-  dayNight: string
   gameMode: string
   pinnedOnly: boolean
   sort: ClipSort
@@ -24,7 +23,6 @@ export interface FilterState {
 
 export const DEFAULT_FILTER: FilterState = {
   tags: [],
-  dayNight: '',
   gameMode: '',
   pinnedOnly: false,
   sort: 'desc',
@@ -42,11 +40,20 @@ interface Props {
   viewMode: ViewMode
   onViewModeChange: (mode: ViewMode) => void
   dateOptions?: string[]
+  onRefresh?: () => void
 }
 
 const SELECT = 'rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm'
 
-export function FilterBar({ value, onChange, variant = 'steam', viewMode, onViewModeChange, dateOptions = [] }: Props) {
+export function FilterBar({
+  value,
+  onChange,
+  variant = 'steam',
+  viewMode,
+  onViewModeChange,
+  dateOptions = [],
+  onRefresh,
+}: Props) {
   const tuning = useTuningUi()
   const labeling = useLabelingUi()
   const toggleTag = (tag: ClipTag) => {
@@ -106,6 +113,17 @@ export function FilterBar({ value, onChange, variant = 'steam', viewMode, onView
         </div>
       )}
 
+      {onRefresh && (
+        <button
+          type="button"
+          className="rounded border border-zinc-600 px-3 py-1 text-sm text-zinc-300 hover:bg-zinc-700"
+          onClick={onRefresh}
+          title="목록을 다시 읽습니다"
+        >
+          ↻ 새로고침
+        </button>
+      )}
+
       <select
         className={SELECT}
         value={value.sort}
@@ -122,7 +140,6 @@ export function FilterBar({ value, onChange, variant = 'steam', viewMode, onView
             <option value="asc">오래된순</option>
           </>
         )}
-        <option value="pvp">교전 가능성순</option>
       </select>
 
       {labeling && (
@@ -172,21 +189,11 @@ export function FilterBar({ value, onChange, variant = 'steam', viewMode, onView
 
       <select
         className={SELECT}
-        value={value.dayNight}
-        onChange={(e) => onChange({ ...value, dayNight: e.target.value })}
-      >
-        <option value="">낮/밤 전체</option>
-        <option value="day">낮</option>
-        <option value="night">밤</option>
-      </select>
-
-      <select
-        className={SELECT}
         value={value.gameMode}
         onChange={(e) => onChange({ ...value, gameMode: e.target.value })}
       >
         <option value="">모드 전체</option>
-        <option value="battle_royale">배틀로얄</option>
+        <option value="battle_royale">일반/랭크</option>
         <option value="cobalt">코발트 프로토콜</option>
       </select>
 

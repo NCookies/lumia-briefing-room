@@ -30,7 +30,14 @@ import { LoadingBar } from './LoadingBar'
 import { LabelingHelp } from './LabelingHelp'
 import { emptyStateKind } from '../emptyState'
 import { loadViewMode, saveViewMode, type ViewMode } from '../viewMode'
-import { formatMatchResult, groupByGame, totalSize, withResultImage, type GameGroup } from '../grouping'
+import {
+  formatMatchResult,
+  groupByGame,
+  resultImageRef,
+  totalSize,
+  withResultImage,
+  type GameGroup,
+} from '../grouping'
 import { applyLabel, applyNote, progress } from '../labeling'
 import { useLabelingUi } from '../labelingContext'
 import { formatBytes } from '../retention'
@@ -38,6 +45,7 @@ import type { Clip, GameRecord, UserLabel } from '../types'
 import {
   cancelAnalysis,
   deleteVodClips,
+  deleteVodGame,
   getAnalysis,
   getDeleteSourceAfter,
   listVods,
@@ -45,11 +53,19 @@ import {
   setStreamer,
   setVideoDate,
   startAnalysis,
+  vodGameResultImageUrl,
   type AnalysisJob,
 } from '../vodApi'
 import { matchesDateFilter, uniqueVideoDates } from '../vodDates'
 import { resolvedDeleteSource } from '../vodDeleteSource'
 import { formatDuration, formatGameRange, groupByVod, probeProgress, type Vod } from '../vodGrouping'
+
+function resolveResultImageUrl(group: { recordId?: string; clips: { id: string }[]; key: string; number: number }): string {
+  const ref = resultImageRef(group)
+  if (ref.kind === 'record') return gameRecordImageUrl(ref.id)
+  if (ref.kind === 'clip') return resultImageUrl(ref.id)
+  return vodGameResultImageUrl(ref.vodId, ref.index)
+}
 
 export type ClipSource = 'steam' | 'vod'
 
@@ -69,7 +85,6 @@ const filterActive = (f: FilterState): boolean =>
   f.pinnedOnly ||
   f.cleanupOnly ||
   f.tags.length > 0 ||
-  f.dayNight !== '' ||
   f.gameMode !== '' ||
   f.label !== '' ||
   f.minPvpScore > 0 ||
@@ -141,7 +156,7 @@ export function ClipBrowser({
   const appliedFilter = useMemo(() => ({ ...filter, q: debouncedQuery }), [filter, debouncedQuery])
 
   const {
-    tags: filterTags, dayNight: filterDayNight, gameMode: filterGameMode, pinnedOnly: filterPinnedOnly,
+    tags: filterTags, gameMode: filterGameMode, pinnedOnly: filterPinnedOnly,
     minPvpScore: filterMinPvpScore, label: filterLabel,
   } = filter
 
@@ -152,7 +167,6 @@ export function ClipBrowser({
     }
     listClips({
       tags: filterTags,
-      dayNight: filterDayNight || undefined,
       gameMode: filterGameMode || undefined,
       pinned: filterPinnedOnly || undefined,
       minPvpScore: filterMinPvpScore || undefined,
@@ -173,7 +187,7 @@ export function ClipBrowser({
       setRecords([])
     }
   }, [
-    filterTags, filterDayNight, filterGameMode, filterPinnedOnly, filterMinPvpScore, filterLabel,
+    filterTags, filterGameMode, filterPinnedOnly, filterMinPvpScore, filterLabel,
     debouncedQuery, source, appliedFilter,
   ])
 
@@ -279,7 +293,14 @@ export function ClipBrowser({
     `게임 ${group.number}(${group.clips.length}개, ${formatBytes(totalSize(group.clips))})`
 
   const handleDeleteGame = (group: GameGroup<Clip>) =>
-    requestDelete(`${gameLabel(group)}의 클립을 모두 삭제합니다.`, () => runAll(group.clips, deleteClip))
+    requestDelete(`${gameLabel(group)}의 클립을 모두 삭제합니다.`, () =>
+      // VOD 는 클립이 0개인 게임도 있다(교전은 못 뽑았지만 결과 화면은 읽은 경우,
+      // plan.md §10-6) - 클립 기준 삭제(runAll)로는 지울 방법이 없어 게임 요약 자체를
+      // 지우는 전용 API 를 쓴다(실사용 보고: "게임 삭제"를 눌러도 목록에서 안 없어짐).
+      source === 'vod' && group.clips.length === 0
+        ? deleteVodGame(group.key.split('|')[0], group.number)
+        : runAll(group.clips, deleteClip),
+    )
 
   const handleCorrectMatchResult = (group: GameGroup<Clip>, values: { placement: number; outcome: string }) =>
     runAndReload(() =>
@@ -439,7 +460,7 @@ export function ClipBrowser({
     () =>
       withResultImage(groups).map((g) => ({
         key: g.key,
-        imageUrl: g.recordId ? gameRecordImageUrl(g.recordId) : resultImageUrl(g.clips[0].id),
+        imageUrl: resolveResultImageUrl(g),
         caption: [`게임 ${g.number}`, formatMatchResult(g.result)].filter(Boolean).join(' · '),
       })),
     [groups],
@@ -472,9 +493,10 @@ export function ClipBrowser({
   const timeline = viewMode === 'timeline'
 
   const renderGame = (group: GameGroup<Clip>) => {
-    const lead = group.result?.imagePath ? (
+    const imageUrl = resolveResultImageUrl(group)
+    const lead = group.result?.imagePath && imageUrl ? (
       <ResultCard
-        imageUrl={group.recordId ? gameRecordImageUrl(group.recordId) : resultImageUrl(group.clips[0].id)}
+        imageUrl={imageUrl}
         result={group.result}
         onOpen={() => setResultViewKey(group.key)}
       />
@@ -506,7 +528,7 @@ export function ClipBrowser({
               }
             >
               {timeline ? (
-                <GameTimeline clips={group.clips} lead={lead} renderClip={renderClipCard} />
+                <GameTimeline clips={group.clips} lead={lead} renderClip={renderClipCard} gameMode={group.gameMode} />
               ) : (
                 <>
                   {lead}
@@ -540,6 +562,14 @@ export function ClipBrowser({
           saveViewMode(source, mode)
         }}
         dateOptions={dateOptions}
+        onRefresh={
+          source === 'vod'
+            ? () => {
+                reload()
+                reloadVods()
+              }
+            : undefined
+        }
       />
 
       <main className="flex-1 p-4">
@@ -633,7 +663,7 @@ export function ClipBrowser({
                   expanded={!collapsedVods.has(vg.vodId)}
                   gameCount={vg.vod?.games.length ?? vg.games.length}
                   clipCount={vg.vod?.clipCount ?? visible}
-                  visibleClipCount={visible}
+                  visibleGameCount={vg.games.length}
                   clipBytes={vg.vod?.clipBytes ?? visibleBytes}
                   analysisBusy={runningVodId !== null}
                   onToggle={() =>

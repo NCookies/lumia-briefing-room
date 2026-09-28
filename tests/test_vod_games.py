@@ -1,5 +1,5 @@
 from lumia_briefing_room.detect.types import FrameState
-from lumia_briefing_room.pipeline.vod_games import GameSpan, split_games, states_in
+from lumia_briefing_room.pipeline.vod_games import GameSpan, is_ingame, split_games, states_in
 
 
 def fs(t, *, ingame=True, day=None, k=None, spectating=False):
@@ -91,6 +91,27 @@ def test_confidence_is_share_of_ingame_frames():
     (game,) = split_games(states, max_gap_sec=60.0)
 
     assert 0.9 < game.confidence < 1.0
+
+
+def test_is_ingame_true_from_cobalt_phase_alone():
+    """plan.md §10 C2: 이 스트리머의 K/spectating 판독이 못 미더워도 Phase 판독만으로 인게임이다."""
+    state = FrameState(
+        t=0.0, combat=None, face_value=None, face_sat=None, k=None, a=None,
+        day_night=None, spectating=None, cobalt_phase=1,
+    )
+    assert is_ingame(state) is True
+
+
+def test_split_games_uses_cobalt_phase_when_k_and_spectating_are_unreadable():
+    states = [
+        FrameState(
+            t=float(t), combat=None, face_value=None, face_sat=None, k=None, a=None,
+            day_night=None, spectating=None, cobalt_phase=1,
+        )
+        for t in range(0, 300)
+    ]
+
+    assert len(split_games(states)) == 1
 
 
 def test_states_in_returns_frames_inside_the_span_only():

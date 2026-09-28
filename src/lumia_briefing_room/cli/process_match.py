@@ -4,6 +4,8 @@ usage:
     python -m lumia_briefing_room.cli.process_match <session_dir> <match_start_iso> <match_end_iso>
         [--config PATH] [--ffmpeg PATH] [--game-mode battle_royale|cobalt]
         [--k-templates PATH] [--a-templates PATH] [--clips-dir PATH] [--hwaccel NAME]
+
+--game-mode 를 생략하면 검출 결과로 자동 판별한다(plan.md §10 C1-b).
 """
 
 import argparse
@@ -30,7 +32,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("match_end", type=_parse_utc)
     parser.add_argument("--config", type=Path, default=None)
     parser.add_argument("--ffmpeg", type=Path, default=None)
-    parser.add_argument("--game-mode", default="battle_royale")
+    parser.add_argument("--game-mode", default=None, choices=["battle_royale", "cobalt"])
     parser.add_argument("--k-templates", type=Path, default=None)
     parser.add_argument("--a-templates", type=Path, default=None)
     parser.add_argument("--clips-dir", type=Path, default=None)

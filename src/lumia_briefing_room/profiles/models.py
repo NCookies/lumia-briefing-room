@@ -10,6 +10,18 @@ _BUILTIN_DIR = Path(__file__).parent / "builtin"
 
 _MEASURED_RESOLUTIONS: tuple[tuple[int, int], ...] = ((2560, 1440),)
 
+# 코발트 프로토콜용 ROI 는 해상도마다 따로 실측한다(스트리머 VOD·사용자 자신의 스팀
+# 녹화가 화면 배치가 서로 다르다는 게 실측으로 확인됨, plan.md §10-8·§10-11) - 다른
+# 해상도의 `reference_rois`(정규화 기준)로 절대 안 빌려줘야 한다. 안 그러면 2560x1440
+# 에 이 키를 추가하는 순간 `normalizedTo: [2560,1440]` 인 1920x1080 프로필이 자신의
+# 네이티브 코발트 크롭을 이 키 이름이 같다는 이유만으로 엉뚱하게 확대해 버린다
+# (2026-09-28 실사용 작업 중 발견 - 회귀 테스트로 고정).
+_RESOLUTION_NATIVE_ONLY_ROIS = frozenset({
+    "phase_digit", "cobalt_outcome", "cobalt_result_panel",
+    "cobalt_teammate1", "cobalt_teammate2", "cobalt_teammate3",
+    "cobalt_tk_value", "cobalt_k_value", "cobalt_a_value",
+})
+
 
 @dataclass(frozen=True)
 class Roi:
@@ -74,6 +86,14 @@ def _day_templates_path(width: int, height: int) -> Path | None:
     return _template_path("days", "일차 본보기", width, height)
 
 
+def _phase_templates_path(width: int, height: int) -> Path | None:
+    return _template_path("phase", "코발트 페이즈 본보기", width, height)
+
+
+def _cobalt_outcome_templates_path(width: int, height: int) -> Path | None:
+    return _template_path("cobalt_outcome", "코발트 승패 본보기", width, height)
+
+
 @dataclass(frozen=True)
 class ResolutionProfile:
     width: int
@@ -83,6 +103,8 @@ class ResolutionProfile:
     templates: Path | None = None
     region_templates: Path | None = None
     day_templates: Path | None = None
+    phase_templates: Path | None = None
+    cobalt_outcome_templates: Path | None = None
     reference_rois: dict[str, Roi] | None = None
 
     @classmethod
@@ -94,7 +116,11 @@ class ResolutionProfile:
         ref_w, ref_h = normalized_to or (width, height)
         reference_rois = None
         if normalized_to:
-            reference_rois = _load_builtin(ref_w, ref_h)[0]
+            reference_rois = {
+                name: roi
+                for name, roi in _load_builtin(ref_w, ref_h)[0].items()
+                if name not in _RESOLUTION_NATIVE_ONLY_ROIS
+            }
         return cls(
             width=width,
             height=height,
@@ -103,6 +129,10 @@ class ResolutionProfile:
             templates=_templates_path(ref_w, ref_h),
             region_templates=_region_templates_path(ref_w, ref_h),
             day_templates=_day_templates_path(ref_w, ref_h),
+            # 코발트는 기준 해상도(2560x1440) 녹화가 없어 정규화하지 않는다 — 이 프로필
+            # 자신의 해상도로 본보기를 찾는다(plan.md §10-1).
+            phase_templates=_phase_templates_path(width, height),
+            cobalt_outcome_templates=_cobalt_outcome_templates_path(width, height),
             reference_rois=reference_rois,
         )
 

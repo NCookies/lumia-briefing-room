@@ -59,16 +59,21 @@ export function ResultViewer({ games, index, onIndexChange, onClose }: ViewerPro
   }, [index, hasPrev, hasNext, onIndexChange, onClose])
 
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-2 bg-black/90 p-2" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-2 bg-black/90 p-2">
+      <button
+        type="button"
+        aria-label="닫기"
+        className="fixed right-2 top-2 z-[75] rounded px-2 py-1 text-2xl text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100"
+        onClick={onClose}
+      >
+        ✕
+      </button>
       <button
         type="button"
         aria-label="이전 게임"
         className={`${NAV} left-2`}
         disabled={!hasPrev}
-        onClick={(e) => {
-          e.stopPropagation()
-          onIndexChange(index - 1)
-        }}
+        onClick={() => onIndexChange(index - 1)}
       >
         ‹
       </button>
@@ -77,22 +82,14 @@ export function ResultViewer({ games, index, onIndexChange, onClose }: ViewerPro
         aria-label="다음 게임"
         className={`${NAV} right-2`}
         disabled={!hasNext}
-        onClick={(e) => {
-          e.stopPropagation()
-          onIndexChange(index + 1)
-        }}
+        onClick={() => onIndexChange(index + 1)}
       >
         ›
       </button>
-      <div className="text-sm text-zinc-200" onClick={(e) => e.stopPropagation()}>
+      <div className="text-sm text-zinc-200">
         {game.caption} · {index + 1}/{games.length}
       </div>
-      <img
-        src={game.imageUrl}
-        alt="결과표"
-        className="max-h-[calc(100%-2rem)] max-w-full rounded"
-        onClick={(e) => e.stopPropagation()}
-      />
+      <img src={game.imageUrl} alt="결과표" className="max-h-[calc(100%-2rem)] max-w-full rounded" />
     </div>
   )
 }

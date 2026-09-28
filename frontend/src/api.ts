@@ -4,7 +4,6 @@ const BASE = '/api'
 
 export interface ClipQuery {
   tags?: string[]
-  dayNight?: string
   gameMode?: string
   pinned?: boolean
   minPvpScore?: number
@@ -24,7 +23,6 @@ async function checkOk(res: Response, action: string): Promise<Response> {
 export async function listClips(query: ClipQuery = {}): Promise<Clip[]> {
   const params = new URLSearchParams()
   if (query.tags?.length) params.set('tags', query.tags.join(','))
-  if (query.dayNight) params.set('dayNight', query.dayNight)
   if (query.gameMode) params.set('gameMode', query.gameMode)
   if (query.pinned) params.set('pinned', 'true')
   if (query.minPvpScore) params.set('minPvpScore', String(query.minPvpScore))

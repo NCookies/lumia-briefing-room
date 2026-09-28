@@ -2,12 +2,17 @@ from lumia_briefing_room.video.segments import SegmentRange
 
 import numpy as np
 
+from lumia_briefing_room.detect.day import white_score
+from lumia_briefing_room.detect.phase import V_LO as PHASE_V_LO
+from lumia_briefing_room.detect.region import build_region_template, region_score
 from lumia_briefing_room.detect.result import ResultScreen
 from lumia_briefing_room.pipeline.result_scan import (
     contiguous_segments,
+    make_is_ingame,
     scan_for_result,
     scan_forward_for_result,
 )
+from lumia_briefing_room.profiles.models import ResolutionProfile
 
 RESULT = ResultScreen(placement=4, total=7, match_type="rank", match_label="랭크", outcome="실험 종료", nickname="나")
 
@@ -108,3 +113,55 @@ def test_scan_window_reaches_past_the_logged_match_end_but_never_before_the_firs
     assert last == 974 + RESULT_TAIL_SEGMENTS
     assert first == last - MAX_SCAN_FRAMES + 1
     assert scan_window(SegmentRange(first=10, last=20))[0] == 10
+
+
+def _paint(frame, roi, value):
+    frame[roi.y0 : roi.y1, roi.x0 : roi.x1] = value
+
+
+def test_make_is_ingame_recognizes_a_battle_royale_day_frame():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    roi = profile.rois["day_digit"]
+    patch = np.full((roi.height, roi.width, 3), 20, np.uint8)
+    rng = np.random.default_rng(1)
+    ink = rng.random((roi.height - 6, roi.width - 2)) > 0.5
+    patch[3 : roi.height - 3, 1 : roi.width - 1][ink] = 255
+    day_templates = {"4": build_region_template([white_score(patch)])}
+
+    frame = np.full((1440, 2560, 3), 5, np.uint8)
+    _paint(frame, roi, patch)
+
+    is_ingame = make_is_ingame(profile, day_templates, None)
+    assert is_ingame(frame) is True
+
+
+def test_make_is_ingame_recognizes_a_cobalt_phase_frame_without_day_templates():
+    """plan.md §10 C2/C3: 일차 본보기가 없어도(코발트 전용 다시보기) Phase 판독만으로 판단한다."""
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    roi = profile.rois["phase_digit"]
+    patch = np.full((roi.height, roi.width, 3), 30, np.uint8)
+    rng = np.random.default_rng(2)
+    ink = rng.random((roi.height - 4, roi.width - 4)) > 0.5
+    patch[2 : roi.height - 2, 2 : roi.width - 2][ink] = (200, 120, 40)
+    phase_templates = {"1": build_region_template([region_score(patch, v_lo=PHASE_V_LO)])}
+
+    frame = np.full((1080, 1920, 3), 5, np.uint8)
+    _paint(frame, roi, patch)
+
+    is_ingame = make_is_ingame(profile, None, phase_templates)
+    assert is_ingame(frame) is True
+
+
+def test_make_is_ingame_false_for_a_blank_lobby_frame():
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    day_templates = {"4": np.zeros((profile.rois["day_digit"].height, profile.rois["day_digit"].width), np.float32)}
+    phase_templates = {"1": np.zeros((profile.rois["phase_digit"].height, profile.rois["phase_digit"].width), np.float32)}
+
+    is_ingame = make_is_ingame(profile, day_templates, phase_templates)
+    assert is_ingame(np.full((1080, 1920, 3), 5, np.uint8)) is False
+
+
+def test_make_is_ingame_false_without_any_templates():
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    is_ingame = make_is_ingame(profile, None, None)
+    assert is_ingame(np.full((1080, 1920, 3), 5, np.uint8)) is False

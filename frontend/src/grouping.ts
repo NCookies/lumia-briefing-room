@@ -1,6 +1,6 @@
 import type { GameRecord, MatchResult } from './types'
 
-export type ClipSort = 'asc' | 'desc' | 'pvp'
+export type ClipSort = 'asc' | 'desc'
 
 interface Groupable {
   id: string
@@ -8,6 +8,7 @@ interface Groupable {
   sessionDir?: string
   pvpScore: number | null
   matchResult?: MatchResult | null
+  gameMode?: string | null
 }
 
 export interface GameGroup<T> {
@@ -15,10 +16,28 @@ export interface GameGroup<T> {
   number: number
   matchStartUtc: string
   result: MatchResult | null
+  gameMode: string | null
   clips: T[]
   recordId?: string
   startSec?: number
   endSec?: number
+}
+
+export type ResultImageRef =
+  | { kind: 'record'; id: string }
+  | { kind: 'clip'; id: string }
+  | { kind: 'vodGame'; vodId: string; index: number }
+
+/**
+ * 결과 화면 이미지를 어떤 API 로 찾을지 정한다. 클립이 없는 VOD 게임(코발트처럼 교전은
+ * 못 뽑았어도 결과 화면은 읽은 경우, plan.md §10-6)엔 `clips[0]` 이 없다 - 이 분기를
+ * 호출부마다 따로 적다가 두 번이나 `clips[0].id` 로 죽였다(실사용 보고, 2026-09-27).
+ * VOD 그룹의 key 는 항상 `${vodId}|${index}` 다(vodGrouping.ts).
+ */
+export function resultImageRef(group: { recordId?: string; clips: { id: string }[]; key: string; number: number }): ResultImageRef {
+  if (group.recordId) return { kind: 'record', id: group.recordId }
+  if (group.clips[0]) return { kind: 'clip', id: group.clips[0].id }
+  return { kind: 'vodGame', vodId: group.key.split('|')[0], index: group.number }
 }
 
 const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
@@ -38,12 +57,14 @@ export function groupByGame<T extends Groupable>(
     if (group) {
       group.clips.push(clip)
       group.result ??= clip.matchResult ?? null
+      group.gameMode ??= clip.gameMode ?? null
     } else {
       map.set(key, {
         key,
         number: 0,
         matchStartUtc: clip.matchStartUtc ?? '',
         result: clip.matchResult ?? null,
+        gameMode: clip.gameMode ?? null,
         clips: [clip],
       })
     }
@@ -57,6 +78,7 @@ export function groupByGame<T extends Groupable>(
       number: 0,
       matchStartUtc: record.matchStartUtc,
       result: record.matchResult,
+      gameMode: record.gameMode ?? null,
       clips: [],
       recordId: record.id,
     })
@@ -71,15 +93,17 @@ export function groupByGame<T extends Groupable>(
   })
 
   if (sort === 'desc') return games.reverse()
-  if (sort === 'pvp') {
-    const best = (g: GameGroup<T>) => Math.max(-2, ...g.clips.map((c) => c.pvpScore ?? -1))
-    return games.sort((a, b) => best(b) - best(a) || byTime(a, b))
-  }
   return games
 }
 
+export const COBALT_OUTCOMES = ['승리', '패배'] as const
+
 export function formatMatchResult(result: MatchResult | null | undefined): string | null {
   if (!result) return null
+  // 코발트 프로토콜은 순위가 아니라 승/패다(§10 C3) - matchType/placement 대신 승패 글자를 쓴다.
+  if (result.outcome && (COBALT_OUTCOMES as readonly string[]).includes(result.outcome)) {
+    return result.outcome
+  }
   const parts = [`${result.placement}위`]
   if (result.matchType !== 'unknown') parts.unshift(result.matchType === 'rank' ? '랭크' : '일반')
   if (result.outcome?.includes('탈출')) parts.push(result.outcome)

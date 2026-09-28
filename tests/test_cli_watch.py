@@ -13,7 +13,7 @@ requires_ffmpeg = pytest.mark.skipif(FFMPEG_PATH is None, reason="ffmpeg를 찾�
 
 def test_build_parser_defaults():
     args = build_parser().parse_args([])
-    assert args.game_mode == "battle_royale"
+    assert args.game_mode is None  # 생략하면 검출 결과로 자동 판별한다(plan.md §10 C1-b)
     assert args.recording_root is None
 
 

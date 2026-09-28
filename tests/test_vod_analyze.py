@@ -115,6 +115,7 @@ def test_index_records_video_facts_and_game_summary(vod_file, tmp_path):
     assert (game["startSec"], game["endSec"]) == (5.0, 55.0)
     assert game["result"]["placement"] == 1
     assert game["clipIds"] and game["kFinal"] == 1
+    assert game["gameMode"] == "battle_royale"
 
 
 @requires_ffmpeg
@@ -195,6 +196,38 @@ def test_progress_is_reported_and_reaches_the_end(vod_file, tmp_path):
     fractions = [p.fraction for p in seen]
     assert fractions == sorted(fractions)
     assert {"decode", "games", "cut"} <= {p.phase for p in seen}
+
+
+def scripted_state_two_fights(t):
+    """5~55초가 한 게임, 서로 멀리 떨어진 두 교전(10~14초, 35~39초)이 각각 클립 하나씩 된다."""
+    ingame = 5 <= t <= 55
+    fighting = 10 <= t <= 14 or 35 <= t <= 39
+    return FrameState(
+        t=t, combat=fighting if ingame else None,
+        face_value=110.0 if ingame else None, face_sat=25.0 if ingame else None,
+        k=(1 if t >= 12 else (2 if t >= 37 else 0)) if ingame else None, a=0 if ingame else None,
+        day_night="day" if ingame else None, spectating=False if ingame else None,
+        game_day=2 if ingame else None, team_combat=False if ingame else None,
+    )
+
+
+def read_frame_two_fights(frame, t):
+    return scripted_state_two_fights(round(t))
+
+
+@requires_ffmpeg
+def test_cut_progress_advances_between_clips_in_the_same_game(vod_file, tmp_path):
+    """실사용 사고(2026-09-27): 컷 단계 진행률이 게임 번호로만 계산돼, 클립이 여러 개인
+    게임 하나를 처리하는 동안 막대가 멈춘 것처럼 보였다(plan-backfill.md B8) - 같은
+    게임 안에서도 클립마다 진행률이 움직여야 한다."""
+    seen = []
+
+    index, _ = run(tmp_path, vod_file, read_frame=read_frame_two_fights, on_progress=seen.append)
+
+    assert len(index["games"][0]["clipIds"]) == 2
+    cut_fractions = [p.fraction for p in seen if p.phase == "cut"]
+    assert len(cut_fractions) == 2
+    assert cut_fractions[0] < cut_fractions[1]
 
 
 @requires_ffmpeg

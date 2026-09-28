@@ -187,6 +187,12 @@
           ],
           "maxLength": 16
         },
+        "cobaltPhase": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "phaseIndex": {
           "type": [
             "integer",
