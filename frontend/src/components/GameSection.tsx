@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react'
-import { formatAgo, formatKda, formatTeammates, totalSize, type GameGroup } from '../grouping'
+import { useState, type ReactNode } from 'react'
+import { formatAgo, formatKda, totalSize, type GameGroup } from '../grouping'
 import { formatBytes } from '../retention'
 import type { Clip } from '../types'
+import { PortraitRow } from './PortraitRow'
 
 interface Props {
   group: GameGroup<Clip>
@@ -18,6 +19,9 @@ interface Props {
   hideReprocess?: boolean
   onDeleteRecord?: () => void
   bare?: boolean
+  matchResultLocked?: boolean
+  onCorrectMatchResult?: (values: { placement: number; outcome: string }) => void
+  onUnlockMatchResult?: () => void
   children: ReactNode
 }
 
@@ -32,6 +36,65 @@ function barColor(placement: number | undefined): string {
   if (placement === 1) return 'bg-emerald-500'
   if (placement !== undefined && placement <= 3) return 'bg-sky-500'
   return 'bg-zinc-500'
+}
+
+interface MatchResultFormProps {
+  placement: number | undefined
+  outcome: string | null | undefined
+  locked?: boolean
+  onSave: (values: { placement: number; outcome: string }) => void
+  onUnlock?: () => void
+  onCancel: () => void
+}
+
+function MatchResultForm({ placement, outcome, locked, onSave, onUnlock, onCancel }: MatchResultFormProps) {
+  const [p, setP] = useState(String(placement ?? ''))
+  const [o, setO] = useState(outcome ?? '')
+
+  return (
+    <div
+      className="flex flex-col gap-1 rounded border border-zinc-600 bg-zinc-900 p-2 text-xs"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <label className="flex items-center gap-1">
+        순위
+        <input
+          type="number"
+          min={1}
+          className="w-14 rounded border border-zinc-600 bg-zinc-800 px-1 py-0.5 text-zinc-100"
+          value={p}
+          onChange={(e) => setP(e.target.value)}
+        />
+      </label>
+      <label className="flex items-center gap-1">
+        결과 문구
+        <input
+          type="text"
+          className="w-32 rounded border border-zinc-600 bg-zinc-800 px-1 py-0.5 text-zinc-100"
+          value={o}
+          onChange={(e) => setO(e.target.value)}
+        />
+      </label>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          className="text-sky-400 hover:underline disabled:opacity-40"
+          disabled={!p || Number(p) < 1}
+          onClick={() => onSave({ placement: Number(p), outcome: o })}
+        >
+          저장(잠금)
+        </button>
+        {locked && onUnlock && (
+          <button type="button" className="text-amber-400 hover:underline" onClick={onUnlock}>
+            잠금 해제
+          </button>
+        )}
+        <button type="button" className="text-zinc-400 hover:underline" onClick={onCancel}>
+          취소
+        </button>
+      </div>
+    </div>
+  )
 }
 
 export function GameSection({
@@ -49,37 +112,98 @@ export function GameSection({
   hideReprocess,
   onDeleteRecord,
   bare,
+  matchResultLocked,
+  onCorrectMatchResult,
+  onUnlockMatchResult,
   children,
 }: Props) {
   const result = group.result
   const kda = formatKda(result)
+  const [editing, setEditing] = useState(false)
+  const canCorrect = Boolean(onCorrectMatchResult) && !trashed && !group.recordId
 
   return (
     <section className="overflow-hidden rounded-lg border border-zinc-700 bg-zinc-800/60">
       <div className="flex items-stretch">
         <div className={`w-1.5 shrink-0 ${barColor(result?.placement)}`} />
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           className="flex flex-1 flex-wrap items-center gap-x-8 gap-y-2 px-4 py-3 text-left hover:bg-zinc-700/30"
           onClick={onToggle}
+          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onToggle()}
           aria-expanded={expanded}
         >
           <div className="w-24">
-            {result ? (
-              <>
-                <div className={`text-xl font-bold ${result.placement === 1 ? 'text-emerald-400' : 'text-zinc-200'}`}>
-                  #{result.placement}
+            {editing ? (
+              <MatchResultForm
+                placement={result?.placement}
+                outcome={result?.outcome}
+                locked={matchResultLocked}
+                onSave={(values) => {
+                  onCorrectMatchResult?.(values)
+                  setEditing(false)
+                }}
+                onUnlock={
+                  onUnlockMatchResult
+                    ? () => {
+                        onUnlockMatchResult()
+                        setEditing(false)
+                      }
+                    : undefined
+                }
+                onCancel={() => setEditing(false)}
+              />
+            ) : result ? (
+              <div className="group/result flex items-start gap-1">
+                <div>
+                  <div className={`text-xl font-bold ${result.placement === 1 ? 'text-emerald-400' : 'text-zinc-200'}`}>
+                    #{result.placement}
+                    {matchResultLocked && (
+                      <span className="ml-1 align-middle text-xs text-amber-400" title="수동으로 고정한 값입니다">
+                        🔒
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm font-semibold text-zinc-300">
+                    {result.matchType === 'rank' ? '랭크' : result.matchType === 'normal' ? '일반' : ''}
+                    {result.outcome?.includes('탈출') && <span className="ml-1 text-amber-300">탈출</span>}
+                  </div>
                 </div>
-                <div className="text-sm font-semibold text-zinc-300">
-                  {result.matchType === 'rank' ? '랭크' : result.matchType === 'normal' ? '일반' : ''}
-                  {result.outcome?.includes('탈출') && <span className="ml-1 text-amber-300">탈출</span>}
-                </div>
-              </>
+                {canCorrect && (
+                  <button
+                    type="button"
+                    className="text-zinc-500 opacity-0 hover:text-sky-300 group-hover/result:opacity-100"
+                    title="순위·결과 보정"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setEditing(true)
+                    }}
+                  >
+                    ✎
+                  </button>
+                )}
+              </div>
             ) : (
-              <>
-                <div className="text-base font-semibold text-zinc-400">게임 {group.number}</div>
-                <div className="text-xs text-zinc-500">결과 미확인</div>
-              </>
+              <div className="group/result flex items-start gap-1">
+                <div>
+                  <div className="text-base font-semibold text-zinc-400">게임 {group.number}</div>
+                  <div className="text-xs text-zinc-500">결과 미확인</div>
+                </div>
+                {canCorrect && (
+                  <button
+                    type="button"
+                    className="text-zinc-500 opacity-0 hover:text-sky-300 group-hover/result:opacity-100"
+                    title="순위·결과 보정"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setEditing(true)
+                    }}
+                  >
+                    ✎
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -88,10 +212,7 @@ export function GameSection({
             <div className="text-xs text-zinc-500">{timeLabel ? timeLabel.sub : formatAgo(group.matchStartUtc)}</div>
           </div>
 
-          <div className="w-40 text-sm text-zinc-200">
-            <div>{result?.character ?? ''}</div>
-            {formatTeammates(result) && <div className="truncate text-xs text-zinc-400">{formatTeammates(result)}</div>}
-          </div>
+          <PortraitRow clip={group.clips[0]} />
 
           <div className="w-28">
             {kda && (
@@ -112,7 +233,7 @@ export function GameSection({
               </>
             )}
           </div>
-        </button>
+        </div>
         <div className="flex shrink-0 items-center gap-3 px-3 text-xs">
           {group.recordId ? (
             <button type="button" className="text-zinc-400 hover:text-rose-400" onClick={onDeleteRecord}>

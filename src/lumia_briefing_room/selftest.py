@@ -46,7 +46,6 @@ def check_resources() -> list[Check]:
     npz = f"{width}x{height}.npz"
     dist = paths.frontend_dist_dir()
     return [
-        _file_check("캐릭터 이름표", paths.characters_path()),
         _file_check("K/A 숫자 본보기", paths.templates_dir("digits") / npz),
         _file_check("지역명 본보기", paths.templates_dir("regions") / npz),
         _file_check("일차 본보기", paths.templates_dir("days") / npz),

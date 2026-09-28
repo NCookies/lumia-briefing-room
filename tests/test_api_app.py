@@ -393,6 +393,67 @@ def test_result_image_is_404_without_image(client):
     assert client.get("/api/clips/zzz/result-image").status_code == 404
 
 
+def test_character_portrait_serves_my_character_and_teammate_slots(client, tmp_path):
+    clips_dir = client.app.state.clips_dir_for_test
+    me = tmp_path / "me.jpg"
+    me.write_bytes(b"\xff\xd8\xff\xe0me")
+    mate1 = tmp_path / "mate1.jpg"
+    mate1.write_bytes(b"\xff\xd8\xff\xe0mate1")
+    _write_clip(
+        clips_dir, "a",
+        myCharacterPortraitPath=str(me),
+        teammatePortraitPaths=[str(mate1)],
+    )
+
+    resp_me = client.get("/api/clips/a/character-portrait/me")
+    resp_mate1 = client.get("/api/clips/a/character-portrait/teammate1")
+    resp_mate2 = client.get("/api/clips/a/character-portrait/teammate2")
+
+    assert resp_me.status_code == 200 and resp_me.content == me.read_bytes()
+    assert resp_mate1.status_code == 200 and resp_mate1.content == mate1.read_bytes()
+    assert resp_mate2.status_code == 404
+
+
+def test_character_portrait_rejects_unknown_slot(client):
+    _write_clip(client.app.state.clips_dir_for_test, "a")
+
+    assert client.get("/api/clips/a/character-portrait/nope").status_code == 404
+
+
+def test_patch_match_result_locks_placement_and_outcome_as_manual(client):
+    clips_dir = client.app.state.clips_dir_for_test
+    _write_clip(clips_dir, "a", matchResult={"placement": 4, "total": 8, "outcome": "실험 종료"})
+
+    resp = client.patch("/api/clips/a", json={"matchResult": {"placement": 1, "outcome": "최종 생존"}})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["matchResult"] == {"placement": 1, "total": 8, "outcome": "최종 생존"}
+    assert body["matchResultSource"] == "manual"
+    saved = json.loads((clips_dir / "a.json").read_text(encoding="utf-8"))
+    assert saved["matchResultSource"] == "manual"
+
+
+def test_patch_match_result_rejects_unknown_fields(client):
+    _write_clip(client.app.state.clips_dir_for_test, "a")
+
+    resp = client.patch("/api/clips/a", json={"matchResult": {"character": "마커스"}})
+
+    assert resp.status_code == 400
+
+
+def test_patch_match_result_source_null_unlocks_without_changing_values(client):
+    clips_dir = client.app.state.clips_dir_for_test
+    _write_clip(clips_dir, "a", matchResult={"placement": 1}, matchResultSource="manual")
+
+    resp = client.patch("/api/clips/a", json={"matchResultSource": None})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["matchResultSource"] is None
+    assert body["matchResult"] == {"placement": 1}
+
+
 def _enable_cleanup(client, **retention):
     client.put("/api/config", json={"retention": {"autoCleanEnabled": True, **retention}})
 

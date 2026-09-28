@@ -9,11 +9,8 @@ from lumia_briefing_room.detect.day import read_game_day
 from lumia_briefing_room.detect.ocr import TextReader
 from lumia_briefing_room.detect.region import load_region_templates
 from lumia_briefing_room.detect.result import ResultScreen, read_result_screen
-from lumia_briefing_room.detect.scoreboard import BoardRow
 from lumia_briefing_room.pipeline.result_scan import (
     FORWARD_BATCH,
-    _board_reader,
-    attach_board,
     get_reader,
     scan_forward_for_result,
 )
@@ -34,11 +31,9 @@ def scan_game_end(
     *,
     read: Callable[[np.ndarray], ResultScreen | None],
     is_ingame: Callable[[np.ndarray], bool],
-    read_board: Callable[[np.ndarray], list[BoardRow] | None] | None = None,
-    recover: Callable[[BoardRow], str | None] | None = None,
     window_sec: float = RESULT_WINDOW_SEC,
 ) -> ResultScreen | None:
-    """게임이 끝난 뒤(다음 게임 시작 전, 최대 window_sec)를 앞으로 훑어 결과 화면·순위표를 찾는다.
+    """게임이 끝난 뒤(다음 게임 시작 전, 최대 window_sec)를 앞으로 훑어 결과 화면을 찾는다.
 
     결과 화면을 찾으면 멈추고 영상 읽기를 닫는다. 결과 화면을 안 본 채 나간 게임은 None 이다.
     """
@@ -58,12 +53,9 @@ def scan_game_end(
             yield batch
 
     try:
-        screens = scan_forward_for_result(
-            batches(), read, is_ingame=is_ingame, read_board=read_board
-        )
+        return scan_forward_for_result(batches(), read, is_ingame=is_ingame).result
     finally:
         frames.close()
-    return attach_board(screens, recover=recover)
 
 
 def find_vod_result(
@@ -75,7 +67,6 @@ def find_vod_result(
     profile: ResolutionProfile,
     reader: TextReader | None = None,
     hwaccel: str | None = None,
-    read_boards: bool = True,
 ) -> ResultScreen | None:
     reader = reader or get_reader()
     ffprobe_path = find_ffprobe(ffmpeg_path)
@@ -92,11 +83,8 @@ def find_vod_result(
             return False
         return read_game_day(profile.crop(frame, "day_digit"), day_templates) is not None
 
-    read_board = recover = None
-    if read_boards:
-        read_board, recover = _board_reader(profile, reader)
     return scan_game_end(
         factory, span, next_start,
         read=lambda f: read_result_screen(f, profile, reader),
-        is_ingame=is_ingame, read_board=read_board, recover=recover,
+        is_ingame=is_ingame,
     )

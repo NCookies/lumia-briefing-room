@@ -40,7 +40,12 @@ export async function listClips(query: ClipQuery = {}): Promise<Clip[]> {
 
 export async function patchClip(
   id: string,
-  body: Partial<Pick<Clip, 'title' | 'pinned'>> & { userLabel?: UserLabel; labelNote?: string | null },
+  body: Partial<Pick<Clip, 'title' | 'pinned'>> & {
+    userLabel?: UserLabel
+    labelNote?: string | null
+    matchResult?: { placement?: number; outcome?: string | null } | null
+    matchResultSource?: 'manual' | null
+  },
 ): Promise<Clip> {
   const res = await checkOk(
     await fetch(`${BASE}/clips/${id}`, {
@@ -119,6 +124,12 @@ export function gameRecordImageUrl(id: string): string {
 
 export function resultImageUrl(id: string): string {
   return `${BASE}/clips/${id}/result-image`
+}
+
+export type PortraitSlot = 'me' | 'teammate1' | 'teammate2'
+
+export function characterPortraitUrl(id: string, slot: PortraitSlot): string {
+  return `${BASE}/clips/${id}/character-portrait/${slot}`
 }
 
 export function thumbnailUrl(id: string, version?: number): string {

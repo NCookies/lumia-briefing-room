@@ -3,7 +3,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
-from backfill_result import apply_match_result, group_by_match  # noqa: E402
+from backfill_result import apply_match_result, group_by_match, is_locked  # noqa: E402
 
 from lumia_briefing_room.detect.result import ResultScreen
 
@@ -23,16 +23,6 @@ def test_apply_match_result_adds_camel_dict_without_touching_other_fields():
     assert "matchResult" not in meta
 
 
-def test_apply_match_result_fills_my_character_only_when_empty():
-    with_char = ResultScreen(
-        placement=1, total=8, match_type="rank", match_label="랭크", outcome="최종 생존",
-        nickname="나", character="마커스", character_raw="MARKU",
-    )
-
-    assert apply_match_result({"myCharacter": None}, with_char)["myCharacter"] == "마커스"
-    assert apply_match_result({"myCharacter": "직접"}, with_char)["myCharacter"] == "직접"
-
-
 def test_group_by_match_groups_clips_of_one_game_and_tracks_last_segment():
     metas = {
         "a": {"sessionDir": "s1", "matchStartUtc": "t1", "segmentEnd": 10},
@@ -47,25 +37,20 @@ def test_group_by_match_groups_clips_of_one_game_and_tracks_last_segment():
     assert groups[("s1", "t2")].last_segment == 50
 
 
-def test_apply_match_result_fills_team_characters_but_titles_only_with_my_character():
-    result = ResultScreen(
-        placement=1, total=8, match_type="rank", match_label="랭크", outcome="최종 생존", nickname="나",
-        character="마커스", character_raw="MARKU",
-        teammates=[{"nickname": "a", "character": "루치아"}, {"nickname": "b", "character": None}],
-    )
-    meta = {"title": "5일차 낮 경찰서 교전", "dayNight": "day", "region": "경찰서", "gameDay": 5, "myCharacter": None}
+def test_is_locked_when_any_clip_in_the_game_was_manually_corrected():
+    from backfill_result import MatchGroup
 
-    new = apply_match_result(meta, result)
-
-    assert new["teamCharacters"] == ["루치아"]
-    assert new["title"] == "5일차 낮 경찰서 교전 · 마커스"
-    assert new["matchResult"]["teammates"] == result.teammates
+    metas = {
+        "a": {"matchResultSource": None},
+        "b": {"matchResultSource": "manual"},
+    }
+    assert is_locked(metas, MatchGroup(ids=["a", "b"])) is True
+    assert is_locked(metas, MatchGroup(ids=["a"])) is False
 
 
 def test_apply_match_result_keeps_a_custom_title():
     result = ResultScreen(
         placement=1, total=8, match_type="rank", match_label="랭크", outcome="최종 생존", nickname="나",
-        character="마커스",
     )
 
     assert apply_match_result({"title": "내가 붙인 제목", "dayNight": "day"}, result)["title"] == "내가 붙인 제목"

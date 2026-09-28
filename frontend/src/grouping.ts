@@ -83,7 +83,6 @@ export function formatMatchResult(result: MatchResult | null | undefined): strin
   const parts = [`${result.placement}위`]
   if (result.matchType !== 'unknown') parts.unshift(result.matchType === 'rank' ? '랭크' : '일반')
   if (result.outcome?.includes('탈출')) parts.push(result.outcome)
-  if (result.character) parts.unshift(result.character)
   return parts.join(' · ')
 }
 
@@ -110,7 +109,3 @@ export function withResultImage<T extends Groupable>(groups: GameGroup<T>[]): Ga
   return groups.filter((g) => g.result?.imagePath)
 }
 
-export function formatTeammates(result: MatchResult | null | undefined): string | null {
-  const names = (result?.teammates ?? []).map((t) => t.character ?? '미확인')
-  return names.length > 0 ? names.join(', ') : null
-}

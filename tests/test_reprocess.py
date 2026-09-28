@@ -164,6 +164,38 @@ def test_reprocess_carries_labels_from_the_old_clips_to_overlapping_new_ones(tmp
     assert second.get("userLabel") is None
 
 
+def test_reprocess_carries_a_manually_locked_match_result_to_the_new_clips(tmp_path):
+    clips = tmp_path / "clips"
+    locked = {"placement": 1, "total": 8, "outcome": "최종 생존"}
+    write_clip(clips, "a_01", matchResult=locked, matchResultSource="manual")
+    write_clip(clips, "a_02", matchResult=locked, matchResultSource="manual")
+
+    def process(session, start, end, cfg, *, ffmpeg_path, clips_dir):
+        write_clip(clips_dir, "a_01", matchResult={"placement": 4, "total": 8}, matchResultSource=None)
+        return [clips_dir / "a_01.json"]
+
+    call(tmp_path, process=process)
+
+    new_meta = json.loads((clips / "a_01.json").read_text(encoding="utf-8"))
+    assert new_meta["matchResult"] == locked
+    assert new_meta["matchResultSource"] == "manual"
+
+
+def test_reprocess_leaves_new_clips_alone_when_nothing_was_locked(tmp_path):
+    clips = tmp_path / "clips"
+    write_clip(clips, "a_01")
+
+    def process(session, start, end, cfg, *, ffmpeg_path, clips_dir):
+        write_clip(clips_dir, "a_01", matchResult={"placement": 4, "total": 8})
+        return [clips_dir / "a_01.json"]
+
+    call(tmp_path, process=process)
+
+    new_meta = json.loads((clips / "a_01.json").read_text(encoding="utf-8"))
+    assert new_meta["matchResult"] == {"placement": 4, "total": 8}
+    assert "matchResultSource" not in new_meta or new_meta["matchResultSource"] is None
+
+
 def test_reprocess_keeps_the_new_clips_when_label_migration_itself_fails(tmp_path, monkeypatch):
     clips = tmp_path / "clips"
     write_clip(clips, "a_01", userLabel="pvp", videoOffsetSec=0.0, durationSec=30.0)

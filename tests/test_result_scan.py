@@ -1,14 +1,9 @@
-from dataclasses import replace
-
 from lumia_briefing_room.video.segments import SegmentRange
 
 import numpy as np
 
 from lumia_briefing_room.detect.result import ResultScreen
-from lumia_briefing_room.detect.scoreboard import BoardRow
 from lumia_briefing_room.pipeline.result_scan import (
-    EndScreens,
-    attach_board,
     contiguous_segments,
     scan_for_result,
     scan_forward_for_result,
@@ -91,67 +86,6 @@ def test_scan_forward_gives_up_after_max_ocr_attempts():
     assert len(calls) == 3
 
 
-BOARD = [BoardRow(rank=1, nickname="나", character="마르티나")]
-
-
-def test_scan_backwards_also_collects_the_scoreboard_seen_after_the_result_screen():
-    boards = []
-
-    def read_board(frame):
-        boards.append(int(frame[0, 0, 0]))
-        return BOARD if int(frame[0, 0, 0]) == 5 else None
-
-    screens = scan_for_result(
-        frames(9, 1, 5, 2), make_read([]), is_ingame=lambda f: False, read_board=read_board
-    )
-
-    assert screens.result == RESULT and screens.board == BOARD
-    assert boards == [2, 5]
-
-
-def test_scan_forward_keeps_looking_for_the_scoreboard_after_the_result_screen():
-    def read_board(frame):
-        return BOARD if int(frame[0, 0, 0]) == 5 else None
-
-    screens = scan_forward_for_result(
-        batches((1, 9, 2), (3, 5, 4)), make_read([]), is_ingame=lambda f: False, read_board=read_board
-    )
-
-    assert screens.result == RESULT and screens.board == BOARD
-
-
-def test_scan_forward_stops_looking_for_the_scoreboard_after_max_after_frames():
-    screens = scan_forward_for_result(
-        batches((9, 2, 2), (2, 2, 5)), make_read([]), is_ingame=lambda f: False,
-        read_board=lambda f: BOARD if int(f[0, 0, 0]) == 5 else None, max_after=3,
-    )
-
-    assert screens.result == RESULT and screens.board is None
-
-
-def test_attach_board_adds_teammates_and_fills_a_missing_character():
-    board = [
-        BoardRow(rank=1, nickname="팀원가", character="루치아"),
-        BoardRow(rank=1, nickname="나", character="마르티나"),
-        BoardRow(rank=2, nickname="x", character="니키"),
-    ]
-
-    attached = attach_board(EndScreens(RESULT, board))
-
-    assert attached.teammates == [{"nickname": "팀원가", "character": "루치아"}]
-    assert attached.character == "마르티나"
-
-
-def test_attach_board_keeps_the_result_screen_character_and_ignores_unmatched_boards():
-    with_char = replace(RESULT, character="마커스")
-    board = [BoardRow(rank=1, nickname="나", character="마르티나")]
-
-    assert attach_board(EndScreens(with_char, board)).character == "마커스"
-    assert attach_board(EndScreens(RESULT, [BoardRow(rank=1, nickname="다른사람", character=None)])) == RESULT
-    assert attach_board(EndScreens(RESULT, None)) == RESULT
-    assert attach_board(EndScreens(None, board)) is None
-
-
 def test_contiguous_segments_starts_right_after_the_last_clip():
     assert contiguous_segments([1, 2, 3, 4, 5], after=2, before=None) == [3, 4, 5]
 
@@ -174,29 +108,3 @@ def test_scan_window_reaches_past_the_logged_match_end_but_never_before_the_firs
     assert last == 974 + RESULT_TAIL_SEGMENTS
     assert first == last - MAX_SCAN_FRAMES + 1
     assert scan_window(SegmentRange(first=10, last=20))[0] == 10
-
-
-def test_attach_board_recovers_only_my_teammates_missing_a_character_never_other_teams():
-    board = [
-        BoardRow(rank=1, nickname="팀원가", character=None, y=245),
-        BoardRow(rank=1, nickname="나", character="마르티나", y=347),
-        BoardRow(rank=1, nickname="동료", character="루치아", y=442),
-        BoardRow(rank=2, nickname="적1", character=None, y=540),
-        BoardRow(rank=3, nickname="적2", character=None, y=640),
-    ]
-    asked = []
-
-    def recover(row):
-        asked.append(row.nickname)
-        return "엘레나"
-
-    attached = attach_board(EndScreens(RESULT, board), recover=recover)
-
-    assert asked == ["팀원가"]
-    assert attached.teammates == [{"nickname": "팀원가", "character": "엘레나"}, {"nickname": "동료", "character": "루치아"}]
-
-
-def test_attach_board_skips_recovery_when_everyone_on_my_team_is_already_read():
-    board = [BoardRow(rank=1, nickname="팀원가", character="루치아"), BoardRow(rank=1, nickname="나", character="마르티나")]
-
-    attach_board(EndScreens(RESULT, board), recover=lambda row: (_ for _ in ()).throw(AssertionError("불필요한 재시도")))

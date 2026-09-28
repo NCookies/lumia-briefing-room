@@ -9,7 +9,6 @@ from lumia_briefing_room.detect.types import CombatInterval
 from lumia_briefing_room.pipeline.clip import ClipRange
 from lumia_briefing_room.pipeline.clip_uid import new_clip_uid
 from lumia_briefing_room.pipeline.metadata import (
-    _teammate_names,
     match_result_dict,
     phase_index,
     revive_cost,
@@ -74,6 +73,9 @@ def build_vod_metadata(
     match_result: ResultScreen | None,
     result_image_path: str | None,
     audio_status: str = "full",
+    my_character_portrait_path: str | None = None,
+    teammate_portrait_paths: list[str] | None = None,
+    match_result_source: str | None = None,
 ) -> dict:
     """스팀 클립 메타데이터와 같은 필드 이름을 쓰되, 세션 필드 대신 다시보기 위치 필드를 채운다(SPEC §2.14)."""
     game_day = interval.game_day
@@ -115,8 +117,10 @@ def build_vod_metadata(
         "dayNight": day_night,
         "phaseIndex": phase,
         "reviveCost": revive_cost(phase) if phase is not None else None,
-        "myCharacter": match_result.character if match_result else None,
-        "teamCharacters": _teammate_names(match_result),
+        "myCharacter": None,
+        "teamCharacters": [],
+        "myCharacterPortraitPath": my_character_portrait_path,
+        "teammatePortraitPaths": teammate_portrait_paths or [],
         "pinned": False,
         "deletedAt": None,
         "matchKills": match_kills,
@@ -124,4 +128,5 @@ def build_vod_metadata(
         "matchTeamKills": None,
         "detectorConfidence": interval.confidence,
         "matchResult": match_result_dict(match_result, result_image_path),
+        "matchResultSource": match_result_source,
     }

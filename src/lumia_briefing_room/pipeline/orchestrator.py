@@ -13,9 +13,16 @@ from lumia_briefing_room.detect.pvp import score_interval
 from lumia_briefing_room.detect.result import ResultScreen
 from lumia_briefing_room.detect.types import CombatInterval, MatchDetection
 from lumia_briefing_room.pipeline.clip import ClipRange, cut_clip, make_thumbnail, resolve_clip_range
+from lumia_briefing_room.detect.types import PortraitCrops
 from lumia_briefing_room.pipeline.filters import apply_filter
 from lumia_briefing_room.pipeline.metadata import build_metadata, write_metadata
 from lumia_briefing_room.pipeline.clip_assets import stored_asset_path
+from lumia_briefing_room.pipeline.portrait_scan import (
+    PORTRAIT_SLOTS,
+    find_match_portraits,
+    portrait_image_name,
+    save_portrait_image,
+)
 from lumia_briefing_room.pipeline.result_scan import (
     find_result_after,
     find_result_screen,
@@ -151,10 +158,6 @@ def _read_result(
         return None
 
 
-def _characters(result: ResultScreen | None) -> list[str]:
-    return [result.character] if result is not None and result.character else []
-
-
 def _save_result_image(result: ResultScreen | None, path: Path, clips_root: Path) -> str | None:
     if result is None or result.image is None:
         return None
@@ -173,6 +176,34 @@ def _save_result_image(result: ResultScreen | None, path: Path, clips_root: Path
 # 60~100초 동안 멈춘 듯 보이던 문제보다는 낫다.
 DETECTION_PROGRESS_FRACTION = 0.45
 RESULT_SCAN_PROGRESS_FRACTION = 0.61
+
+
+def _find_portraits(
+    session: RecordingSession, seg_range, ffmpeg_path: Path, hwaccel: str | None
+) -> PortraitCrops | None:
+    """초상화 판독은 부가 정보라 실패해도 클립 생성을 막지 않는다."""
+    try:
+        return find_match_portraits(session, seg_range, ffmpeg_path=ffmpeg_path, hwaccel=hwaccel)
+    except Exception:
+        log.exception("팀 소개 화면 초상화 판독 실패 - 초상화 없이 저장한다")
+        return None
+
+
+def _save_portrait_images(
+    portraits: PortraitCrops | None, match_start: datetime, thumbnails_root: Path, clips_root: Path
+) -> dict[str, str | None]:
+    paths: dict[str, str | None] = {slot: None for slot in PORTRAIT_SLOTS}
+    if portraits is None:
+        return paths
+    for slot in PORTRAIT_SLOTS:
+        path = thumbnails_root / portrait_image_name(match_start, slot)
+        try:
+            save_portrait_image(getattr(portraits, slot), path)
+        except OSError:
+            log.exception("초상화 이미지 저장 실패(%s)", slot)
+            continue
+        paths[slot] = stored_asset_path(path, clips_root)
+    return paths
 
 
 def process_match(
@@ -231,6 +262,8 @@ def process_match(
     result_image_path = _save_result_image(result, thumbnails_root / result_image_name(match_start), clips_root)
     if on_progress is not None:
         on_progress(RESULT_SCAN_PROGRESS_FRACTION)
+    portraits = _find_portraits(session, seg_range, ffmpeg_path, hwaccel)
+    portrait_paths = _save_portrait_images(portraits, match_start, thumbnails_root, clips_root)
 
     written: list[Path] = []
     for i, plan in enumerate(plans, start=1):
@@ -257,7 +290,7 @@ def process_match(
             thumbnail_rel = stored_asset_path(thumb_path, clips_root)
 
         meta = build_metadata(
-            title=default_title(aggregated.day_night, aggregated.region, aggregated.game_day, _characters(result)),
+            title=default_title(aggregated.day_night, aggregated.region, aggregated.game_day),
             game_day=aggregated.game_day,
             pvp=score_interval(aggregated, cfg.filter.pvp_weights),
             session=session,
@@ -272,6 +305,10 @@ def process_match(
             match_result=result,
             result_image_path=result_image_path,
             match_end_utc=match_end,
+            my_character_portrait_path=portrait_paths["me"],
+            teammate_portrait_paths=[
+                p for p in (portrait_paths["teammate1"], portrait_paths["teammate2"]) if p
+            ],
         )
         meta_path = clip_path.with_suffix(".json")
         write_metadata(meta, meta_path)

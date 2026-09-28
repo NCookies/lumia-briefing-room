@@ -20,7 +20,7 @@ from lumia_briefing_room.detect.match import (
 )
 from lumia_briefing_room.detect.pvp import score_interval
 from lumia_briefing_room.detect.result import ResultScreen
-from lumia_briefing_room.detect.types import FrameState
+from lumia_briefing_room.detect.types import FrameState, PortraitCrops
 from lumia_briefing_room.pipeline.clip import ClipRange, make_thumbnail
 from lumia_briefing_room.pipeline.clip_assets import stored_asset_path
 from lumia_briefing_room.pipeline.filters import apply_filter
@@ -32,6 +32,7 @@ from lumia_briefing_room.pipeline.orchestrator import (
     _save_result_image,
     default_title,
 )
+from lumia_briefing_room.pipeline.portrait_scan import PORTRAIT_SLOTS, find_vod_portraits, save_portrait_image
 from lumia_briefing_room.pipeline.retention import trash_clip
 from lumia_briefing_room.pipeline.vod_clips import build_vod_metadata, cut_vod_clip, vod_clip_id
 from lumia_briefing_room.pipeline.vod_detect import detect_games
@@ -74,6 +75,7 @@ class VodProgress:
 
 ReadFrame = Callable[[np.ndarray, float], FrameState]
 FindResult = Callable[[Path, GameSpan, "float | None"], "ResultScreen | None"]
+FindPortraits = Callable[[Path, GameSpan], "PortraitCrops | None"]
 SourceFactory = Callable[[float], FrameSource]
 
 
@@ -117,6 +119,45 @@ def _safe_result(find: FindResult, video: Path, span: GameSpan, next_start: floa
         return None
 
 
+def _default_find_portraits(ffmpeg_path: Path, width: int, height: int, hwaccel: str | None) -> FindPortraits:
+    profile = ResolutionProfile.for_resolution(width, height)
+
+    def find(video: Path, span: GameSpan) -> PortraitCrops | None:
+        return find_vod_portraits(video, span, ffmpeg_path=ffmpeg_path, profile=profile, hwaccel=hwaccel)
+
+    return find
+
+
+def _safe_portraits(find: FindPortraits, video: Path, span: GameSpan) -> PortraitCrops | None:
+    """초상화 판독도 부가 정보라 실패해도 클립 생성을 막지 않는다."""
+    try:
+        return find(video, span)
+    except Exception:
+        log.exception("게임 %d 초상화 판독 실패 - 초상화 없이 저장한다", span.index)
+        return None
+
+
+def _vod_portrait_image_name(vod: str, game_index: int, slot: str) -> str:
+    return f"{vod}_g{game_index:02d}_portrait_{slot}.jpg"
+
+
+def _save_vod_portrait_images(
+    portraits: PortraitCrops | None, vod: str, game_index: int, thumbs: Path, root: Path
+) -> dict[str, str | None]:
+    paths: dict[str, str | None] = {slot: None for slot in PORTRAIT_SLOTS}
+    if portraits is None:
+        return paths
+    for slot in PORTRAIT_SLOTS:
+        path = thumbs / _vod_portrait_image_name(vod, game_index, slot)
+        try:
+            save_portrait_image(getattr(portraits, slot), path)
+        except OSError:
+            log.exception("초상화 이미지 저장 실패(%s)", slot)
+            continue
+        paths[slot] = stored_asset_path(path, root)
+    return paths
+
+
 def _trash_existing_clips(root: Path, vod: str) -> list[dict]:
     """기존 클립을 휴지통으로 옮기고, 라벨을 새 클립으로 옮길 수 있게 옛 메타데이터를 돌려준다."""
     paths = sorted(root.glob(f"vod_{vod}_*.json"))
@@ -140,6 +181,7 @@ def analyze_vod(
     cancel: threading.Event | None = None,
     read_frame: ReadFrame | None = None,
     find_result: FindResult | None = None,
+    find_portraits: FindPortraits | None = None,
     source_factory: SourceFactory | None = None,
 ) -> dict:
     """다시보기 영상 하나를 분석해 게임별 교전 클립을 만든다.
@@ -199,6 +241,7 @@ def analyze_vod(
         _make_clips(
             video_path, cfg, ffmpeg_path, root, index, states, info,
             find_result or _default_find_result(ffmpeg_path, info.width, info.height, hwaccel),
+            find_portraits or _default_find_portraits(ffmpeg_path, info.width, info.height, hwaccel),
             cancel, report,
         )
     except VodCancelled:
@@ -273,6 +316,7 @@ def _make_clips(
     states: list[FrameState],
     info,
     find_result: FindResult,
+    find_portraits: FindPortraits,
     cancel: threading.Event | None,
     report: Callable[..., None],
 ) -> None:
@@ -296,6 +340,8 @@ def _make_clips(
         next_start = spans[i + 1].start if i + 1 < len(spans) else None
         result = _safe_result(find_result, video_path, span, next_start)
         result_image = _save_result_image(result, thumbs / f"{vod}_g{span.index:02d}_result.jpg", root)
+        portraits = _safe_portraits(find_portraits, video_path, span)
+        portrait_paths = _save_vod_portrait_images(portraits, vod, span.index, thumbs, root)
 
         filtered = apply_filter(det.detection.intervals, cfg.filter, game_mode="battle_royale")
         game_clip_ids: list[str] = []
@@ -325,10 +371,7 @@ def _make_clips(
                 )
                 thumb_rel = stored_asset_path(thumb_path, root)
             meta = build_vod_metadata(
-                title=default_title(
-                    aggregated.day_night, aggregated.region, aggregated.game_day,
-                    [result.character] if result is not None and result.character else [],
-                ),
+                title=default_title(aggregated.day_night, aggregated.region, aggregated.game_day),
                 vod_id=vod, vod_file=str(video_path), streamer=index.get("streamer"),
                 game_index=span.index, game_start=span.start, game_end=span.end,
                 width=info.width, height=info.height, interval=aggregated, clip_range=rng,
@@ -336,6 +379,10 @@ def _make_clips(
                 pvp=score_interval(aggregated, cfg.filter.pvp_weights),
                 match_kills=det.detection.k_final, match_assists=det.detection.a_final,
                 match_result=result, result_image_path=result_image,
+                my_character_portrait_path=portrait_paths["me"],
+                teammate_portrait_paths=[
+                    p for p in (portrait_paths["teammate1"], portrait_paths["teammate2"]) if p
+                ],
             )
             clip_path.with_suffix(".json").write_text(
                 json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"

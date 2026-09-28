@@ -43,3 +43,14 @@ def resolve_thumbnail(meta_path: Path, meta: dict) -> Path | None:
 def resolve_result_image(meta_path: Path, meta: dict) -> Path | None:
     raw = (meta.get("matchResult") or {}).get("imagePath")
     return _resolve(raw, clips_root_of(meta_path)) if raw else None
+
+
+def resolve_character_portrait(meta_path: Path, meta: dict, slot: str) -> Path | None:
+    """`slot` 은 `me`/`teammate1`/`teammate2`. 팀원은 캡처 순서대로 저장돼 있어 못 찾은 슬롯은 없다."""
+    if slot == "me":
+        raw = meta.get("myCharacterPortraitPath")
+    else:
+        index = {"teammate1": 0, "teammate2": 1}.get(slot)
+        paths = meta.get("teammatePortraitPaths") or []
+        raw = paths[index] if index is not None and index < len(paths) else None
+    return _resolve(raw, clips_root_of(meta_path)) if raw else None

@@ -6,7 +6,7 @@ from lumia_briefing_room import paths
 
 def test_resource_dir_in_source_tree_is_repo_root():
     root = paths.resource_dir(frozen=False)
-    assert (root / "data" / "characters.json").exists()
+    assert (root / "data" / "templates").exists()
     assert (root / "pyproject.toml").exists()
 
 
@@ -27,7 +27,6 @@ def test_resource_dir_env_override_wins(tmp_path: Path, monkeypatch):
 
 def test_data_paths_are_under_resource_dir(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("LUMIA_RESOURCE_DIR", str(tmp_path))
-    assert paths.characters_path() == tmp_path / "data" / "characters.json"
     assert paths.templates_dir("digits") == tmp_path / "data" / "templates" / "digits"
     assert paths.bundled_ffmpeg_dir() == tmp_path / "vendor" / "ffmpeg"
 

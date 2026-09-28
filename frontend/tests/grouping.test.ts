@@ -5,7 +5,6 @@ import {
   formatAgo,
   formatKda,
   formatMatchResult,
-  formatTeammates,
   gameRecordId,
   groupByGame,
   totalSize,
@@ -111,8 +110,7 @@ test('formatMatchResult omits the game type when it could not be read', () => {
   assert.equal(formatMatchResult(result({ matchType: 'unknown', placement: 2 })), '2위')
 })
 
-test('formatMatchResult leads with the character name and shows an escape outcome', () => {
-  assert.equal(formatMatchResult(result({ placement: 1, character: '마커스' })), '마커스 · 랭크 · 1위')
+test('formatMatchResult shows an escape outcome but no character name(초상화로 대체, plan-ui.md §0)', () => {
   assert.equal(formatMatchResult(result({ placement: 3, outcome: '탈출 성공' })), '랭크 · 3위 · 탈출 성공')
 })
 
@@ -149,17 +147,6 @@ test('withResultImage keeps only games that have a saved result screenshot, in t
   )
 
   assert.deepEqual(withResultImage(groups).map((g) => g.clips[0].id), ['c', 'a'])
-})
-
-test('formatTeammates lists teammate characters, never nicknames, and marks unknown ones', () => {
-  const teammates = [
-    { nickname: '팀원가', character: '루치아' },
-    { nickname: 'TeamMateB', character: null },
-  ]
-  assert.equal(formatTeammates(result({ teammates })), '루치아, 미확인')
-  assert.equal(formatTeammates(result({ teammates: [] })), null)
-  assert.equal(formatTeammates(result()), null)
-  assert.equal(formatTeammates(null), null)
 })
 
 const record = (id: string, matchStartUtc: string, sessionDir = 's1') => ({

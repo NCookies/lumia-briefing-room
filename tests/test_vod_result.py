@@ -34,8 +34,7 @@ def frame(value):
 def result(placement=1):
     return ResultScreen(
         placement=placement, total=7, match_type="rank", match_label="랭크",
-        outcome="최종 생존", nickname="x", character="마티나", character_raw="MARTIN",
-        stats={"tk": 1}, image=None,
+        outcome="최종 생존", nickname="x", stats={"tk": 1}, image=None,
     )
 
 

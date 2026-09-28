@@ -41,7 +41,6 @@ COLLECT_DATA = ("rapidocr", "certifi")
 COLLECT_SUBMODULES = ("uvicorn", "rapidocr")
 EXCLUDES = ("torch", "torchvision", "tensorrt", "paddle", "matplotlib", "tkinter", "pytest")
 REQUIRED_IN_BUNDLE = (
-    "data/characters.json",
     f"data/templates/digits/{MEASURED_NPZ}",
     f"data/templates/regions/{MEASURED_NPZ}",
     f"data/templates/days/{MEASURED_NPZ}",
@@ -84,7 +83,6 @@ def data_specs(root: Path) -> list[tuple[str, str]]:
     ]
     endpoint = root / "data" / "telemetry_endpoint.json"
     return [
-        (str(root / "data" / "characters.json"), "data"),
         *([(str(endpoint), "data")] if endpoint.exists() else []),
         *templates,
         (str(root / "src" / "lumia_briefing_room" / "profiles" / "builtin"), "lumia_briefing_room/profiles/builtin"),
@@ -136,8 +134,6 @@ def missing_prerequisites(root: Path) -> list[str]:
     for kind in ("digits", "regions", "days"):
         if not (root / "data" / "templates" / kind / MEASURED_NPZ).exists():
             problems.append(f"{kind} 본보기가 없다: data/templates/{kind}/{MEASURED_NPZ}")
-    if not (root / "data" / "characters.json").exists():
-        problems.append("data/characters.json 이 없다")
     return problems
 
 

@@ -75,7 +75,7 @@ def no_result(video, span, next_start):
 def screen():
     return ResultScreen(
         placement=1, total=7, match_type="rank", match_label="랭크", outcome="최종 생존",
-        nickname="스트리머", character="마르티나", character_raw="MARTIN",
+        nickname="스트리머",
         stats={"tk": 5, "kills": 1, "deaths": 0, "assists": 0}, image=None,
     )
 
@@ -99,7 +99,7 @@ def test_analyze_makes_clips_metadata_and_index(vod_file, tmp_path):
     assert meta["source"] == "vod" and meta["vodId"] == vod_id(vod_file)
     assert meta["vodGameIndex"] == 1
     assert "kill" in meta["tags"] and meta["gameDay"] == 2
-    assert meta["myCharacter"] == "마르티나" and meta["matchResult"]["placement"] == 1
+    assert meta["myCharacter"] is None and meta["matchResult"]["placement"] == 1
     assert metas[0].with_suffix(".mp4").exists()
     assert (root / ".thumbs" / f"{metas[0].stem}.jpg").exists()
     assert load_index(root, vod_id(vod_file))["clips"] == [m.stem for m in metas]

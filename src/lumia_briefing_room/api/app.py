@@ -52,7 +52,11 @@ from lumia_briefing_room.pipeline.game_records import (
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for, archive_if_labeled
 from lumia_briefing_room.pipeline.label_note import normalize_label_note
 from lumia_briefing_room.pipeline.cleanup import plan_cleanup, remove_orphan_result_images, run_cleanup
-from lumia_briefing_room.pipeline.clip_assets import resolve_result_image, resolve_thumbnail
+from lumia_briefing_room.pipeline.clip_assets import (
+    resolve_character_portrait,
+    resolve_result_image,
+    resolve_thumbnail,
+)
 from lumia_briefing_room.pipeline.move_clips import MoveError, execute_move, plan_move
 from lumia_briefing_room.pipeline.retention import restore_clip, trash_clip
 from lumia_briefing_room.pipeline.proxy import create_proxy, is_proxy_fresh, proxy_path, remove_orphan_proxies
@@ -249,6 +253,19 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
                 meta["labeledAt"] = None
             elif body["userLabel"] != clip.meta.get("userLabel") or not clip.meta.get("labeledAt"):
                 meta["labeledAt"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        if "matchResult" in body:
+            incoming = body["matchResult"] or {}
+            if not isinstance(incoming, dict):
+                raise HTTPException(400, "matchResult 형식이 올바르지 않습니다")
+            unknown = set(incoming) - {"placement", "outcome"}
+            if unknown:
+                raise HTTPException(400, f"고칠 수 없는 값입니다: {sorted(unknown)}")
+            if "placement" in incoming and not isinstance(incoming["placement"], (int, type(None))):
+                raise HTTPException(400, "순위는 정수여야 합니다")
+            meta["matchResult"] = {**(clip.meta.get("matchResult") or {}), **incoming}
+            meta["matchResultSource"] = "manual"
+        if "matchResultSource" in body and body["matchResultSource"] is None:
+            meta["matchResultSource"] = None
         clip.meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
         return meta | {"id": clip_id}
 
@@ -423,6 +440,18 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         path = resolve_result_image(clip.meta_path, clip.meta)
         if path is None or not path.exists():
             raise HTTPException(404, "결과 화면 이미지가 없습니다")
+        return FileResponse(path, media_type="image/jpeg")
+
+    @app.get("/api/clips/{clip_id}/character-portrait/{slot}")
+    def character_portrait(clip_id: str, slot: str):
+        if slot not in ("me", "teammate1", "teammate2"):
+            raise HTTPException(404, "잘못된 초상화 자리입니다")
+        clip = find_any(clip_id)
+        if clip is None:
+            raise HTTPException(404, "클립을 찾을 수 없습니다")
+        path = resolve_character_portrait(clip.meta_path, clip.meta, slot)
+        if path is None or not path.exists():
+            raise HTTPException(404, "초상화 이미지가 없습니다")
         return FileResponse(path, media_type="image/jpeg")
 
     @app.get("/api/fs/dirs")

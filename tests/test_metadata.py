@@ -172,26 +172,6 @@ def test_metadata_starts_without_a_label_source():
     assert meta.label_conflict is False
 
 
-def test_build_metadata_uses_result_character_as_my_character():
-    from lumia_briefing_room.detect.result import ResultScreen
-
-    result = ResultScreen(
-        placement=1, total=8, match_type="rank", match_label="랭크", outcome="최종 생존",
-        nickname="나", character="마커스", character_raw="MARKU",
-    )
-    meta = build_metadata(
-        title="t", session=_FakeSession(),
-        match_start_utc=datetime(2026, 9, 19, 15, 22, 20, tzinfo=timezone.utc),
-        game_mode="battle_royale", interval=_interval(),
-        clip_range=ClipRange(start=0.0, end=10.0, preroll_source="combat"),
-        cut_result=CutResult(segment_start=1, segment_end=2, duration_sec=9.0, source_incomplete=False),
-        thumbnail_path=None, match_result=result,
-    )
-
-    assert meta.my_character == "마커스"
-    assert meta.match_result["characterRaw"] == "MARKU"
-
-
 def test_build_metadata_stores_match_result_as_camel_dict_and_defaults_to_none():
     from lumia_briefing_room.detect.result import ResultScreen
 
@@ -210,7 +190,7 @@ def test_build_metadata_stores_match_result_as_camel_dict_and_defaults_to_none()
     assert build_metadata(**kwargs).match_result is None
     assert build_metadata(**kwargs, match_result=result).match_result == {
         "matchType": "rank", "matchLabel": "랭크", "placement": 4, "total": 7,
-        "outcome": "실험 종료", "nickname": "나", "character": None, "characterRaw": None,
+        "outcome": "실험 종료", "nickname": "나",
     }
 
 
@@ -226,13 +206,7 @@ def test_match_result_dict_includes_image_path_only_when_given():
     assert match_result_dict(result, image_path="x/r.jpg")["imagePath"] == "x/r.jpg"
 
 
-def test_build_metadata_takes_team_characters_from_the_scoreboard_teammates():
-    from lumia_briefing_room.detect.result import ResultScreen
-
-    result = ResultScreen(
-        placement=1, total=8, match_type="rank", match_label="랭크", outcome="최종 생존", nickname="나",
-        teammates=[{"nickname": "a", "character": "루치아"}, {"nickname": "b", "character": None}],
-    )
+def test_build_metadata_team_characters_defaults_to_empty_but_can_be_overridden():
     kwargs = dict(
         title="t", session=_FakeSession(),
         match_start_utc=datetime(2026, 9, 19, 15, 22, 20, tzinfo=timezone.utc),
@@ -242,12 +216,44 @@ def test_build_metadata_takes_team_characters_from_the_scoreboard_teammates():
         thumbnail_path=None,
     )
 
-    with_result = build_metadata(**kwargs, match_result=result)
-
-    assert with_result.team_characters == ["루치아"]
-    assert with_result.match_result["teammates"] == result.teammates
-    assert build_metadata(**kwargs, team_characters=["직접"]).team_characters == ["직접"]
     assert build_metadata(**kwargs).team_characters == []
+    assert build_metadata(**kwargs, team_characters=["직접"]).team_characters == ["직접"]
+
+
+def test_build_metadata_carries_portrait_paths_and_defaults_to_empty():
+    kwargs = dict(
+        title="t", session=_FakeSession(),
+        match_start_utc=datetime(2026, 9, 19, 15, 22, 20, tzinfo=timezone.utc),
+        game_mode="battle_royale", interval=_interval(),
+        clip_range=ClipRange(start=0.0, end=10.0, preroll_source="combat"),
+        cut_result=CutResult(segment_start=1, segment_end=2, duration_sec=9.0, source_incomplete=False),
+        thumbnail_path=None,
+    )
+
+    assert build_metadata(**kwargs).my_character_portrait_path is None
+    assert build_metadata(**kwargs).teammate_portrait_paths == []
+
+    meta = build_metadata(
+        **kwargs,
+        my_character_portrait_path=".thumbs/x_portrait_me.jpg",
+        teammate_portrait_paths=[".thumbs/x_portrait_1.jpg", ".thumbs/x_portrait_2.jpg"],
+    )
+    assert meta.my_character_portrait_path == ".thumbs/x_portrait_me.jpg"
+    assert meta.teammate_portrait_paths == [".thumbs/x_portrait_1.jpg", ".thumbs/x_portrait_2.jpg"]
+
+
+def test_build_metadata_match_result_source_defaults_to_none_and_can_be_locked():
+    kwargs = dict(
+        title="t", session=_FakeSession(),
+        match_start_utc=datetime(2026, 9, 19, 15, 22, 20, tzinfo=timezone.utc),
+        game_mode="battle_royale", interval=_interval(),
+        clip_range=ClipRange(start=0.0, end=10.0, preroll_source="combat"),
+        cut_result=CutResult(segment_start=1, segment_end=2, duration_sec=9.0, source_incomplete=False),
+        thumbnail_path=None,
+    )
+
+    assert build_metadata(**kwargs).match_result_source is None
+    assert build_metadata(**kwargs, match_result_source="manual").match_result_source == "manual"
 
 
 def test_build_metadata_records_the_match_end_so_the_game_can_be_reanalyzed_later():

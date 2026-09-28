@@ -40,12 +40,12 @@ class MatchGroup:
 
 def apply_match_result(meta: dict, result: ResultScreen, image_path: str | None = None) -> dict:
     new = {**meta, "matchResult": match_result_dict(result, image_path)}
-    if result.character and not new.get("myCharacter"):
-        new["myCharacter"] = result.character
-    mates = [t["character"] for t in result.teammates or [] if t.get("character")]
-    if mates:
-        new["teamCharacters"] = mates
     return retitle(new)
+
+
+def is_locked(metas: dict[str, dict], group: MatchGroup) -> bool:
+    """게임 행에서 순위·결과를 직접 고쳐 `manual` 로 잠근 게임은 `--force` 로도 덮어쓰지 않는다(SPEC §2.13 수동 보정)."""
+    return any(metas[clip_id].get("matchResultSource") == "manual" for clip_id in group.ids)
 
 
 def group_by_match(metas: dict[str, dict]) -> dict[tuple[str, str], MatchGroup]:
@@ -83,9 +83,12 @@ def main() -> None:
         raise SystemExit("녹화 폴더를 찾을 수 없다 - --recording-root 로 지정할 것")
 
     metas = {p.stem: json.loads(p.read_text(encoding="utf-8")) for p in sorted(args.clips_dir.glob("*.json"))}
-    filled = missing_raw = not_found = skipped = 0
+    filled = missing_raw = not_found = skipped = locked = 0
     groups = group_by_match(metas)
     for (session_name, match_start), group in sorted(groups.items()):
+        if is_locked(metas, group):
+            locked += 1
+            continue
         if not args.force and all(metas[i].get("matchResult") for i in group.ids):
             skipped += 1
             continue
@@ -121,7 +124,7 @@ def main() -> None:
             )
         filled += 1
         print(f"{match_start}: {result.match_type} {result.placement}/{result.total} {result.outcome} ({len(group.ids)}개)")
-    print(f"{filled}개 경기 채움, 이미 있음 {skipped}, 원본 없음 {missing_raw}, 못 찾음 {not_found}")
+    print(f"{filled}개 경기 채움, 이미 있음 {skipped}, 수동 잠금 {locked}, 원본 없음 {missing_raw}, 못 찾음 {not_found}")
 
 
 if __name__ == "__main__":
