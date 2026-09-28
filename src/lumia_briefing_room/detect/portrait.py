@@ -15,7 +15,23 @@ PORTRAIT_VIVID_PCT_MIN = 10.0
 
 
 def crop_portraits(frame: np.ndarray, profile: ResolutionProfile) -> PortraitCrops:
-    """내 캐릭터·팀원 2명의 초상화 ROI 를 그대로 자른다(SPEC §2.10 좌표, `2.9` 표 동일)."""
+    """내 캐릭터·팀원 2명의 초상화를 저장용으로 넉넉하게 자른다(SPEC §2.10 좌표, `2.9` 표 동일).
+
+    `*_display` ROI(`portrait_display`/`teammate1_display`/`teammate2_display`)는 얼굴만 딱
+    잘리던 `portrait`/`teammate1`/`teammate2`(판정용, `crops_look_like_portraits` 전용) 보다
+    위아래로 넉넉해 상반신까지 나온다(실측 2026-09-29, 사용자 피드백 - "얼굴만 잘라서 못생겨
+    보인다"). 판정용 ROI 는 화면마다 그림이 채우는 비율이 달라(밝고 채도 높은 픽셀 비율로
+    화면을 가리는지 본다) 넓히면 배경 여백이 늘어나 오히려 못 찾는 경기가 생겨 그대로 뒀다.
+    """
+    return PortraitCrops(
+        me=profile.crop(frame, "portrait_display"),
+        teammate1=profile.crop(frame, "teammate1_display"),
+        teammate2=profile.crop(frame, "teammate2_display"),
+    )
+
+
+def _detect_crops(frame: np.ndarray, profile: ResolutionProfile) -> PortraitCrops:
+    """`crops_look_like_portraits` 판정 전용 - 저장용(`crop_portraits`)보다 좁고 신뢰도가 검증된 ROI."""
     return PortraitCrops(
         me=profile.crop(frame, "portrait"),
         teammate1=profile.crop(frame, "teammate1"),
@@ -63,7 +79,6 @@ def find_portraits_in_frames(
         )
         if spectating is not None:
             return None
-        crops = crop_portraits(frame, profile)
-        if crops_look_like_portraits(crops):
-            return crops
+        if crops_look_like_portraits(_detect_crops(frame, profile)):
+            return crop_portraits(frame, profile)
     return None
