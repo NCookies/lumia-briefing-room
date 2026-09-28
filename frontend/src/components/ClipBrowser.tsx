@@ -69,7 +69,8 @@ const filterActive = (f: FilterState): boolean =>
   f.dayNight !== '' ||
   f.gameMode !== '' ||
   f.label !== '' ||
-  f.minPvpScore > 0
+  f.minPvpScore > 0 ||
+  f.q.trim() !== ''
 
 interface Props {
   source: ClipSource
@@ -116,19 +117,33 @@ export function ClipBrowser({
   const [viewMode, setViewMode] = useState<ViewMode>(() => loadViewMode(source))
   const ask = useConfirm()
 
+  const [debouncedQuery, setDebouncedQuery] = useState(filter.q)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(filter.q), 300)
+    return () => clearTimeout(timer)
+  }, [filter.q])
+
+  const appliedFilter = useMemo(() => ({ ...filter, q: debouncedQuery }), [filter, debouncedQuery])
+
+  const {
+    tags: filterTags, dayNight: filterDayNight, gameMode: filterGameMode, pinnedOnly: filterPinnedOnly,
+    trashed: filterTrashed, minPvpScore: filterMinPvpScore, label: filterLabel,
+  } = filter
+
   const reload = useCallback((silent = false) => {
     if (!silent) {
       setLoading(true)
       setError(null)
     }
     listClips({
-      tags: filter.tags,
-      dayNight: filter.dayNight || undefined,
-      gameMode: filter.gameMode || undefined,
-      pinned: filter.pinnedOnly || undefined,
-      trashed: filter.trashed,
-      minPvpScore: filter.minPvpScore || undefined,
-      label: filter.label || undefined,
+      tags: filterTags,
+      dayNight: filterDayNight || undefined,
+      gameMode: filterGameMode || undefined,
+      pinned: filterPinnedOnly || undefined,
+      trashed: filterTrashed,
+      minPvpScore: filterMinPvpScore || undefined,
+      label: filterLabel || undefined,
+      q: debouncedQuery || undefined,
       source,
     })
       .then(setClips)
@@ -136,14 +151,17 @@ export function ClipBrowser({
         if (!silent) setError(e.message)
       })
       .finally(() => setLoading(false))
-    if (source === 'steam' && !filterActive(filter)) {
+    if (source === 'steam' && !filterActive(appliedFilter)) {
       listGameRecords()
         .then(setRecords)
         .catch(() => setRecords([]))
     } else {
       setRecords([])
     }
-  }, [filter, source])
+  }, [
+    filterTags, filterDayNight, filterGameMode, filterPinnedOnly, filterTrashed, filterMinPvpScore, filterLabel,
+    debouncedQuery, source, appliedFilter,
+  ])
 
   useEffect(() => {
     if (active) reload()
@@ -510,7 +528,7 @@ export function ClipBrowser({
     error: error !== null,
     empty: listEmpty,
     trashed: filter.trashed,
-    filtered: !filter.trashed && filterActive(filter),
+    filtered: !filter.trashed && filterActive(appliedFilter),
     vodTotal: vods.length,
   })
 

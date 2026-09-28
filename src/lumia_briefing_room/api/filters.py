@@ -19,9 +19,16 @@ class ClipQuery:
     trashed_only: bool = False
     min_pvp_score: float | None = None
     label: str | None = None  # pvp / pve / unlabeled / conflict
+    title_query: str | None = None  # 제목 검색어 — labelNote 는 검색 대상이 아니다
+
+
+def _normalize_for_search(text: str) -> str:
+    """대소문자·공백 차이를 무시한 부분 일치 비교용으로 정규화한다."""
+    return "".join(text.split()).casefold()
 
 
 def filter_clip_summaries(clips: list[ClipSummary], query: ClipQuery) -> list[ClipSummary]:
+    title_needle = _normalize_for_search(query.title_query) if query.title_query else ""
     result = []
     for c in clips:
         meta = c.meta
@@ -40,6 +47,8 @@ def filter_clip_summaries(clips: list[ClipSummary], query: ClipQuery) -> list[Cl
         if query.game_mode is not None and meta.get("gameMode") != query.game_mode:
             continue
         if query.pinned_only and not meta.get("pinned"):
+            continue
+        if title_needle and title_needle not in _normalize_for_search(meta.get("title") or ""):
             continue
         if query.min_pvp_score is not None and (meta.get("pvpScore") or 0.0) < query.min_pvp_score:
             continue

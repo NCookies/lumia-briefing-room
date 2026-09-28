@@ -257,6 +257,16 @@ def test_list_clips_supports_score_label_and_sort_params(client):
     assert [c["id"] for c in unlabeled] == ["c", "a"]
 
 
+def test_list_clips_filters_by_title_query(client):
+    clips_dir = client.app.state.clips_dir_for_test
+    _write_clip(clips_dir, "a", title="5일차 낮 Police Station KILL")
+    _write_clip(clips_dir, "b", title="8일차 밤 초원")
+
+    resp = client.get("/api/clips", params={"q": "  police   station kill "})
+
+    assert [c["id"] for c in resp.json()] == ["a"]
+
+
 def test_patching_a_label_marks_it_as_a_user_label_and_clears_the_conflict_flag(client):
     clips_dir = client.app.state.clips_dir_for_test
     _write_clip(clips_dir, "a", userLabel="pvp", labelSource="migrated", labelConflict=True)

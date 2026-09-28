@@ -17,6 +17,7 @@ export interface FilterState {
   sort: ClipSort
   label: '' | 'unlabeled' | 'pvp' | 'pve' | 'conflict'
   minPvpScore: number
+  q: string
 }
 
 export const DEFAULT_FILTER: FilterState = {
@@ -28,6 +29,7 @@ export const DEFAULT_FILTER: FilterState = {
   sort: 'desc',
   label: '',
   minPvpScore: 0,
+  q: '',
 }
 
 interface Props {
@@ -66,6 +68,15 @@ export function FilterBar({ value, onChange, variant = 'steam', viewMode, onView
         ))}
       </div>
       </div>
+
+      <input
+        type="search"
+        placeholder="제목 검색"
+        aria-label="제목 검색"
+        className="rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm text-zinc-100 placeholder:text-zinc-500"
+        value={value.q}
+        onChange={(e) => onChange({ ...value, q: e.target.value })}
+      />
 
       <select
         className={SELECT}

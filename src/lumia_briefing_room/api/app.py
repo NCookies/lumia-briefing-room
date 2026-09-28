@@ -197,6 +197,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         label: str | None = None,
         sort: str | None = None,
         source: str = "steam",
+        q: str | None = None,
     ):
         clips_dir = _source_root(app, source)
         target = (clips_dir / ".trash") if trashed else clips_dir
@@ -215,6 +216,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             trashed_only=trashed,
             min_pvp_score=minPvpScore,
             label=label,
+            title_query=q,
         )
         filtered = sort_clip_summaries(filter_clip_summaries(summaries, query), sort)
         return [_serialize(c) for c in filtered]

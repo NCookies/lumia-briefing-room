@@ -12,6 +12,7 @@ export interface ClipQuery {
   label?: string
   sort?: string
   source?: 'steam' | 'vod'
+  q?: string
 }
 
 async function checkOk(res: Response, action: string): Promise<Response> {
@@ -32,6 +33,7 @@ export async function listClips(query: ClipQuery = {}): Promise<Clip[]> {
   if (query.label) params.set('label', query.label)
   if (query.sort) params.set('sort', query.sort)
   if (query.source) params.set('source', query.source)
+  if (query.q) params.set('q', query.q)
 
   const res = await checkOk(await fetch(`${BASE}/clips?${params}`), '클립 목록 불러오기')
   const clips: Clip[] = await res.json()
