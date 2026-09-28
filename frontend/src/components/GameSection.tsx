@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { cleanupReasonLabel, cleanupReasonTooltip, type CleanupPreviewEntry } from '../cleanupPreview'
 import { formatAgo, formatKda, totalSize, type GameGroup } from '../grouping'
 import { formatBytes } from '../retention'
 import type { Clip } from '../types'
@@ -19,6 +20,7 @@ interface Props {
   matchResultLocked?: boolean
   onCorrectMatchResult?: (values: { placement: number; outcome: string }) => void
   onUnlockMatchResult?: () => void
+  cleanupEntry?: CleanupPreviewEntry | null
   children: ReactNode
 }
 
@@ -109,6 +111,7 @@ export function GameSection({
   matchResultLocked,
   onCorrectMatchResult,
   onUnlockMatchResult,
+  cleanupEntry,
   children,
 }: Props) {
   const result = group.result
@@ -118,10 +121,12 @@ export function GameSection({
 
   return (
     <section
-      className={`overflow-hidden rounded-lg border bg-zinc-800/60 ${reprocessing ? 'border-sky-500/60' : 'border-zinc-700'}`}
+      className={`overflow-hidden rounded-lg border bg-zinc-800/60 ${
+        cleanupEntry ? 'border-rose-600/70' : reprocessing ? 'border-sky-500/60' : 'border-zinc-700'
+      }`}
     >
       <div className="flex items-stretch">
-        <div className={`w-1.5 shrink-0 ${barColor(result?.placement)}`} />
+        <div className={`w-1.5 shrink-0 ${cleanupEntry ? 'bg-rose-600' : barColor(result?.placement)}`} />
         <div
           role="button"
           tabIndex={0}
@@ -226,6 +231,11 @@ export function GameSection({
               <>
                 <div>클립 {group.clips.length}개</div>
                 <div className="text-xs text-zinc-500">{formatBytes(totalSize(group.clips))}</div>
+                {cleanupEntry && (
+                  <div className="text-xs text-rose-400" title={cleanupReasonTooltip(cleanupEntry)}>
+                    삭제 예정 · {cleanupReasonLabel(cleanupEntry)}
+                  </div>
+                )}
               </>
             )}
           </div>

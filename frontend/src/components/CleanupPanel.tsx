@@ -69,6 +69,18 @@ export function CleanupPanel() {
     setStatus(null)
   }
 
+  const toggleAutoClean = async (checked: boolean) => {
+    if (checked && !draft.autoCleanEnabled) {
+      const message =
+        draft.deleteMode === 'recycle'
+          ? '자동 정리를 켜면 기준에 해당하는 클립이 확인 없이 Windows 휴지통으로 보내집니다. 목록의 빨간 "삭제 예정" 표시로 미리 확인하세요.'
+          : '자동 정리를 켜면 기준에 해당하는 클립이 확인 없이 영구 삭제됩니다. 목록의 빨간 "삭제 예정" 표시로 미리 확인하세요.'
+      const confirmed = await ask({ message, confirmLabel: '켜기', danger: true })
+      if (!confirmed.ok) return
+    }
+    patch({ autoCleanEnabled: checked })
+  }
+
   const toggleTag = (tag: string) =>
     patch({
       protectTags: draft.protectTags.includes(tag)
@@ -110,7 +122,7 @@ export function CleanupPanel() {
           <input
             type="checkbox"
             checked={draft.autoCleanEnabled}
-            onChange={(e) => patch({ autoCleanEnabled: e.target.checked })}
+            onChange={(e) => void toggleAutoClean(e.target.checked)}
           />
           자동 정리 켜기
         </label>

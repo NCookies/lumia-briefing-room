@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ClipId } from './ClipId'
 import { thumbnailUrl } from '../api'
+import { cleanupReasonLabel, cleanupReasonTooltip, type CleanupPreviewEntry } from '../cleanupPreview'
 import type { Clip, UserLabel } from '../types'
 import { useLabelingUi } from '../labelingContext'
 import { LabelButtons } from './LabelButtons'
@@ -15,6 +16,7 @@ interface Props {
   onDelete: (clip: Clip) => void
   onLabel: (clip: Clip, label: UserLabel) => void
   onExport: (clip: Clip) => void
+  cleanupEntry?: CleanupPreviewEntry
 }
 
 function formatDuration(sec: number): string {
@@ -36,6 +38,7 @@ export function ClipCard({
   onDelete,
   onLabel,
   onExport,
+  cleanupEntry,
 }: Props) {
   const labeling = useLabelingUi()
   const [editing, setEditing] = useState(false)
@@ -53,7 +56,7 @@ export function ClipCard({
   return (
     <div
       className={`flex flex-col overflow-hidden rounded-lg border bg-zinc-800/60 ${
-        (labeling && clip.userLabel && BORDER[clip.userLabel]) || 'border-zinc-700'
+        cleanupEntry ? 'border-rose-600/70' : (labeling && clip.userLabel && BORDER[clip.userLabel]) || 'border-zinc-700'
       }`}
     >
       <button
@@ -135,6 +138,14 @@ export function ClipCard({
         <ClipId id={clip.id} />
 
         <div className="flex flex-wrap gap-1">
+          {cleanupEntry && (
+            <span
+              className="rounded bg-rose-900/60 px-1.5 py-0.5 text-xs text-rose-300"
+              title={cleanupReasonTooltip(cleanupEntry)}
+            >
+              삭제 예정 · {cleanupReasonLabel(cleanupEntry)}
+            </span>
+          )}
           {clip.tags.map((t) => (
             <TagBadge key={t} tag={t} />
           ))}

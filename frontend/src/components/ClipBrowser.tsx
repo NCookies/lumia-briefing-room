@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { gameCleanupEntry } from '../cleanupPreview'
+import { useCleanupPreview } from '../useCleanupPreview'
 import {
   deleteClip,
   deleteGameRecord,
@@ -62,6 +64,7 @@ const EMPTY_HINTS: Record<string, string> = {
 
 const filterActive = (f: FilterState): boolean =>
   f.pinnedOnly ||
+  f.cleanupOnly ||
   f.tags.length > 0 ||
   f.dayNight !== '' ||
   f.gameMode !== '' ||
@@ -102,6 +105,7 @@ export function ClipBrowser({
 }: Props) {
   const [filter, setFilter] = useState<FilterState>(source === 'vod' ? { ...DEFAULT_FILTER, sort: 'asc' } : DEFAULT_FILTER)
   const labeling = useLabelingUi()
+  const cleanupPreview = useCleanupPreview(source === 'steam')
   useEffect(() => {
     if (!labeling) setFilter((f) => (f.label === '' ? f : { ...f, label: '' }))
   }, [labeling])
@@ -395,10 +399,11 @@ export function ClipBrowser({
     })
   }
 
-  const steamGroups = useMemo(
-    () => (source === 'steam' ? groupByGame(clips, filter.sort, records) : []),
-    [source, clips, records, filter.sort],
-  )
+  const steamGroups = useMemo(() => {
+    if (source !== 'steam') return []
+    const scoped = filter.cleanupOnly ? clips.filter((c) => cleanupPreview[c.id]) : clips
+    return groupByGame(scoped, filter.sort, filter.cleanupOnly ? [] : records)
+  }, [source, clips, records, filter.sort, filter.cleanupOnly, cleanupPreview])
   const vodGroups = useMemo(
     () =>
       source === 'vod'
@@ -444,6 +449,7 @@ export function ClipBrowser({
       onDelete={handleDelete}
       onLabel={handleLabel}
       onExport={setExportTarget}
+      cleanupEntry={cleanupPreview[clip.id]}
     />
   )
 
@@ -473,6 +479,7 @@ export function ClipBrowser({
               matchResultLocked={group.clips[0]?.matchResultSource === 'manual'}
               onCorrectMatchResult={(values) => handleCorrectMatchResult(group, values)}
               onUnlockMatchResult={() => handleUnlockMatchResult(group)}
+              cleanupEntry={gameCleanupEntry(group.clips.map((c) => c.id), cleanupPreview)}
               timeLabel={
                 source === 'vod' && group.startSec !== undefined
                   ? {

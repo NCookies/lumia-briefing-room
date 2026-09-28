@@ -19,6 +19,7 @@ export interface FilterState {
   minPvpScore: number
   q: string
   dates: string[]
+  cleanupOnly: boolean
 }
 
 export const DEFAULT_FILTER: FilterState = {
@@ -31,6 +32,7 @@ export const DEFAULT_FILTER: FilterState = {
   minPvpScore: 0,
   q: '',
   dates: [],
+  cleanupOnly: false,
 }
 
 interface Props {
@@ -196,6 +198,17 @@ export function FilterBar({ value, onChange, variant = 'steam', viewMode, onView
         />
         고정한 클립만
       </label>
+
+      {variant === 'steam' && (
+        <label className="flex items-center gap-1 text-sm text-rose-300">
+          <input
+            type="checkbox"
+            checked={value.cleanupOnly}
+            onChange={(e) => onChange({ ...value, cleanupOnly: e.target.checked })}
+          />
+          삭제 예정만 보기
+        </label>
+      )}
     </div>
   )
 }
