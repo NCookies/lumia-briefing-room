@@ -3,8 +3,8 @@ from datetime import datetime, timedelta, timezone
 
 from lumia_briefing_room.config import RetentionConfig
 from lumia_briefing_room.pipeline.cleanup import run_cleanup
+from lumia_briefing_room.pipeline.delete_helper import delete_clip
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for, archive_if_labeled, load_archived
-from lumia_briefing_room.pipeline.retention import purge_expired
 
 NOW = datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc)
 
@@ -49,15 +49,15 @@ def test_unlabeled_clip_is_not_archived(tmp_path):
     assert not archive.exists()
 
 
-def test_purging_an_expired_trash_clip_archives_only_the_labeled_ones(tmp_path):
+def test_deleting_clips_archives_only_the_labeled_ones(tmp_path):
     clips = tmp_path / "clips"
-    trash = clips / ".trash"
-    write_clip(trash, "keep", deleted_days_ago=40)
-    write_clip(trash, "drop", label=None, deleted_days_ago=40)
+    keep = write_clip(clips, "keep")
+    drop = write_clip(clips, "drop", label=None)
 
-    purge_expired(trash, trash_days=30, now=lambda: NOW, archive_dir=archive_dir_for(clips))
+    delete_clip(keep, mode="permanent", archive_dir=archive_dir_for(clips))
+    delete_clip(drop, mode="permanent", archive_dir=archive_dir_for(clips))
 
-    assert not (trash / "keep.json").exists() and not (trash / "keep.mp4").exists()
+    assert not (clips / "keep.json").exists() and not (clips / "keep.mp4").exists()
     assert [m["id"] for m in load_archived(clips)] == ["keep"]
 
 
@@ -67,7 +67,7 @@ def test_permanent_auto_delete_archives_labeled_clips(tmp_path):
     write_clip(clips, "drop", label=None)
     cfg = RetentionConfig(delete_mode="permanent", auto_clean_enabled=True, max_age_days=1, protect_pinned=False, protect_tags=[])
 
-    run_cleanup(clips, clips / ".trash", cfg, now=NOW)
+    run_cleanup(clips, cfg, now=NOW)
 
     assert not (clips / "keep.mp4").exists()
     assert [m["id"] for m in load_archived(clips)] == ["keep"]

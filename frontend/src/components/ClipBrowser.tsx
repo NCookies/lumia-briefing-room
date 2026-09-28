@@ -1,22 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  deleteClipForever,
+  deleteClip,
   deleteGameRecord,
   gameRecordImageUrl,
   listGameRecords,
   resultImageUrl,
-  emptyTrash,
   getReprocessStatus,
   listClips,
   patchClip,
-  restoreClip,
   startReprocess,
-  trashClip,
   splitClip,
   trimClip,
 } from '../api'
 import { useConfirm } from '../confirmContext'
+import type { DeleteMode } from '../deleteConfirm'
 import { ClipCard } from './ClipCard'
+import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { DEFAULT_FILTER, FilterBar, type FilterState } from './FilterBar'
 import { ExportDialog } from './ExportDialog'
 import { GameSection } from './GameSection'
@@ -29,20 +28,18 @@ import { LoadingBar } from './LoadingBar'
 import { LabelingHelp } from './LabelingHelp'
 import { emptyStateKind } from '../emptyState'
 import { loadViewMode, saveViewMode, type ViewMode } from '../viewMode'
-import { formatMatchResult, gameRecordId, groupByGame, totalSize, withResultImage, type GameGroup } from '../grouping'
+import { formatMatchResult, groupByGame, totalSize, withResultImage, type GameGroup } from '../grouping'
 import { applyLabel, applyNote, progress } from '../labeling'
 import { useLabelingUi } from '../labelingContext'
 import { formatBytes } from '../retention'
 import type { Clip, GameRecord, UserLabel } from '../types'
 import {
   cancelAnalysis,
-  deleteVodClipsForever,
+  deleteVodClips,
   getAnalysis,
   listVods,
-  restoreVodClips,
   setStreamer,
   startAnalysis,
-  trashVodClips,
   type AnalysisJob,
 } from '../vodApi'
 import { formatDuration, formatGameRange, groupByVod, probeProgress, type Vod } from '../vodGrouping'
@@ -50,7 +47,6 @@ import { formatDuration, formatGameRange, groupByVod, probeProgress, type Vod } 
 export type ClipSource = 'steam' | 'vod'
 
 const EMPTY_TITLES: Record<string, string> = {
-  trash: '휴지통이 비어 있습니다',
   filter: '조건에 맞는 클립이 없습니다',
   steam: '아직 클립이 없습니다',
   'vod-no-sources': '분석할 영상 파일이 없습니다. 영상 파일이나 폴더를 추가해 주세요',
@@ -63,19 +59,20 @@ const EMPTY_HINTS: Record<string, string> = {
 }
 
 const filterActive = (f: FilterState): boolean =>
-  f.trashed ||
-  f.pinnedOnly ||
-  f.tags.length > 0 ||
-  f.dayNight !== '' ||
-  f.gameMode !== '' ||
-  f.label !== '' ||
-  f.minPvpScore > 0
+  f.pinnedOnly || f.tags.length > 0 || f.dayNight !== '' || f.gameMode !== '' || f.label !== '' || f.minPvpScore > 0
+
+interface DeleteRequest {
+  label: string
+  run: (mode: DeleteMode) => Promise<unknown>
+}
 
 interface Props {
   source: ClipSource
   active: boolean
   confirmDelete: boolean
   onConfirmDeleteChange: (value: boolean) => void
+  deleteMode: DeleteMode
+  onDeleteModeChange: (value: DeleteMode) => void
   onBackfill: () => void
   backfillLabel: string
   onAddVodSources: () => void
@@ -87,6 +84,8 @@ export function ClipBrowser({
   active,
   confirmDelete,
   onConfirmDeleteChange,
+  deleteMode,
+  onDeleteModeChange,
   onBackfill,
   backfillLabel,
   onAddVodSources,
@@ -114,6 +113,7 @@ export function ClipBrowser({
   const [reprocessGame, setReprocessGame] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>(() => loadViewMode(source))
+  const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null)
   const ask = useConfirm()
 
   const reload = useCallback((silent = false) => {
@@ -126,7 +126,6 @@ export function ClipBrowser({
       dayNight: filter.dayNight || undefined,
       gameMode: filter.gameMode || undefined,
       pinned: filter.pinnedOnly || undefined,
-      trashed: filter.trashed,
       minPvpScore: filter.minPvpScore || undefined,
       label: filter.label || undefined,
       source,
@@ -221,47 +220,33 @@ export function ClipBrowser({
     }
   }
 
-  const changeConfirmDelete = onConfirmDeleteChange
-
-  const confirmTrash = async (message: string): Promise<boolean> => {
-    if (!confirmDelete) return true
-    const result = await ask({ message, confirmLabel: '삭제', danger: true, allowSkip: true })
-    if (result.ok && result.skipNext) changeConfirmDelete(false)
-    return result.ok
+  const requestDelete = (label: string, run: (mode: DeleteMode) => Promise<unknown>) => {
+    if (!confirmDelete) {
+      runAndReload(() => run(deleteMode))
+      return
+    }
+    setDeleteRequest({ label, run })
   }
 
-  const confirmTrashClip = (clip: Clip) =>
-    confirmTrash(`"${clip.title}" 클립을 삭제하시겠습니까?\n삭제한 클립은 휴지통에서 복구할 수 있습니다.`)
+  const handleDeleteConfirm = async ({ mode, skipNext }: { mode: DeleteMode; skipNext: boolean }) => {
+    const request = deleteRequest
+    setDeleteRequest(null)
+    if (skipNext) onConfirmDeleteChange(false)
+    if (mode !== deleteMode) onDeleteModeChange(mode)
+    if (request) await runAndReload(() => request.run(mode))
+  }
 
   const handleTogglePin = (clip: Clip) => runAndReload(() => patchClip(clip.id, { pinned: !clip.pinned }))
 
   const handleRename = (clip: Clip, title: string) => runAndReload(() => patchClip(clip.id, { title }))
 
-  const handleTrash = async (clip: Clip) => {
-    if (await confirmTrashClip(clip)) await runAndReload(() => trashClip(clip.id))
-  }
-
-  const handleRestore = (clip: Clip) => runAndReload(() => restoreClip(clip.id))
-
-  const handleDeleteForever = async (clip: Clip) => {
-    const result = await ask({
-      message: `"${clip.title}" 클립을 완전히 삭제합니다. 계속하시겠습니까?`,
-      confirmLabel: '완전 삭제',
-      danger: true,
-    })
-    if (result.ok) await runAndReload(() => deleteClipForever(clip.id))
-  }
+  const handleDelete = (clip: Clip) => requestDelete(`"${clip.title}" 클립을 삭제합니다.`, () => deleteClip(clip.id))
 
   const gameLabel = (group: GameGroup<Clip>) =>
     `게임 ${group.number}(${group.clips.length}개, ${formatBytes(totalSize(group.clips))})`
 
-  const handleTrashGame = async (group: GameGroup<Clip>) => {
-    if (await confirmTrash(`${gameLabel(group)}의 클립을 모두 삭제하시겠습니까?\n삭제한 클립은 휴지통에서 복구할 수 있습니다.`)) {
-      await runAndReload(() => runAll(group.clips, trashClip))
-    }
-  }
-
-  const handleRestoreGame = (group: GameGroup<Clip>) => runAndReload(() => runAll(group.clips, restoreClip))
+  const handleDeleteGame = (group: GameGroup<Clip>) =>
+    requestDelete(`${gameLabel(group)}의 클립을 모두 삭제합니다.`, () => runAll(group.clips, deleteClip))
 
   useEffect(() => {
     if (reprocessKey === null) return
@@ -286,7 +271,7 @@ export function ClipBrowser({
 
   const handleReprocess = async (group: GameGroup<Clip>) => {
     const result = await ask({
-      message: `다음 게임을 원본 녹화에서 다시 분석합니다.\n${gameLabel(group)}\n기존 클립은 라벨과 편집 내용을 포함해 휴지통으로 이동하고 새로 만듭니다.\n분석에는 몇 분이 걸릴 수 있습니다. 계속하시겠습니까?`,
+      message: `다음 게임을 원본 녹화에서 다시 분석합니다.\n${gameLabel(group)}\n분석에 성공하면 기존 클립을 지우고 새로 만듭니다(라벨은 그대로 옮겨집니다). 실패하면 기존 클립은 그대로 남습니다.\n분석에는 몇 분이 걸릴 수 있습니다. 계속하시겠습니까?`,
       confirmLabel: '다시 분석',
     })
     if (!result.ok) return
@@ -303,9 +288,9 @@ export function ClipBrowser({
 
   const handleAnalyze = async (vod: Vod, options: { force?: boolean; rebuild?: boolean }) => {
     const message = options.force
-      ? `"${vod.name}" 영상을 처음부터 다시 분석합니다.\n기존 클립은 라벨과 편집 내용을 포함해 휴지통으로 옮기고 새로 만듭니다.\n영상 길이에 따라 수십 분이 걸릴 수 있습니다. 계속하시겠습니까?`
+      ? `"${vod.name}" 영상을 처음부터 다시 분석합니다.\n분석에 성공하면 기존 클립을 지우고 새로 만듭니다(라벨은 그대로 옮겨집니다). 실패하면 기존 클립은 그대로 남습니다.\n영상 길이에 따라 수십 분이 걸릴 수 있습니다. 계속하시겠습니까?`
       : options.rebuild
-        ? `"${vod.name}" 영상의 클립을 저장된 분석 결과로 다시 만듭니다.\n기존 클립은 휴지통으로 옮기고 새로 만듭니다. 계속하시겠습니까?`
+        ? `"${vod.name}" 영상의 클립을 저장된 분석 결과로 다시 만듭니다.\n분석에 성공하면 기존 클립을 지우고 새로 만듭니다. 계속하시겠습니까?`
         : `"${vod.name}" 영상을 분석합니다.\n영상 길이에 따라 수십 분이 걸릴 수 있으며, 도중에 취소해도 다음에 이어서 할 수 있습니다. 계속하시겠습니까?`
     const result = await ask({
       message,
@@ -338,48 +323,11 @@ export function ClipBrowser({
       reloadVods()
     })
 
-  const handleTrashVod = async (id: string, name: string, count: number) => {
-    if (
-      await confirmTrash(
-        `"${name}" 영상의 클립 ${count}개를 모두 삭제하시겠습니까?\n삭제한 클립은 휴지통에서 복구할 수 있습니다. 영상 파일은 지우지 않습니다.`,
-      )
-    ) {
-      await vodAction(() => trashVodClips(id))
-    }
-  }
-
-  const handleDeleteVodForever = async (id: string, name: string) => {
-    const result = await ask({
-      message: `"${name}" 영상의 휴지통 클립을 완전히 삭제합니다. 영상 파일은 지우지 않습니다. 계속하시겠습니까?`,
-      confirmLabel: '완전 삭제',
-      danger: true,
-    })
-    if (result.ok) await vodAction(() => deleteVodClipsForever(id))
-  }
-
-  const handleEmptyTrash = async () => {
-    const result = await ask({
-      message: `휴지통의 클립 ${clips.length}개(${formatBytes(totalSize(clips))})를 모두 완전히 삭제합니다. 계속하시겠습니까?`,
-      confirmLabel: '휴지통 비우기',
-      danger: true,
-    })
-    if (result.ok) await runAndReload(() => emptyTrash(source))
-  }
-
-  const handleDeleteGameForever = async (group: GameGroup<Clip>) => {
-    const result = await ask({
-      message: `${gameLabel(group)}의 클립을 완전히 삭제합니다.${source === 'steam' ? '\n게임 기록도 함께 삭제됩니다.' : ''} 계속하시겠습니까?`,
-      confirmLabel: '완전 삭제',
-      danger: true,
-    })
-    if (!result.ok) return
-    await runAndReload(async () => {
-      await runAll(group.clips, deleteClipForever)
-      if (source === 'steam') {
-        await deleteGameRecord(gameRecordId(group.clips[0]?.sessionDir, group.clips[0]?.matchStartUtc))
-      }
-    })
-  }
+  const handleDeleteVod = (id: string, name: string, count: number) =>
+    requestDelete(
+      `"${name}" 영상의 클립 ${count}개를 모두 삭제합니다. 영상 파일은 지우지 않습니다.`,
+      () => vodAction(() => deleteVodClips(id)),
+    )
 
   const handleDeleteRecord = async (group: GameGroup<Clip>) => {
     const result = await ask({
@@ -411,8 +359,8 @@ export function ClipBrowser({
     [source, clips, records, filter.sort],
   )
   const vodGroups = useMemo(
-    () => (source === 'vod' ? groupByVod(clips, vods, filter.sort, !filter.trashed) : []),
-    [source, clips, vods, filter.sort, filter.trashed],
+    () => (source === 'vod' ? groupByVod(clips, vods, filter.sort, true) : []),
+    [source, clips, vods, filter.sort],
   )
   const groups = useMemo(
     () => (source === 'steam' ? steamGroups : vodGroups.flatMap((v) => v.games)),
@@ -443,13 +391,10 @@ export function ClipBrowser({
     <ClipCard
       key={clip.id}
       clip={clip}
-      trashed={filter.trashed}
       onPlay={() => setPlayingId(clip.id)}
       onTogglePin={handleTogglePin}
       onRename={handleRename}
-      onTrash={handleTrash}
-      onRestore={handleRestore}
-      onDeleteForever={handleDeleteForever}
+      onDelete={handleDelete}
       onLabel={handleLabel}
       onExport={setExportTarget}
     />
@@ -471,11 +416,8 @@ export function ClipBrowser({
       bare={timeline}
               group={group}
               expanded={expandedKeys.has(group.key)}
-              trashed={filter.trashed}
               onToggle={() => toggleGame(group.key)}
-              onTrashGame={() => handleTrashGame(group)}
-              onRestoreGame={() => handleRestoreGame(group)}
-              onDeleteGameForever={() => handleDeleteGameForever(group)}
+              onDeleteGame={() => handleDeleteGame(group)}
               onReprocess={() => handleReprocess(group)}
               onDeleteRecord={() => handleDeleteRecord(group)}
               reprocessing={reprocessGame === group.key}
@@ -509,8 +451,7 @@ export function ClipBrowser({
     loading: loading || !vodsLoaded,
     error: error !== null,
     empty: listEmpty,
-    trashed: filter.trashed,
-    filtered: !filter.trashed && filterActive(filter),
+    filtered: filterActive(filter),
     vodTotal: vods.length,
   })
 
@@ -528,7 +469,7 @@ export function ClipBrowser({
       />
 
       <main className="flex-1 p-4">
-        {labeling && !filter.trashed && total > 0 && (
+        {labeling && total > 0 && (
           <p className="mb-2 flex items-center gap-2 text-sm text-zinc-400">
             라벨 {labeled}/{total}
             <LabelingHelp />
@@ -600,15 +541,6 @@ export function ClipBrowser({
               모두 접기
             </button>
             {source === 'vod' && <VideoFormatHelp />}
-            {filter.trashed && (
-              <button
-                type="button"
-                className="ml-auto rounded border border-rose-500/60 px-3 py-0.5 text-rose-300 hover:bg-rose-500/20"
-                onClick={handleEmptyTrash}
-              >
-                휴지통 비우기 ({clips.length}개 · {formatBytes(totalSize(clips))})
-              </button>
-            )}
           </div>
         )}
 
@@ -618,7 +550,6 @@ export function ClipBrowser({
             vodGroups.map((vg) => {
               const visible = vg.games.reduce((n, g) => n + g.clips.length, 0)
               const visibleBytes = vg.games.reduce((n, g) => n + totalSize(g.clips), 0)
-              const trashedView = filter.trashed
               return (
                 <VodSection
                   key={vg.vodId}
@@ -626,11 +557,10 @@ export function ClipBrowser({
                   vod={vg.vod}
                   job={job?.id === vg.vodId ? job : null}
                   expanded={!collapsedVods.has(vg.vodId)}
-                  trashed={trashedView}
-                  gameCount={trashedView ? vg.games.length : (vg.vod?.games.length ?? vg.games.length)}
-                  clipCount={trashedView ? visible : (vg.vod?.clipCount ?? visible)}
+                  gameCount={vg.vod?.games.length ?? vg.games.length}
+                  clipCount={vg.vod?.clipCount ?? visible}
                   visibleClipCount={visible}
-                  clipBytes={trashedView ? visibleBytes : (vg.vod?.clipBytes ?? visibleBytes)}
+                  clipBytes={vg.vod?.clipBytes ?? visibleBytes}
                   analysisBusy={runningVodId !== null}
                   onToggle={() =>
                     setCollapsedVods((prev) => {
@@ -642,9 +572,7 @@ export function ClipBrowser({
                   onAnalyze={(options) => vg.vod && handleAnalyze(vg.vod, options)}
                   onCancel={() => vg.vod && handleCancelAnalysis(vg.vod)}
                   onRenameStreamer={(name) => vg.vod && handleRenameStreamer(vg.vod, name)}
-                  onTrashClips={() => handleTrashVod(vg.vodId, vg.name, vg.vod?.clipCount ?? visible)}
-                  onRestoreClips={() => vodAction(() => restoreVodClips(vg.vodId))}
-                  onDeleteClipsForever={() => handleDeleteVodForever(vg.vodId, vg.name)}
+                  onDeleteClips={() => handleDeleteVod(vg.vodId, vg.name, vg.vod?.clipCount ?? visible)}
                 >
                   {vg.games.map((group) => renderGame(group))}
                 </VodSection>
@@ -672,11 +600,13 @@ export function ClipBrowser({
             reload()
           }}
           paused={exportTarget !== null}
-          onTrash={async (clip) => {
+          onDelete={(clip) => {
             const next = ordered[playingIndex + 1] ?? ordered[playingIndex - 1]
-            if (!(await confirmTrashClip(clip))) return
-            setPlayingId(next?.id ?? null)
-            await runAndReload(() => trashClip(clip.id))
+            requestDelete(`"${clip.title}" 클립을 삭제합니다.`, async (mode) => {
+              setPlayingId(next?.id ?? null)
+              await deleteClip(clip.id)
+              return mode
+            })
           }}
           onClose={() => setPlayingId(null)}
         />
@@ -688,6 +618,14 @@ export function ClipBrowser({
           index={resultViewIndex}
           onIndexChange={(i) => setResultViewKey(resultGames[i].key)}
           onClose={() => setResultViewKey(null)}
+        />
+      )}
+      {deleteRequest && (
+        <DeleteConfirmDialog
+          label={deleteRequest.label}
+          deleteMode={deleteMode}
+          onCancel={() => setDeleteRequest(null)}
+          onConfirm={handleDeleteConfirm}
         />
       )}
     </div>

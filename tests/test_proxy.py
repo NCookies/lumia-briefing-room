@@ -75,20 +75,18 @@ def test_is_fresh_requires_existing_nonempty_and_not_older_than_source(tmp_path:
 
 
 def test_remove_orphan_proxies_keeps_only_existing_clips(tmp_path: Path):
-    clips, trash = tmp_path, tmp_path / ".trash"
-    trash.mkdir()
-    for cid, where in [("live", clips), ("trashed", trash)]:
-        (where / f"{cid}.json").write_text(json.dumps({"sessionDir": "s"}), encoding="utf-8")
-        (where / f"{cid}.mp4").write_bytes(b"x")
+    clips = tmp_path
+    (clips / "live.json").write_text(json.dumps({"sessionDir": "s"}), encoding="utf-8")
+    (clips / "live.mp4").write_bytes(b"x")
     pdir = proxy.proxy_dir(clips)
     pdir.mkdir()
-    for cid in ["live", "trashed", "gone"]:
+    for cid in ["live", "gone"]:
         (pdir / f"{cid}.mp4").write_bytes(b"p")
     (pdir / "gone.tmp.mp4").write_bytes(b"p")
 
-    removed = proxy.remove_orphan_proxies(clips, trash)
+    removed = proxy.remove_orphan_proxies(clips)
 
-    assert sorted(p.name for p in pdir.iterdir()) == ["live.mp4", "trashed.mp4"]
+    assert sorted(p.name for p in pdir.iterdir()) == ["live.mp4"]
     assert {p.name for p in removed} == {"gone.mp4", "gone.tmp.mp4"}
 
 

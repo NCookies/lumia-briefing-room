@@ -10,8 +10,7 @@ const INPUT = 'w-24 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm
 
 interface Draft {
   autoCleanEnabled: boolean
-  deleteMode: 'trash' | 'permanent'
-  trashDays: string
+  deleteMode: 'recycle' | 'permanent'
   ageOn: boolean
   maxAgeDays: string
   countOn: boolean
@@ -26,7 +25,6 @@ interface Draft {
 const toDraft = (r: RetentionSettings): Draft => ({
   autoCleanEnabled: r.autoCleanEnabled,
   deleteMode: r.deleteMode,
-  trashDays: String(r.trashDays),
   ageOn: r.maxAgeDays != null,
   maxAgeDays: r.maxAgeDays == null ? '' : String(r.maxAgeDays),
   countOn: r.maxCount != null,
@@ -41,7 +39,6 @@ const toDraft = (r: RetentionSettings): Draft => ({
 const toSettings = (d: Draft): RetentionSettings => ({
   autoCleanEnabled: d.autoCleanEnabled,
   deleteMode: d.deleteMode,
-  trashDays: Math.max(1, Math.round(parseLimit(d.trashDays) ?? 30)),
   maxAgeDays: d.ageOn ? parseLimit(d.maxAgeDays) : null,
   maxCount: d.countOn ? parseLimit(d.maxCount) : null,
   maxTotalGb: d.gbOn ? parseLimit(d.maxTotalGb) : null,
@@ -193,19 +190,12 @@ export function CleanupPanel() {
           value={draft.deleteMode}
           onChange={(e) => patch({ deleteMode: e.target.value as Draft['deleteMode'] })}
         >
-          <option value="trash">휴지통으로 이동 (복구 가능)</option>
-          <option value="permanent">즉시 완전 삭제</option>
+          <option value="permanent">즉시 완전 삭제 (기본)</option>
+          <option value="recycle">Windows 휴지통으로 이동</option>
         </select>
-        <label className="flex items-center gap-2 text-sm text-zinc-300">
-          휴지통에서
-          <input
-            className={INPUT}
-            inputMode="numeric"
-            value={draft.trashDays}
-            onChange={(e) => patch({ trashDays: e.target.value })}
-          />
-          일이 지나면 완전 삭제
-        </label>
+        <p className="text-xs text-zinc-500">
+          자동 정리는 디스크 용량 확보가 목적이라 기본은 영구 삭제입니다. 이 설정은 수동 삭제 방식과 별개입니다.
+        </p>
       </section>
 
       <section className="flex flex-col gap-2">

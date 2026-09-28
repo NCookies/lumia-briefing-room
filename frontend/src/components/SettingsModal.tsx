@@ -9,6 +9,7 @@ import {
   setNickname,
   setProxyPrefetch,
 } from '../exportApi'
+import { needsPermanentSkipWarning, type DeleteMode } from '../deleteConfirm'
 import { AboutPanel } from './AboutPanel'
 import { CleanupPanel } from './CleanupPanel'
 import { ClipsDirSection } from './ClipsDirSection'
@@ -29,6 +30,8 @@ const TABS: { id: Tab; label: string }[] = [
 interface Props {
   confirmDelete: boolean
   onConfirmDeleteChange: (value: boolean) => void
+  deleteMode: DeleteMode
+  onDeleteModeChange: (value: DeleteMode) => void
   onClose: () => void
   onClipsDirChanged: () => void
   initialTab?: Tab
@@ -37,10 +40,14 @@ interface Props {
 function GeneralPanel({
   confirmDelete,
   onConfirmDeleteChange,
+  deleteMode,
+  onDeleteModeChange,
   onClipsDirChanged,
 }: {
   confirmDelete: boolean
   onConfirmDeleteChange: (value: boolean) => void
+  deleteMode: DeleteMode
+  onDeleteModeChange: (value: DeleteMode) => void
   onClipsDirChanged: () => void
 }) {
   const [nickname, setDraft] = useState('')
@@ -111,11 +118,51 @@ function GeneralPanel({
     <section className="flex flex-col gap-2">
       <h3 className="text-sm font-medium text-zinc-200">삭제</h3>
       <label className="flex items-center gap-2 text-sm text-zinc-300">
-        <input type="checkbox" checked={confirmDelete} onChange={(e) => onConfirmDeleteChange(e.target.checked)} />
+        <input
+          type="checkbox"
+          checked={confirmDelete}
+          onChange={(e) => {
+            const next = e.target.checked
+            if (
+              !next &&
+              needsPermanentSkipWarning({ skipNext: true, permanent: deleteMode === 'permanent' }) &&
+              !window.confirm(
+                '영구 삭제 + 다시 묻지 않기를 함께 켜면, 앞으로 삭제할 때 확인도 복구도 없이 즉시 완전히 지워집니다. 계속하시겠습니까?',
+              )
+            ) {
+              return
+            }
+            onConfirmDeleteChange(next)
+          }}
+        />
         클립을 삭제할 때 확인 창 표시
       </label>
+      <label className="flex items-center gap-2 text-sm text-zinc-300">
+        삭제 방식
+        <select
+          className="rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm"
+          value={deleteMode}
+          onChange={(e) => {
+            const next = e.target.value as DeleteMode
+            if (
+              !confirmDelete &&
+              needsPermanentSkipWarning({ skipNext: true, permanent: next === 'permanent' }) &&
+              !window.confirm(
+                '영구 삭제 + 다시 묻지 않기를 함께 켜면, 앞으로 삭제할 때 확인도 복구도 없이 즉시 완전히 지워집니다. 계속하시겠습니까?',
+              )
+            ) {
+              return
+            }
+            onDeleteModeChange(next)
+          }}
+        >
+          <option value="recycle">Windows 휴지통으로 이동</option>
+          <option value="permanent">영구 삭제</option>
+        </select>
+      </label>
       <p className="text-xs text-zinc-500">
-        끄면 삭제 버튼을 누르는 즉시 휴지통으로 이동합니다. 완전 삭제는 이 설정과 관계없이 항상 확인합니다.
+        휴지통으로 보내면 Windows 휴지통에서 클립의 영상·정보·썸네일을 모두 복원해야 이 앱에서 다시 볼 수 있습니다.
+        확인 창을 끄면 삭제 버튼을 누르는 즉시 이 방식으로 지웁니다.
       </p>
     </section>
     <section className="flex flex-col gap-2">
@@ -195,7 +242,15 @@ function ExportPanel() {
   )
 }
 
-export function SettingsModal({ confirmDelete, onConfirmDeleteChange, onClose, onClipsDirChanged, initialTab }: Props) {
+export function SettingsModal({
+  confirmDelete,
+  onConfirmDeleteChange,
+  deleteMode,
+  onDeleteModeChange,
+  onClose,
+  onClipsDirChanged,
+  initialTab,
+}: Props) {
   const [tab, setTab] = useState<Tab>(initialTab ?? 'general')
 
   useEffect(() => {
@@ -238,6 +293,8 @@ export function SettingsModal({ confirmDelete, onConfirmDeleteChange, onClose, o
               <GeneralPanel
                 confirmDelete={confirmDelete}
                 onConfirmDeleteChange={onConfirmDeleteChange}
+                deleteMode={deleteMode}
+                onDeleteModeChange={onDeleteModeChange}
                 onClipsDirChanged={onClipsDirChanged}
               />
             )}

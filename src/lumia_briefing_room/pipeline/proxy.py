@@ -146,12 +146,12 @@ def remove_proxy(clips_dir: Path, clip_id: str) -> None:
     proxy_path(clips_dir, clip_id).unlink(missing_ok=True)
 
 
-def remove_orphan_proxies(clips_dir: Path, trash_dir: Path) -> list[Path]:
-    """클립(휴지통 포함)이 더는 없는 프록시와 만들다 만 임시 파일을 지운다."""
+def remove_orphan_proxies(clips_dir: Path) -> list[Path]:
+    """클립이 더는 없는 프록시와 만들다 만 임시 파일을 지운다."""
     directory = proxy_dir(clips_dir)
     if not directory.exists():
         return []
-    alive = {c.id for root in (clips_dir, trash_dir) for c in scan_clips(root)}
+    alive = {c.id for c in scan_clips(clips_dir)}
     removed = []
     for path in directory.glob("*.mp4"):
         if path.name.split(".", 1)[0] not in alive:

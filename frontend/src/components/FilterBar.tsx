@@ -13,7 +13,6 @@ export interface FilterState {
   dayNight: string
   gameMode: string
   pinnedOnly: boolean
-  trashed: boolean
   sort: ClipSort
   label: '' | 'unlabeled' | 'pvp' | 'pve' | 'conflict'
   minPvpScore: number
@@ -24,7 +23,6 @@ export const DEFAULT_FILTER: FilterState = {
   dayNight: '',
   gameMode: '',
   pinnedOnly: false,
-  trashed: false,
   sort: 'desc',
   label: '',
   minPvpScore: 0,
@@ -156,23 +154,6 @@ export function FilterBar({ value, onChange, variant = 'steam', viewMode, onView
         />
         고정한 클립만
       </label>
-
-      <div className="ml-auto flex rounded border border-zinc-600 text-sm">
-        <button
-          type="button"
-          className={`px-3 py-1 ${!value.trashed ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-400'}`}
-          onClick={() => onChange({ ...value, trashed: false })}
-        >
-          클립
-        </button>
-        <button
-          type="button"
-          className={`px-3 py-1 ${value.trashed ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-400'}`}
-          onClick={() => onChange({ ...value, trashed: true })}
-        >
-          휴지통
-        </button>
-      </div>
     </div>
   )
 }

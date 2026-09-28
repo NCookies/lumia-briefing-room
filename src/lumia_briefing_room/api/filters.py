@@ -16,7 +16,6 @@ class ClipQuery:
     day_night: str | None = None
     game_mode: str | None = None
     pinned_only: bool = False
-    trashed_only: bool = False
     min_pvp_score: float | None = None
     label: str | None = None  # pvp / pve / unlabeled / conflict
 
@@ -25,13 +24,6 @@ def filter_clip_summaries(clips: list[ClipSummary], query: ClipQuery) -> list[Cl
     result = []
     for c in clips:
         meta = c.meta
-        is_trashed = meta.get("deletedAt") is not None
-
-        if query.trashed_only:
-            if not is_trashed:
-                continue
-        elif is_trashed:
-            continue
 
         if query.tags and not (set(meta.get("tags", [])) & set(query.tags)):
             continue

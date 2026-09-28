@@ -22,7 +22,7 @@ interface Props {
   onIndexChange: (index: number) => void
   onLabel: (clip: Clip, label: UserLabel) => void
   onNote: (clip: Clip, note: string | null) => void
-  onTrash: (clip: Clip) => void
+  onDelete: (clip: Clip) => void
   onRename: (clip: Clip, title: string) => void
   onExport: (clip: Clip) => void
   onTrim: (clip: Clip, ranges: TrimRange[]) => Promise<void>
@@ -36,7 +36,7 @@ export function PlayerModal({
   onIndexChange,
   onLabel,
   onNote,
-  onTrash,
+  onDelete,
   onRename,
   onExport,
   onTrim,
@@ -293,7 +293,7 @@ export function PlayerModal({
             <button
               type="button"
               className="rounded border border-rose-500/50 px-3 py-1 text-sm text-rose-300 hover:bg-rose-500/20"
-              onClick={() => onTrash(clip)}
+              onClick={() => onDelete(clip)}
             >
               삭제
             </button>

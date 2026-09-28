@@ -48,7 +48,6 @@ class PathsConfig:
     clips: Path | None = None
     thumbnails: Path | None = None
     proxies: Path | None = None
-    trash: Path | None = None
     export_default: Path | None = None
     steam_recording: Path | None = None
     vod_clips: Path | None = None
@@ -61,7 +60,6 @@ class ResolvedPaths:
     clips: Path
     thumbnails: Path
     proxies: Path
-    trash: Path
     export_default: Path
     vod_clips: Path
 
@@ -86,7 +84,6 @@ def resolve_paths(cfg: PathsConfig) -> ResolvedPaths:
         clips=clips,
         thumbnails=cfg.thumbnails or (clips / ".thumbs"),
         proxies=cfg.proxies or (clips / ".proxy"),
-        trash=cfg.trash or (clips / ".trash"),
         export_default=cfg.export_default or (_default_userprofile() / "Videos"),
         vod_clips=cfg.vod_clips or (_default_userprofile() / "Videos" / paths.app_folder_name() / "vod"),
     )
@@ -165,8 +162,7 @@ class EncodeConfig:
 
 @dataclass
 class RetentionConfig:
-    delete_mode: str = "trash"
-    trash_days: int = 30
+    delete_mode: str = "permanent"
     auto_clean_enabled: bool = False
     max_age_days: int | None = None
     max_total_gb: float | None = None
@@ -195,6 +191,7 @@ class UiConfig:
     start_minimized: bool = True
     auto_start: bool = True
     confirm_delete: bool = True
+    delete_mode: str = "recycle"
 
 
 @dataclass

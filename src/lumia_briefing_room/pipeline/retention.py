@@ -1,136 +1,16 @@
-"""휴지통 기반 삭제/복구 + 자동 정리. (SPEC §7.6)
+"""자동 정리 대상 선정. (SPEC §7.6)
 
-"삭제는 되돌릴 수 있어야 한다"는 이 절의 전제다 — 그래서 즉시 지우지 않고
-휴지통으로 옮긴 뒤, 유예 기간이 지난 것만 purge_expired() 가 실제로 지운다.
+무엇을 지울지(나이·개수·용량 한도, 보호 규칙) 만 다룬다. 실제로 어떻게 지우는지
+(Windows 휴지통/영구 삭제)는 pipeline/delete_helper.py 가 맡는다.
 """
 
-import json
-import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from datetime import datetime, timezone
 
 from lumia_briefing_room.config import RetentionConfig
-from lumia_briefing_room.pipeline.clip_assets import resolve_thumbnail
-from lumia_briefing_room.pipeline.game_records import record_game
-from lumia_briefing_room.pipeline.label_archive import archive_if_labeled
 
 _default_now: Callable[[], datetime] = lambda: datetime.now(timezone.utc)
-
-
-def _read_meta(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _write_meta(meta: dict, path: Path) -> None:
-    path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
-def _clip_files(meta_path: Path, meta: dict) -> list[Path]:
-    """메타데이터 하나에 딸린 파일들(mp4, 썸네일) — 메타데이터 자신은 제외."""
-    files = [meta_path.with_suffix(".mp4")]
-    thumb = resolve_thumbnail(meta_path, meta)
-    if thumb is not None:
-        files.append(thumb)
-    return [f for f in files if f.exists()]
-
-
-def _move_clip(meta_path: Path, dest_root: Path, src_root: Path) -> Path:
-    """meta_path 와 딸린 파일들을 dest_root 아래로, src_root 기준 상대 구조를 유지하며 옮긴다."""
-    meta = _read_meta(meta_path)
-    files = _clip_files(meta_path, meta) + [meta_path]
-
-    moved_meta_path = meta_path
-    for f in files:
-        try:
-            rel = f.relative_to(src_root)
-        except ValueError:
-            rel = Path(f.name)
-        dest = dest_root / rel
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(f), str(dest))
-        if f == meta_path:
-            moved_meta_path = dest
-
-    return moved_meta_path
-
-
-def trash_clip(
-    meta_path: Path, trash_dir: Path, *, now: Callable[[], datetime] = _default_now
-) -> Path:
-    """클립을 휴지통으로 옮기고 deletedAt 을 채운다. 새 메타데이터 경로를 반환."""
-    clips_dir = meta_path.parent
-    moved_path = _move_clip(meta_path, trash_dir, clips_dir)
-
-    meta = _read_meta(moved_path)
-    meta["deletedAt"] = now().isoformat()
-    thumb = meta.get("thumbnailPath")
-    if thumb:
-        old_thumb = Path(thumb)
-        try:
-            rel = old_thumb.relative_to(clips_dir)
-            meta["thumbnailPath"] = str(trash_dir / rel)
-        except ValueError:
-            pass
-    _write_meta(meta, moved_path)
-
-    return moved_path
-
-
-def restore_clip(trashed_meta_path: Path, clips_dir: Path) -> Path:
-    """휴지통에서 원래 위치로 되돌리고 deletedAt 을 지운다. 새 메타데이터 경로를 반환."""
-    trash_dir = trashed_meta_path.parent
-    moved_path = _move_clip(trashed_meta_path, clips_dir, trash_dir)
-
-    meta = _read_meta(moved_path)
-    meta["deletedAt"] = None
-    thumb = meta.get("thumbnailPath")
-    if thumb:
-        old_thumb = Path(thumb)
-        try:
-            rel = old_thumb.relative_to(trash_dir)
-            meta["thumbnailPath"] = str(clips_dir / rel)
-        except ValueError:
-            pass
-    _write_meta(meta, moved_path)
-
-    return moved_path
-
-
-def list_expired(
-    trash_dir: Path, *, trash_days: int, now: Callable[[], datetime] = _default_now
-) -> list[Path]:
-    """휴지통에서 유예 기간이 지난 클립의 메타데이터 경로 목록."""
-    if not trash_dir.exists():
-        return []
-
-    cutoff = now() - timedelta(days=trash_days)
-    expired: list[Path] = []
-    for meta_path in sorted(trash_dir.glob("*.json")):
-        deleted_at = _read_meta(meta_path).get("deletedAt")
-        if deleted_at and datetime.fromisoformat(deleted_at.replace("Z", "+00:00")) <= cutoff:
-            expired.append(meta_path)
-    return expired
-
-
-def purge_expired(
-    trash_dir: Path,
-    *,
-    trash_days: int,
-    now: Callable[[], datetime] = _default_now,
-    archive_dir: Path | None = None,
-    records_dir: Path | None = None,
-) -> list[Path]:
-    """유예 기간이 지난 클립을 실제로(되돌릴 수 없게) 지운다. 라벨 붙은 클립은 archive_dir 에 근거·라벨을 남긴다."""
-    purged = list_expired(trash_dir, trash_days=trash_days, now=now)
-    for meta_path in purged:
-        archive_if_labeled(meta_path, archive_dir)
-        record_game(meta_path, records_dir)
-        for f in _clip_files(meta_path, _read_meta(meta_path)):
-            f.unlink(missing_ok=True)
-        meta_path.unlink()
-    return purged
 
 
 def is_protected(meta: dict, cfg: RetentionConfig) -> bool:
@@ -156,7 +36,7 @@ def select_for_auto_clean(
     오래된 것부터 고른다. auto_clean_enabled 가 꺼져 있거나 한도가 하나도 없으면 빈 리스트.
 
     호출 규약: 각 meta 는 "_created_at"(datetime) 과 "_size_bytes"(int) 를 들고 있어야
-    한다 — 실제 클립 스캔 계층(아직 안 만듦)이 파일 mtime/크기로 채워 넣는다.
+    한다 — 실제 클립 스캔 계층이 파일 mtime/크기로 채워 넣는다.
     """
     if not cfg.auto_clean_enabled:
         return []

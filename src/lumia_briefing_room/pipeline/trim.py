@@ -21,7 +21,7 @@ from lumia_briefing_room.pipeline.clip_uid import (
     piece_uids,
     write_json_atomic,
 )
-from lumia_briefing_room.pipeline.retention import trash_clip
+from lumia_briefing_room.pipeline.delete_helper import delete_clip
 from lumia_briefing_room.procs import run_hidden
 
 MIN_LENGTH_SEC = 1.0
@@ -88,16 +88,12 @@ def trim_clip(
     return meta
 
 
-def _free_piece_ids(meta_path: Path, trash_dir: Path, count: int) -> list[str]:
+def _free_piece_ids(meta_path: Path, count: int) -> list[str]:
     ids: list[str] = []
     n = 1
     while len(ids) < count:
         candidate = f"{meta_path.stem}-p{n}"
-        taken = any(
-            (folder / f"{candidate}{suffix}").exists()
-            for folder in (meta_path.parent, trash_dir)
-            for suffix in (".json", ".mp4")
-        )
+        taken = any((meta_path.parent / f"{candidate}{suffix}").exists() for suffix in (".json", ".mp4"))
         if not taken:
             ids.append(candidate)
         n += 1
@@ -108,19 +104,20 @@ def split_clip(
     meta_path: Path,
     ranges: list[tuple[float, float]],
     *,
-    trash_dir: Path,
     ffmpeg_path: Path,
     thumbnail: ThumbnailConfig,
+    delete_mode: str = "recycle",
+    archive_dir: Path | None = None,
 ) -> list[Path]:
-    """구간마다 새 클립을 만들고 원본은 휴지통으로 옮긴다. 하나라도 실패하면 만든 조각을 지우고 원본은 그대로 둔다."""
+    """구간마다 새 클립을 만들고 원본은 지운다(설정한 삭제 방식). 하나라도 실패하면 만든 조각을 지우고 원본은 그대로 둔다."""
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
     duration = float(meta["durationSec"])
     ordered = validate_ranges(ranges, duration)
     src_mp4 = meta_path.with_suffix(".mp4")
     folder = meta_path.parent
-    ids = _free_piece_ids(meta_path, trash_dir, len(ordered))
+    ids = _free_piece_ids(meta_path, len(ordered))
     parent_uid = meta.get(UID_KEY) or new_clip_uid()
-    uids = piece_uids(parent_uid, collect_uids(folder, trash_dir, folder / ARCHIVE_DIRNAME), len(ordered))
+    uids = piece_uids(parent_uid, collect_uids(folder, folder / ARCHIVE_DIRNAME), len(ordered))
 
     created: list[Path] = []
     try:
@@ -159,7 +156,7 @@ def split_clip(
             piece_meta_path.write_text(json.dumps(piece, ensure_ascii=False, indent=2), encoding="utf-8")
         if not meta.get(UID_KEY):
             write_json_atomic(meta_path, meta | {UID_KEY: parent_uid})
-        trash_clip(meta_path, trash_dir)
+        delete_clip(meta_path, mode=delete_mode, archive_dir=archive_dir)
     except BaseException:
         for f in created:
             f.unlink(missing_ok=True)

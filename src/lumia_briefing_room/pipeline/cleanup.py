@@ -1,12 +1,12 @@
 """자동 정리 실행기. (SPEC §7.6)
 
-retention.py 의 선택/이동 함수들을 실제로 돌린다: 한도(나이·개수·용량)를 넘은 클립은 휴지통으로(또는 즉시 삭제),
-휴지통에서 유예 기간이 지난 것은 영구 삭제, 클립이 다 사라진 경기의 결과표 이미지는 함께 정리한다.
+retention.py 로 한도(나이·개수·용량)를 넘은 클립을 고르고, delete_helper.py 로
+바로 지운다(휴지통으로 보내거나 영구 삭제) — 예전처럼 앱 자체 휴지통에 옮겨
+두었다가 유예 기간 뒤에 지우는 중간 단계는 없다.
 """
 
 from __future__ import annotations
 
-import json
 import logging
 import threading
 from collections.abc import Callable
@@ -17,16 +17,11 @@ from pathlib import Path
 from lumia_briefing_room.api.clips import scan_clips, to_summary_dict
 from lumia_briefing_room.config import RetentionConfig, load_config, resolve_paths
 from lumia_briefing_room.pipeline.clip_assets import resolve_result_image
+from lumia_briefing_room.pipeline.delete_helper import delete_clip
 from lumia_briefing_room.pipeline.game_records import clear_records, record_game, records_dir_for
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for, archive_if_labeled
 from lumia_briefing_room.pipeline.proxy import remove_orphan_proxies
-from lumia_briefing_room.pipeline.retention import (
-    _clip_files,
-    list_expired,
-    purge_expired,
-    select_for_auto_clean,
-    trash_clip,
-)
+from lumia_briefing_room.pipeline.retention import select_for_auto_clean
 
 log = logging.getLogger(__name__)
 
@@ -35,8 +30,7 @@ DEFAULT_INTERVAL_SEC = 3600.0
 
 @dataclass(frozen=True)
 class CleanupPlan:
-    to_trash: list[Path]
-    to_purge: list[Path]
+    to_delete: list[Path]
     bytes_to_free: int
 
 
@@ -51,17 +45,10 @@ def _game_time(meta: dict, fallback: datetime) -> datetime:
     return fallback
 
 
-def _size(meta_path: Path) -> int:
-    mp4 = meta_path.with_suffix(".mp4")
-    return mp4.stat().st_size if mp4.exists() else 0
-
-
-def plan_cleanup(
-    clips_dir: Path, trash_dir: Path, cfg: RetentionConfig, *, now: datetime | None = None
-) -> CleanupPlan:
+def plan_cleanup(clips_dir: Path, cfg: RetentionConfig, *, now: datetime | None = None) -> CleanupPlan:
     now = now or datetime.now(timezone.utc)
     if not cfg.auto_clean_enabled:
-        return CleanupPlan([], [], 0)
+        return CleanupPlan([], 0)
 
     entries = []
     for clip in scan_clips(clips_dir):
@@ -71,30 +58,17 @@ def plan_cleanup(
         entries.append(entry)
 
     selected = select_for_auto_clean(entries, cfg, now=lambda: now)
-    to_trash = [e["_path"] for e in selected]
-    to_purge = list_expired(trash_dir, trash_days=cfg.trash_days, now=lambda: now)
-    freed = sum(e["_size_bytes"] for e in selected) + sum(_size(p) for p in to_purge)
-    return CleanupPlan(to_trash, to_purge, freed)
+    to_delete = [e["_path"] for e in selected]
+    freed = sum(e["_size_bytes"] for e in selected)
+    return CleanupPlan(to_delete, freed)
 
 
-def _delete_clip_permanently(
-    meta_path: Path, archive_dir: Path | None = None, records_dir: Path | None = None
-) -> None:
-    archive_if_labeled(meta_path, archive_dir)
-    record_game(meta_path, records_dir)
-    meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    for f in _clip_files(meta_path, meta):
-        f.unlink(missing_ok=True)
-    meta_path.unlink(missing_ok=True)
-
-
-def remove_orphan_result_images(clips_dir: Path, trash_dir: Path) -> list[Path]:
+def remove_orphan_result_images(clips_dir: Path) -> list[Path]:
     referenced: set[Path] = set()
-    for root in (clips_dir, trash_dir):
-        for clip in scan_clips(root):
-            image = resolve_result_image(clip.meta_path, clip.meta)
-            if image is not None:
-                referenced.add(image.resolve())
+    for clip in scan_clips(clips_dir):
+        image = resolve_result_image(clip.meta_path, clip.meta)
+        if image is not None:
+            referenced.add(image.resolve())
 
     thumbs = clips_dir / ".thumbs"
     removed: list[Path] = []
@@ -106,11 +80,9 @@ def remove_orphan_result_images(clips_dir: Path, trash_dir: Path) -> list[Path]:
     return removed
 
 
-def run_cleanup(
-    clips_dir: Path, trash_dir: Path, cfg: RetentionConfig, *, now: datetime | None = None
-) -> CleanupPlan:
+def run_cleanup(clips_dir: Path, cfg: RetentionConfig, *, now: datetime | None = None) -> CleanupPlan:
     now = now or datetime.now(timezone.utc)
-    plan = plan_cleanup(clips_dir, trash_dir, cfg, now=now)
+    plan = plan_cleanup(clips_dir, cfg, now=now)
     records_dir = records_dir_for(clips_dir)
     if not cfg.keep_game_records:
         clear_records(records_dir)
@@ -118,20 +90,11 @@ def run_cleanup(
     if not cfg.auto_clean_enabled:
         return plan
 
-    for meta_path in plan.to_trash:
-        if cfg.delete_mode == "permanent":
-            _delete_clip_permanently(meta_path, archive_dir_for(clips_dir), records_dir)
-        else:
-            trash_clip(meta_path, trash_dir, now=lambda: now)
-    purge_expired(
-        trash_dir,
-        trash_days=cfg.trash_days,
-        now=lambda: now,
-        archive_dir=archive_dir_for(clips_dir),
-        records_dir=records_dir,
-    )
-    remove_orphan_result_images(clips_dir, trash_dir)
-    remove_orphan_proxies(clips_dir, trash_dir)
+    archive_dir = archive_dir_for(clips_dir)
+    for meta_path in plan.to_delete:
+        delete_clip(meta_path, mode=cfg.delete_mode, archive_dir=archive_dir, records_dir=records_dir)
+    remove_orphan_result_images(clips_dir)
+    remove_orphan_proxies(clips_dir)
     return plan
 
 
@@ -141,7 +104,7 @@ def make_cleanup_runner(config_path: Path | None) -> Callable[[], CleanupPlan]:
     def run() -> CleanupPlan:
         cfg = load_config(config_path)
         resolved = resolve_paths(cfg.paths)
-        return run_cleanup(resolved.clips, resolved.trash, cfg.retention)
+        return run_cleanup(resolved.clips, cfg.retention)
 
     return run
 

@@ -7,7 +7,6 @@ export interface ClipQuery {
   dayNight?: string
   gameMode?: string
   pinned?: boolean
-  trashed?: boolean
   minPvpScore?: number
   label?: string
   sort?: string
@@ -27,7 +26,6 @@ export async function listClips(query: ClipQuery = {}): Promise<Clip[]> {
   if (query.dayNight) params.set('dayNight', query.dayNight)
   if (query.gameMode) params.set('gameMode', query.gameMode)
   if (query.pinned) params.set('pinned', 'true')
-  if (query.trashed) params.set('trashed', 'true')
   if (query.minPvpScore) params.set('minPvpScore', String(query.minPvpScore))
   if (query.label) params.set('label', query.label)
   if (query.sort) params.set('sort', query.sort)
@@ -53,25 +51,12 @@ export async function patchClip(
   return res.json()
 }
 
-export async function trashClip(id: string): Promise<void> {
-  await checkOk(await fetch(`${BASE}/clips/${id}/trash`, { method: 'POST' }), '삭제')
-}
-
-export async function restoreClip(id: string): Promise<void> {
-  await checkOk(await fetch(`${BASE}/clips/${id}/restore`, { method: 'POST' }), '복구')
-}
-
-export async function deleteClipForever(id: string): Promise<void> {
-  await checkOk(await fetch(`${BASE}/clips/${id}`, { method: 'DELETE' }), '완전 삭제')
+export async function deleteClip(id: string): Promise<void> {
+  await checkOk(await fetch(`${BASE}/clips/${id}`, { method: 'DELETE' }), '삭제')
 }
 
 export function videoUrl(id: string, version?: number): string {
   return `${BASE}/clips/${id}/video${version === undefined ? '' : `?v=${version}`}`
-}
-
-export async function emptyTrash(source: 'steam' | 'vod' = 'steam'): Promise<{ deleted: number; bytes: number }> {
-  const res = await checkOk(await fetch(`${BASE}/trash/empty?source=${source}`, { method: 'POST' }), '휴지통 비우기')
-  return res.json()
 }
 
 export interface ReprocessStatus {

@@ -17,7 +17,7 @@ def write_clip(root, clip_id, *, start="2026-09-01T10:00:00Z"):
     image.parent.mkdir(exist_ok=True)
     image.write_bytes(b"result-jpg")
     meta = {
-        "title": clip_id, "tags": ["kill"], "pinned": False, "deletedAt": None, "thumbnailPath": None,
+        "title": clip_id, "tags": ["kill"], "pinned": False, "thumbnailPath": None,
         "sessionDir": "s1", "matchStartUtc": start, "matchResult": {**RESULT, "imagePath": str(image)},
     }
     (root / f"{clip_id}.json").write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
@@ -29,10 +29,9 @@ def make_client(tmp_path, *, keep=True):
     return TestClient(create_app(cfg, config_path=tmp_path / "config.json")), clips
 
 
-def test_permanent_delete_of_last_clip_leaves_a_record_row(tmp_path):
+def test_deleting_the_last_clip_leaves_a_record_row(tmp_path):
     client, clips = make_client(tmp_path)
     write_clip(clips, "a_01")
-    client.post("/api/clips/a_01/trash")
     client.delete("/api/clips/a_01")
 
     rows = client.get("/api/games/records").json()
@@ -46,25 +45,14 @@ def test_record_is_hidden_while_the_game_still_has_live_clips(tmp_path):
     client, clips = make_client(tmp_path)
     write_clip(clips, "a_01")
     write_clip(clips, "a_02")
-    client.post("/api/clips/a_01/trash")
     client.delete("/api/clips/a_01")
 
     assert client.get("/api/games/records").json() == []
 
 
-def test_empty_trash_records_games(tmp_path):
-    client, clips = make_client(tmp_path)
-    write_clip(clips, "a_01")
-    client.post("/api/clips/a_01/trash")
-    client.post("/api/trash/empty")
-
-    assert len(client.get("/api/games/records").json()) == 1
-
-
 def test_keep_game_records_off_leaves_nothing(tmp_path):
     client, clips = make_client(tmp_path, keep=False)
     write_clip(clips, "a_01")
-    client.post("/api/clips/a_01/trash")
     client.delete("/api/clips/a_01")
 
     assert client.get("/api/games/records").json() == []
@@ -74,7 +62,6 @@ def test_keep_game_records_off_leaves_nothing(tmp_path):
 def test_delete_record_removes_summary_and_image(tmp_path):
     client, clips = make_client(tmp_path)
     write_clip(clips, "a_01")
-    client.post("/api/clips/a_01/trash")
     client.delete("/api/clips/a_01")
     rid = client.get("/api/games/records").json()[0]["id"]
 

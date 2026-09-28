@@ -80,7 +80,6 @@ export interface Clip {
   myCharacter: string | null
   teamCharacters: string[]
   pinned: boolean
-  deletedAt: string | null
   matchKills: number | null
   matchAssists: number | null
   matchTeamKills: number | null

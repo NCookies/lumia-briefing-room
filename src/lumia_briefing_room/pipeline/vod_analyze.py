@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
 import threading
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -32,7 +34,8 @@ from lumia_briefing_room.pipeline.orchestrator import (
     _save_result_image,
     default_title,
 )
-from lumia_briefing_room.pipeline.retention import trash_clip
+from lumia_briefing_room.pipeline.delete_helper import delete_clip
+from lumia_briefing_room.pipeline.label_archive import archive_dir_for
 from lumia_briefing_room.pipeline.vod_clips import build_vod_metadata, cut_vod_clip, vod_clip_id
 from lumia_briefing_room.pipeline.vod_detect import detect_games
 from lumia_briefing_room.pipeline.vod_games import GameSpan, split_games
@@ -61,6 +64,10 @@ GAMES_SHARE = 0.10
 
 class VodCancelled(Exception):
     """사용자가 분석을 취소했다. 여기까지의 판독은 캐시에 남아 이어할 수 있다."""
+
+
+class VodAnalyzeError(Exception):
+    """다시 만들었지만 클립이 하나도 안 나와, 기존 클립을 지우지 않고 실패로 남긴 경우."""
 
 
 @dataclass(frozen=True)
@@ -117,13 +124,22 @@ def _safe_result(find: FindResult, video: Path, span: GameSpan, next_start: floa
         return None
 
 
-def _trash_existing_clips(root: Path, vod: str) -> list[dict]:
-    """기존 클립을 휴지통으로 옮기고, 라벨을 새 클립으로 옮길 수 있게 옛 메타데이터를 돌려준다."""
-    paths = sorted(root.glob(f"vod_{vod}_*.json"))
-    olds = load_metas(paths)
-    for meta_path in paths:
-        trash_clip(meta_path, root / ".trash")
-    return olds
+STAGING_DIRNAME = ".staging"
+
+
+def _existing_clip_paths(root: Path, vod: str) -> list[Path]:
+    return sorted(root.glob(f"vod_{vod}_*.json"))
+
+
+def _move_staged_tree(staging: Path, dest_root: Path) -> None:
+    for path in sorted(staging.rglob("*")):
+        if path.is_dir():
+            continue
+        rel = path.relative_to(staging)
+        dest = dest_root / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(path), str(dest))
+    shutil.rmtree(staging, ignore_errors=True)
 
 
 def analyze_vod(
@@ -146,7 +162,7 @@ def analyze_vod(
 
     판독(디코딩)은 캐시에 이어 쓰므로 취소·종료 뒤 다시 부르면 저장된 시각부터 이어간다.
     이미 끝난 영상은 아무것도 안 한다. force 는 캐시까지 지우고 처음부터, rebuild 는 캐시로 클립만 다시 만든다.
-    다시 만들 때 기존 클립은 휴지통으로 옮긴다. 원본 영상은 읽기만 한다.
+    다시 만들 때 새 클립을 전부 만든 뒤에만 기존 클립을 지운다(설정한 삭제 방식). 원본 영상은 읽기만 한다.
     """
     video_path = Path(video_path)
     root = clips_dir or resolve_paths(cfg.paths).vod_clips
@@ -276,81 +292,100 @@ def _make_clips(
     cancel: threading.Event | None,
     report: Callable[..., None],
 ) -> None:
+    """새 클립은 스테이징 폴더에 만들고, 다 만든 뒤에만 기존 클립을 지우고 실제 위치로 옮긴다.
+
+    취소되거나 실패하면 스테이징만 지우고 기존 클립은 그대로 둔다(docs/plan-ui.md §0-(6))."""
     vod = index["id"]
     spans = split_games(
         states, max_gap_sec=cfg.vod.game_gap_sec, min_game_sec=cfg.vod.min_game_sec
     )
     detections = detect_games(states, spans)
-    olds = _trash_existing_clips(root, vod)
-    thumbs = root / ".thumbs"
+    old_paths = _existing_clip_paths(root, vod)
+    olds = load_metas(old_paths)
+    staging = root / STAGING_DIRNAME / uuid.uuid4().hex
+    thumbs = staging / ".thumbs"
     games: list[dict] = []
     clip_ids: list[str] = []
     n = max(1, len(detections))
 
-    for i, det in enumerate(detections):
-        if cancel is not None and cancel.is_set():
-            raise VodCancelled()
-        span = det.span
-        base = DECODE_SHARE + GAMES_SHARE
-        report("games", DECODE_SHARE + GAMES_SHARE * i / n, f"게임 {span.index} 결과 화면", games=len(games), clips=len(clip_ids))
-        next_start = spans[i + 1].start if i + 1 < len(spans) else None
-        result = _safe_result(find_result, video_path, span, next_start)
-        result_image = _save_result_image(result, thumbs / f"{vod}_g{span.index:02d}_result.jpg", root)
-
-        filtered = apply_filter(det.detection.intervals, cfg.filter, game_mode="battle_royale")
-        game_clip_ids: list[str] = []
-        for plan in _plan_clips(filtered, cfg.clip):
+    try:
+        for i, det in enumerate(detections):
             if cancel is not None and cancel.is_set():
                 raise VodCancelled()
-            rng = ClipRange(
-                start=max(0.0, plan.range.start),
-                end=min(info.duration_sec, plan.range.end),
-                preroll_source=plan.range.preroll_source,
-            )
-            aggregated = _aggregate_interval(plan.intervals)
-            clip_id = vod_clip_id(vod, span.index, rng.start)
-            clip_path = root / f"{clip_id}.mp4"
-            report("cut", base + (1 - base) * i / n, f"게임 {span.index} 클립 {len(game_clip_ids) + 1}",
-                   games=len(games), clips=len(clip_ids))
-            cut = cut_vod_clip(
-                video_path, rng, clip_path, ffmpeg_path=ffmpeg_path, include_audio=cfg.clip.include_audio
-            )
-            thumb_rel = None
-            if cfg.encode.thumbnail.enabled:
-                thumb_path = thumbs / f"{clip_id}.jpg"
-                make_thumbnail(
-                    clip_path, thumb_path, duration_sec=cut.duration_sec,
-                    offset_ratio=cfg.encode.thumbnail.offset_ratio,
-                    width=cfg.encode.thumbnail.width, ffmpeg_path=ffmpeg_path,
+            span = det.span
+            base = DECODE_SHARE + GAMES_SHARE
+            report("games", DECODE_SHARE + GAMES_SHARE * i / n, f"게임 {span.index} 결과 화면", games=len(games), clips=len(clip_ids))
+            next_start = spans[i + 1].start if i + 1 < len(spans) else None
+            result = _safe_result(find_result, video_path, span, next_start)
+            result_image = _save_result_image(result, thumbs / f"{vod}_g{span.index:02d}_result.jpg", staging)
+
+            filtered = apply_filter(det.detection.intervals, cfg.filter, game_mode="battle_royale")
+            game_clip_ids: list[str] = []
+            for plan in _plan_clips(filtered, cfg.clip):
+                if cancel is not None and cancel.is_set():
+                    raise VodCancelled()
+                rng = ClipRange(
+                    start=max(0.0, plan.range.start),
+                    end=min(info.duration_sec, plan.range.end),
+                    preroll_source=plan.range.preroll_source,
                 )
-                thumb_rel = stored_asset_path(thumb_path, root)
-            meta = build_vod_metadata(
-                title=default_title(
-                    aggregated.day_night, aggregated.region, aggregated.game_day,
-                    [result.character] if result is not None and result.character else [],
-                ),
-                vod_id=vod, vod_file=str(video_path), streamer=index.get("streamer"),
-                game_index=span.index, game_start=span.start, game_end=span.end,
-                width=info.width, height=info.height, interval=aggregated, clip_range=rng,
-                duration_sec=cut.duration_sec, thumbnail_path=thumb_rel,
-                pvp=score_interval(aggregated, cfg.filter.pvp_weights),
-                match_kills=det.detection.k_final, match_assists=det.detection.a_final,
-                match_result=result, result_image_path=result_image,
-            )
-            clip_path.with_suffix(".json").write_text(
-                json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
-            )
-            game_clip_ids.append(clip_id)
-            clip_ids.append(clip_id)
+                aggregated = _aggregate_interval(plan.intervals)
+                clip_id = vod_clip_id(vod, span.index, rng.start)
+                clip_path = staging / f"{clip_id}.mp4"
+                report("cut", base + (1 - base) * i / n, f"게임 {span.index} 클립 {len(game_clip_ids) + 1}",
+                       games=len(games), clips=len(clip_ids))
+                cut = cut_vod_clip(
+                    video_path, rng, clip_path, ffmpeg_path=ffmpeg_path, include_audio=cfg.clip.include_audio
+                )
+                thumb_rel = None
+                if cfg.encode.thumbnail.enabled:
+                    thumb_path = thumbs / f"{clip_id}.jpg"
+                    make_thumbnail(
+                        clip_path, thumb_path, duration_sec=cut.duration_sec,
+                        offset_ratio=cfg.encode.thumbnail.offset_ratio,
+                        width=cfg.encode.thumbnail.width, ffmpeg_path=ffmpeg_path,
+                    )
+                    thumb_rel = stored_asset_path(thumb_path, staging)
+                meta = build_vod_metadata(
+                    title=default_title(
+                        aggregated.day_night, aggregated.region, aggregated.game_day,
+                        [result.character] if result is not None and result.character else [],
+                    ),
+                    vod_id=vod, vod_file=str(video_path), streamer=index.get("streamer"),
+                    game_index=span.index, game_start=span.start, game_end=span.end,
+                    width=info.width, height=info.height, interval=aggregated, clip_range=rng,
+                    duration_sec=cut.duration_sec, thumbnail_path=thumb_rel,
+                    pvp=score_interval(aggregated, cfg.filter.pvp_weights),
+                    match_kills=det.detection.k_final, match_assists=det.detection.a_final,
+                    match_result=result, result_image_path=result_image,
+                )
+                clip_path.with_suffix(".json").write_text(
+                    json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
+                )
+                game_clip_ids.append(clip_id)
+                clip_ids.append(clip_id)
 
-        games.append({
-            "index": span.index, "startSec": span.start, "endSec": span.end,
-            "confidence": span.confidence,
-            "kFinal": det.detection.k_final, "aFinal": det.detection.a_final,
-            "result": match_result_dict(result, result_image), "clipIds": game_clip_ids,
-        })
+            games.append({
+                "index": span.index, "startSec": span.start, "endSec": span.end,
+                "confidence": span.confidence,
+                "kFinal": det.detection.k_final, "aFinal": det.detection.a_final,
+                "result": match_result_dict(result, result_image), "clipIds": game_clip_ids,
+            })
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
 
-    report_labels = migrate_labels(olds, [root / f"{cid}.json" for cid in clip_ids])
+    if not clip_ids and old_paths:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise VodAnalyzeError("다시 만들었지만 이 영상에서 클립을 찾지 못했습니다. 기존 클립을 그대로 둡니다")
+
+    report_labels = migrate_labels(olds, [staging / f"{cid}.json" for cid in clip_ids])
+
+    archive_dir = archive_dir_for(root)
+    for meta_path in old_paths:
+        delete_clip(meta_path, mode=cfg.ui.delete_mode, archive_dir=archive_dir)
+    _move_staged_tree(staging, root)
+
     index.update(
         games=games, clips=clip_ids,
         labelsMigrated=report_labels["migrated"], labelConflicts=report_labels["conflicts"],

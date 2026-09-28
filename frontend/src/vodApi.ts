@@ -52,16 +52,8 @@ export async function cancelAnalysis(id: string): Promise<void> {
   await jsonOrThrow(await send(`${BASE}/vods/${id}/analyze/cancel`, 'POST'), '분석 취소')
 }
 
-export async function trashVodClips(id: string): Promise<number> {
-  return (await jsonOrThrow<{ count: number }>(await send(`${BASE}/vods/${id}/trash`, 'POST'), '삭제')).count
-}
-
-export async function restoreVodClips(id: string): Promise<number> {
-  return (await jsonOrThrow<{ count: number }>(await send(`${BASE}/vods/${id}/restore`, 'POST'), '복구')).count
-}
-
-export async function deleteVodClipsForever(id: string): Promise<number> {
-  return (await jsonOrThrow<{ count: number }>(await send(`${BASE}/vods/${id}/clips`, 'DELETE'), '완전 삭제')).count
+export async function deleteVodClips(id: string): Promise<number> {
+  return (await jsonOrThrow<{ count: number }>(await send(`${BASE}/vods/${id}/clips`, 'DELETE'), '삭제')).count
 }
 
 export async function pickVideoFiles(initial = ''): Promise<string[]> {
