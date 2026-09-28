@@ -3,14 +3,14 @@ import { useTuningUi } from '../appInfo'
 import { ClipId } from './ClipId'
 import { ClipVideo } from './ClipVideo'
 import { SIGNAL_LABELS } from '../labels'
-import { applyLabel, labelForKey, nextUnlabeledIndex, progress } from '../labeling'
+import { labelForKey, progress } from '../labeling'
 import type { Clip, UserLabel } from '../types'
 import { loadVolume, saveVolume } from '../volume'
 import { useLabelingUi } from '../labelingContext'
 import { LabelButtons } from './LabelButtons'
 import { LabelNoteInput } from './LabelNoteInput'
 import { LabelingHelp } from './LabelingHelp'
-import { playerWidthCss, shouldAutoAdvance, showEvidence } from '../playerLayout'
+import { playerWidthCss, showEvidence } from '../playerLayout'
 import { ScoreChip } from './ScoreChip'
 import { TagBadge } from './TagBadge'
 import type { TrimRange } from '../trimming'
@@ -76,13 +76,10 @@ export function PlayerModal({
       const label = labelForKey(e.key)
       if (label === undefined) return
       onLabel(clip, label)
-      if (label === null || !shouldAutoAdvance({ tuning })) return
-      const next = nextUnlabeledIndex(applyLabel(clips, clip.id, label), index)
-      if (next !== null) onIndexChange(next)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [clips, clip, index, paused, trimming, labeling, tuning, onClose, onIndexChange, onLabel])
+  }, [clip, paused, trimming, labeling, onClose, onLabel])
 
   const startRename = () => {
     setDraftTitle(clip.title)
@@ -257,12 +254,7 @@ export function PlayerModal({
             {labeling && (
               <LabelButtons
                 value={clip.userLabel}
-                onChange={(l) => {
-                  onLabel(clip, l)
-                  if (l === null || !shouldAutoAdvance({ tuning })) return
-                  const next = nextUnlabeledIndex(applyLabel(clips, clip.id, l), index)
-                  if (next !== null) onIndexChange(next)
-                }}
+                onChange={(l) => onLabel(clip, l)}
                 showKeys
                 size="lg"
               />

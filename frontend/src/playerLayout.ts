@@ -7,6 +7,4 @@ export function playerWidthCss(o: { labeling: boolean; trimming: boolean }): str
   return `min(97vw, calc((100vh - ${reserve}rem) * 1.7778))`
 }
 
-export const shouldAutoAdvance = (o: { tuning: boolean }): boolean => o.tuning
-
 export const showEvidence = (o: { tuning: boolean; labeling: boolean }): boolean => o.tuning || o.labeling

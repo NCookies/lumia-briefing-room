@@ -24,14 +24,6 @@ export function applyNote<T extends { id: string }>(clips: T[], id: string, note
   return clips.map((c) => (c.id === id ? { ...c, labelNote: note } : c))
 }
 
-export function nextUnlabeledIndex(clips: { userLabel: UserLabel }[], from: number): number | null {
-  for (let step = 1; step <= clips.length; step++) {
-    const i = (from + step) % clips.length
-    if (clips[i].userLabel === null) return i
-  }
-  return null
-}
-
 export function progress(clips: { userLabel: UserLabel }[]): { labeled: number; total: number } {
   return { labeled: clips.filter((c) => c.userLabel !== null).length, total: clips.length }
 }

@@ -5,7 +5,6 @@ import {
   applyNote,
   applyLabel,
   labelForKey,
-  nextUnlabeledIndex,
   progress,
   scorePercent,
   scoreTone,
@@ -38,24 +37,6 @@ test('applyLabel changes only the matching clip and does not mutate', () => {
 
 test('applyLabel can clear a label', () => {
   assert.deepEqual(applyLabel([clip('a', 'pve')], 'a', null), [{ ...clip('a'), labelNote: null }])
-})
-
-test('nextUnlabeledIndex finds the next unlabeled clip after the current one', () => {
-  const clips = [clip('a'), clip('b', 'pvp'), clip('c'), clip('d')]
-
-  assert.equal(nextUnlabeledIndex(clips, 0), 2)
-  assert.equal(nextUnlabeledIndex(clips, 2), 3)
-})
-
-test('nextUnlabeledIndex wraps around to earlier unlabeled clips', () => {
-  const clips = [clip('a'), clip('b', 'pvp'), clip('c', 'pve')]
-
-  assert.equal(nextUnlabeledIndex(clips, 2), 0)
-})
-
-test('nextUnlabeledIndex returns null when everything is labeled', () => {
-  assert.equal(nextUnlabeledIndex([clip('a', 'pvp'), clip('b', 'pve')], 0), null)
-  assert.equal(nextUnlabeledIndex([], 0), null)
 })
 
 test('progress counts labeled clips', () => {
