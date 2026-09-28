@@ -106,7 +106,7 @@ def make_process_window(
     cfg: Config,
     ffmpeg_path: Path,
     *,
-    game_mode: str,
+    game_mode: str | None = None,
     k_templates: dict | None,
     a_templates: dict | None,
     hwaccel: str | None,

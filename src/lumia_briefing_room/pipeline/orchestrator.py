@@ -35,20 +35,42 @@ def default_title(
     region: str | None = None,
     game_day: int | None = None,
     characters: list[str] | None = None,
+    cobalt_phase: int | None = None,
+    clip_index: int | None = None,
 ) -> str:
     """SPEC §7.7 titleTemplate 의 축소판.
 
     일차/캐릭터 인식이 아직 없어(plan.md §8-5, v2 후보) 낮/밤과 지역만 반영한다.
+
+    코발트 프로토콜은 낮/밤·일차 개념이 없어 `game_day`/`day_night` 가 항상 `None` 이라
+    "알 수 없음 교전"이 됐다(실사용 보고, 2026-09-28) - 대신 이미 읽고 있는 Phase 번호를
+    붙인다. `game_day` 가 있으면(배틀로얄) 그쪽을 우선한다 - 두 모드는 겹치지 않는다.
+
+    `day_night` 는 프레임마다 모드와 무관하게 항상 읽는다(§2.7) - 코발트 화면에서
+    우연히 뭔가 읽혀도("Phase 3 낮 교전" 실사용 보고, 2026-09-28) 코발트엔 낮/밤 자체가
+    없으므로 `cobalt_phase` 가 있으면 절대 안 보여준다.
+
+    §10-13 이후 코발트 한 게임에 클립이 여러 개(목숨마다 하나) 생기는데, 같은 Phase 에서
+    두 번 죽으면 제목이 겹친다 - `clip_index`(그 게임 안에서 이 클립이 몇 번째인지)를
+    주면 뒤에 "- N" 을 붙여 구분한다(사용자 요청, 2026-09-28).
     """
     parts = []
     if game_day is not None:
         parts.append(f"{game_day}일차")
-    parts.append(_DAY_NIGHT_KR.get(day_night, "알 수 없음"))
+        parts.append(_DAY_NIGHT_KR.get(day_night, "알 수 없음"))
+    elif cobalt_phase is not None:
+        parts.append(f"Phase {cobalt_phase}")
+    else:
+        parts.append(_DAY_NIGHT_KR.get(day_night, "알 수 없음"))
     if region:
         parts.append(region)
     parts.append("교전")
     title = " ".join(parts)
-    return f"{title} · {', '.join(characters)}" if characters else title
+    if characters:
+        title = f"{title} · {', '.join(characters)}"
+    if cobalt_phase is not None and clip_index is not None:
+        title = f"{title} - {clip_index}"
+    return title
 
 
 def _mean_of_known(values: list[float | None]) -> float | None:
@@ -83,6 +105,7 @@ def _aggregate_interval(intervals: list[CombatInterval]) -> CombatInterval:
         enemy_ring_mean=_mean_of_known([iv.enemy_ring_mean for iv in intervals]),
         ultimate_delta=_max_of_known([iv.ultimate_delta for iv in intervals]),
         team_combat_unreliable=any(iv.team_combat_unreliable for iv in intervals),
+        cobalt_phase=next((iv.cobalt_phase for iv in intervals if iv.cobalt_phase is not None), None),
     )
 
 
@@ -92,13 +115,24 @@ class ClipPlan:
     intervals: list[CombatInterval]
 
 
-def _plan_clips(intervals: list[CombatInterval], cfg: ClipConfig) -> list[ClipPlan]:
+def next_phase_clip_index(counts: dict[int | None, int], cobalt_phase: int | None) -> int:
+    """코발트 클립 제목의 "- N"은 게임 전체가 아니라 같은 Phase 안에서 몇 번째인지다.
+
+    (사용자 보고, 2026-09-28 - "Phase 2 교전 - 3"처럼 게임 전체 순번이 붙어 있었다.)
+    `counts` 는 호출자가 게임 하나 동안 들고 있는 누적 카운터이며, Phase 값이 바뀌면
+    그 Phase 는 다시 1부터 시작한다.
+    """
+    counts[cobalt_phase] = counts.get(cobalt_phase, 0) + 1
+    return counts[cobalt_phase]
+
+
+def _plan_clips(intervals: list[CombatInterval], cfg: ClipConfig, *, game_mode: str = "battle_royale") -> list[ClipPlan]:
     """SPEC §3: 교전마다 구간을 정하고, 겹치거나 mergeGapSec 이내면 하나로 합친다."""
     if not intervals:
         return []
 
     pairs = sorted(
-        ((resolve_clip_range(iv, cfg), iv) for iv in intervals),
+        ((resolve_clip_range(iv, cfg, game_mode=game_mode), iv) for iv in intervals),
         key=lambda pair: pair[0].start,
     )
 
@@ -173,7 +207,7 @@ def process_match(
     cfg: Config,
     *,
     ffmpeg_path: Path,
-    game_mode: str = "battle_royale",
+    game_mode: str | None = None,
     k_templates: dict[int, np.ndarray] | None = None,
     a_templates: dict[int, np.ndarray] | None = None,
     clips_dir: Path | None = None,
@@ -184,6 +218,9 @@ def process_match(
 ) -> list[Path]:
     """SPEC §3 다이어그램 전체: 매치 하나를 검출부터 메타데이터 저장까지 처리한다.
 
+    `game_mode` 를 안 주면(기본) 검출 결과(`Phase N` vs `N일 차` 판독 횟수, plan.md §10
+    C1-b)로 자동 판별한다. 명시하면(CLI `--game-mode` 등) 그 값을 그대로 쓴다.
+
     반환값은 만들어진 메타데이터 JSON 경로 목록이다(클립 0개면 빈 리스트).
     """
     seg_range = segment_time_range(session, match_start, match_end)
@@ -191,6 +228,7 @@ def process_match(
         session, seg_range, ffmpeg_path=ffmpeg_path,
         k_templates=k_templates, a_templates=a_templates, hwaccel=hwaccel, cancel=cancel,
     )
+    game_mode = game_mode if game_mode is not None else detection.game_mode
 
     filtered = apply_filter(detection.intervals, cfg.filter, game_mode=game_mode)
     if not filtered:
@@ -201,15 +239,17 @@ def process_match(
     clips_root.mkdir(parents=True, exist_ok=True)
     resolved.temp.mkdir(parents=True, exist_ok=True)
 
-    plans = _plan_clips(filtered, cfg.clip)
+    plans = _plan_clips(filtered, cfg.clip, game_mode=game_mode)
     result = _read_result(session, seg_range, ffmpeg_path, hwaccel, search_from=result_search_from)
     if result is not None and on_result is not None:
         on_result(result)
     result_image_path = _save_result_image(result, thumbnails_root / result_image_name(match_start), clips_root)
 
     written: list[Path] = []
+    phase_clip_counts: dict[int | None, int] = {}
     for i, plan in enumerate(plans, start=1):
         aggregated = _aggregate_interval(plan.intervals)
+        phase_clip_index = next_phase_clip_index(phase_clip_counts, aggregated.cobalt_phase)
         clip_id = f"{match_start:%Y%m%d_%H%M%S}_{i:02d}"
         clip_path = clips_root / f"{clip_id}.mp4"
 
@@ -232,7 +272,10 @@ def process_match(
             thumbnail_rel = stored_asset_path(thumb_path, clips_root)
 
         meta = build_metadata(
-            title=default_title(aggregated.day_night, aggregated.region, aggregated.game_day, _characters(result)),
+            title=default_title(
+                aggregated.day_night, aggregated.region, aggregated.game_day, _characters(result),
+                cobalt_phase=aggregated.cobalt_phase, clip_index=phase_clip_index,
+            ),
             game_day=aggregated.game_day,
             pvp=score_interval(aggregated, cfg.filter.pvp_weights),
             session=session,

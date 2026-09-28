@@ -146,7 +146,7 @@ def register_backfill_routes(app: FastAPI, *, current_config: Callable[[], Confi
             try:
                 scanner = SteamSessionScanner(root, ffmpeg, state_dir=state_dir, hwaccel=cfg.vod.hwaccel)
                 process = make_process_window(
-                    cfg, ffmpeg, game_mode="battle_royale", k_templates=None, a_templates=None,
+                    cfg, ffmpeg, k_templates=None, a_templates=None,
                     hwaccel=cfg.vod.hwaccel, config_path=app.state.config_path,
                 )
                 known = collect_known_starts(clips_dir) + collect_log_starts(cfg)

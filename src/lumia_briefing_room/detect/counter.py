@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+import cv2
 import numpy as np
 
 from lumia_briefing_room.detect.glyph import similarity
@@ -11,6 +12,7 @@ MIN_SCORE = 0.5
 MIN_MARGIN = 0.05
 NMS_RADIUS = 8
 CONFIRM_SAMPLES = 2
+LOCATE_MIN_SCORE = 0.6
 
 
 @dataclass(frozen=True)
@@ -83,6 +85,35 @@ def read_field(
     digits = "".join(str(best_digit[x]) for x in peaks)
     confidence = float(np.clip(min(best_score[x] for x in peaks), 0.0, 1.0))
     return ReadResult(value=int(digits), confidence=confidence)
+
+
+def locate_digit(
+    score: np.ndarray,
+    templates: dict[int, np.ndarray],
+    *,
+    min_score: float = LOCATE_MIN_SCORE,
+) -> tuple[int, int, int, float] | None:
+    """숫자 본보기 하나를 넓은 영역(score) 안 아무 데서나 찾는다. (plan.md §10-13)
+
+    read_field 는 ROI 폭이 본보기 폭과 같아야 한다(칸 위치를 이미 안다고 가정) - 이 함수는
+    위치를 몰라서 넓게 뒤져야 할 때 쓴다(예: 실측해 둔 자리가 이 영상에서는 안 맞을 때
+    자동으로 실제 위치를 찾는 용도, calibrate_counter_position 이 호출한다). 자릿수 조합은
+    안 보고 낱자 하나만 찾는다 - 위치를 찾는 게 목적이라 어떤 숫자든 상관없다.
+    """
+    best: tuple[float, int, int, int] | None = None
+    for digit, template in templates.items():
+        th, tw = template.shape
+        if score.shape[0] < th or score.shape[1] < tw:
+            continue
+        corr = cv2.matchTemplate(score.astype(np.float32), template.astype(np.float32), cv2.TM_CCOEFF_NORMED)
+        y, x = np.unravel_index(int(np.argmax(corr)), corr.shape)
+        s = float(corr[y, x])
+        if best is None or s > best[0]:
+            best = (s, x, y, digit)
+    if best is None or best[0] < min_score:
+        return None
+    s, x, y, digit = best
+    return x, y, digit, s
 
 
 TWO_DIGIT_SHIFT = 6

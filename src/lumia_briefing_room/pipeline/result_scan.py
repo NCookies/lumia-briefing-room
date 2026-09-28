@@ -13,11 +13,12 @@ from PIL import Image
 from lumia_briefing_room.detect.character import load_characters
 from lumia_briefing_room.detect.day import read_game_day
 from lumia_briefing_room.detect.ocr import OcrReader, TextReader
+from lumia_briefing_room.detect.phase import read_cobalt_phase
 from lumia_briefing_room.detect.region import load_region_templates
 from lumia_briefing_room.detect.result import ResultScreen, read_result_screen
 from lumia_briefing_room.detect.scoreboard import BoardRow, find_team, read_scoreboard, recover_character
 from lumia_briefing_room.profiles.models import ResolutionProfile
-from lumia_briefing_room.video.frames import crop_roi, extract_keyframe_frames
+from lumia_briefing_room.video.frames import extract_keyframe_frames
 from lumia_briefing_room.video.segments import SegmentRange, existing_segment_numbers
 from lumia_briefing_room.video.session import RecordingSession
 
@@ -166,6 +167,29 @@ def scan_window(seg_range: SegmentRange) -> tuple[int, int]:
     return max(seg_range.first, last - MAX_SCAN_FRAMES + 1), last
 
 
+def make_is_ingame(
+    profile: ResolutionProfile,
+    day_templates: dict | None,
+    phase_templates: dict | None = None,
+) -> Callable[[np.ndarray], bool]:
+    """plan.md §10 C2/C3: 배틀로얄은 일차, 코발트는 `Phase N` 이 읽히면 아직 게임 안이다.
+
+    어느 모드인지 미리 알 필요 없이 `or` 로 합친다 - 실제 경기에서는 둘 중 하나만 읽힌다.
+    """
+    def is_ingame(frame: np.ndarray) -> bool:
+        """`profile.crop()` 을 쓴다(`crop_roi` 아님) - 다시보기 1080p 프로필은 일차 ROI 가
+        기준 해상도로 정규화돼야 본보기와 크기가 맞는다(§10-2, `phase_digit` 는 정규화가 없어
+        둘 다 써도 결과가 같다).
+        """
+        if day_templates and read_game_day(profile.crop(frame, "day_digit"), day_templates) is not None:
+            return True
+        if phase_templates and "phase_digit" in profile.rois:
+            return read_cobalt_phase(profile.crop(frame, "phase_digit"), phase_templates) is not None
+        return False
+
+    return is_ingame
+
+
 def find_result_screen(
     session: RecordingSession,
     seg_range: SegmentRange,
@@ -178,6 +202,7 @@ def find_result_screen(
     profile = profile or ResolutionProfile.for_resolution(session.width, session.height)
     reader = reader or get_reader()
     day_templates = load_region_templates(profile.day_templates) if profile.day_templates else None
+    phase_templates = load_region_templates(profile.phase_templates) if profile.phase_templates else None
 
     tail_first, tail_last = scan_window(seg_range)
     numbers = existing_segment_numbers(session, 0, tail_first, tail_last)
@@ -185,17 +210,12 @@ def find_result_screen(
         session, stream=0, segment_numbers=numbers, ffmpeg_path=ffmpeg_path, hwaccel=hwaccel
     )
 
-    def is_ingame(frame: np.ndarray) -> bool:
-        if day_templates is None:
-            return False
-        return read_game_day(crop_roi(frame, profile.rois["day_digit"]), day_templates) is not None
-
     read_board, recover = _board_reader(profile, reader)
     return attach_board(
         scan_for_result(
             frames,
             lambda f: read_result_screen(f, profile, reader),
-            is_ingame=is_ingame,
+            is_ingame=make_is_ingame(profile, day_templates, phase_templates),
             read_board=read_board,
         ),
         recover=recover,
@@ -234,6 +254,7 @@ def find_result_after(
     profile = profile or ResolutionProfile.for_resolution(session.width, session.height)
     reader = reader or get_reader()
     day_templates = load_region_templates(profile.day_templates) if profile.day_templates else None
+    phase_templates = load_region_templates(profile.phase_templates) if profile.phase_templates else None
 
     window_end = after_segment + FORWARD_BATCH * FORWARD_MAX_BATCHES
     numbers = contiguous_segments(
@@ -251,11 +272,7 @@ def find_result_after(
                 )
             )
 
-    def is_ingame(frame: np.ndarray) -> bool:
-        if day_templates is None:
-            return False
-        return read_game_day(crop_roi(frame, profile.rois["day_digit"]), day_templates) is not None
-
+    is_ingame = make_is_ingame(profile, day_templates, phase_templates)
     read_board, recover = _board_reader(profile, reader)
     return attach_board(
         scan_forward_for_result(

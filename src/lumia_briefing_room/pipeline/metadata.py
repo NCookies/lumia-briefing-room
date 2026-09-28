@@ -62,6 +62,7 @@ class ClipMetadata:
     label_conflict: bool
     game_day: int | None
     day_night: str | None
+    cobalt_phase: int | None
     phase_index: int | None
     revive_cost: str | None
     my_character: str | None
@@ -161,6 +162,7 @@ def build_metadata(
         label_conflict=False,
         game_day=game_day,
         day_night=day_night,
+        cobalt_phase=interval.cobalt_phase,
         phase_index=phase,
         revive_cost=revive_cost(phase) if phase is not None else None,
         my_character=my_character or (match_result.character if match_result else None),

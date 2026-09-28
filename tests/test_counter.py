@@ -5,6 +5,7 @@ from lumia_briefing_room.detect.counter import (
     CounterEvent,
     ReadResult,
     final_confirmed_value,
+    locate_digit,
     read_field,
     to_events,
 )
@@ -76,6 +77,39 @@ def test_read_field_returns_none_without_templates():
     result = read_field(score, {}, max_digits=2)
     assert result.value is None
     assert result.confidence == 0.0
+
+
+def test_locate_digit_finds_a_digit_anywhere_in_a_wide_search_area(render_digit, compose):
+    """read_field 는 ROI 폭이 본보기 폭과 같아야 한다(위치를 안다고 가정) - locate_digit
+    은 위치를 모를 때 넓은 영역 아무 데서나 찾는다(plan.md §10-13, 자동 위치 보정용)."""
+    templates = _build_digit_templates(render_digit, compose)
+    digit_h, digit_w = templates[7].shape
+    wide = np.full((digit_h + 20, 300, 3), 70, dtype=np.uint8)
+    patch = compose(render_digit(7), (60, 40, 90))
+    x, y = 150, 12
+    wide[y : y + digit_h, x : x + digit_w] = patch
+
+    result = locate_digit(text_score(wide), templates, min_score=0.5)
+
+    assert result is not None
+    found_x, found_y, digit, score = result
+    assert digit == 7
+    assert abs(found_x - x) <= 1 and abs(found_y - y) <= 1
+    assert score > 0.5
+
+
+def test_locate_digit_returns_none_when_nothing_matches(render_digit, compose):
+    templates = _build_digit_templates(render_digit, compose)
+    blank = np.full((60, 200, 3), 70, dtype=np.uint8)
+
+    assert locate_digit(text_score(blank), templates, min_score=0.5) is None
+
+
+def test_locate_digit_returns_none_when_search_area_is_smaller_than_the_template(render_digit, compose):
+    templates = _build_digit_templates(render_digit, compose)
+    tiny = np.full((3, 3, 3), 70, dtype=np.uint8)
+
+    assert locate_digit(text_score(tiny), templates, min_score=0.5) is None
 
 
 def r(t: float, v: int | None) -> tuple[float, int | None]:

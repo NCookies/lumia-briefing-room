@@ -14,6 +14,7 @@ from lumia_briefing_room.config import Config, resolve_paths
 from lumia_briefing_room.detect.match import (
     analyze_frame,
     resolve_day_templates,
+    resolve_phase_templates,
     resolve_region_templates,
     resolve_templates,
     resolve_tk_templates,
@@ -31,6 +32,7 @@ from lumia_briefing_room.pipeline.orchestrator import (
     _plan_clips,
     _save_result_image,
     default_title,
+    next_phase_clip_index,
 )
 from lumia_briefing_room.pipeline.retention import trash_clip
 from lumia_briefing_room.pipeline.vod_clips import build_vod_metadata, cut_vod_clip, vod_clip_id
@@ -52,10 +54,26 @@ log = logging.getLogger(__name__)
 
 # 3: TK 판독 추가 + 배지 꺼진 뒤 트레일링 킬로 구간 끝 늘리기(2026-09-23) - 캐시된
 # FrameState 에는 tk 가 없어 이 로직이 못 살아나므로 캐시를 무효화해야 한다.
-ANALYSIS_VERSION = 3
+# 4: 코발트 프로토콜 지원(2026-09-27, plan.md §10) - `cobalt_phase` 판독 추가.
+# 이전 캐시는 phase_templates 를 아예 연결하지 않았을 때 만들어져 `cobalt_phase`
+# 가 전부 None 이라 `is_ingame()`/`infer_game_mode` 가 코발트 게임을 하나도 못
+# 찾는다(실사용 사고: 코발트 다시보기 1편이 games=0 으로 "분석 완료"돼 버렸다 -
+# 목록에서도 사라진다, `keptEmpty` 필터가 "분석 끝났는데 클립 0개"인 영상을 숨기므로).
+# 5: 코발트 TK/K/A HUD 위치 보정(2026-09-27, plan.md §10-3 후속) - 코발트는 같은
+# 스트리머의 배틀로얄 녹화 대비 TK/K/A 칸이 ~80px 왼쪽에 있다는 걸 실측으로 확인해
+# `analyze_frame`이 그 자리도 시도하도록 고쳤다. 이전 캐시는 그 자리를 아예 안 봐서
+# k/a/tk 가 전부 None 이라 교전 구간을 하나도 못 만든다(실사용 사고: 코발트 6게임
+# 전부 결과 화면은 읽혔는데 클립이 0개).
+ANALYSIS_VERSION = 5
 CHECKPOINT_FRAMES = 120
 PROGRESS_EVERY_FRAMES = 30
-DECODE_SHARE = 0.70
+# 진행률은 화면의 각 구간이 실제로 걸리는 시간에 비례해야 한다(2026-09-27 사용자 보고 -
+# "다시 분석"을 누르면 70%까지 순식간에 뛰었다가 나머지 30%는 한참 밍기적거려 기대하게
+# 만들지 말라는 피드백. 원인은 반대였다: 디코드(키프레임만 읽어 ~50배속, plan-vod.md)는
+# 제일 빠른 단계인데 막대의 70%를 차지했고, 실제로 시간이 제일 오래 걸리는 클립 컷
+# (ffmpeg 재인코딩 + 썸네일)은 나머지 20%에 몰려 있었다. 3시간18분/8게임/106클립 영상
+# 실측(plan-vod.md, 총 12분) 기준으로 디코드는 전체의 일부일 뿐이고 컷이 대부분을 먹는다.
+DECODE_SHARE = 0.15
 GAMES_SHARE = 0.10
 
 
@@ -87,11 +105,12 @@ def _default_reader(width: int, height: int) -> ReadFrame:
     tk = resolve_tk_templates(profile, k)
     regions = resolve_region_templates(profile)
     days = resolve_day_templates(profile)
+    phases = resolve_phase_templates(profile)
 
     def read(frame: np.ndarray, t: float) -> FrameState:
         return analyze_frame(
             frame, profile, t=t, k_templates=k, a_templates=a, tk_templates=tk,
-            region_templates=regions, day_templates=days,
+            region_templates=regions, day_templates=days, phase_templates=phases,
         )
 
     return read
@@ -287,19 +306,33 @@ def _make_clips(
     clip_ids: list[str] = []
     n = max(1, len(detections))
 
+    # 컷 단계 진행률을 게임 수가 아니라 클립 수에 비례하게 하려고 미리 계획을 전부
+    # 세운다(plan-backfill.md B8 - 클립이 몰린 게임 하나 처리하는 동안 막대가 멈춘 듯
+    # 보이던 문제, 2026-09-27). apply_filter/_plan_clips 는 이미 계산된 interval 을
+    # 훑을 뿐 I/O 가 없어 두 번 부르는 대신 여기서 한 번만 계산해 재사용한다.
+    plans_by_game = [
+        _plan_clips(
+            apply_filter(det.detection.intervals, cfg.filter, game_mode=det.detection.game_mode), cfg.clip,
+            game_mode=det.detection.game_mode,
+        )
+        for det in detections
+    ]
+    total_clips = max(1, sum(len(p) for p in plans_by_game))
+    base = DECODE_SHARE + GAMES_SHARE
+    clips_done = 0
+
     for i, det in enumerate(detections):
         if cancel is not None and cancel.is_set():
             raise VodCancelled()
         span = det.span
-        base = DECODE_SHARE + GAMES_SHARE
         report("games", DECODE_SHARE + GAMES_SHARE * i / n, f"게임 {span.index} 결과 화면", games=len(games), clips=len(clip_ids))
         next_start = spans[i + 1].start if i + 1 < len(spans) else None
         result = _safe_result(find_result, video_path, span, next_start)
         result_image = _save_result_image(result, thumbs / f"{vod}_g{span.index:02d}_result.jpg", root)
 
-        filtered = apply_filter(det.detection.intervals, cfg.filter, game_mode="battle_royale")
         game_clip_ids: list[str] = []
-        for plan in _plan_clips(filtered, cfg.clip):
+        phase_clip_counts: dict[int | None, int] = {}
+        for plan in plans_by_game[i]:
             if cancel is not None and cancel.is_set():
                 raise VodCancelled()
             rng = ClipRange(
@@ -308,10 +341,12 @@ def _make_clips(
                 preroll_source=plan.range.preroll_source,
             )
             aggregated = _aggregate_interval(plan.intervals)
+            phase_clip_index = next_phase_clip_index(phase_clip_counts, aggregated.cobalt_phase)
             clip_id = vod_clip_id(vod, span.index, rng.start)
             clip_path = root / f"{clip_id}.mp4"
-            report("cut", base + (1 - base) * i / n, f"게임 {span.index} 클립 {len(game_clip_ids) + 1}",
+            report("cut", base + (1 - base) * clips_done / total_clips, f"게임 {span.index} 클립 {len(game_clip_ids) + 1}",
                    games=len(games), clips=len(clip_ids))
+            clips_done += 1
             cut = cut_vod_clip(
                 video_path, rng, clip_path, ffmpeg_path=ffmpeg_path, include_audio=cfg.clip.include_audio
             )
@@ -328,8 +363,10 @@ def _make_clips(
                 title=default_title(
                     aggregated.day_night, aggregated.region, aggregated.game_day,
                     [result.character] if result is not None and result.character else [],
+                    cobalt_phase=aggregated.cobalt_phase, clip_index=phase_clip_index,
                 ),
                 vod_id=vod, vod_file=str(video_path), streamer=index.get("streamer"),
+                game_mode=det.detection.game_mode,
                 game_index=span.index, game_start=span.start, game_end=span.end,
                 width=info.width, height=info.height, interval=aggregated, clip_range=rng,
                 duration_sec=cut.duration_sec, thumbnail_path=thumb_rel,
@@ -347,6 +384,7 @@ def _make_clips(
             "index": span.index, "startSec": span.start, "endSec": span.end,
             "confidence": span.confidence,
             "kFinal": det.detection.k_final, "aFinal": det.detection.a_final,
+            "gameMode": det.detection.game_mode,
             "result": match_result_dict(result, result_image), "clipIds": game_clip_ids,
         })
 

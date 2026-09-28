@@ -12,8 +12,12 @@ def characters_of(meta: dict) -> list[str]:
 
 
 def _bases(meta: dict) -> set[str]:
-    day_night, region = meta.get("dayNight"), meta.get("region")
-    return {default_title(day_night, region), default_title(day_night, region, meta.get("gameDay"))}
+    day_night, region, cobalt_phase = meta.get("dayNight"), meta.get("region"), meta.get("cobaltPhase")
+    return {
+        default_title(day_night, region),
+        default_title(day_night, region, meta.get("gameDay")),
+        default_title(day_night, region, cobalt_phase=cobalt_phase),
+    }
 
 
 def is_auto_title(meta: dict) -> bool:
@@ -24,5 +28,8 @@ def is_auto_title(meta: dict) -> bool:
 def retitle(meta: dict) -> dict:
     if not is_auto_title(meta):
         return meta
-    title = default_title(meta.get("dayNight"), meta.get("region"), meta.get("gameDay"), characters_of(meta))
+    title = default_title(
+        meta.get("dayNight"), meta.get("region"), meta.get("gameDay"), characters_of(meta),
+        cobalt_phase=meta.get("cobaltPhase"),
+    )
     return {**meta, "title": title}

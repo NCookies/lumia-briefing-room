@@ -22,7 +22,7 @@ class ClipRange:
     preroll_source: str  # "combat" — SPEC §3 클립 메타데이터의 prerollSource
 
 
-def resolve_clip_range(interval: CombatInterval, cfg: ClipConfig) -> ClipRange:
+def resolve_clip_range(interval: CombatInterval, cfg: ClipConfig, *, game_mode: str = "battle_royale") -> ClipRange:
     """SPEC §3 클립 구간: 교전 시작 -preroll ~ 교전 종료 +postroll. 길이 상한은 두지 않는다.
 
     이어지는 교전은 끝까지 한 클립에 담는다(2026-09-24 실사용: 90초 상한이 126초 교전의 추격 장면을
@@ -34,7 +34,15 @@ def resolve_clip_range(interval: CombatInterval, cfg: ClipConfig) -> ClipRange:
     팀원 전투 신호가 그 구멍을 메워준다(§2.7) - 그 신호 자체가 못 쓰게 된 상태라 놓칠 폭이
     더 크다(2026-09-23 실사용: 팀원 캐릭터(데비&마를렌)의 빨간 머리 초상화가 "전투 중" 링
     판정을 매치 내내 오탐시켜, 80초 넘게 이어진 마지막 교전의 도입부가 통째로 잘렸다).
+
+    코발트는 구간 경계 자체가 이미 "부활 직후~사망 직후"라(§10-13) preroll/postroll 을
+    더하면 죽어있는 화면을 다시 끌어들인다. 게다가 사망~부활 간격(실측 15~21초)이
+    preroll+postroll(기본 5+8=13초)을 빼고 나면 mergeGapSec(기본 10초) 밑으로 내려가
+    바로 옆 구간과 다시 합쳐져 게임 전체가 클립 하나로 뭉쳐버렸다(2026-09-28 실사용
+    보고) - 그래서 preroll/postroll 을 아예 안 더한다.
     """
+    if game_mode == "cobalt":
+        return ClipRange(start=interval.start, end=interval.end, preroll_source="combat")
     preroll = cfg.fixed_preroll_sec if interval.team_combat_unreliable else cfg.preroll_sec
     source = "fixed" if interval.team_combat_unreliable else "combat"
     start = max(0.0, interval.start - preroll)

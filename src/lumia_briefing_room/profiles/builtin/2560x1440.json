@@ -27,6 +27,12 @@
     "result_character": [1470, 420, 1600, 830],
     "scoreboard_panel": [40, 100, 520, 700],
     "scoreboard_names": [800, 200, 1300, 1260],
-    "scoreboard_ranks": [480, 200, 640, 1260]
+    "scoreboard_ranks": [480, 200, 640, 1260],
+    "phase_digit": [1290, 3, 1325, 28],
+    "cobalt_result_panel": [150, 595, 655, 965],
+    "cobalt_outcome": [185, 680, 295, 745],
+    "cobalt_teammate1": [1465, 970, 1755, 1105],
+    "cobalt_teammate2": [1770, 970, 2065, 1105],
+    "cobalt_teammate3": [2080, 970, 2375, 1105]
   }
 }

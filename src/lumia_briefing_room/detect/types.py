@@ -29,6 +29,7 @@ class FrameState:
     ultimate_blue: float | None = None
     ultimate_locked: bool | None = None
     tk: int | None = None
+    cobalt_phase: int | None = None
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,7 @@ class CombatInterval:
     game_day: int | None = None
     ultimate_delta: float | None = None
     team_combat_unreliable: bool = False
+    cobalt_phase: int | None = None
 
 
 @dataclass(frozen=True)
@@ -58,3 +60,4 @@ class MatchDetection:
     source_incomplete: bool
     spectator_ranges: list[tuple[float, float]] = field(default_factory=list)
     teammate_deaths: list[tuple[float, int]] = field(default_factory=list)
+    game_mode: str = "battle_royale"

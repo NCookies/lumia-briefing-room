@@ -80,7 +80,10 @@ def parse_stats(lines: list[TextLine]) -> dict:
             and abs(l.x - label.x) <= STAT_COLUMN_TOLERANCE
         ]
         if candidates:
-            nearest = min(candidates, key=lambda l: (l.y - label.y, abs(l.x - label.x)))
+            # 열(x)이 먼저다 - 위 docstring대로. 행 간격(y)을 먼저 보면 다른 열의 값이
+            # 우연히 한 행 더 가까울 때 잘못 짝지어진다(코발트 팀원 카드처럼 열 간격이
+            # 좁으면 실제로 벌어진다, plan.md §10 C3 실측).
+            nearest = min(candidates, key=lambda l: (abs(l.x - label.x), l.y - label.y))
             stats[STAT_LABELS[text]] = int(nearest.text.strip())
     return stats
 
