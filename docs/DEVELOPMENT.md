@@ -199,7 +199,11 @@ python -m lumia_briefing_room.cli.detect_match \
 
 **영상 저장(내보내기)**: 카드/플레이어의 "저장" 버튼 → "폴더 선택…" 으로 윈도우 탐색기 창을 띄워 폴더를 골라(새 폴더 만들기도 그 창에서) 파일 이름과 함께 복사한다. 같은 이름이 있으면 `(2)` 를 붙여 덮어쓰지 않는다. 마지막에 저장한 폴더가 `paths.exportDefault` 로 기억돼 다음 저장 창의 시작 위치가 된다. 헤더의 "⚙ 옵션" 에서 이 기본 폴더를 직접 바꿀 수 있다. 실행 방법은 그대로다(프론트를 고쳤으면 `npm run build`).
 
-**게임 결과(순위·랭크 여부)**: 경기가 끝날 때 나오는 결과 화면(`4/7 실험 종료`)을 OCR 로 읽어 클립 메타데이터의 `matchResult`(`matchType` rank/normal, `placement`, `total`, `outcome`, `nickname`)에 넣고, 게임 행에 `#4 랭크 … 13 / 3 / 6` 으로 표시한다. 원본 녹화가 남아 있는 새 경기부터 채워진다. 이미 저장된 클립은 영상에 결과 화면이 없어서, 원본이 아직 남은 경기만 `python tools/backfill_result.py [clips_dir] [--recording-root DIR] [--force]` 로 채운다(게임별로 마지막 클립 뒤에서 원본을 훑어 첫 결과 화면을 읽는다. 링버퍼가 지운 경기는 건너뛴다). 결과 화면은 1280px JPEG 로 `clips/.thumbs/<경기시작>_result.jpg` 에 저장돼 게임 섹션의 첫 칸에 썸네일처럼 보이고(클릭하면 크게), 이미 저장된 경기는 `backfill_result.py` 가 같이 만든다. 내 캐릭터는 결과 화면 오른쪽 세로 영문 이름을 읽어 `data/characters.json`(영문→한글, 없는 이름은 여기에 추가)으로 한글 이름을 찾는다. 닉네임은 첫 결과 화면에서 자동으로 읽어 설정에 저장하고(비어 있을 때만), 헤더 "⚙ 옵션" 에서 직접 고칠 수 있다.
+**게임 결과(순위·랭크 여부)**: 경기가 끝날 때 나오는 결과 화면(`4/7 실험 종료`)을 OCR 로 읽어 클립 메타데이터의 `matchResult`(`matchType` rank/normal, `placement`, `total`, `outcome`, `nickname`)에 넣고, 게임 행에 `#4 랭크 … 13 / 3 / 6` 으로 표시한다. 원본 녹화가 남아 있는 새 경기부터 채워진다. 이미 저장된 클립은 영상에 결과 화면이 없어서, 원본이 아직 남은 경기만 `python tools/backfill_result.py [clips_dir] [--recording-root DIR] [--force]` 로 채운다(게임별로 마지막 클립 뒤에서 원본을 훑어 첫 결과 화면을 읽는다. 링버퍼가 지운 경기는 건너뛴다. `matchResultSource="manual"` 로 잠근 게임은 건너뛴다 — 아래 "판독값 수동 보정"). 결과 화면은 1280px JPEG 로 `clips/.thumbs/<경기시작>_result.jpg` 에 저장돼 게임 섹션의 첫 칸에 썸네일처럼 보이고(클릭하면 크게), 이미 저장된 경기는 `backfill_result.py` 가 같이 만든다. 닉네임은 첫 결과 화면에서 자동으로 읽어 설정에 저장하고(비어 있을 때만), 헤더 "⚙ 옵션" 에서 직접 고칠 수 있다. 캐릭터 이름은 더 이상 OCR 로 읽지 않는다(아래 "캐릭터 표시(초상화)").
+
+**판독값 수동 보정**: 게임 행의 순위 배지 옆 `✎` 를 누르면 순위·결과 문구를 직접 고칠 수 있다. 저장하면 그 게임의 모든 클립에 `matchResultSource="manual"` 이 붙어 `backfill_result.py`·다시 분석(`pipeline/reprocess.py`)이 값을 덮어쓰지 않는다(다시 분석해도 잠긴 값이 새 클립으로 그대로 옮겨진다). 잠금 해제(🔒 옆 버튼)를 누르면 값은 남긴 채 잠금만 풀려 다음 자동 판독이 다시 채울 수 있다. `PATCH /api/clips/{id}` 가 `matchResult`(`placement`/`outcome` 만)·`matchResultSource` 를 받는다.
+
+**캐릭터 표시(초상화)**: 내 캐릭터·팀원 2명은 이름을 읽지 않고 경기 시작 직후 팀 소개 화면(체력바가 아직 없는 화면)의 초상화를 그대로 크롭해 게임 행에 3장 나란히 보여준다(`detect/portrait.py`, `pipeline/portrait_scan.py`, `GET /api/clips/{id}/character-portrait/{me|teammate1|teammate2}`). 캐릭터 식별이 없어 실패할 여지가 없지만, **이 변경 이전에 만든 클립은 소급으로 채워지지 않는다** — 새로 처리되는 경기부터만 초상화가 생긴다.
 
 **기준: 클립에 사람과의 교전이 *포함*되어 있으면 "교전".** 사냥하다 교전하거나, 교전 뒤에 야생동물·오브젝트(알파/오메가/위클라인)를 잡는 클립도 교전이다.
 야생동물·보스만 상대했으면 "사냥", 판단이 안 되면 안 찍고 넘어간다. 자세한 표는 [plan-pvp.md §4-0](plan-pvp.md).
@@ -252,7 +256,7 @@ python tools/fetch_ffmpeg.py      # 최초 1회: LGPL ffmpeg 를 vendor/ffmpeg �
 - `vendor/ffmpeg` 가 생기면 **개발 환경의 `discover_ffmpeg()` 도 그 LGPL 빌드를 먼저 고른다.**
   테스트만은 `tests/conftest.py` 가 PATH 의 전체 빌드를 쓰도록 되돌린다(합성 녹화 픽스처에 libx264 가 필요하다).
 
-**빌드본 점검**: 빌드가 끝나면 아래로 번들이 제대로 묶였는지 확인한다(본보기 npz·characters.json·프론트 dist·
+**빌드본 점검**: 빌드가 끝나면 아래로 번들이 제대로 묶였는지 확인한다(본보기 npz·프론트 dist·
 ffmpeg/ffprobe·H.264 인코더·OCR 엔진 로드). 콘솔이 없는 빌드라 보고서는
 `%LOCALAPPDATA%\LumiaBriefingRoom\logs\selftest.txt` 에 남고 자동으로 열린다(`--quiet` 면 안 연다).
 
