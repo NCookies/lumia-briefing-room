@@ -11,6 +11,7 @@ from lumia_briefing_room.api.app import create_app
 from lumia_briefing_room.config import Config, PathsConfig, load_config
 from lumia_briefing_room.pipeline.vod_analyze import VodCancelled, VodProgress
 from lumia_briefing_room.pipeline.vod_store import save_index, vod_id
+from lumia_briefing_room.video.vod import VideoInfo
 
 
 def write_video(path: Path, content: bytes = b"video-bytes" * 100) -> Path:
@@ -32,7 +33,7 @@ def write_vod_clip(root: Path, vid: str, game: int, start: int, **meta):
 @pytest.fixture
 def env(tmp_path, monkeypatch):
     monkeypatch.setattr(vods_module, "discover_ffmpeg", lambda: tmp_path / "ffmpeg.exe")
-    monkeypatch.setattr(vods_module, "_probe_duration", lambda path, ffmpeg: None)
+    monkeypatch.setattr(vods_module, "_probe_info", lambda path, ffmpeg: None)
     videos = tmp_path / "videos"
     a = write_video(videos / "a.mp4", b"A" * 3000)
     b = write_video(videos / "sub" / "b.mkv", b"B" * 4000)
@@ -143,6 +144,85 @@ def test_clearing_the_streamer_name_removes_it(env):
 
     assert resp.json()["streamer"] is None
     assert by_id(client.get("/api/vods"))[vid]["streamer"] is None
+
+
+def test_video_date_falls_back_to_file_mtime(env):
+    client, a, *_ = env
+    vid = vod_id(a)
+    import os
+    from datetime import datetime
+
+    mtime = datetime(2026, 9, 27, 15, 0).timestamp()
+    os.utime(a, (mtime, mtime))
+
+    entry = by_id(client.get("/api/vods"))[vid]
+
+    assert entry["videoDate"] == "2026-09-27"
+
+
+def test_video_date_prefers_creation_time_from_probe(env, monkeypatch):
+    client, a, *_ = env
+    from lumia_briefing_room.pipeline.vod_dates import date_from_creation_time
+
+    monkeypatch.setattr(
+        vods_module, "_probe_info",
+        lambda path, ffmpeg: VideoInfo(
+            width=1, height=1, fps=1.0, duration_sec=10.0, codec="h264",
+            creation_time="2026-09-20T03:00:00.000000Z",
+        ),
+    )
+
+    deadline = time.time() + 3
+    entry = by_id(client.get("/api/vods"))[vod_id(a)]
+    while entry["probing"] and time.time() < deadline:
+        time.sleep(0.02)
+        entry = by_id(client.get("/api/vods"))[vod_id(a)]
+
+    assert entry["videoDate"] == date_from_creation_time("2026-09-20T03:00:00.000000Z")
+
+
+def test_video_date_prefers_creation_time_saved_in_index(env):
+    client, a, _, vod_dir, *_ = env
+    from lumia_briefing_room.pipeline.vod_dates import date_from_creation_time
+
+    save_index(vod_dir, {
+        "id": vod_id(a), "path": str(a), "status": "done", "durationSec": 10.0,
+        "creationTime": "2026-09-20T03:00:00.000000Z", "games": [], "clips": [],
+    })
+
+    entry = by_id(client.get("/api/vods"))[vod_id(a)]
+
+    assert entry["videoDate"] == date_from_creation_time("2026-09-20T03:00:00.000000Z")
+
+
+def test_video_date_user_override_wins_over_probe_and_mtime(env):
+    client, a, *_ = env
+    vid = vod_id(a)
+
+    resp = client.patch(f"/api/vods/{vid}", json={"date": "2026-01-01"})
+
+    assert resp.status_code == 200 and resp.json()["date"] == "2026-01-01"
+    assert by_id(client.get("/api/vods"))[vid]["videoDate"] == "2026-01-01"
+
+
+def test_patch_date_rejects_invalid_format(env):
+    client, a, *_ = env
+    vid = vod_id(a)
+
+    resp = client.patch(f"/api/vods/{vid}", json={"date": "2026/01/01"})
+
+    assert resp.status_code == 400
+
+
+def test_clearing_the_date_override_falls_back_to_automatic_date(env):
+    client, a, *_ = env
+    vid = vod_id(a)
+    client.patch(f"/api/vods/{vid}", json={"date": "2026-01-01"})
+
+    resp = client.patch(f"/api/vods/{vid}", json={"date": ""})
+
+    assert resp.json()["date"] is None
+    assert by_id(client.get("/api/vods"))[vid]["videoDate"] is not None
 
 
 class FakeAnalyze:
@@ -302,9 +382,9 @@ def test_listing_does_not_wait_for_slow_duration_probes_and_reports_probing(env,
     def slow_probe(path, ffmpeg):
         probed.append(path.name)
         release.wait(5)
-        return 1234.5
+        return VideoInfo(width=1, height=1, fps=1.0, duration_sec=1234.5, codec="h264")
 
-    monkeypatch.setattr(vods_module, "_probe_duration", slow_probe)
+    monkeypatch.setattr(vods_module, "_probe_info", slow_probe)
     started = time.time()
     first = by_id(client.get("/api/vods"))
     assert time.time() - started < 2
@@ -329,7 +409,7 @@ def test_indexed_vods_and_missing_files_are_never_probed(env, monkeypatch):
     vid = vod_id(a)
     save_index(vod_dir, {"id": vid, "path": str(a), "status": "done", "durationSec": 99.0, "games": [], "clips": []})
     probed = []
-    monkeypatch.setattr(vods_module, "_probe_duration", lambda path, ffmpeg: probed.append(path.name))
+    monkeypatch.setattr(vods_module, "_probe_info", lambda path, ffmpeg: probed.append(path.name))
     entry = by_id(client.get("/api/vods"))[vid]
     time.sleep(0.3)
     assert entry["durationSec"] == 99.0 and entry["probing"] is False

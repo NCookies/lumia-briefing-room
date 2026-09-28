@@ -39,6 +39,7 @@ class VideoInfo:
     fps: float
     duration_sec: float
     codec: str
+    creation_time: str | None = None
 
 
 def _parse_rate(text: str) -> float:
@@ -55,7 +56,7 @@ def probe_video(path: Path, *, ffprobe_path: Path) -> VideoInfo:
     proc = run_hidden(
         [
             str(ffprobe_path), "-v", "error", "-select_streams", "v:0",
-            "-show_entries", "stream=width,height,r_frame_rate,codec_name:format=duration",
+            "-show_entries", "stream=width,height,r_frame_rate,codec_name:format=duration:format_tags=creation_time",
             "-of", "json", str(path),
         ],
         capture_output=True, check=True,
@@ -68,6 +69,7 @@ def probe_video(path: Path, *, ffprobe_path: Path) -> VideoInfo:
         fps=_parse_rate(stream.get("r_frame_rate", "0/1")),
         duration_sec=float(data["format"]["duration"]),
         codec=stream.get("codec_name", ""),
+        creation_time=data["format"].get("tags", {}).get("creation_time"),
     )
 
 

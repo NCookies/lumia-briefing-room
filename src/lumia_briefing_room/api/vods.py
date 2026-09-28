@@ -20,8 +20,9 @@ from lumia_briefing_room.pipeline.clip_assets import resolve_thumbnail
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for, archive_if_labeled
 from lumia_briefing_room.pipeline.retention import restore_clip, trash_clip
 from lumia_briefing_room.pipeline.vod_analyze import VodCancelled, VodProgress, analyze_vod
+from lumia_briefing_room.pipeline.vod_dates import is_valid_iso_date, resolve_video_date
 from lumia_briefing_room.pipeline.vod_store import load_index, vod_id
-from lumia_briefing_room.video.vod import find_ffprobe, probe_video
+from lumia_briefing_room.video.vod import VideoInfo, find_ffprobe, probe_video
 from lumia_briefing_room.video_formats import VIDEO_EXTENSIONS
 
 
@@ -49,12 +50,12 @@ def discover_videos(sources: list[str], recursive: bool) -> list[Path]:
     return list(found)
 
 
-def _probe_duration(path: Path, ffmpeg: Path | None) -> float | None:
+def _probe_info(path: Path, ffmpeg: Path | None) -> VideoInfo | None:
     ffprobe = find_ffprobe(ffmpeg) if ffmpeg else None
     if ffprobe is None:
         return None
     try:
-        return probe_video(path, ffprobe_path=ffprobe).duration_sec
+        return probe_video(path, ffprobe_path=ffprobe)
     except Exception:
         return None
 
@@ -74,7 +75,7 @@ def register_vod_routes(
     put_config: Callable[[dict], dict],
 ) -> None:
     id_cache: dict[tuple[str, int, int], str] = {}
-    duration_cache: dict[tuple[str, int, int], float | None] = {}
+    info_cache: dict[tuple[str, int, int], VideoInfo | None] = {}
     job: dict = {}
 
     def root() -> Path:
@@ -96,20 +97,20 @@ def register_vod_routes(
 
     def probe_in_background(key: tuple[str, int, int], path: Path) -> None:
         try:
-            value = _probe_duration(path, discover_ffmpeg())
+            value = _probe_info(path, discover_ffmpeg())
         except Exception:
             value = None
         with probe_lock:
-            duration_cache[key] = value
+            info_cache[key] = value
             pending.discard(key)
 
-    def duration_of(path: Path) -> tuple[float | None, bool]:
-        """(길이, 재는 중인지). 큰 영상은 길이를 재는 데 오래 걸려서(11GB 파일 실측 1분 이상) 목록 요청이 기다리지 않고 백그라운드로 잰다."""
+    def info_of(path: Path) -> tuple[VideoInfo | None, bool]:
+        """(영상 정보, 재는 중인지). 큰 영상은 길이를 재는 데 오래 걸려서(11GB 파일 실측 1분 이상) 목록 요청이 기다리지 않고 백그라운드로 잰다."""
         stat = path.stat()
         key = (str(path), stat.st_size, int(stat.st_mtime))
         with probe_lock:
-            if key in duration_cache:
-                return duration_cache[key], False
+            if key in info_cache:
+                return info_cache[key], False
             if key not in pending:
                 pending.add(key)
                 prober.submit(probe_in_background, key, path)
@@ -138,11 +139,20 @@ def register_vod_routes(
 
     def entry_for(vid: str, path: Path, index: dict | None, active: dict, trashed: dict, cfg: Config) -> dict:
         exists = path.exists()
-        size = path.stat().st_size if exists else (index or {}).get("size")
+        stat = path.stat() if exists else None
+        size = stat.st_size if stat else (index or {}).get("size")
         duration = (index or {}).get("durationSec")
+        creation_time = (index or {}).get("creationTime")
         probing = False
         if duration is None and exists:
-            duration, probing = duration_of(path)
+            info, probing = info_of(path)
+            if info is not None:
+                duration, creation_time = info.duration_sec, info.creation_time
+        video_date = resolve_video_date(
+            override=cfg.vod.video_dates.get(vid),
+            creation_time=creation_time,
+            mtime=stat.st_mtime if stat else None,
+        )
         return {
             "id": vid,
             "path": str(path),
@@ -157,6 +167,7 @@ def register_vod_routes(
             "analyzedSec": (index or {}).get("analyzedSec"),
             "error": (index or {}).get("error"),
             "streamer": cfg.vod.streamers.get(vid) or (index or {}).get("streamer"),
+            "videoDate": video_date,
             "games": (index or {}).get("games", []),
             "clipCount": active.get(vid, {}).get("count", 0),
             "clipBytes": active.get(vid, {}).get("bytes", 0),
@@ -201,7 +212,16 @@ def register_vod_routes(
         if "streamer" in body:
             name = str(body["streamer"] or "").strip()
             put_config({"vod": {"streamers": {vid: name}}})
-        return {"id": vid, "streamer": current_config().vod.streamers.get(vid) or None}
+        if "date" in body:
+            date = str(body["date"] or "").strip()
+            if date and not is_valid_iso_date(date):
+                raise HTTPException(400, "날짜는 YYYY-MM-DD 형식이어야 합니다")
+            put_config({"vod": {"videoDates": {vid: date}}})
+        return {
+            "id": vid,
+            "streamer": current_config().vod.streamers.get(vid) or None,
+            "date": current_config().vod.video_dates.get(vid) or None,
+        }
 
     @app.post("/api/vods/{vid}/analyze", status_code=202)
     def start_analysis(vid: str, body: dict | None = None):

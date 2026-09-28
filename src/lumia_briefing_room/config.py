@@ -211,6 +211,7 @@ class VodConfig:
     min_game_sec: float = 60.0
     hwaccel: str | None = None
     streamers: dict[str, str] = field(default_factory=dict)
+    video_dates: dict[str, str] = field(default_factory=dict)  # vodId -> 사용자가 고친 날짜(YYYY-MM-DD), plan-vod.md V8
 
 
 @dataclass
