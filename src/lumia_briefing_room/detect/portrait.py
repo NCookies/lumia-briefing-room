@@ -59,26 +59,39 @@ def crops_look_like_portraits(crops: PortraitCrops) -> bool:
     )
 
 
+GIVE_UP_AFTER_CONSECUTIVE_NON_NONE = 2
+
+
 def find_portraits_in_frames(
     frames: Iterable[tuple[float, np.ndarray]], profile: ResolutionProfile
 ) -> PortraitCrops | None:
-    """경기 시작 직후 루트 선택 화면(우측 아래 팀원 카드 3장)에서 초상화를 자른다.
+    """경기 시작 전후 루트 선택 화면(우측 아래 팀원 카드 3장)에서 초상화를 자른다.
 
     실측(2026-09-29): 애초에 노렸던 "관전 판정 True(=팀 로비 원형 화면)" 프레임은 화면에
     떠 있는 시간이 3초 키프레임 간격보다 짧아 실전에서 거의 못 잡았고, 좌표도 팀 소개
     화면이 아니라 게임 화면 하단 자기 HUD 를 가리키고 있었다(우연히 그 프레임에서만
     사람 얼굴처럼 보였을 뿐). 대신 관전 판정이 아직 `None`(미니맵도 안 보이는 로비·선택
     단계)인 동안 매 프레임에서 `portrait`/`teammate1`/`teammate2` 세 칸을 직접 확인해,
-    셋 다 초상화다운 색(`crops_look_like_portraits`)이면 그 자리에서 멈춘다. `None` 을
-    벗어나면(`True`=팀 로비, `False`=실제 인게임) 루트 선택 화면은 이미 지나친 것이라
-    포기한다 - 그 뒤엔 이 좌표에 다른 HUD 가 그려진다.
+    셋 다 초상화다운 색(`crops_look_like_portraits`)이면 그 자리에서 멈춘다.
+
+    재실측(2026-09-29, 같은 날 후속): `pipeline/portrait_scan.py` 가 `matchStartUtc` 앞뒤로
+    훑다 보니, 훑는 구간 맨 앞쪽이 이전 경기의 팀 로비·인게임 꼬리일 수 있다 - 그 한두 프레임
+    때문에 바로 포기하면 정작 이 경기의 루트 선택 화면(그 바로 뒤에 있을 수 있다)을 못 본다.
+    그래서 `None` 이 아닌 판정이 **연속으로** `GIVE_UP_AFTER_CONSECUTIVE_NON_NONE` 번 나와야
+    포기한다 - 낱개로 섞인 오판(관전 판정 자체가 가끔 틀리는 것도 실측으로 확인함)은 넘기고,
+    진짜로 로비·인게임에 들어선 뒤(연속으로 찍힘)에는 더 볼 필요가 없어 계속 멈춘다.
     """
+    consecutive_non_none = 0
     for _, frame in frames:
         spectating = read_spectating(
             profile.crop(frame, "minimap_icons"), profile.crop(frame, "hp_strip")
         )
         if spectating is not None:
-            return None
+            consecutive_non_none += 1
+            if consecutive_non_none >= GIVE_UP_AFTER_CONSECUTIVE_NON_NONE:
+                return None
+            continue
+        consecutive_non_none = 0
         if crops_look_like_portraits(_detect_crops(frame, profile)):
             return crop_portraits(frame, profile)
     return None

@@ -90,18 +90,40 @@ def test_find_portraits_in_frames_stops_at_the_first_frame_with_all_three_filled
     assert tuple(found.me[0, 0]) == winning_me_color
 
 
-def test_find_portraits_in_frames_gives_up_once_the_team_lobby_appears():
-    frames = [(0.0, _blank_frame()), (3.0, _lobby_frame()), (6.0, _route_select_frame())]
+def test_find_portraits_in_frames_gives_up_once_the_team_lobby_settles_in():
+    """2연속 이상 `spectating` 이 `None` 이 아니어야 진짜로 로비에 들어선 것으로 본다."""
+    frames = [
+        (0.0, _blank_frame()),
+        (3.0, _lobby_frame()),
+        (6.0, _lobby_frame()),
+        (9.0, _route_select_frame()),
+    ]
 
     assert find_portraits_in_frames(frames, PROFILE) is None
 
 
-def test_find_portraits_in_frames_gives_up_once_real_gameplay_starts():
+def test_find_portraits_in_frames_gives_up_once_real_gameplay_settles_in():
     """실측(2026-09-29): 빠르게 캐릭터·루트를 확정하는 경기는 몇 초 만에 로비를 지나쳐
     인게임까지 가 버릴 수 있다 - 그런 경기는 초상화를 못 얻고 포기한다(예외는 아님)."""
-    frames = [(0.0, _blank_frame()), (3.0, _ingame_frame()), (6.0, _route_select_frame())]
+    frames = [
+        (0.0, _blank_frame()),
+        (3.0, _ingame_frame()),
+        (6.0, _ingame_frame()),
+        (9.0, _route_select_frame()),
+    ]
 
     assert find_portraits_in_frames(frames, PROFILE) is None
+
+
+def test_find_portraits_in_frames_tolerates_a_single_stray_non_none_reading():
+    """재실측(2026-09-29): `matchStartUtc` 앞쪽을 훑을 때 맨 앞이 이전 경기의 로비 꼬리일 수 있고,
+    관전 판정 자체가 가끔 낱개로 틀리기도 한다(팀 로비 원형 화면에서 실측 확인) - 한 프레임만
+    `None` 이 아니면 포기하지 않고 계속 찾는다."""
+    frames = [(0.0, _lobby_frame()), (3.0, _route_select_frame())]
+
+    found = find_portraits_in_frames(frames, PROFILE)
+
+    assert found is not None
 
 
 def test_find_portraits_in_frames_returns_none_when_nothing_matches():
