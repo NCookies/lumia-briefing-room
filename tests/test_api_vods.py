@@ -447,6 +447,74 @@ def test_vod_wide_delete_also_clears_the_games_summary_so_the_row_resets(env):
     assert saved["decodeDone"] is True and saved["analyzedSec"] == 100.0
 
 
+def test_delete_vod_entirely_removes_index_cache_and_clips(env):
+    """"게임 항목"(색인) 자체를 지운다 - `DELETE .../clips`(전체 삭제)는 색인을 남기고
+    games/clips 만 비우지만, 이건 색인 파일과 판독 캐시까지 지운다."""
+    from lumia_briefing_room.pipeline.vod_store import cache_path, index_path
+
+    client, a, _, vod_dir, *_ = env
+    vid = vod_id(a)
+    cid = write_vod_clip(vod_dir, vid, 1, 10)
+    save_index(vod_dir, {"id": vid, "path": str(a), "status": "done", "games": [], "clips": [cid]})
+    cache_path(vod_dir, vid).parent.mkdir(parents=True, exist_ok=True)
+    cache_path(vod_dir, vid).write_bytes(b"cache")
+
+    resp = client.delete(f"/api/vods/{vid}")
+
+    assert resp.status_code == 200 and resp.json()["deletedClips"] == 1
+    assert not (vod_dir / f"{cid}.json").exists()
+    assert not index_path(vod_dir, vid).exists()
+    assert not cache_path(vod_dir, vid).exists()
+
+
+def test_delete_vod_disappears_from_the_list_once_the_source_is_also_gone(env):
+    """실사용 보고(2026-09-29): 원본 영상도 "성공 시 원본 삭제"로 지워지고 클립도 전체
+    삭제했는데, 색인만 남아 "분석 안 함" 행이 목록에서 영원히 안 없어졌다."""
+    client, a, _, vod_dir, *_ = env
+    vid = vod_id(a)
+    save_index(vod_dir, {
+        "id": vid, "path": str(a), "status": "new", "games": [], "clips": [], "sourceDeleted": True,
+    })
+    a.unlink()
+
+    resp = client.delete(f"/api/vods/{vid}")
+
+    assert resp.status_code == 200
+    assert vid not in by_id(client.get("/api/vods"))
+
+
+def test_delete_vod_reappears_as_new_when_the_source_file_still_exists(env):
+    """원본이 아직 있으면 다음 목록 조회 때 `discover_videos` 가 다시 찾아 "분석 안 함"으로
+    나타난다 - 색인만 지웠을 뿐 원본 파일은 건드리지 않는다."""
+    client, a, _, vod_dir, *_ = env
+    vid = vod_id(a)
+    save_index(vod_dir, {"id": vid, "path": str(a), "status": "done", "games": [], "clips": []})
+
+    client.delete(f"/api/vods/{vid}")
+
+    entry = by_id(client.get("/api/vods"))[vid]
+    assert entry["status"] == "new" and entry["exists"] is True
+
+
+def test_delete_vod_is_blocked_while_that_vod_is_analyzing(env, monkeypatch):
+    client, a, *_ = env
+    fake = FakeAnalyze()
+    monkeypatch.setattr(vods_module, "analyze_vod", fake)
+    vid = vod_id(a)
+    client.post(f"/api/vods/{vid}/analyze", json={})
+    assert fake.started.wait(2)
+
+    assert client.delete(f"/api/vods/{vid}").status_code == 409
+
+    fake.release.set()
+    wait_for(client, vid, "done")
+
+
+def test_delete_vod_unknown_id_is_404(env):
+    client, *_ = env
+    assert client.delete("/api/vods/does-not-exist").status_code == 404
+
+
 def test_delete_vod_game_removes_it_and_deletes_its_clips(env, monkeypatch):
     from lumia_briefing_room.pipeline import delete_helper
 

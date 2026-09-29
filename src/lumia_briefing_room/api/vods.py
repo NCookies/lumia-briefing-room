@@ -22,7 +22,7 @@ from lumia_briefing_room.pipeline.ffmpeg_errors import describe_clip_error
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for
 from lumia_briefing_room.pipeline.vod_analyze import VodCancelled, VodProgress, analyze_vod
 from lumia_briefing_room.pipeline.vod_dates import is_valid_iso_date, resolve_video_date
-from lumia_briefing_room.pipeline.vod_store import load_index, save_index, vod_id
+from lumia_briefing_room.pipeline.vod_store import cache_path, index_path, load_index, save_index, vod_id
 from lumia_briefing_room.video.vod import VideoInfo, find_ffprobe, probe_video
 from lumia_briefing_room.video_formats import VIDEO_EXTENSIONS
 
@@ -322,6 +322,31 @@ def register_vod_routes(
                 index.update(games=[], clips=[], status="new", error=None, errorKind=None)
                 save_index(base, index)
         return {"id": vid, "count": len(clips)}
+
+    @app.delete("/api/vods/{vid}")
+    def delete_vod(vid: str):
+        """다시보기를 목록에서 완전히 지운다 - 클립·판독 캐시·색인을 모두 지운다.
+
+        원본 영상 파일은 건드리지 않는다 - 아직 있으면 다음 목록 조회 때 "분석 안 함"으로
+        다시 나타난다(`collect()` 가 `cfg.vod.sources` 를 다시 훑으므로). 원본까지 이미
+        지워졌다면(예: "성공 시 원본 삭제" 설정, `sourceDeleted`) 목록에서도 완전히
+        사라진다 - "원본도 클립도 다 지웠는데 게임 항목이 목록에 남아 지울 방법이 없다"는
+        실사용 보고(2026-09-29)에 대응한다. `delete_vod_clips`(전체 삭제)는 색인은 남기고
+        게임·클립만 비워 "분석 안 함"으로 되돌리는 것과 달리, 이건 색인 자체를 지운다.
+        """
+        require(vid)
+        if running_for(vid):
+            raise HTTPException(409, "분석 중인 영상은 지울 수 없습니다. 먼저 분석을 취소하세요")
+        with lock:
+            base = root()
+            clips = vod_clip_paths(base, vid)
+            archive_dir = archive_dir_for(base)
+            mode = current_config().ui.delete_mode
+            for clip in clips:
+                delete_clip(clip.meta_path, mode=mode, archive_dir=archive_dir)
+            index_path(base, vid).unlink(missing_ok=True)
+            cache_path(base, vid).unlink(missing_ok=True)
+        return {"id": vid, "deletedClips": len(clips)}
 
     @app.delete("/api/vods/{vid}/games/{game_index}")
     def delete_vod_game(vid: str, game_index: int):

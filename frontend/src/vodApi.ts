@@ -64,6 +64,13 @@ export async function deleteVodClips(id: string): Promise<number> {
   return (await jsonOrThrow<{ count: number }>(await send(`${BASE}/vods/${id}/clips`, 'DELETE'), '삭제')).count
 }
 
+// "전체 삭제"(deleteVodClips)와 달리 색인 자체를 지워 목록에서 이 영상을 완전히
+// 없앤다 - 원본까지 이미 지워졌다면(예: 성공 시 원본 삭제) 다시는 나타나지 않는다.
+export async function deleteVod(id: string): Promise<number> {
+  return (await jsonOrThrow<{ deletedClips: number }>(await send(`${BASE}/vods/${id}`, 'DELETE'), '목록에서 삭제'))
+    .deletedClips
+}
+
 // 클립이 없는 게임(교전은 못 뽑았지만 결과 화면은 읽은 경우, plan.md §10-6)도 지울 수
 // 있어야 한다 - 클립 ID 기준 삭제 경로로는 지울 방법이 없다.
 export async function deleteVodGame(vodId: string, gameIndex: number): Promise<void> {

@@ -44,6 +44,7 @@ import { formatBytes } from '../retention'
 import type { Clip, GameRecord, UserLabel } from '../types'
 import {
   cancelAnalysis,
+  deleteVod,
   deleteVodClips,
   deleteVodGame,
   getAnalysis,
@@ -421,6 +422,18 @@ export function ClipBrowser({
     if (result.ok && group.recordId) await runAndReload(() => deleteGameRecord(group.recordId!))
   }
 
+  // 스팀 녹화의 "기록 삭제"(클립을 다 지워도 남는 결과 요약을 마저 지우는 것)와 같은
+  // 자리 - 다시보기는 클립·원본을 다 지워도 색인(.vods/<id>.json)이 남아 목록에서
+  // 안 없어졌다(실사용 보고, 2026-09-29). 같은 확인창 스타일로 색인까지 지운다.
+  const handleRemoveVod = async (id: string, name: string) => {
+    const result = await ask({
+      message: `"${name}" 을(를) 다시보기 목록에서 삭제합니다. 남은 클립과 판독 기록도 함께 지워집니다(원본 영상은 지우지 않으며, 아직 있으면 다음에 새 영상으로 다시 나타납니다). 되돌릴 수 없습니다. 계속하시겠습니까?`,
+      confirmLabel: '목록에서 삭제',
+      danger: true,
+    })
+    if (result.ok) await vodAction(() => deleteVod(id))
+  }
+
   const handleNote = (clip: Clip, note: string | null) => {
     setClips((prev) => applyNote(prev, clip.id, note))
     patchClip(clip.id, { labelNote: note }).catch((e: Error) => {
@@ -679,6 +692,7 @@ export function ClipBrowser({
                   onRenameStreamer={(name) => vg.vod && handleRenameStreamer(vg.vod, name)}
                   onEditDate={(date) => vg.vod && handleEditVideoDate(vg.vod, date)}
                   onDeleteClips={() => handleDeleteVod(vg.vodId, vg.name, vg.vod?.clipCount ?? visible)}
+                  onDeleteVod={() => handleRemoveVod(vg.vodId, vg.name)}
                 >
                   {vg.games.map((group) => renderGame(group))}
                 </VodSection>

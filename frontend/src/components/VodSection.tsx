@@ -21,6 +21,7 @@ interface Props {
   onRenameStreamer: (streamer: string) => void
   onEditDate: (date: string) => void
   onDeleteClips: () => void
+  onDeleteVod: () => void
   children: ReactNode
 }
 
@@ -248,6 +249,7 @@ export function VodSection({
   onRenameStreamer,
   onEditDate,
   onDeleteClips,
+  onDeleteVod,
   children,
 }: Props) {
   const running = vod?.status === 'analyzing'
@@ -322,6 +324,16 @@ export function VodSection({
           {clipCount > 0 && (
             <button type="button" className="text-zinc-400 hover:text-rose-400" onClick={onDeleteClips}>
               전체 삭제
+            </button>
+          )}
+          {vod && !vod.exists && (
+            <button
+              type="button"
+              className="text-zinc-400 hover:text-rose-400"
+              title="원본 영상이 남아있으면 목록에서 지워도 다음에 다시 나타납니다"
+              onClick={onDeleteVod}
+            >
+              목록에서 삭제
             </button>
           )}
         </div>
