@@ -950,7 +950,7 @@ Player.log            →  로컬 타임존
 - `pinned` 은 §7.6의 자동 정리 보호용. `deletedAt` 필드는 없다(2026-09-28 — 앱 자체 휴지통이 없어지면서 삭제는 파일을 바로 지우거나 Windows 휴지통으로 보낸다).
 - `sourceIncomplete` 는 링버퍼가 이미 일부를 지운 뒤에 처리한 매치라는 표시다 (§7.2.1). UI에서 눈에 띄게 할 것.
 - `matchResult` 는 경기 종료 결과 화면을 OCR 로 읽은 값이다(§2.13). **같은 경기의 클립이 모두 같은 값**을 갖고, 판독 실패·옛 클립은 `null`/없음이다. `matchType` 은 `rank` / `normal` / `unknown`(칩을 못 읽음), `outcome` 은 화면 문구 그대로(`실험 종료`, `최종 생존`, 탈출은 미실측). `matchResultSource` 가 `"manual"` 이면 사용자가 직접 고쳐 잠근 값이라 자동 판독이 덮어쓰지 않는다(§2.13 수동 보정).
-- `myCharacter`/`teamCharacters` 는 캐릭터 이름 OCR 을 폐기하면서(§2.10) 항상 `null`/`[]` 다 — 필드는 옛 클립·서버 전송 계약과의 호환을 위해 남겨 뒀을 뿐 더 이상 채워지지 않는다. 캐릭터는 `myCharacterPortraitPath`/`teammatePortraitPaths`(초상화 크롭 경로, 로컬 전용 — 서버에 전송하지 않는다)로만 나타난다.
+- `myCharacter`/`teamCharacters` 는 캐릭터 이름 OCR 을 폐기하면서(§2.10) 항상 `null`/`[]` 다 — 필드는 옛 클립·서버 전송 계약과의 호환을 위해 남겨 뒀을 뿐 더 이상 채워지지 않는다. 캐릭터는 `myCharacterPortraitPath`/`teammatePortraitPaths`(초상화 크롭 경로, 로컬 전용 — 서버에 전송하지 않는다)로만 나타난다. **코발트 게임은 예외** — 캐릭터 선택 화면 UI 자체가 다르고 직전까지 캐릭터를 바꿀 수 있어(§2.9) 판정 로직이 애초에 맞지 않아 초상화를 찾지 않는다(경로가 항상 비어 있다). `GameSection.tsx` 도 코발트 게임 행에서는 `PortraitRow` 를 아예 그리지 않는다(2026-09-29, plan-ui.md §0 "코발트 게임 행 표시 정리").
 - `cobaltPhase` 는 코발트 프로토콜(§2.9) 클립에서만 채워지고 배틀로얄 클립은 `null` 이다(`gameDay`/`dayNight` 는 반대로 코발트에서 `null`). 제목도 `gameDay` 가 있으면 `"N일차 낮/밤"`, 없고 `cobaltPhase` 가 있으면 `"Phase N"` 을 쓴다(2026-09-28 실사용 보고로 추가 — 전엔 코발트 클립 제목이 `"알 수 없음 교전"` 이었다).
 
 ## 4. 기술 스택

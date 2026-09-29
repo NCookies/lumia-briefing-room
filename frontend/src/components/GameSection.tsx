@@ -158,20 +158,18 @@ export function GameSection({
             ) : result ? (
               <div className="group/result flex items-start gap-1">
                 <div>
-                  {group.gameMode === 'cobalt' && (
-                    <div className="mb-1 inline-block rounded border border-indigo-500 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-300">
-                      코발트
-                    </div>
-                  )}
                   {group.gameMode === 'cobalt' ? (
-                    <div className={`text-xl font-bold ${result.outcome === '승리' ? 'text-emerald-400' : 'text-zinc-200'}`}>
-                      {result.outcome ?? '결과 미확인'}
-                      {matchResultLocked && (
-                        <span className="ml-1 align-middle text-xs text-amber-400" title="수동으로 고정한 값입니다">
-                          🔒
-                        </span>
-                      )}
-                    </div>
+                    <>
+                      <div className={`text-xl font-bold ${result.outcome === '승리' ? 'text-emerald-400' : 'text-zinc-200'}`}>
+                        {result.outcome ?? '결과 미확인'}
+                        {matchResultLocked && (
+                          <span className="ml-1 align-middle text-xs text-amber-400" title="수동으로 고정한 값입니다">
+                            🔒
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm font-semibold text-zinc-400">코발트</div>
+                    </>
                   ) : (
                     <>
                       <div className={`text-xl font-bold ${result.placement === 1 ? 'text-emerald-400' : 'text-zinc-200'}`}>
@@ -231,7 +229,7 @@ export function GameSection({
             <div className="text-xs text-zinc-500">{timeLabel ? timeLabel.sub : formatAgo(group.matchStartUtc)}</div>
           </div>
 
-          <PortraitRow clip={group.clips[0]} />
+          {group.gameMode !== 'cobalt' && <PortraitRow clip={group.clips[0]} />}
 
           <div className="w-28">
             {kda && (
