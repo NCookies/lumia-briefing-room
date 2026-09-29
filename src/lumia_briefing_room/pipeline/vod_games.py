@@ -7,6 +7,8 @@ from lumia_briefing_room.detect.types import FrameState
 DEFAULT_MAX_GAP_SEC = 30.0
 DEFAULT_MIN_GAME_SEC = 60.0
 DAY_CONFIRM_FRAMES = 5
+SELECT_MAX_BEFORE_GAME_SEC = 150.0
+SELECT_MAX_GAP_SEC = 15.0
 
 
 @dataclass(frozen=True)
@@ -15,6 +17,7 @@ class GameSpan:
     start: float
     end: float
     confidence: float
+    select_start: float | None = None
 
 
 def is_ingame(state: FrameState) -> bool:
@@ -86,14 +89,33 @@ def split_games(
         pieces.extend(run[a:b] for a, b in zip(bounds, bounds[1:]))
 
     games: list[GameSpan] = []
+    prev_end = float("-inf")
     for piece in pieces:
         start, end = piece[0].t, piece[-1].t
         if end - start < min_game_sec:
             continue
         inside = states_in(states, GameSpan(0, start, end, 0.0))
         confidence = sum(is_ingame(s) for s in inside) / len(inside)
-        games.append(GameSpan(index=len(games) + 1, start=start, end=end, confidence=confidence))
+        select_start = _selection_start(states, start, floor=prev_end)
+        games.append(
+            GameSpan(index=len(games) + 1, start=start, end=end, confidence=confidence, select_start=select_start)
+        )
+        prev_end = end
     return games
+
+
+def _selection_start(states: list[FrameState], game_start: float, *, floor: float) -> float | None:
+    """게임 바로 앞의 캐릭터·루트 선택 화면 덩어리의 첫 프레임. 뒤에 게임이 이어지지 않는 덩어리(닷지)는 여기 닿지 않는다."""
+    lo = max(game_start - SELECT_MAX_BEFORE_GAME_SEC, floor)
+    times = [s.t for s in states if s.select_screen and lo < s.t < game_start]
+    if not times:
+        return None
+    start = times[-1]
+    for t in reversed(times[:-1]):
+        if start - t > SELECT_MAX_GAP_SEC:
+            break
+        start = t
+    return start
 
 
 def states_in(states: list[FrameState], span: GameSpan) -> list[FrameState]:

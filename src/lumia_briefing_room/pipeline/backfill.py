@@ -111,7 +111,7 @@ def collect_known_starts(clips_dir: Path) -> list[datetime]:
 
 def overlaps_known(window: GameWindow, known_starts: list[datetime]) -> bool:
     """알려진 경기 시작이 이 구간 안(또는 로딩 시간만큼 앞)에 있으면 같은 경기다."""
-    lo = window.hud_start_utc - timedelta(seconds=KNOWN_TOLERANCE_SEC)
+    lo = window.start_utc - timedelta(seconds=KNOWN_TOLERANCE_SEC)
     return any(lo <= start <= window.end_utc for start in known_starts)
 
 

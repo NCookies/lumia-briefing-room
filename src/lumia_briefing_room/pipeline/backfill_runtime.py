@@ -142,7 +142,7 @@ def make_process_window(
         session = RecordingSession.load(session_dir)
         try:
             return process_match(
-                session, window.hud_start_utc, window.end_utc, staged,
+                session, window.start_utc, window.end_utc, staged,
                 ffmpeg_path=ffmpeg_path, game_mode=game_mode,
                 k_templates=k_templates, a_templates=a_templates, hwaccel=hwaccel,
                 clips_dir=staging, cancel=cancel, result_search_from=window.hud_end_utc,

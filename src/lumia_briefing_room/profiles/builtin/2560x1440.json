@@ -32,6 +32,8 @@
     "scoreboard_names": [800, 200, 1300, 1260],
     "scoreboard_ranks": [480, 200, 640, 1260],
     "phase_digit": [1290, 3, 1325, 28],
+    "select_timer": [1225, 30, 1335, 95],
+    "select_title": [35, 74, 265, 108],
     "cobalt_result_panel": [150, 595, 655, 965],
     "cobalt_outcome": [185, 680, 295, 745],
     "cobalt_teammate1": [1465, 970, 1755, 1105],

@@ -29,6 +29,7 @@ from lumia_briefing_room.detect.intervals import to_intervals
 from lumia_briefing_room.detect.minimap import count_rings
 from lumia_briefing_room.detect.phase import read_cobalt_phase
 from lumia_briefing_room.detect.region import load_region_templates, read_region, region_score
+from lumia_briefing_room.detect.select_screen import read_select_screen
 from lumia_briefing_room.detect.spectator import read_spectating
 from lumia_briefing_room.detect.teammate import combat_slots, dead_slots, new_deaths
 from lumia_briefing_room.detect.ultimate import blue_tint_ratio, is_locked, max_rise
@@ -340,6 +341,10 @@ def analyze_frame(
     if phase_templates and "phase_digit" in profile.rois:
         cobalt_phase = read_cobalt_phase(profile.crop(frame, "phase_digit"), phase_templates)
 
+    select_screen = None
+    if "select_timer" in profile.rois and "select_title" in profile.rois:
+        select_screen = read_select_screen(profile.crop(frame, "select_timer"), profile.crop(frame, "select_title"))
+
     return FrameState(
         t=t,
         combat=combat,
@@ -362,6 +367,7 @@ def analyze_frame(
         cobalt_phase=cobalt_phase,
         cobalt_face_value=cobalt_face_value,
         cobalt_face_sat=cobalt_face_sat,
+        select_screen=select_screen,
     )
 
 

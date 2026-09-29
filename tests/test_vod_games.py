@@ -121,3 +121,55 @@ def test_states_in_returns_frames_inside_the_span_only():
     inside = states_in(states, span)
 
     assert inside[0].t == 100.0 and inside[-1].t == 700.0
+
+
+def _sel(t):
+    return FrameState(t=t, combat=None, face_value=None, face_sat=None, k=None, a=None, day_night=None, select_screen=True)
+
+
+def _with_selection(states, select_times):
+    by_t = {s.t: s for s in states}
+    for t in select_times:
+        by_t[t] = _sel(t)
+    return [by_t[t] for t in sorted(by_t)]
+
+
+def _times(a, b, step=3.0):
+    return [a + i * step for i in range(int((b - a) / step) + 1)]
+
+
+def _game_with_selection(select_spans, game, step=3.0):
+    times = [t for a, b in select_spans for t in _times(a, b, step)]
+    return _with_selection(timeline([game], step=step), times)
+
+
+def test_game_start_extends_back_to_first_frame_of_selection_cluster():
+    states = _game_with_selection([(500.0, 600.0)], (624.0, 1900.0), step=3.0)
+    (game,) = split_games(states)
+    assert game.start == 624.0
+    assert game.select_start == 500.0
+
+
+def test_selection_without_a_following_game_is_a_dodge_and_ignored():
+    states = _game_with_selection([(100.0, 160.0), (500.0, 600.0)], (624.0, 1900.0), step=3.0)
+    (game,) = split_games(states)
+    assert game.select_start == 500.0
+
+
+def test_selection_too_far_before_the_game_is_not_attached():
+    states = _game_with_selection([(100.0, 160.0)], (624.0, 1900.0), step=3.0)
+    (game,) = split_games(states)
+    assert game.select_start is None
+
+
+def test_selection_cluster_tolerates_a_few_missed_frames():
+    states = _game_with_selection([(500.0, 530.0), (542.0, 600.0)], (624.0, 1900.0), step=3.0)
+    (game,) = split_games(states)
+    assert game.select_start == 500.0
+
+
+def test_selection_does_not_reach_into_the_previous_game():
+    states = _with_selection(timeline([(0.0, 700.0), (800.0, 1900.0)], step=3.0), _times(711.0, 768.0))
+    first, second = split_games(states)
+    assert first.select_start is None
+    assert second.select_start == 711.0

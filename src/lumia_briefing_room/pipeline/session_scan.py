@@ -40,10 +40,12 @@ class GameWindow:
     confidence: float
     cut_at_start: bool
     still_running: bool
+    select_start_utc: datetime | None = None
 
     @property
     def start_utc(self) -> datetime:
-        return self.hud_start_utc
+        """풀영상 시작. 캐릭터 선택 화면이 보이면 거기서, 아니면 인게임 HUD 가 처음 보인 시각."""
+        return self.select_start_utc or self.hud_start_utc
 
 
 def window_key(session_name: str, window: GameWindow) -> str:
@@ -86,7 +88,10 @@ def windows_from_states(
 
     windows = []
     for i, span in enumerate(spans):
-        next_start = spans[i + 1].start if i + 1 < len(spans) else None
+        next_start = None
+        if i + 1 < len(spans):
+            nxt = spans[i + 1]
+            next_start = nxt.select_start if nxt.select_start is not None else nxt.start
         end = min(span.end + post_game_sec, last_t + seg_sec)
         if next_start is not None:
             end = min(end, next_start)
@@ -97,8 +102,9 @@ def windows_from_states(
                 hud_end_utc=at(span.end),
                 end_utc=at(end),
                 confidence=span.confidence,
-                cut_at_start=span.start <= first_t + seg_sec,
+                cut_at_start=(span.start if span.select_start is None else span.select_start) <= first_t + seg_sec,
                 still_running=span.end >= last_t - seg_sec,
+                select_start_utc=at(span.select_start) if span.select_start is not None else None,
             )
         )
     return windows

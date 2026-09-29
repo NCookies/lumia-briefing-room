@@ -62,6 +62,21 @@ def test_margin_is_capped_at_the_end_of_the_recording():
     assert windows[0].end_utc == _utc(960 + SEG)
 
 
+def test_window_starts_at_the_character_selection_screen_when_it_was_seen():
+    states = _timeline((300, 900), (1200, 2400), end=3000)
+    picked = {s.t: FrameState(t=s.t, combat=None, face_value=None, face_sat=None, k=None, a=None,
+                              day_night=None, select_screen=True)
+              for s in states if 1110 <= s.t <= 1170}
+    states = [picked.get(s.t, s) for s in states]
+
+    first, second = scan.windows_from_states(states, session_start_utc=START, seg_sec=SEG, post_game_sec=300)
+
+    assert first.start_utc == first.hud_start_utc == _utc(300)
+    assert second.hud_start_utc == _utc(1200)
+    assert second.select_start_utc == second.start_utc == _utc(1110)
+    assert first.end_utc == _utc(1110)
+
+
 def test_a_game_that_reaches_the_first_segment_is_marked_as_cut_at_the_start():
     """링버퍼가 경기 앞부분을 지웠다 — 시작을 알 수 없다."""
     states = _timeline((0, 600), (900, 1500), end=1800)
