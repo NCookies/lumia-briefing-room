@@ -332,6 +332,11 @@ $env:LUMIA_UPDATE_DOWNLOAD_PREFIX = "http://127.0.0.1:8770/download/"
 
 태그를 푸시하면 `.github/workflows/release.yml` 이 설치기를 만들어 GitHub Release 로 올린다. 사람이 하는 일은 아래뿐이다.
 
+**태그를 달기 전에 [docs/release-checklist.md](release-checklist.md) 의 "다음 릴리스" 절 "실측
+체크리스트"를 먼저 확인한다.** `- [ ]` 로 남은 항목이 있으면 태그를 만들거나 푸시하지
+않는다(CLAUDE.md "릴리스 체크리스트 관리" 참고) — CHANGELOG 절 누락은 CI 가 걸러 주지만,
+실측 미확인은 사람(또는 세션)이 직접 걸러야 한다.
+
 ```bash
 # 1) src/lumia_briefing_room/__init__.py 의 __version__ 을 올리고, CHANGELOG.md 에 그 버전 절을 쓴다 → 커밋·푸시
 # 2) 태그를 달아 푸시한다 (태그 = v + __version__)
