@@ -284,7 +284,7 @@ export function VodSection({
 
         {vod && (
           <span className={`rounded px-2 py-0.5 text-xs ${STATUS_STYLES[vod.status]}`}>
-            {vodStatusLabel(vod.status)}
+            {vod.status === 'error' && vod.errorKind === 'disk_full' ? '저장 공간 부족으로 중단됨' : vodStatusLabel(vod.status)}
             {vod.status !== 'done' && vod.status !== 'new' && percent > 0 ? ` ${percent}%` : ''}
           </span>
         )}

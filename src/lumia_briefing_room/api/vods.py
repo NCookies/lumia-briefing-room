@@ -18,6 +18,7 @@ from lumia_briefing_room.api.clips import scan_clips
 from lumia_briefing_room.api.export import list_roots, list_subdirs, parent_of
 from lumia_briefing_room.config import Config, discover_ffmpeg, resolve_paths
 from lumia_briefing_room.pipeline.delete_helper import delete_clip
+from lumia_briefing_room.pipeline.ffmpeg_errors import describe_clip_error
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for
 from lumia_briefing_room.pipeline.vod_analyze import VodCancelled, VodProgress, analyze_vod
 from lumia_briefing_room.pipeline.vod_dates import is_valid_iso_date, resolve_video_date
@@ -166,6 +167,7 @@ def register_vod_routes(
             "status": status_of(vid, index),
             "analyzedSec": (index or {}).get("analyzedSec"),
             "error": (index or {}).get("error"),
+            "errorKind": (index or {}).get("errorKind"),
             "streamer": cfg.vod.streamers.get(vid) or (index or {}).get("streamer"),
             "videoDate": video_date,
             "games": (index or {}).get("games", []),
@@ -273,7 +275,7 @@ def register_vod_routes(
             except VodCancelled:
                 job.update(state="cancelled", message="분석을 멈췄습니다. 다시 시작하면 이어서 합니다.")
             except Exception as exc:
-                job.update(state="error", message=f"분석에 실패했습니다: {exc}")
+                job.update(state="error", message=describe_clip_error(exc))
 
         threading.Thread(target=run, daemon=True).start()
         return {"id": vid}
@@ -316,7 +318,7 @@ def register_vod_routes(
                 # decodeDone/analyzedSec 은 그대로 둔다 - 프레임 판독 캐시는 영상 자체가
                 # 안 바뀌면 그대로 유효하므로, 다음 "분석 시작"이 처음부터 다시 디코드하지
                 # 않고 캐시를 그대로 써서 게임·클립만 빠르게 다시 만들게 한다.
-                index.update(games=[], clips=[], status="new", error=None)
+                index.update(games=[], clips=[], status="new", error=None, errorKind=None)
                 save_index(base, index)
         return {"id": vid, "count": len(clips)}
 

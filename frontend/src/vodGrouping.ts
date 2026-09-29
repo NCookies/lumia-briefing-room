@@ -27,6 +27,7 @@ export interface Vod {
   status: VodStatus
   analyzedSec: number | null
   error: string | null
+  errorKind: 'disk_full' | 'other' | null
   streamer: string | null
   videoDate: string | null
   games: VodGameSummary[]

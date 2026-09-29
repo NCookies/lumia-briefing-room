@@ -26,6 +26,7 @@ from lumia_briefing_room.detect.result import ResultScreen
 from lumia_briefing_room.detect.types import FrameState, PortraitCrops
 from lumia_briefing_room.pipeline.clip import ClipRange, make_thumbnail
 from lumia_briefing_room.pipeline.clip_assets import stored_asset_path
+from lumia_briefing_room.pipeline.ffmpeg_errors import describe_clip_error, is_disk_full_error
 from lumia_briefing_room.pipeline.filters import apply_filter
 from lumia_briefing_room.pipeline.label_migrate import load_metas, migrate_labels
 from lumia_briefing_room.pipeline.metadata import match_result_dict
@@ -259,7 +260,8 @@ def analyze_vod(
         **index,
         "id": vod, "path": str(video_path), "size": video_path.stat().st_size,
         "durationSec": info.duration_sec, "width": info.width, "height": info.height,
-        "fps": info.fps, "creationTime": info.creation_time, "streamer": streamer, "status": "analyzing", "error": None,
+        "fps": info.fps, "creationTime": info.creation_time, "streamer": streamer, "status": "analyzing",
+        "error": None, "errorKind": None,
         "decodeDone": bool(index.get("decodeDone")) and not force and not stale,
         "analysisVersion": ANALYSIS_VERSION,
         "updatedAt": _now_iso(),
@@ -291,7 +293,12 @@ def analyze_vod(
         save_index(root, index)
         raise
     except Exception as exc:
-        index.update(status="error", error=str(exc), updatedAt=_now_iso())
+        index.update(
+            status="error",
+            error=describe_clip_error(exc),
+            errorKind="disk_full" if is_disk_full_error(exc) else "other",
+            updatedAt=_now_iso(),
+        )
         save_index(root, index)
         raise
 

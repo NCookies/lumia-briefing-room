@@ -22,6 +22,7 @@ function vod(over: Partial<Vod> = {}): Vod {
     status: 'done',
     analyzedSec: 3600,
     error: null,
+    errorKind: null,
     streamer: null,
     videoDate: null,
     games: [],

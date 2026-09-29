@@ -354,6 +354,29 @@ def test_error_is_recorded_in_the_index_and_reraised(vod_file, tmp_path):
 
 
 @requires_ffmpeg
+def test_disk_full_during_cut_is_recorded_with_a_friendly_message(vod_file, tmp_path, monkeypatch):
+    """클립을 자르다 디스크가 꽉 차면 ffmpeg 의 stderr 를 읽어 "저장 공간 부족"이라고
+    분명히 알려준다(일반적인 str(CalledProcessError)는 종료 코드만 남긴다)."""
+    import lumia_briefing_room.pipeline.vod_analyze as vod_analyze
+
+    def boom_cut(*a, **kw):
+        raise subprocess.CalledProcessError(
+            returncode=1, cmd=["ffmpeg"], output=b"", stderr=b"No space left on device\n"
+        )
+
+    monkeypatch.setattr(vod_analyze, "cut_vod_clip", boom_cut)
+    cfg = make_cfg(tmp_path)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        analyze_vod(vod_file, cfg, ffmpeg_path=FFMPEG_PATH, read_frame=read_frame, find_result=no_result)
+
+    index = load_index(cfg.paths.vod_clips, vod_id(vod_file))
+    assert index["status"] == "error"
+    assert index["errorKind"] == "disk_full"
+    assert "저장 공간" in index["error"]
+
+
+@requires_ffmpeg
 def test_result_failure_does_not_stop_clip_creation(vod_file, tmp_path):
     def broken(video, span, next_start):
         raise RuntimeError("ocr 실패")
