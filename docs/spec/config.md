@@ -9,6 +9,7 @@
 | 키 | 기본값 | 설명 |
 |---|---|---|
 | `paths.clips` | `%USERPROFILE%\Videos\LumiaBriefingRoom\clips` | 스팀 클립. 썸네일 `.thumbs`, 프록시 `.proxy`, 라벨 보관소 `.labels`, 게임 기록 `.games` 가 그 아래 |
+| `paths.games` | `<clips 의 상위>\games` | 게임별 풀영상·게임 기록(`games\<경기키>ull.mp4`, `game.json`) |
 | `paths.vodClips` | `…\LumiaBriefingRoom\vod` | 영상 파일 클립(스팀과 섞지 않는다). `.thumbs`·`.vods` |
 | `paths.temp` | `%LOCALAPPDATA%\Temp\LumiaBriefingRoom` | 구출 복사·병합 중간물·처리 이력. 클립 폴더와 드라이브가 다르면 최종 이동이 복사가 된다 |
 | `paths.exportDefault` | `%USERPROFILE%\Videos` | 저장 창 시작 위치. 저장할 때마다 갱신 |
@@ -57,6 +58,7 @@
 | `clip.fixedPrerollSec` | 30 | `fixed` 모드, 팀 전투 신호 포화 구간 |
 | `clip.mergeGapSec` | 10 | |
 | `clip.includeAudio` | `true` | |
+| `clip.saveMode` | `auto` | `auto`=분석이 끝나면 후보를 전부 클립으로 저장(기존 방식) / `manual`=직접 저장. 풀영상을 못 만든 게임은 어느 쪽이든 확실한 후보(킬·어시·사망)만 저장 |
 | `clip.snapToKeyframe` | `true` | 미사용 — 항상 `-c copy` |
 
 ## 인코딩 `encode.*`

@@ -51,6 +51,7 @@ class PathsConfig:
     export_default: Path | None = None
     steam_recording: Path | None = None
     vod_clips: Path | None = None
+    games: Path | None = None
     min_free_gb: float = 20.0
 
 
@@ -62,6 +63,7 @@ class ResolvedPaths:
     proxies: Path
     export_default: Path
     vod_clips: Path
+    games: Path
 
 
 def _default_local_appdata() -> Path:
@@ -86,6 +88,7 @@ def resolve_paths(cfg: PathsConfig) -> ResolvedPaths:
         proxies=cfg.proxies or (clips / ".proxy"),
         export_default=cfg.export_default or (_default_userprofile() / "Videos"),
         vod_clips=cfg.vod_clips or (_default_userprofile() / "Videos" / paths.app_folder_name() / "vod"),
+        games=cfg.games or (clips.parent / "games"),
     )
 
 
@@ -136,6 +139,7 @@ class ClipConfig:
     merge_gap_sec: float = 10.0
     include_audio: bool = True
     snap_to_keyframe: bool = True
+    save_mode: str = "auto"
 
 
 @dataclass
