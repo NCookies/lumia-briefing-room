@@ -419,31 +419,107 @@ def test_process_match_reports_progress_through_detection_result_scan_and_cuttin
     assert orch.RESULT_SCAN_PROGRESS_FRACTION in seen
 
 
-def test_process_match_reports_completion_immediately_when_nothing_passes_the_filter(tmp_path, monkeypatch):
-    from datetime import datetime, timezone
+class _FakeSession:
+    from datetime import datetime as _dt, timezone as _tz
 
-    from lumia_briefing_room.pipeline import orchestrator as orch
+    start_utc = _dt(2026, 9, 24, 6, 0, 0, tzinfo=_tz.utc)
+    segment_duration_sec = 3.0
+    width = 2560
+    height = 1440
+    directory = Path("bg_1049590_20260924_060000")
 
-    class Session:
-        start_utc = datetime(2026, 9, 24, 6, 0, 0, tzinfo=timezone.utc)
-        segment_duration_sec = 3.0
-        width = 2560
-        height = 1440
-        directory = Path("bg_1049590_20260924_060000")
+
+def _patch_pipeline(monkeypatch, orch, *, intervals, full_ok=True, markers=()):
+    from lumia_briefing_room.pipeline.clip import CutResult
+    from lumia_briefing_room.pipeline.full_video import FullVideo, FullVideoOutcome
+
+    cuts: list[str] = []
 
     def fake_detect_match(session, seg_range, *, on_progress=None, **kwargs):
         return orch.MatchDetection(
-            intervals=[], k_final=0, a_final=0, gaps=[],
-            source_incomplete=False, spectator_ranges=[], teammate_deaths=0,
+            intervals=list(intervals), k_final=1, a_final=0, gaps=[],
+            source_incomplete=False, spectator_ranges=[], teammate_deaths=[], markers=list(markers),
         )
 
-    monkeypatch.setattr(orch, "detect_match", fake_detect_match)
+    def fake_full(session, seg_range, start, end, folder, **kw):
+        cuts.append("full")
+        if not full_ok:
+            return FullVideoOutcome(None, "저장 공간이 부족해 풀영상을 만들지 못했습니다")
+        cut = CutResult(segment_start=2, segment_end=5, duration_sec=12.0, source_incomplete=False)
+        return FullVideoOutcome(FullVideo(path=folder / "full.mp4", cut=cut, size_bytes=5, offset_sec=3.0))
 
-    seen: list[float] = []
+    def fake_cut(session, rng, out, **kw):
+        cuts.append(out.stem)
+        return CutResult(segment_start=1, segment_end=4, duration_sec=10.0, source_incomplete=False)
+
+    monkeypatch.setattr(orch, "detect_match", fake_detect_match)
+    monkeypatch.setattr(orch, "cut_full_video", fake_full)
+    monkeypatch.setattr(orch, "cut_clip", fake_cut)
+    monkeypatch.setattr(orch, "_read_result", lambda *a, **kw: None)
+    monkeypatch.setattr(orch, "_find_portraits", lambda *a, **kw: None)
+    monkeypatch.setattr(orch, "make_thumbnail", lambda *a, **kw: None)
+    return cuts
+
+
+def _run_process(orch, tmp_path, *, save_mode="auto", **kw):
+    cfg = Config(paths=PathsConfig(clips=tmp_path / "clips", temp=tmp_path / "tmp"), clip=ClipConfig(save_mode=save_mode))
+    start = _FakeSession.start_utc
     written = orch.process_match(
-        Session(), Session.start_utc, Session.start_utc, Config(paths=PathsConfig(clips=tmp_path)),
-        ffmpeg_path=Path("ffmpeg"), clips_dir=tmp_path, on_progress=seen.append,
+        _FakeSession(), start, start, cfg, ffmpeg_path=Path("ffmpeg"), clips_dir=tmp_path / "clips",
+        games_dir=tmp_path / "games", **kw,
     )
+    import json
+    game = json.loads((tmp_path / "games" / "20260924_060000" / "game.json").read_text(encoding="utf-8"))
+    return written, game
+
+
+def test_process_match_records_the_game_even_when_nothing_passes_the_filter(tmp_path, monkeypatch):
+    from lumia_briefing_room.pipeline import orchestrator as orch
+
+    _patch_pipeline(monkeypatch, orch, intervals=[])
+    seen: list[float] = []
+    written, game = _run_process(orch, tmp_path, on_progress=seen.append)
 
     assert written == []
-    assert seen == [1.0]
+    assert game["candidates"] == []
+    assert game["fullVideo"]["path"] == "full.mp4"
+    assert seen[-1] == 1.0
+
+
+def test_full_video_is_cut_before_any_clip_and_candidates_are_relative_to_it(tmp_path, monkeypatch):
+    from lumia_briefing_room.pipeline import orchestrator as orch
+
+    cuts = _patch_pipeline(monkeypatch, orch, intervals=[ci(10.0, 20.0, {"kill"})], markers=[(12.0, "kill")])
+    written, game = _run_process(orch, tmp_path)
+
+    assert cuts[0] == "full" and len(written) == 1
+    (cand,) = game["candidates"]
+    assert (cand["start"], cand["end"]) == (2.0, 25.0)
+    assert cand["user"] == {"savedClipId": "20260924_060000_01"}
+    assert game["markers"] == [{"t": 9.0, "kind": "kill"}]
+    assert game["saveMode"] == "auto"
+
+
+def test_manual_save_mode_records_candidates_but_cuts_no_clips(tmp_path, monkeypatch):
+    from lumia_briefing_room.pipeline import orchestrator as orch
+
+    cuts = _patch_pipeline(monkeypatch, orch, intervals=[ci(10.0, 20.0, {"kill"})])
+    written, game = _run_process(orch, tmp_path, save_mode="manual")
+
+    assert written == [] and cuts == ["full"]
+    assert game["candidates"][0]["user"] == {}
+
+
+def test_when_the_full_video_fails_only_certain_candidates_become_clips_and_the_error_is_recorded(tmp_path, monkeypatch):
+    from lumia_briefing_room.pipeline import orchestrator as orch
+
+    intervals = [ci(10.0, 20.0, {"kill"}), ci(200.0, 210.0, {"no_result"})]
+    cuts = _patch_pipeline(monkeypatch, orch, intervals=intervals, full_ok=False)
+    errors: list[str] = []
+    written, game = _run_process(orch, tmp_path, save_mode="manual", on_full_video_error=errors.append)
+
+    assert len(written) == 1
+    assert errors and "저장 공간이 부족" in errors[0]
+    assert game["fullVideo"] is None and "저장 공간이 부족" in game["fullVideoError"]
+    assert len(game["candidates"]) == 2
+    assert game["candidates"][0]["user"] and not game["candidates"][1]["user"]

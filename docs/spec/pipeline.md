@@ -7,7 +7,8 @@
 ```
 Player.log 폴링 ─ 경기 경계(GAME→LOBBY) ─▶ 녹화 세션 결정(폴더명·session.mpd)
   ─▶ 세그먼트 범위(존재 확인) ─▶ [여유 적으면 구출 복사] ─▶ 검출(detect_match)
-  ─▶ 결과 화면·초상화 판독 ─▶ 생성 필터 ─▶ 클립 범위·병합 ─▶ -c copy 컷 + 썸네일 + 메타데이터 JSON
+  ─▶ 게임 전체 영상 컷(full.mp4) ─▶ 결과 화면·초상화 판독 ─▶ 생성 필터 ─▶ 클립 범위·병합
+  ─▶ (saveMode=auto) -c copy 컷 + 썸네일 + 메타데이터 JSON ─▶ game.json
 ```
 
 `pipeline/orchestrator.py::process_match(session, start, end, cfg, …)` 가 한 경기를 끝까지 처리한다. 경계만 받으면 나머지는 같으므로 로그 감시·다시 분석·과거 녹화 분석이 모두 이 함수를 부른다.
@@ -133,3 +134,20 @@ Player.log 폴링 ─ 경기 경계(GAME→LOBBY) ─▶ 녹화 세션 결정(�
 - 로그인 자동 시작(`autostart.py`, `HKCU\…\Run\LumiaBriefingRoom`): 빌드본이면 exe 경로, 소스면 `python -m lumia_briefing_room.cli.app`. 시작할 때마다 현재 명령으로 덮어쓴다.
 - 중복 실행 방지(`single_instance.py`, 뮤텍스): 두 번째 실행은 기존 앱의 UI 를 열고 종료. 개발 앱과 빌드본이 뮤텍스를 공유한다(동시 실행은 `LUMIA_PROFILE` 로 분리 — `run-parallel.bat`).
 - `app.lowPriority`: 앱 전체와 자식 ffmpeg 를 BELOW_NORMAL 로 돌려 게임 프레임 저하를 줄인다.
+
+## 11. 게임 폴더·풀영상 (`pipeline/game_store.py`, `full_video.py`)
+
+게임 하나 = `paths.games\<경기키>\`(경기키 = 게임 시작 시각 `YYYYMMDD_HHMMSS`, 클립 ID 앞부분과 같다).
+
+```
+full.mp4      게임 전체(-c copy, 원본 화질, 4GB/24분 실측)
+game.json     결과·초상화·후보·마커·사용자 수정 자리(마지막에 원자적으로 씀 - 있어야 게임으로 본다)
+result.jpg / portrait_{me,teammate1,teammate2}.jpg   클립 쪽 썸네일 폴더 사본
+```
+
+- **순서**(`process_match`): 검출 → **풀영상 컷(클립 컷보다 먼저 - 링버퍼가 원본을 지우기 전)** → 결과 화면·초상화 → 후보 이름 붙이기 → `clip.saveMode` 에 따라 클립 컷 → `game.json`. 후보가 0개인 게임도 풀영상과 `game.json` 은 남는다.
+- **풀영상이 실패해도(디스크 부족·세그먼트 없음·ffmpeg 오류) 후보 기록과 클립 저장은 계속한다.** 컷 전에 원본 청크 크기로 필요 용량을 어림해 여유(+512MB)가 없으면 건너뛰고 `fullVideoError` 에 이유를 남기며 `on_full_video_error` 로 알린다. 이때는 `saveMode` 와 무관하게 **확실한 후보(킬·어시·사망 태그)만** 클립으로 저장한다.
+- `clip.saveMode`: `auto`(기본, 후보 전부 클립으로 - 기존 방식) / `manual`(클립을 안 자름 - 수동 저장 UI 는 아직 없다).
+- `game.json` 필드: `fullVideo{path,sizeBytes,durationSec,offsetSec,segmentStart/End,sourceIncomplete,audioStatus}`, `candidates[]`(시각은 풀영상 기준 초 - 후보 범위 `start/end`, 교전 `combatStart/End`, `certain`, 태그·pvp·지역·일차, `user{savedClipId}`), `userCandidates[]`(비어 있음), `markers[]{t,kind}`(kill/assist/death/teammate_death - 검출이 이미 읽는 값), 결과표·초상화 파일명. 풀영상 0초 = 세션 기준 `offsetSec`(첫 세그먼트 시작)라 후보 시각 = 세션 기준 시각 - `offsetSec`.
+- 스테이징(다시 분석·백필)으로 클립만 옮기는 경우에도 `games/` 는 스테이징을 거치지 않고 바로 쓴다(같은 경기키를 덮어쓴다).
+- 실측(2026-09-30, 스팀 녹화 24분 게임): 검출 + 풀영상 컷 + 클립 12개 전체 81초, 풀영상 4.02GB.

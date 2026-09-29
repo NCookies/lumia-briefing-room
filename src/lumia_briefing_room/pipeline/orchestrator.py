@@ -1,5 +1,6 @@
-import threading
 import logging
+import shutil
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -15,7 +16,17 @@ from lumia_briefing_room.detect.types import CombatInterval, MatchDetection
 from lumia_briefing_room.pipeline.clip import ClipRange, cut_clip, make_thumbnail, resolve_clip_range
 from lumia_briefing_room.detect.types import PortraitCrops
 from lumia_briefing_room.pipeline.filters import apply_filter
-from lumia_briefing_room.pipeline.metadata import build_metadata, write_metadata
+from lumia_briefing_room.pipeline.full_video import FullVideoOutcome, cut_full_video
+from lumia_briefing_room.pipeline.game_store import (
+    SCHEMA_VERSION,
+    candidate_dict,
+    game_key,
+    is_certain,
+    markers_dict,
+    plans_to_save,
+    write_game_json,
+)
+from lumia_briefing_room.pipeline.metadata import build_metadata, match_result_dict, write_metadata
 from lumia_briefing_room.pipeline.clip_assets import stored_asset_path
 from lumia_briefing_room.pipeline.cleanup_registry import registry as cleanup_preview_registry
 from lumia_briefing_room.pipeline.portrait_scan import (
@@ -241,6 +252,116 @@ def _save_portrait_images(
     return paths
 
 
+@dataclass(frozen=True)
+class NamedCandidate:
+    candidate_id: str
+    clip_id: str
+    title: str
+    plan: ClipPlan
+    aggregated: CombatInterval
+
+
+def _name_candidates(plans: list[ClipPlan], match_start: datetime) -> list[NamedCandidate]:
+    named: list[NamedCandidate] = []
+    phase_clip_counts: dict[int | None, int] = {}
+    for i, plan in enumerate(plans, start=1):
+        aggregated = _aggregate_interval(plan.intervals)
+        phase_clip_index = next_phase_clip_index(phase_clip_counts, aggregated.cobalt_phase)
+        clip_id = f"{match_start:%Y%m%d_%H%M%S}_{i:02d}"
+        title = default_title(
+            aggregated.day_night, aggregated.region, aggregated.game_day,
+            cobalt_phase=aggregated.cobalt_phase, clip_index=phase_clip_index,
+        )
+        named.append(NamedCandidate(clip_id, clip_id, title, plan, aggregated))
+    return named
+
+
+def _copy_game_asset(src: Path, dest: Path) -> str | None:
+    try:
+        shutil.copy2(src, dest)
+    except OSError:
+        return None
+    return dest.name
+
+
+def _iso_z(dt: datetime) -> str:
+    return dt.isoformat().replace("+00:00", "Z")
+
+
+def _write_game_record(
+    folder: Path,
+    *,
+    session: RecordingSession,
+    match_start: datetime,
+    match_end: datetime,
+    game_mode: str,
+    detection: MatchDetection,
+    candidates: list[NamedCandidate],
+    saved_ids: dict[str, str],
+    full: FullVideoOutcome,
+    result: ResultScreen | None,
+    thumbnails_root: Path,
+    portrait_names: dict[str, str],
+    result_name: str,
+    cfg: Config,
+) -> None:
+    """game.json 을 쓴다. 실패해도 클립 결과를 막지 않는다."""
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        offset = full.video.offset_sec if full.video else 0.0
+        result_file = _copy_game_asset(thumbnails_root / result_name, folder / "result.jpg") if result else None
+        portraits = {
+            slot: _copy_game_asset(thumbnails_root / name, folder / f"portrait_{slot}.jpg")
+            for slot, name in portrait_names.items()
+        }
+        video = None
+        if full.video is not None:
+            video = {
+                "path": full.video.path.name,
+                "sizeBytes": full.video.size_bytes,
+                "durationSec": full.video.cut.duration_sec,
+                "offsetSec": full.video.offset_sec,
+                "segmentStart": full.video.cut.segment_start,
+                "segmentEnd": full.video.cut.segment_end,
+                "sourceIncomplete": full.video.cut.source_incomplete,
+                "audioStatus": full.video.cut.audio_status,
+            }
+        candidate_rows = []
+        for c in candidates:
+            pvp = score_interval(c.aggregated, cfg.filter.pvp_weights)
+            candidate_rows.append(candidate_dict(
+                c.candidate_id, interval=c.aggregated, start=c.plan.range.start, end=c.plan.range.end,
+                preroll_source=c.plan.range.preroll_source, title=c.title, offset_sec=offset,
+                pvp_score=pvp.score, pvp_signals=list(pvp.signals), clip_id=saved_ids.get(c.candidate_id),
+            ))
+        data = {
+            "schemaVersion": SCHEMA_VERSION,
+            "gameKey": game_key(match_start),
+            "source": "steam",
+            "sessionDir": session.directory.name,
+            "sessionStartUtc": _iso_z(session.start_utc),
+            "matchStartUtc": _iso_z(match_start),
+            "matchEndUtc": _iso_z(match_end),
+            "gameMode": game_mode,
+            "sourceWidth": session.width,
+            "sourceHeight": session.height,
+            "sourceIncomplete": detection.source_incomplete,
+            "matchKills": detection.k_final,
+            "matchAssists": detection.a_final,
+            "matchResult": match_result_dict(result, result_file),
+            "portraits": portraits,
+            "saveMode": cfg.clip.save_mode,
+            "fullVideo": video,
+            "fullVideoError": full.error,
+            "candidates": candidate_rows,
+            "userCandidates": [],
+            "markers": markers_dict(detection.markers, offset_sec=offset),
+        }
+        write_game_json(folder, data)
+    except Exception:
+        log.exception("게임 기록(game.json) 저장 실패 - 클립 저장은 계속한다")
+
+
 def process_match(
     session: RecordingSession,
     match_start: datetime,
@@ -257,11 +378,16 @@ def process_match(
     cancel: threading.Event | None = None,
     result_search_from: datetime | None = None,
     on_progress: Callable[[float], None] | None = None,
+    games_dir: Path | None = None,
+    on_full_video_error: Callable[[str], None] | None = None,
 ) -> list[Path]:
     """SPEC §3 다이어그램 전체: 매치 하나를 검출부터 메타데이터 저장까지 처리한다.
 
     `game_mode` 를 안 주면(기본) 검출 결과(`Phase N` vs `N일 차` 판독 횟수, plan.md §10
     C1-b)로 자동 판별한다. 명시하면(CLI `--game-mode` 등) 그 값을 그대로 쓴다.
+
+    검출 직후 게임 전체 영상을 `games/<경기키>/full.mp4` 로 먼저 자르고(실패해도 계속), 클립은
+    `clip.saveMode` 가 `auto` 일 때만 자른다(풀영상이 없으면 확실한 후보만). 후보·마커는 `game.json` 에 남긴다.
 
     반환값은 만들어진 메타데이터 JSON 경로 목록이다(클립 0개면 빈 리스트).
     `on_progress(0~1)` 는 이 게임 하나의 내부 진행률이다(plan-backfill B8) — 검출 프레임 비율 →
@@ -281,18 +407,23 @@ def process_match(
     game_mode = game_mode if game_mode is not None else detection.game_mode
 
     filtered = apply_filter(detection.intervals, cfg.filter, game_mode=game_mode)
-    if not filtered:
-        if on_progress is not None:
-            on_progress(1.0)
-        return []
-
-    if on_progress is not None:
-        on_progress(DETECTION_PROGRESS_FRACTION)
 
     resolved = resolve_paths(cfg.paths)
     clips_root, thumbnails_root = _resolve_clip_paths(cfg, clips_dir)
+    game_folder = (games_dir or resolved.games) / game_key(match_start)
     clips_root.mkdir(parents=True, exist_ok=True)
     resolved.temp.mkdir(parents=True, exist_ok=True)
+
+    # 링버퍼가 원본을 지우기 전에 끝나야 하므로 풀영상 컷이 클립 컷보다 먼저다. 실패해도 나머지는 계속한다.
+    full = cut_full_video(
+        session, seg_range, match_start, match_end, game_folder,
+        ffmpeg_path=ffmpeg_path, include_audio=cfg.clip.include_audio, tmp_dir=resolved.temp,
+    )
+    if full.error is not None and on_full_video_error is not None:
+        on_full_video_error(full.error)
+
+    if on_progress is not None:
+        on_progress(DETECTION_PROGRESS_FRACTION)
 
     plans = _plan_clips(filtered, cfg.clip, game_mode=game_mode)
     result = _read_result(session, seg_range, ffmpeg_path, hwaccel, search_from=result_search_from)
@@ -304,64 +435,75 @@ def process_match(
     portraits = _find_portraits(session, seg_range, ffmpeg_path, hwaccel)
     portrait_paths = _save_portrait_images(portraits, match_start, thumbnails_root, clips_root)
 
+    candidates = _name_candidates(plans, match_start)
+    to_save = plans_to_save(
+        candidates, cfg.clip.save_mode, full.video is not None, is_certain=lambda c: is_certain(c.aggregated.tags)
+    )
+
+    saved_ids: dict[str, str] = {}
     written: list[Path] = []
-    phase_clip_counts: dict[int | None, int] = {}
-    for i, plan in enumerate(plans, start=1):
-        aggregated = _aggregate_interval(plan.intervals)
-        phase_clip_index = next_phase_clip_index(phase_clip_counts, aggregated.cobalt_phase)
-        clip_id = f"{match_start:%Y%m%d_%H%M%S}_{i:02d}"
-        clip_path = clips_root / f"{clip_id}.mp4"
-
-        cut_result = cut_clip(
-            session, plan.range, clip_path,
-            ffmpeg_path=ffmpeg_path, include_audio=cfg.clip.include_audio,
-            tmp_dir=resolved.temp,
-        )
-
-        thumbnail_rel: str | None = None
-        if cfg.encode.thumbnail.enabled:
-            thumb_path = thumbnails_root / f"{clip_id}.jpg"
-            make_thumbnail(
-                clip_path, thumb_path,
-                duration_sec=cut_result.duration_sec,
-                offset_ratio=cfg.encode.thumbnail.offset_ratio,
-                width=cfg.encode.thumbnail.width,
-                ffmpeg_path=ffmpeg_path,
+    try:
+        for n, cand in enumerate(to_save, start=1):
+            clip_path = clips_root / f"{cand.clip_id}.mp4"
+            cut_result = cut_clip(
+                session, cand.plan.range, clip_path,
+                ffmpeg_path=ffmpeg_path, include_audio=cfg.clip.include_audio,
+                tmp_dir=resolved.temp,
             )
-            thumbnail_rel = stored_asset_path(thumb_path, clips_root)
 
-        meta = build_metadata(
-            title=default_title(
-                aggregated.day_night, aggregated.region, aggregated.game_day,
-                cobalt_phase=aggregated.cobalt_phase, clip_index=phase_clip_index,
-            ),
-            game_day=aggregated.game_day,
-            pvp=score_interval(aggregated, cfg.filter.pvp_weights),
-            session=session,
-            match_start_utc=match_start,
-            game_mode=game_mode,
-            interval=aggregated,
-            clip_range=plan.range,
-            cut_result=cut_result,
-            thumbnail_path=thumbnail_rel,
-            match_kills=detection.k_final,
-            match_assists=detection.a_final,
-            match_result=result,
-            result_image_path=result_image_path,
-            match_end_utc=match_end,
-            my_character_portrait_path=portrait_paths["me"],
-            teammate_portrait_paths=[
-                p for p in (portrait_paths["teammate1"], portrait_paths["teammate2"]) if p
-            ],
+            thumbnail_rel: str | None = None
+            if cfg.encode.thumbnail.enabled:
+                thumb_path = thumbnails_root / f"{cand.clip_id}.jpg"
+                make_thumbnail(
+                    clip_path, thumb_path,
+                    duration_sec=cut_result.duration_sec,
+                    offset_ratio=cfg.encode.thumbnail.offset_ratio,
+                    width=cfg.encode.thumbnail.width,
+                    ffmpeg_path=ffmpeg_path,
+                )
+                thumbnail_rel = stored_asset_path(thumb_path, clips_root)
+
+            aggregated = cand.aggregated
+            meta = build_metadata(
+                title=cand.title,
+                game_day=aggregated.game_day,
+                pvp=score_interval(aggregated, cfg.filter.pvp_weights),
+                session=session,
+                match_start_utc=match_start,
+                game_mode=game_mode,
+                interval=aggregated,
+                clip_range=cand.plan.range,
+                cut_result=cut_result,
+                thumbnail_path=thumbnail_rel,
+                match_kills=detection.k_final,
+                match_assists=detection.a_final,
+                match_result=result,
+                result_image_path=result_image_path,
+                match_end_utc=match_end,
+                my_character_portrait_path=portrait_paths["me"],
+                teammate_portrait_paths=[
+                    p for p in (portrait_paths["teammate1"], portrait_paths["teammate2"]) if p
+                ],
+            )
+            meta_path = clip_path.with_suffix(".json")
+            write_metadata(meta, meta_path)
+            written.append(meta_path)
+            saved_ids[cand.candidate_id] = cand.clip_id
+
+            if on_progress is not None:
+                remaining = 1.0 - RESULT_SCAN_PROGRESS_FRACTION
+                on_progress(RESULT_SCAN_PROGRESS_FRACTION + remaining * n / len(to_save))
+    finally:
+        _write_game_record(
+            game_folder, session=session, match_start=match_start, match_end=match_end, game_mode=game_mode,
+            detection=detection, candidates=candidates, saved_ids=saved_ids, full=full, result=result,
+            thumbnails_root=thumbnails_root,
+            portrait_names={slot: portrait_image_name(match_start, slot) for slot in PORTRAIT_SLOTS},
+            result_name=result_image_name(match_start), cfg=cfg,
         )
-        meta_path = clip_path.with_suffix(".json")
-        write_metadata(meta, meta_path)
-        written.append(meta_path)
 
-        if on_progress is not None:
-            remaining = 1.0 - RESULT_SCAN_PROGRESS_FRACTION
-            on_progress(RESULT_SCAN_PROGRESS_FRACTION + remaining * i / len(plans))
-
+    if on_progress is not None:
+        on_progress(1.0)
     if written:
         cleanup_preview_registry.notify_clips_changed()
     return written
