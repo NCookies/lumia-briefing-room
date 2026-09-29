@@ -42,3 +42,15 @@ def test_read_spectating_false_when_character_ui_present():
 
 def test_read_spectating_none_when_minimap_gone_such_as_blackout_or_lobby():
     assert read_spectating(_header(0.0), _strip(0.0)) is None
+
+
+def test_read_spectating_falls_back_to_cobalt_header_when_default_header_is_empty():
+    """코발트는 미니맵 헤더 아이콘도 배틀로얄과 다른 자리에 있다(실측, 코발트.mp4
+    2026-09-29) - 기본 자리가 비어 있어도 코발트 자리에 아이콘이 보이면 로비/암전으로
+    잘못 새면 안 된다."""
+    assert read_spectating(_header(0.0), _strip(0.05), cobalt_header_rgb=_header(0.6)) is False
+    assert read_spectating(_header(0.0), _strip(0.0), cobalt_header_rgb=_header(0.6)) is True
+
+
+def test_read_spectating_stays_none_when_cobalt_header_also_empty():
+    assert read_spectating(_header(0.0), _strip(0.0), cobalt_header_rgb=_header(0.0)) is None

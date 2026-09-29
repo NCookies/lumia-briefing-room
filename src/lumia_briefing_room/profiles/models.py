@@ -20,6 +20,7 @@ _RESOLUTION_NATIVE_ONLY_ROIS = frozenset({
     "phase_digit", "cobalt_outcome", "cobalt_result_panel",
     "cobalt_teammate1", "cobalt_teammate2", "cobalt_teammate3",
     "cobalt_tk_value", "cobalt_k_value", "cobalt_a_value",
+    "cobalt_face", "cobalt_minimap_icons",
 })
 
 

@@ -223,9 +223,13 @@ def analyze_frame(
     phase_templates: dict[str, np.ndarray] | None = None,
 ) -> FrameState:
     """프레임 하나에서 교전/사망/카운터/낮밤 신호를 전부 읽는다. (plan.md §5)"""
+    cobalt_header = (
+        profile.crop(frame, "cobalt_minimap_icons") if "cobalt_minimap_icons" in profile.rois else None
+    )
     spectating = read_spectating(
         profile.crop(frame, "minimap_icons"),
         profile.crop(frame, "hp_strip"),
+        cobalt_header,
     )
 
     dead_teammates = None
@@ -269,11 +273,21 @@ def analyze_frame(
         # 화면이 "알 수 없음 교전"으로 잘못 뽑힌 사례). combat=False(확인됨)일 때만 읽는다.
         combat = None
         face_value = face_sat = None
+        cobalt_face_value = cobalt_face_sat = None
     else:
         combat = read_badge(profile.crop(frame, "badge"))
         face_stats = channel_stats(profile.crop(frame, "face"))
         face_value = float(face_stats.v.mean())
         face_sat = float(face_stats.s.mean())
+        cobalt_face_value = cobalt_face_sat = None
+        if "cobalt_face" in profile.rois:
+            # 코발트는 얼굴 ROI 도 배틀로얄과 다른 자리에 있다(실측, 코발트.mp4
+            # 2026-09-29) - game_mode 를 프레임 하나로는 아직 모르므로(§10-3 후속과
+            # 같은 사정) 두 자리를 모두 재두고, finalize_match 가 game_mode 를 알아낸
+            # 뒤 cobalt 면 이 값을 쓴다.
+            cobalt_face_stats = channel_stats(profile.crop(frame, "cobalt_face"))
+            cobalt_face_value = float(cobalt_face_stats.v.mean())
+            cobalt_face_sat = float(cobalt_face_stats.s.mean())
 
     day_night = read_day_night(profile.crop(frame, "day_night"))
     clock_zero = read_clock_zero(profile.crop(frame, "timer")) if "timer" in profile.rois else None
@@ -346,6 +360,8 @@ def analyze_frame(
         ultimate_blue=ultimate_blue,
         ultimate_locked=ultimate_locked,
         cobalt_phase=cobalt_phase,
+        cobalt_face_value=cobalt_face_value,
+        cobalt_face_sat=cobalt_face_sat,
     )
 
 
@@ -506,11 +522,17 @@ def finalize_match(
     first = states[0].t
     game_mode = infer_game_mode(states)
 
-    face_stats = [
-        FaceStat(t=s.t, value=s.face_value, sat=s.face_sat)
-        for s in states
-        if s.face_value is not None and s.face_sat is not None and not _spectating(s.t)
-    ]
+    # 코발트는 얼굴 ROI 가 배틀로얄과 다른 자리에 있다(실측, 코발트.mp4 2026-09-29) -
+    # analyze_frame 은 game_mode 를 몰라 두 자리를 모두 재뒀으니, 여기서 game_mode 가
+    # 밝혀진 뒤 코발트면 cobalt_face_value/sat 를, 아니면 기존 face_value/sat 를 쓴다.
+    face_stats = []
+    for s in states:
+        if _spectating(s.t):
+            continue
+        if game_mode == "cobalt" and s.cobalt_face_value is not None and s.cobalt_face_sat is not None:
+            face_stats.append(FaceStat(t=s.t, value=s.cobalt_face_value, sat=s.cobalt_face_sat))
+        elif s.face_value is not None and s.face_sat is not None:
+            face_stats.append(FaceStat(t=s.t, value=s.face_value, sat=s.face_sat))
     death_ranges = detect_death(face_stats)
 
     k_events = to_events([(s.t, s.k) for s in states], "K")

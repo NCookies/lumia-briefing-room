@@ -1,3 +1,5 @@
+import dataclasses
+
 import numpy as np
 import pytest
 
@@ -219,6 +221,52 @@ def test_analyze_frame_k_stays_none_when_neither_hud_position_has_a_digit(render
     frame = np.full((1080, 1920, 3), 80, dtype=np.uint8)
 
     assert analyze_frame(frame, profile, t=0.0, k_templates=k_templates).k is None
+
+
+def test_analyze_frame_detects_alive_via_cobalt_minimap_icons_position():
+    """미니맵 헤더 아이콘도 코발트 자리가 배틀로얄과 다르다(실측, 코발트.mp4 2026-09-29) -
+    기본 자리가 비어 있어도 코발트 자리에 아이콘이 보이면 로비/암전(None)으로 새면
+    안 된다(그러면 얼굴/배지를 아예 안 읽어 사망 검출이 통째로 죽는다)."""
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    frame = np.full((profile.height, profile.width, 3), 80, dtype=np.uint8)
+    cobalt_header = profile.rois["cobalt_minimap_icons"]
+    frame[cobalt_header.y0 + 2 : cobalt_header.y1 - 2, cobalt_header.x0 : cobalt_header.x1] = 210
+    strip = profile.rois["hp_strip"]
+    mid_y = (strip.y0 + strip.y1) // 2
+    frame[mid_y - 5 : mid_y + 5, strip.x0 : strip.x0 + 200] = (90, 220, 40)
+
+    state = analyze_frame(frame, profile, t=0.0)
+
+    assert state.spectating is False
+
+
+def test_analyze_frame_also_reads_cobalt_face_position_when_configured():
+    """얼굴 ROI 도 코발트 자리가 배틀로얄과 다르다(실측, 코발트.mp4 2026-09-29) - game_mode
+    를 프레임 하나로는 아직 모르므로 두 자리를 모두 재두고, finalize_match 가 game_mode
+    를 알아낸 뒤에 고른다. 실측 좌표는 face 자리와 겹치므로(둘 다 캐릭터 상반신 쪽), 이
+    테스트에서는 겹치지 않는 임의 자리로 바꿔 두 값이 섞이지 않고 각자 읽히는지만 본다."""
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    moved_cobalt_face = Roi(1000, 100, 1050, 150)
+    profile = dataclasses.replace(profile, rois={**profile.rois, "cobalt_face": moved_cobalt_face})
+    frame = _alive_frame(profile)
+    _paint(frame, profile.rois["face"], (60, 40, 30))
+    _paint(frame, moved_cobalt_face, (120, 200, 210))
+
+    state = analyze_frame(frame, profile, t=0.0)
+
+    assert (state.face_value, state.face_sat) == (60.0, 30.0)
+    assert (state.cobalt_face_value, state.cobalt_face_sat) == (210.0, 90.0)
+
+
+def test_analyze_frame_cobalt_face_is_none_without_the_roi():
+    profile = ResolutionProfile.builtin(2560, 1440)
+    frame = _alive_frame(profile)
+    _paint(frame, profile.rois["face"], (60, 40, 30))
+
+    state = analyze_frame(frame, profile, t=0.0)
+
+    assert state.cobalt_face_value is None
+    assert state.cobalt_face_sat is None
 
 
 def test_calibrate_counter_position_finds_a_shifted_k_value(render_digit, compose):
@@ -1157,6 +1205,37 @@ def _cobalt_state(t, *, dead=False, k=0, a=0):
         t=t, combat=None, face_value=face[0], face_sat=face[1], k=k, a=a,
         day_night=None, spectating=False, cobalt_phase=1,
     )
+
+
+def _cobalt_state_with_mismatched_default_face(t, *, dead=False):
+    """기본(배틀로얄) 자리 값은 절대 사망처럼 안 보이게 고정하고, 실제 사망 신호는
+    cobalt_face_value/sat 에만 담는다 - finalize_match 가 기본 자리를 무시하고
+    cobalt_face 를 쓰는지 가려낸다."""
+    cobalt_face = (34.0, 13.0) if dead else (111.0, 26.0)
+    return FrameState(
+        t=t, combat=None, face_value=200.0, face_sat=5.0,
+        cobalt_face_value=cobalt_face[0], cobalt_face_sat=cobalt_face[1],
+        k=0, a=0, day_night=None, spectating=False, cobalt_phase=1,
+    )
+
+
+def test_finalize_match_cobalt_mode_prefers_cobalt_face_position_for_death_detection():
+    """얼굴 ROI 는 코발트에서 배틀로얄과 다른 자리에 있다(실측, 코발트.mp4 2026-09-29) -
+    game_mode==cobalt 로 밝혀진 뒤에는 cobalt_face_value/sat 로 사망을 판정해야 하고,
+    (틀린 자리를 보는) 기본 face_value/sat 는 무시해야 한다."""
+    times = [float(t) for t in range(0, 30, 2)]
+    dead_ranges = [(10.0, 16.0)]
+    is_dead = lambda t: any(a <= t <= b for a, b in dead_ranges)
+
+    states = [_cobalt_state_with_mismatched_default_face(t, dead=is_dead(t)) for t in times]
+
+    det = finalize_match(states)
+
+    assert det.game_mode == "cobalt"
+    assert len(det.intervals) == 2
+    ivs = sorted(det.intervals, key=lambda iv: iv.start)
+    assert ivs[0].died is True and ivs[0].end < 10.0
+    assert ivs[1].start > 16.0
 
 
 def test_finalize_match_cobalt_mode_treats_each_alive_span_as_one_interval():

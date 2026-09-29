@@ -11,6 +11,8 @@ class FrameState:
 
     combat/day_night 은 None 이면 판독 불가(로비·암전 등)다.
     face_value/face_sat 은 사망 검출을 위해 매치 전체를 모아 나중에 판단한다.
+    cobalt_face_value/cobalt_face_sat 은 코발트 전용 얼굴 ROI(배틀로얄과 자리가 다르다,
+    실측 2026-09-29) 판독값 - game_mode 를 프레임 단위로는 아직 모르므로 둘 다 재둔다.
     """
 
     t: float
@@ -32,6 +34,8 @@ class FrameState:
     ultimate_locked: bool | None = None
     tk: int | None = None
     cobalt_phase: int | None = None
+    cobalt_face_value: float | None = None
+    cobalt_face_sat: float | None = None
 
 
 @dataclass(frozen=True)
