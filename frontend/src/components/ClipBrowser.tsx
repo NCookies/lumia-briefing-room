@@ -21,6 +21,8 @@ import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { DEFAULT_FILTER, FilterBar, type FilterState } from './FilterBar'
 import { ExportDialog } from './ExportDialog'
 import { GameSection } from './GameSection'
+import { GameDayHeader } from './GameDayHeader'
+import { groupByDay } from '../gameDays'
 import { PlayerModal } from './PlayerModal'
 import { ResultCard, ResultViewer } from './ResultCard'
 import { GameTimeline } from './GameTimeline'
@@ -663,7 +665,18 @@ export function ClipBrowser({
         )}
 
         <div className="flex flex-col gap-3">
-          {source === 'steam' && groups.map((group) => renderGame(group))}
+          {source === 'steam' &&
+            groupByDay(groups).map((dayGroup) => (
+              <section key={dayGroup.day ?? 'unknown'} className="flex flex-col gap-3 [&+&]:mt-5">
+                <GameDayHeader
+                  day={dayGroup.day}
+                  gameCount={dayGroup.games.length}
+                  clipCount={dayGroup.games.reduce((n, g) => n + g.clips.length, 0)}
+                  clipBytes={dayGroup.games.reduce((n, g) => n + totalSize(g.clips), 0)}
+                />
+                {dayGroup.games.map((group) => renderGame(group))}
+              </section>
+            ))}
           {source === 'vod' &&
             vodGroups.map((vg) => {
               const visible = vg.games.reduce((n, g) => n + g.clips.length, 0)
