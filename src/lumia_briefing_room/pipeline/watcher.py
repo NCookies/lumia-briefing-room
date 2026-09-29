@@ -40,7 +40,8 @@ def should_rescue(remaining_margin_min: float, threshold_min: float) -> bool:
 
 
 def match_key(match: MatchBoundary) -> str:
-    return match.start_utc.isoformat()
+    """처리 이력 키. 경계를 캐릭터 선택까지 넓히기 전 이력과 맞도록 `[LOADING][GAME]` 시각을 쓴다."""
+    return match.loading_utc.isoformat()
 
 
 @dataclass(frozen=True)

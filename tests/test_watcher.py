@@ -506,3 +506,11 @@ def test_run_polling_with_once_stops_as_soon_as_nothing_is_left_to_process(tmp_p
     )
 
     assert len(calls) == 2
+
+
+def test_match_key_stays_on_loading_time_so_old_history_still_matches():
+    from lumia_briefing_room.pipeline.watcher import match_key
+
+    loading = datetime(2026, 1, 1, 0, 1, 20, tzinfo=UTC)
+    widened = MatchBoundary(loading - timedelta(seconds=80), loading + timedelta(minutes=20), loading_utc=loading)
+    assert match_key(widened) == loading.isoformat()

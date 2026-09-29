@@ -51,6 +51,21 @@ phaseIndex = (일차 - 1) × 2 + (낮 0 / 밤 1)
 | 게임 시작·페이즈 | `[ClientService:StartGame:…]`, `OnUpdateGamePlayPhase : Briefing\|StartCountdown\|PlayGame` |
 
 - GAME ↔ LOBBY 가 1:1 교대, 누락 0(실측 19판). 실시간 flush.
+
+**게임 경계는 캐릭터 선택부터다**(`playerlog.extract_matches`, 2026-09-30 실측). 한 게임은 로그에서 이렇게 이어진다.
+
+| 순서 | 화면 | 로그 |
+|---|---|---|
+| 1 | 로비 "매칭 중" | `matchingNotification : StartMatching` |
+| 2 | **캐릭터 선택**(로비 장면 안) | `MatchingComplete, matchPadding.userCount : N` |
+| 3~4 | 루트 선택, "잠시 후 실험이 시작됩니다" | (없음) |
+| 5 | 로딩 | `[LOADING][GAME]` (2번에서 약 80초 뒤) |
+| 6 | 브리핑 룸 → 본게임 | `OnUpdateGamePlayPhase : Briefing → StartCountdown → PlayGame` |
+| 7 | 결과 화면 → `나가기` | `[LOADING][LOBBY]` |
+
+- 시작 = `[LOADING][GAME]` 직전의 **마지막** `MatchingComplete`. 사이에 `StartMatching` 이 다시 있으면 앞의 것은 닷지라 버린다. 없거나 5분 넘게 앞서면 `[LOADING][GAME]` 이 시작이다. 끝 = `[LOADING][LOBBY]`.
+- `MatchBoundary.start_utc` 가 이 넓힌 시작, `loading_utc` 가 `[LOADING][GAME]` 시각이다. **처리 이력 키(`match_key`)는 `loading_utc`** 라서 경계를 넓히기 전 이력과 맞는다. 옛 클립의 `matchStartUtc` 는 `loading_utc` 와 같은 값이라 다시 분석(`find_match_end`)은 둘 다 본다.
+- **연습 모드는 게임이 아니다**: 직전 `GlobalUserData:SetMatchingMode ... Invoked: Practice` 이거나 게임 구간 안에 `"matchingMode":"Practice"`(battleGameInfo) 가 찍힌 `[LOADING][GAME]`~`[LOADING][LOBBY]` 쌍은 버린다(실측 3분 24초). 사용자 설정 게임은 넣는다.
 - **시각은 로컬 타임존**이다(녹화는 UTC).
 - `GameResultTeamPlayerSlot` 은 프리메이드일 때만 찍힌다 — 종료 마커로 쓰지 않는다.
 - 로그의 낮/밤(`SetDayNight input=Day|Night`)은 누락이 심해 **쓰지 않는다**. 로그에 게임 모드 문구도 없다.

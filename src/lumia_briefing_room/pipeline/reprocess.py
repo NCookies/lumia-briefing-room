@@ -48,7 +48,9 @@ def _parse(iso: str) -> datetime:
 
 def find_match_end(start: datetime, boundaries: list[MatchBoundary]) -> datetime | None:
     for b in boundaries:
-        if b.end_utc is not None and abs(b.start_utc - start) <= END_MATCH_TOLERANCE:
+        if b.end_utc is not None and any(
+            abs(t - start) <= END_MATCH_TOLERANCE for t in (b.start_utc, b.loading_utc)
+        ):
             return b.end_utc
     return None
 

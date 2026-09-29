@@ -32,7 +32,7 @@ from lumia_briefing_room.pipeline.session_scan import GameWindow, ScanCancelled,
 
 log = logging.getLogger("lumia_briefing_room.backfill")
 
-KNOWN_TOLERANCE_SEC = 120.0
+KNOWN_TOLERANCE_SEC = 240.0
 MAX_ATTEMPTS = 3
 STATE_FILE = "backfill.json"
 STAGING_PREFIX = "game_"

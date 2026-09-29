@@ -247,3 +247,11 @@ def test_reprocess_recycle_mode_sends_old_clip_files_to_recycle_bin(tmp_path, mo
     call(tmp_path, process=process, cfg=cfg)
 
     assert set(sent) == {"a_01.json", "a_01.mp4"}
+
+
+def test_find_match_end_also_matches_clips_made_before_the_boundary_was_widened():
+    """옛 클립의 matchStartUtc 는 [LOADING][GAME] 시각이다. 새 경계의 시작은 캐릭터 선택이라 더 앞선다."""
+    boundary = MatchBoundary(START - timedelta(seconds=80), END, loading_utc=START)
+
+    assert find_match_end(START, [boundary]) == END
+    assert find_match_end(START - timedelta(seconds=80), [boundary]) == END
