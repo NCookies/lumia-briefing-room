@@ -3,6 +3,7 @@ import { createContext, useContext } from 'react'
 export interface ConfirmOptions {
   message: string
   confirmLabel?: string
+  cancelLabel?: string
   danger?: boolean
   allowSkip?: boolean
 }

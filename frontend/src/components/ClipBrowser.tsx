@@ -367,6 +367,7 @@ export function ClipBrowser({
       const choice = await ask({
         message: '클립 추출이 끝나면 원본 영상 파일을 삭제할까요?',
         confirmLabel: '삭제',
+        cancelLabel: '삭제 안 함',
         allowSkip: true,
         danger: true,
       })

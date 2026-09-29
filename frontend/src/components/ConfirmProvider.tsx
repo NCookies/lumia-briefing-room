@@ -48,7 +48,7 @@ function ConfirmDialog({ pending, onDone }: { pending: Pending; onDone: (result:
             className="rounded px-4 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700"
             onClick={() => onDone({ ok: false, skipNext: false })}
           >
-            취소
+            {options.cancelLabel ?? '취소'}
           </button>
           <button
             type="button"
