@@ -38,7 +38,7 @@ export async function listVods(): Promise<Vod[]> {
 }
 
 export async function setStreamer(id: string, streamer: string): Promise<void> {
-  await jsonOrThrow(await send(`${BASE}/vods/${id}`, 'PATCH', { streamer }), '스트리머 이름 저장')
+  await jsonOrThrow(await send(`${BASE}/vods/${id}`, 'PATCH', { streamer }), '이름 저장')
 }
 
 export async function setVideoDate(id: string, date: string): Promise<void> {

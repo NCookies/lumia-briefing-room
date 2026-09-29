@@ -164,7 +164,7 @@ function StreamerName({ value, onSave }: { value: string | null; onSave: (name: 
           autoFocus
           className="w-32 rounded border border-zinc-600 bg-zinc-900 px-2 py-0.5 text-sm"
           value={draft}
-          placeholder="스트리머 이름"
+          placeholder="이름"
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === 'Escape' && setEditing(false)}
         />
@@ -178,7 +178,7 @@ function StreamerName({ value, onSave }: { value: string | null; onSave: (name: 
     <button
       type="button"
       className="text-sm text-zinc-300 hover:text-sky-300"
-      title="스트리머 이름 수정"
+      title="이름 변경"
       onClick={() => {
         setDraft(value ?? '')
         setEditing(true)
