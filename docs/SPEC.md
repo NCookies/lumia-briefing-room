@@ -1281,6 +1281,8 @@ eplay\<캐릭터>` 처럼 폴더를 나눠 보관한다.
 
 추출이 실패하면(디스크 부족, ffmpeg 오류 등) `watch.retryCount` 만큼 재시도한다. 끝내 실패하면 **매치를 "미처리"로 남겨두고** 다음 시작 때 백로그가 다시 집어가게 한다 — 그때까지 버퍼에 남아있다면.
 
+**실패는 화면에도 남는다(2026-09-29).** 재시도 횟수 제한 자체는 여전히 메모리에만 있어 앱을 껐다 켜야 초기화되지만, "이 매치가 실패했다"는 사실과 원인 메시지는 `pipeline/watch_failures.py::WatchFailureTracker` 가 JSON 파일로 영속화한다 — 새로고침해도 남아있다. ffmpeg 가 디스크 용량 부족으로 실패한 경우(`pipeline/ffmpeg_errors.py`) "저장 공간이 부족해 클립 추출이 중단됐습니다" 처럼 원인을 명시한다. 화면 상단 빨간 배너의 "계속하기"(`POST /api/watch/failures/{key}/retry`)를 누르면 재시도 횟수 제한과 무관하게 다음 폴링에서 바로 다시 시도한다. 같은 판별기(`describe_clip_error`/`is_disk_full_error`)를 다시보기(VOD) 분석 실패 메시지(`pipeline/vod_analyze.py`)에도 쓴다 — 그쪽은 실패 상태(`status: "error"`, `errorKind: "disk_full"`)가 이미 `.vods/<id>.json` 에 영속화돼 있었고 "이어서 분석" 버튼도 이미 있어, 메시지만 이 판별기로 바꿨다.
+
 ### 7.3 클립 생성 필터
 
 **기본값은 전부 통과.** 여기를 건드리지 않으면 모든 교전이 클립이 된다.
