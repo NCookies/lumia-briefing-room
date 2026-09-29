@@ -15,6 +15,7 @@ function vod(over: Partial<Vod> = {}): Vod {
     path: 'H:/vod/a.mp4',
     name: 'a.mp4',
     exists: true,
+    sourceDeleted: false,
     sizeBytes: 1000,
     durationSec: 3600,
     width: 1920,
@@ -200,4 +201,10 @@ test('a disabled analysis button always says why', () => {
   assert.match(analysisBlockedReason(vod(), true), /다른 영상을 분석하는 중/)
   assert.match(analysisBlockedReason(vod({ exists: false }), true), /찾을 수 없/)
   assert.equal(analysisBlockedReason(null, false), '')
+})
+
+test('a source deleted by the auto-delete setting gets its own reason, not "file missing"', () => {
+  const reason = analysisBlockedReason(vod({ exists: false, sourceDeleted: true }), false)
+  assert.match(reason, /자동 삭제/)
+  assert.doesNotMatch(reason, /찾을 수 없/)
 })

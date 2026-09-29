@@ -124,6 +124,9 @@ def test_deletes_source_video_when_requested_and_clips_were_made(vod_file, tmp_p
 
     assert index["status"] == "done" and len(index["clips"]) >= 1
     assert not vod_file.exists()
+    # "영상 파일을 찾을 수 없습니다"(VodSection.tsx)를 오류로 오해하지 않도록,
+    # 설정에 따라 자동으로 지웠다는 표시를 남긴다(실사용 보고, 2026-09-29).
+    assert index["sourceDeleted"] is True
 
 
 @requires_ffmpeg
@@ -132,6 +135,7 @@ def test_keeps_source_video_when_not_requested(vod_file, tmp_path):
 
     assert index["status"] == "done"
     assert vod_file.exists()
+    assert not index.get("sourceDeleted")
 
 
 @requires_ffmpeg

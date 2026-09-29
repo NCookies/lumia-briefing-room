@@ -168,6 +168,7 @@ def register_vod_routes(
             "analyzedSec": (index or {}).get("analyzedSec"),
             "error": (index or {}).get("error"),
             "errorKind": (index or {}).get("errorKind"),
+            "sourceDeleted": (index or {}).get("sourceDeleted", False),
             "streamer": cfg.vod.streamers.get(vid) or (index or {}).get("streamer"),
             "videoDate": video_date,
             "games": (index or {}).get("games", []),

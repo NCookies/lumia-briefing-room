@@ -306,6 +306,12 @@ def analyze_vod(
     save_index(root, index)
     if index.get("deleteSourceOnSuccess") and len(index["clips"]) >= 1:
         _delete_source_video(video_path, mode=cfg.vod.delete_source_mode)
+        # 화면이 "영상 파일을 찾을 수 없습니다"(vod.exists=False, VodSection.tsx)를 오류처럼
+        # 보여주지 않고 "설정대로 자동 삭제했다"고 구분해서 보여주게 하는 표시
+        # (실사용 보고, 2026-09-29 - 원본 삭제를 직접 선택해 놓고 나중에 그 사실을 잊어
+        # 버그로 오해했다).
+        index.update(sourceDeleted=True, updatedAt=_now_iso())
+        save_index(root, index)
     report("done", 1.0, games=len(index["games"]), clips=len(index["clips"]))
     return index
 

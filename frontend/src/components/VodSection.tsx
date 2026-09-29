@@ -274,7 +274,12 @@ export function VodSection({
               {[formatDuration(vod?.durationSec), resolution, vod?.sizeBytes ? formatBytes(vod.sizeBytes) : '']
                 .filter(Boolean)
                 .join(' · ')}
-              {vod && !vod.exists && <span className="ml-2 text-rose-400">영상 파일을 찾을 수 없습니다</span>}
+              {vod && !vod.exists && vod.sourceDeleted && (
+                <span className="ml-2 text-zinc-500">설정에 따라 원본을 자동 삭제했습니다</span>
+              )}
+              {vod && !vod.exists && !vod.sourceDeleted && (
+                <span className="ml-2 text-rose-400">영상 파일을 찾을 수 없습니다</span>
+              )}
             </span>
           </span>
         </button>

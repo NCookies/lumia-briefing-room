@@ -20,6 +20,7 @@ export interface Vod {
   path: string
   name: string
   exists: boolean
+  sourceDeleted: boolean
   sizeBytes: number | null
   durationSec: number | null
   width: number | null
@@ -184,9 +185,13 @@ export function analysisPercent(vod: Pick<Vod, 'analyzedSec' | 'durationSec'>): 
   return Math.min(100, Math.round((vod.analyzedSec / vod.durationSec) * 100))
 }
 
-export function analysisBlockedReason(vod: Pick<Vod, 'exists'> | null, analysisBusy: boolean): string {
+export function analysisBlockedReason(vod: Pick<Vod, 'exists' | 'sourceDeleted'> | null, analysisBusy: boolean): string {
   if (vod === null) return ''
-  if (!vod.exists) return '영상 파일을 찾을 수 없어 분석할 수 없습니다'
+  if (!vod.exists) {
+    return vod.sourceDeleted
+      ? '설정에 따라 원본을 자동 삭제해 다시 분석할 수 없습니다'
+      : '영상 파일을 찾을 수 없어 분석할 수 없습니다'
+  }
   if (analysisBusy) return '다른 영상을 분석하는 중입니다. 끝나면 시작할 수 있습니다'
   return ''
 }
