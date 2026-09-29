@@ -5,7 +5,7 @@
 
 - 코드: [receiver/](receiver/) (`app/`, `tests/`, `Dockerfile`)
 - 계약(요청·응답 명세와 픽스처): [../contract/](../contract/)
-- 앱 쪽 연결 계획·결정: [../docs/plan-infra.md](../docs/plan-infra.md)
+- 앱 쪽 연결·결정: [../docs/spec/deploy.md](../docs/spec/deploy.md) §9, 남은 작업: [../docs/plan.md](../docs/plan.md) §6
 
 ## 이미지 빌드와 배포
 

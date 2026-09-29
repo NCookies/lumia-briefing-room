@@ -2,15 +2,11 @@
 
 사용자용 안내(설치·사용법)는 저장소 루트의 [README.md](../README.md) 에 있다. 이 문서는 소스에서 실행·빌드·테스트하는 개발자용이다. 설계 문서는 이 폴더에 있다.
 
-- [docs/SPEC.md](SPEC.md) — 설계 결정과 근거
+- [docs/SPEC.md](SPEC.md) — 확정·구현된 설계. 목적·원칙과 문서 지도, 세부는 [docs/spec/](spec/) 의 영역별 파일
+- [docs/plan.md](plan.md) — 남은 작업·확인 필요·우선순위 / [docs/plan-fullvideo.md](plan-fullvideo.md) — 진행 중인 풀영상 전환
 - [docs/research.md](research.md) — 0단계 조사 결과(실측)
-- [docs/plan.md](plan.md) — 검출기 구현 계획 및 진행 상태
-- [docs/plan-pipeline.md](plan-pipeline.md) — 파이프라인 자동화(SPEC 2단계) 구현 계획 및 진행 상태
-- [docs/plan-ui.md](plan-ui.md) — 열람 UI(SPEC 3단계) 구현 계획 및 진행 상태
-- [docs/plan-pvp.md](plan-pvp.md) — PvP 판별(SPEC 4단계) 구현 계획 및 진행 상태
-- [docs/plan-deploy.md](plan-deploy.md) — 공개 배포 계획. D1~D6·D10·D14 구현 완료, D7 은 파일 정리 완료·git 이력 정리 대기. D13 배포 자동화는 완료(v0.1.3 태그 릴리스까지 자동으로 성공). D9 자동 업데이트는 구현·자동 테스트 완료, 남은 것은 덮어쓰기 설치 실측(수동 절차는 plan-deploy D9)
+- [docs/release-checklist.md](release-checklist.md) — 릴리스 전 사람이 확인할 것
 - [docs/friend-guide.md](friend-guide.md) — **친구에게 설치기와 같이 주는 안내문**(설치·확인 항목·진단 파일 보내는 법)
-- [docs/plan-vod.md](plan-vod.md) — 다시보기(VOD) 클립(SPEC 5단계) 설계 및 진행 상태. 분석·클립 생성, API, UI 탭("다시보기")까지 구현됐다(아래 "실행 방법 8")
 
 ## 개발 환경
 
@@ -110,7 +106,7 @@ python -m lumia_briefing_room.cli.app \
   [--k-templates PATH] [--a-templates PATH] [--hwaccel d3d11va] [--open-ui]
 ```
 
-`--game-mode` 를 생략하면(기본값) 검출 결과(`Phase N` vs `N일 차` 판독 횟수)로 자동 판별한다(plan.md §10 C1-b) — 명시하면 그 값을 강제한다.
+`--game-mode` 를 생략하면(기본값) 검출 결과(`Phase N` vs `N일 차` 판독 횟수)로 자동 판별한다([spec/detection.md §5](spec/detection.md)) — 명시하면 그 값을 강제한다.
 
 `--open-ui` 를 주지 않으면 UI 는 자동으로 열리지 않고 트레이 메뉴 "열기" 로 연다
 (`ui.startMinimized=false` 로 설정해도 시작 시 자동으로 열린다).
@@ -209,7 +205,7 @@ python -m lumia_briefing_room.cli.detect_match \
 **캐릭터 표시(초상화)**: 내 캐릭터·팀원 2명은 이름을 읽지 않고 경기 시작 직후 팀 소개 화면(체력바가 아직 없는 화면)의 초상화를 그대로 크롭해 게임 행에 3장 나란히 보여준다(`detect/portrait.py`, `pipeline/portrait_scan.py`, `GET /api/clips/{id}/character-portrait/{me|teammate1|teammate2}`). 캐릭터 식별이 없어 실패할 여지가 없지만, **이 변경 이전에 만든 클립은 소급으로 채워지지 않는다** — 새로 처리되는 경기부터만 초상화가 생긴다.
 
 **기준: 클립에 사람과의 교전이 *포함*되어 있으면 "교전".** 사냥하다 교전하거나, 교전 뒤에 야생동물·오브젝트(알파/오메가/위클라인)를 잡는 클립도 교전이다.
-야생동물·보스만 상대했으면 "사냥", 판단이 안 되면 안 찍고 넘어간다. 자세한 표는 [plan-pvp.md §4-0](plan-pvp.md).
+야생동물·보스만 상대했으면 "사냥", 판단이 안 되면 안 찍고 넘어간다. 라벨 기준은 [spec/detection.md §10](spec/detection.md).
 
 ```bash
 python tools/eval_pvp.py                  # 라벨로 점수를 평가: 오탐, 적 링 분포, 임계별 정밀도/재현율 (기본: 스팀 클립만)
@@ -232,7 +228,7 @@ python -m lumia_briefing_room.cli.analyze_vod "<영상.mp4>" \
   [--force] [--rebuild]
 ```
 
-- 진행률이 단계(`decode`/`games`/`cut`)별로 출력된다. 8시간 영상은 디코딩·판독에 수십 분이 걸린다(3시간 18분 영상 기준 실측은 plan-vod.md).
+- 진행률이 단계(`decode`/`games`/`cut`)별로 출력된다. 8시간 영상은 디코딩·판독에 수십 분이 걸린다(3시간 18분 영상이 약 12분 — [spec/vod.md](spec/vod.md)).
 - **Ctrl+C 로 멈춰도 된다.** 판독은 120프레임마다 `<클립폴더>/.vods/<영상id>.states.jsonl.gz` 에 저장되고, 같은 명령을 다시 실행하면 저장된 시각부터 이어간다. 영상 id 는 파일 내용(크기 + 앞뒤 1MiB)이라 파일을 옮겨도 이어진다.
 - 이미 끝난 영상은 아무것도 안 한다. `--rebuild` 는 저장된 판독으로 클립만 다시 만들고(설정의 `clip.*`·`filter.*` 를 바꾼 뒤), `--force` 는 판독까지 처음부터 다시 한다. 다시 만들 때는 새 클립을 임시 폴더에 만들어 성공한 뒤에만 기존 클립을 지우고(설정한 삭제 방식) 옮긴다.
 - 스트리머 이름은 `--streamer` 또는 설정 `vod.streamers` 에 영상 id 로 넣는다. `vod.gameGapSec`(게임 안 끊김 허용, 기본 30초)·`vod.minGameSec`(기본 60초)로 게임 분할을 조절한다.
@@ -358,12 +354,46 @@ git push origin v0.1.4
   | `LUMIA_RECEIVER_TOKEN` | 수신 서버 API 토큰 (`terraform.tfvars` 의 `receiver_api_token`) |
 
   `LUMIA_RECEIVER_URL`·`LUMIA_RECEIVER_TOKEN` 이 없으면 서버 전송이 꺼진 빌드가 나가고, `VT_API_KEY` 가 없으면 Release 는 만들어지되 검사 링크만 빠진다.
-- 러너 실측: Inno Setup 6.7.1 이 이미 설치돼 있고 전체 약 4분 반이다([plan-deploy §7-19](plan-deploy.md)).
+- 러너 실측: Inno Setup 6.7.1 이 이미 설치돼 있고 전체 약 4분 반이다.
 
 ### 9. 브라우저 디버깅 (개발용)
 
 - **클라이언트 오류 로그**: 프론트가 `window.onerror` / `unhandledrejection` / `console.error` 를 `POST /api/client-log` 로 보내고, 서버가 `[client]` 접두로 로그 파일에 남긴다. 로그 파일은 `%LOCALAPPDATA%\LumiaBriefingRoom\logs\app.log` (서버 로그와 같은 파일, 2MB 회전). Claude Code 에 "브라우저 오류 봐줘" 라고 하면 이 파일을 읽는다. 프론트를 고쳤으면 `npm run build`.
-- **브라우저 자동 조작(Playwright MCP)**: 저장소 루트 `.mcp.json` 에 시스템 Chrome(`--browser chrome`)으로 붙는 설정이 들어 있다. Claude Code 를 이 폴더에서 다시 열면 프로젝트 MCP 승인을 물어본다. 대상은 `python -m lumia_briefing_room.cli.serve --port 8000` 로 띄운 `http://127.0.0.1:8000/`. (Chrome 재생·콘솔 읽기 실측은 아직 안 했다 — [plan-ui.md §6](plan-ui.md))
+- **브라우저 자동 조작(Playwright MCP)**: 저장소 루트 `.mcp.json` 에 시스템 Chrome(`--browser chrome`)으로 붙는 설정이 들어 있다. Claude Code 를 이 폴더에서 다시 열면 프로젝트 MCP 승인을 물어본다. 대상은 `python -m lumia_briefing_room.cli.serve --port 8000` 로 띄운 `http://127.0.0.1:8000/`. (실제 클립 `<video>` 재생 확인은 아직 — [plan.md §4](plan.md))
+
+### 15. Windows 샌드박스 확인 (깨끗한 환경, 사용자가 직접)
+
+개발 PC 는 HEVC 코덱이 깔려 있어 **코덱 없는 PC 의 프록시 자동 전환**과 **깨끗한 윈도우의 `h264_mf` 인코더 존재**를 재현하지 못한다. Windows 11 Pro 의 Windows 샌드박스로 확인한다(없으면 `Windows 기능 켜기/끄기 → Windows 샌드박스` 후 재부팅). 샌드박스는 닫으면 안이 전부 사라지므로 결과는 닫기 전에 쓰기 가능한 매핑 폴더로 옮긴다.
+
+`sandbox.wsb`(경로는 실제 위치로, 백슬래시가 많으니 셸 heredoc 말고 편집기로 쓴다):
+
+```xml
+<Configuration>
+  <MappedFolders>
+    <MappedFolder><HostFolder>P:\lumia_briefing_room\dist</HostFolder><SandboxFolder>C:\Users\WDAGUtilityAccount\Desktop\setup</SandboxFolder><ReadOnly>true</ReadOnly></MappedFolder>
+    <MappedFolder><HostFolder>H:\steam video\video</HostFolder><SandboxFolder>C:\Users\WDAGUtilityAccount\Desktop\recordings</SandboxFolder><ReadOnly>true</ReadOnly></MappedFolder>
+  </MappedFolders>
+  <MemoryInMB>8192</MemoryInMB>
+</Configuration>
+```
+
+1. **설치**: `Desktop\setup\LumiaBriefingRoom-x.y.z-setup.exe`. 설치 경로가 `%LOCALAPPDATA%\Programs\LumiaBriefingRoom` 인지, SmartScreen 문구.
+2. **자체 점검**: `"%LOCALAPPDATA%\Programs\LumiaBriefingRoom\LumiaBriefingRoom.exe" --selftest` → 모두 통과, 특히 `H.264 프록시 인코더` 가 `h264_mf` 로 통과하는지(실패하면 프록시를 만들 방법이 없다).
+3. **첫 실행**: 콘솔 창이 번쩍이지 않음, 트레이 아이콘, 브라우저에 첫 실행 화면, 녹화 폴더를 직접 골라 `Desktop\recordings` 지정(스팀이 없어 자동 탐지 안 됨이 정상), 해상도 `2560x1440 — 측정한 해상도`.
+4. **클립 생성**(선택): `Player.log` 가 없어 감시는 경기를 못 찾는다. 과거 녹화 분석을 돌리거나 건너뛴다.
+5. **재생 — 핵심**: 호스트 클립 폴더에서 mp4 + json 한 쌍을 복사해 넣고 열어 **"재생용 영상을 만드는 중… NN%" → 재생**되는지, 걸린 시간·화질. 검은 화면이면 F12 콘솔과 진단 zip 을 남긴다.
+6. 자르기·저장·삭제, 두 번째 실행 시 기존 UI 가 열림, 진단 zip 에 닉네임·사용자 이름 없음, Defender 반응.
+7. **제거**: 자동 시작 레지스트리 값(`HKCU\Software\Microsoft\Windows\CurrentVersion\Run\LumiaBriefingRoom`)이 사라지고 클립 폴더는 남는다.
+
+### 16. 앱 안 업데이트 수동 확인 (실제 릴리스)
+
+덮어쓰기 설치·재시작은 자동 테스트로 못 덮는다. 실제 릴리스 두 개(기준 버전 A → 새 버전 B)로 확인한다.
+
+1. A 를 설치한 PC 에서(설치 폴더·프로그램 추가/제거 항목이 하나인지, 설정·클립 유지) 옵션 "정보·진단" 의 버전이 A 인지 본다.
+2. **수동 경로**(선택 기능은 꺼둔 채): "업데이트 확인" → B 와 패치노트 → "업데이트". 진행률 → 설치 진행 창 → 앱 종료 → **앱이 다시 떠서 트레이 상주** → 버전 B → 탭 자동 새로고침과 "업데이트가 완료되었습니다" 창 → 설정·클립·자동 시작 유지 → `%LOCALAPPDATA%\LumiaBriefingRoom\updates\` 에 받은 설치기. 앱이 받은 설치기에 SmartScreen 이 뜨는지 기록.
+3. **자동 경로**: A 로 되돌려(설치기 재실행) "업데이트 알림" 을 켜고 재시작 → 트레이 알림·배너 → 배너의 "업데이트". 알림은 버전당 한 번이라 다시 보려면 `update_state.json` 의 `notified` 를 지운다.
+4. **거부 경로**(선택): 릴리스의 `.sha256` 을 잘못된 값으로 올려(`gh release upload --clobber`) "SHA-256 이 달라 실행하지 않았습니다" 와 설치기 미실행 확인 후 되돌린다.
+5. 문제가 있으면 이전 설치기를 다시 실행해 덮어쓴다(같은 `AppId`).
 
 ## 개발 도구 (tools/)
 

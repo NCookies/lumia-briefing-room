@@ -1,6 +1,6 @@
 name: release
 
-# v* 태그를 푸시하면 설치기를 만들어 GitHub Release 로 올리고 VirusTotal 검사 링크를 본문에 붙인다. (docs/plan-deploy.md D13)
+# v* 태그를 푸시하면 설치기를 만들어 GitHub Release 로 올리고 VirusTotal 검사 링크를 본문에 붙인다. (docs/spec/deploy.md §7)
 # 수동 실행(workflow_dispatch)은 빌드·설치기·SHA-256 까지만 하고 Release 는 만들지 않는다 — 태그 없이 파이프라인과 빌드 시간을 확인하는 용도.
 
 on:
