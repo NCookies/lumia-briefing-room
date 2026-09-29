@@ -358,6 +358,21 @@ def test_finalize_match_tags_kill():
     assert result.a_final == 0
 
 
+def test_finalize_match_reports_kill_and_assist_markers_at_their_times():
+    times = [0, 3, 6, 9, 12, 15, 18, 21, 24, 27]
+    combat_on = {6, 9, 12, 15, 18, 21, 24}
+    k_values = {t: (1 if t >= 12 else 0) for t in times}
+    a_values = {t: (1 if t >= 18 else 0) for t in times}
+    states = [fs(t, t in combat_on, k=k_values[t], a=a_values[t]) for t in times]
+
+    result = finalize_match(states)
+
+    kinds = {(kind, round(t)) for t, kind in result.markers}
+    assert ("kill", 12) in kinds
+    assert ("assist", 18) in kinds
+    assert [t for t, _ in result.markers] == sorted(t for t, _ in result.markers)
+
+
 def test_finalize_match_tags_assist():
     times = [0, 3, 6, 9, 12, 15, 18, 21, 24]
     combat_on = {6, 9, 12, 15, 18}

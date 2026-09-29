@@ -660,11 +660,18 @@ def finalize_match(
             )
         )
 
+    markers = sorted(
+        [(e.t, "kill") for e in k_events if e.delta > 0]
+        + [(e.t, "assist") for e in a_events if e.delta > 0]
+        + [(t, "death") for t in death_starts]
+        + [(t, "teammate_death") for t, _ in teammate_deaths]
+    )
+
     return MatchDetection(
         intervals=intervals, k_final=k_final, a_final=a_final,
         gaps=gaps, source_incomplete=bool(gaps),
         spectator_ranges=spectator_ranges, teammate_deaths=teammate_deaths,
-        game_mode=game_mode,
+        game_mode=game_mode, markers=markers,
     )
 
 

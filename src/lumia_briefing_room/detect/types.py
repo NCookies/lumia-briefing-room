@@ -77,3 +77,4 @@ class MatchDetection:
     spectator_ranges: list[tuple[float, float]] = field(default_factory=list)
     teammate_deaths: list[tuple[float, int]] = field(default_factory=list)
     game_mode: str = "battle_royale"
+    markers: list[tuple[float, str]] = field(default_factory=list)
