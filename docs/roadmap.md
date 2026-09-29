@@ -12,6 +12,7 @@
 | [plan-ui.md](plan-ui.md) | 열람 UI(3단계) | ✅ 거의 완료 | 캐릭터 후보 선택 UI(수동 보정 범위 밖으로 뺌), pywebview `.localhost` 실측, Playwright HEVC 재생 확인 |
 | [plan-pvp.md](plan-pvp.md) | PvP 판별(4단계) | ✅ 구현, 튜닝 진행 | 라벨 확인, 증거 없는 교전용 신호, 후순위 신호들 |
 | [plan-vod.md](plan-vod.md) | 다시보기(5단계) | ✅ V0~V6 | 다른 스트리머 검증 |
+| [plan-fullvideo.md](plan-fullvideo.md) | 풀영상 중심 구조 전환 | 🔶 계획 수립(2026-09-29) | F0 결정 확정 → F1~F7 |
 | [plan-backfill.md](plan-backfill.md) | 과거 녹화 분석 | ✅ B0~B8 | 다른 PC·4시간 규모 검증 |
 | [plan-deploy.md](plan-deploy.md) | 배포 | 🔶 D1~D6 완료 | **D7·D8·D9·D10·D11·D12·D13·D14** — 지금 주 작업 |
 | [plan-infra.md](plan-infra.md) + [server/](../server/README.md) + 인프라 저장소 | 수신 서버 | 🔶 I1~I3 + 전송 계약 구현·배포 | I4(클라이언트 연결), I5(DB), 운영 위험 |
@@ -75,7 +76,7 @@
 | pywebview `.localhost` 실측 | [ui §4-3](plan-ui.md) | 트레이 경로는 기본 브라우저라 영향 작음 |
 | ~~휴지통 제거 → 삭제 확인 창(Windows 휴지통/영구 삭제)~~ ✅ 2026-09-28 완료 | [ui §0](plan-ui.md), SPEC §7.6 | 앱 자체 휴지통·복구·유예 기간을 없애고 삭제를 확인 창(Windows 휴지통/영구 삭제)으로 통일. 다시 분석·구간 분할·자동 정리·다시보기 클립 삭제가 모두 `pipeline/delete_helper.py`(Send2Trash) 를 쓴다. 기존 `clips/.trash` 는 `pipeline/legacy_trash.py` 가 첫 실행에 이전 창으로 처리 |
 | ~~자동 정리 삭제 예정 표시~~ ✅ 2026-09-28 완료 — 빨간 계열 배지·삭제 예정 필터, 자동 정리 켤 때 확인 창 | [ui §0](plan-ui.md), SPEC §7.6 | dry-run 을 매번 돌리지 않고 클립 변경 시점마다 디바운스 재계산해 메모리 캐시(`GET /api/cleanup/preview`)하는 방식으로 구현, dry-run 비용 문제 자체가 없어짐 |
-| **풀 영상 탭**(게임 전체 영상 저장, 기본 꺼짐, 용량 경고, 자동 정리 포함 여부 체크) | [ui §0·§4-9](plan-ui.md), SPEC §7.12 | 커뮤니티 피드백(2026-09-27). 처리 시간·링버퍼 영향 실측 필요 |
+| ~~**풀 영상 탭**(기본 꺼짐 보조 뷰)~~ → **풀영상 중심 구조 전환(F0~F7)** — 풀영상 항상 저장, 보기 방식 통일, 후보 구간 조정·저장·일괄 저장, 클립 자동 저장 옵션, 자동 정리는 풀영상만, 여유 공간 강조·부족 알림, 클립 정리 탭(논의 필요) | [plan-fullvideo](plan-fullvideo.md), SPEC §7.12 | 2026-09-29 사용자 결정으로 옛 풀 영상 탭 계획을 대체. **F0(남은 결정 4건) 확정이 먼저** |
 | **클립 제목 검색** | [ui §0](plan-ui.md) | 같은 피드백. 작다 |
 | **일자 타임라인 시점 미상 클립을 경과 시간으로 배치** | [ui §0·§4-8](plan-ui.md) | 같은 피드백. 페이즈 길이가 고정인지 실측 필요 |
 | **영상 파일 탭 날짜별 보기(V8)** | [vod V8·§8-11](plan-vod.md) | 같은 피드백. 파일에서 날짜를 얻을 수 있는지 확인 필요 |
