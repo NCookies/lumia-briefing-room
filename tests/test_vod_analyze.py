@@ -234,6 +234,65 @@ def test_cut_progress_advances_between_clips_in_the_same_game(vod_file, tmp_path
     assert cut_fractions[0] < cut_fractions[1]
 
 
+def scripted_state_two_games(t):
+    """게임 1(5~70초)에 교전 3번, 게임 2(80~105초)에 교전 1번 - 클립이 앞 게임에 몰린다.
+
+    교전 사이 간격을 `scripted_state_two_fights`(§ 위)와 같은 21~22초로 둔다 - 그보다
+    좁으면 검출기가 하나의 교전으로 이어 붙인다(§2.7 팀원 전투 신호의 이어 붙이기)."""
+    in_game1 = 5 <= t <= 70
+    in_game2 = 80 <= t <= 105
+    ingame = in_game1 or in_game2
+    fighting = False
+    k = 0
+    if in_game1:
+        fights = (5, 7), (29, 31), (53, 55)
+        fighting = any(a <= t <= b for a, b in fights)
+        k = sum(1 for a, _ in fights if t >= a)
+    elif in_game2:
+        fighting = 90 <= t <= 92
+        k = 1 if t >= 90 else 0
+    return FrameState(
+        t=t, combat=fighting if ingame else None,
+        face_value=110.0 if ingame else None, face_sat=25.0 if ingame else None,
+        k=k if ingame else None, a=0 if ingame else None,
+        day_night="day" if ingame else None, spectating=False if ingame else None,
+        game_day=2 if ingame else None, team_combat=False if ingame else None,
+    )
+
+
+def read_frame_two_games(frame, t):
+    return scripted_state_two_games(round(t))
+
+
+@requires_ffmpeg
+def test_progress_never_drops_back_between_games_with_uneven_clip_counts(tmp_path):
+    """실사용 사고(2026-09-29): "게임 정리" 단계가 앞 게임에서 이미 쌓인 클립 진행률
+    (clips_done)을 무시하고 게임 번호만으로 진행률을 다시 계산해, 클립이 많은 게임을
+    끝내고 클립이 적은 다음 게임으로 넘어가는 순간 막대가 85%에서 24%로 떨어졌다."""
+    path = tmp_path / "두게임.mp4"
+    subprocess.run(
+        [
+            str(FFMPEG_PATH), "-hide_banner", "-v", "error", "-y",
+            "-f", "lavfi", "-i", "testsrc=size=64x48:rate=10",
+            "-t", "110", "-c:v", "libx264", "-g", "10", "-keyint_min", "10",
+            "-sc_threshold", "0", "-pix_fmt", "yuv420p", str(path),
+        ],
+        check=True,
+    )
+    cfg = make_cfg(tmp_path)
+    cfg.vod.game_gap_sec = 5.0
+    seen = []
+
+    index, _ = run(
+        tmp_path, path, cfg=cfg, read_frame=read_frame_two_games, on_progress=seen.append,
+    )
+
+    assert len(index["games"]) == 2
+    assert [len(g["clipIds"]) for g in index["games"]] == [3, 1]
+    fractions = [p.fraction for p in seen]
+    assert fractions == sorted(fractions), fractions
+
+
 @requires_ffmpeg
 def test_cancel_saves_progress_and_resume_gives_the_same_result(vod_file, tmp_path):
     cfg = make_cfg(tmp_path)

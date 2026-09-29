@@ -419,14 +419,26 @@ def _make_clips(
     ]
     total_clips = max(1, sum(len(p) for p in plans_by_game))
     base = DECODE_SHARE + GAMES_SHARE
+    cut_share = 1.0 - base
     clips_done = 0
+
+    def progress_fraction(games_done: int) -> float:
+        """디코드 이후 진행률. 이미 자른 클립(`clips_done`)은 게임이 넘어가도 절대 줄지 않는다.
+
+        "게임 정리"(결과 화면 판독) 단계를 `games_done/n` 만으로만 계산하면, 클립이 몰린 게임
+        하나를 다 자른 뒤 다음 게임 정리로 넘어가는 순간 막대가 앞 게임에서 쌓인 클립 진행률을
+        무시하고 뚝 떨어져 보인다(실사용 보고, 2026-09-29 - 85%까지 갔다가 24%로 떨어짐:
+        `게임 정리` 리포트가 `클립 만들기` 가 이미 반영한 `clips_done` 을 무시했었다). 게임
+        진행(`games_done`)과 클립 진행(`clips_done`)을 더해서 절대 역행하지 않게 한다.
+        """
+        return DECODE_SHARE + GAMES_SHARE * games_done / n + cut_share * clips_done / total_clips
 
     try:
         for i, det in enumerate(detections):
             if cancel is not None and cancel.is_set():
                 raise VodCancelled()
             span = det.span
-            report("games", DECODE_SHARE + GAMES_SHARE * i / n, f"게임 {span.index} 결과 화면", games=len(games), clips=len(clip_ids))
+            report("games", progress_fraction(i), f"게임 {span.index} 결과 화면", games=len(games), clips=len(clip_ids))
             next_start = spans[i + 1].start if i + 1 < len(spans) else None
             result = _safe_result(find_result, video_path, span, next_start)
             result_image = _save_result_image(result, thumbs / f"{vod}_g{span.index:02d}_result.jpg", staging)
@@ -447,7 +459,7 @@ def _make_clips(
                 phase_clip_index = next_phase_clip_index(phase_clip_counts, aggregated.cobalt_phase)
                 clip_id = vod_clip_id(vod, span.index, rng.start)
                 clip_path = staging / f"{clip_id}.mp4"
-                report("cut", base + (1 - base) * clips_done / total_clips, f"게임 {span.index} 클립 {len(game_clip_ids) + 1}",
+                report("cut", progress_fraction(i + 1), f"게임 {span.index} 클립 {len(game_clip_ids) + 1}",
                        games=len(games), clips=len(clip_ids))
                 clips_done += 1
                 cut = cut_vod_clip(
