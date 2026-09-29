@@ -424,6 +424,73 @@ def test_run_polling_skips_matches_already_processed(tmp_path):
     assert calls == []
 
 
+def test_run_polling_calls_on_failure_with_the_exception_and_on_success_when_it_recovers(tmp_path):
+    from lumia_briefing_room.pipeline.watcher import run_polling
+
+    _make_session_dir(tmp_path, 1049590, datetime(2026, 9, 19, 12, 0, tzinfo=UTC))
+    calls = []
+    failures_seen = []
+    successes_seen = []
+
+    def process(d, m, r):
+        calls.append(m)
+        if len(calls) == 1:
+            raise RuntimeError("디스크가 꽉 찼다")
+
+    run_polling(
+        read_matches=lambda: [_match(5, 25)], state=ProcessedState(frozenset()), state_path=tmp_path / "state.json",
+        recording_root=tmp_path, now=lambda: datetime(2026, 9, 19, 14, 0, tzinfo=UTC),
+        delay_sec=5.0, rescue_threshold_min=20.0, buffer_minutes=120.0,
+        process=process, poll_interval_sec=1.0, sleep=lambda s: None,
+        should_stop=(lambda calls={"n": 0}: (calls.__setitem__("n", calls["n"] + 1), calls["n"] > 3)[1]),
+        on_failure=lambda key, m, exc: failures_seen.append((key, str(exc))),
+        on_success=lambda key: successes_seen.append(key),
+    )
+
+    key = match_key(_match(5, 25))
+    assert failures_seen == [(key, "디스크가 꽉 찼다")]
+    assert successes_seen == [key]
+
+
+def test_run_polling_retry_requested_bypasses_max_failures(tmp_path):
+    from lumia_briefing_room.pipeline.watcher import run_polling
+
+    _make_session_dir(tmp_path, 1049590, datetime(2026, 9, 19, 12, 0, tzinfo=UTC))
+    calls = []
+    key = match_key(_match(5, 25))
+    # 딱 한 번만 재시도를 요청한다 - 계속 요청하면 max_failures 게이트가 있으나 마나가 된다.
+    retry_flag = {"asked": False}
+
+    def process(d, m, r):
+        calls.append(m)
+        raise RuntimeError("실패")
+
+    def retry_requested():
+        if not retry_flag["asked"] and len(calls) >= 1:
+            retry_flag["asked"] = True
+            return {key}
+        return set()
+
+    _polling(
+        tmp_path, lambda: [_match(5, 25)], process=process,
+        now=lambda: datetime(2026, 9, 19, 14, 0, tzinfo=UTC), stops=6, failures=1,
+    )
+    # max_failures=1 이면 원래 한 번만 시도하는지 먼저 확인(회귀 대조)
+    assert calls == [_match(5, 25)]
+
+    calls.clear()
+    run_polling(
+        read_matches=lambda: [_match(5, 25)], state=ProcessedState(frozenset()), state_path=tmp_path / "state2.json",
+        recording_root=tmp_path, now=lambda: datetime(2026, 9, 19, 14, 0, tzinfo=UTC),
+        delay_sec=5.0, rescue_threshold_min=20.0, buffer_minutes=120.0,
+        process=process, poll_interval_sec=1.0, sleep=lambda s: None,
+        should_stop=(lambda c=[0]: (c.__setitem__(0, c[0] + 1), c[0] > 6)[1]),
+        max_failures=1, retry_requested=retry_requested,
+    )
+
+    assert len(calls) == 2
+
+
 def test_run_polling_with_once_stops_as_soon_as_nothing_is_left_to_process(tmp_path):
     from lumia_briefing_room.pipeline.watcher import run_polling
 

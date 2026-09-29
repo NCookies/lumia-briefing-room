@@ -20,8 +20,9 @@ from lumia_briefing_room.updater import Updater, launch_installer
 from lumia_briefing_room.consent import needs_first_run
 from lumia_briefing_room.logsetup import default_log_path
 from lumia_briefing_room.single_instance import SingleInstance
-from lumia_briefing_room.config import load_config, resolve_config_path
+from lumia_briefing_room.config import load_config, resolve_config_path, resolve_paths
 from lumia_briefing_room.pipeline.cleanup import cleanup_loop, make_cleanup_runner
+from lumia_briefing_room.pipeline.watch_failures import WatchFailureTracker
 from lumia_briefing_room.tray import build_icon
 
 log = logging.getLogger("lumia_briefing_room.app")
@@ -81,6 +82,7 @@ def make_on_open(
     open_browser=webbrowser.open,
     on_recording_root_changed=None,
     on_update_launched=None,
+    watch_failures: WatchFailureTracker | None = None,
 ):
     """트레이 "열기": 서버를 (최초 1회만) 띄우고 브라우저로 연다.
 
@@ -101,6 +103,8 @@ def make_on_open(
                     app.state.on_recording_root_changed = on_recording_root_changed
                 if on_update_launched is not None:
                     app.state.on_update_launched = on_update_launched
+                if watch_failures is not None:
+                    app.state.watch_failures = watch_failures
                 if paths.is_frozen():
                     app.state.update_launcher = deferred_installer.launcher
                 server, thread = serve_cli.run_server_in_thread(app, host=host, port=port)
@@ -138,13 +142,18 @@ def open_after_update(on_open, *, wait_sec: float = 8.0, poll_sec: float = 0.5, 
     on_open()
 
 
-def make_watch_controller(args, *, auto_start: bool = True):
+def make_watch_controller(args, *, auto_start: bool = True, failure_tracker: WatchFailureTracker | None = None):
     """트레이 "감시 중" 토글의 실제 시작/정지 배선. (plan-pipeline.md §3-5 해결)
 
     `run()` 이 `should_stop` 으로 넘겨받는 `stop_event.is_set` 을 `run_polling()` 이
     폴링마다 확인하므로, 정지 요청은 다음 폴링 주기 안에 반영된다. 재개는
     새 스레드로 `run()` 을 처음부터 다시 부르는 것과 같다 — 이미 끝난 경기는
     `ProcessedState` 로 이미 처리한 매치를 다시 건드리지 않으니 안전하다.
+
+    `failure_tracker` 를 주면 감시가 재시작돼도(설정 변경 등) 같은 실패 내역을
+    이어 쓴다 - `_run_app` 이 앱 시작 때 한 번만 만들어 여기와 `make_on_open` 양쪽에
+    같은 인스턴스를 넘긴다(API 가 같은 실패 목록을 읽고, "계속하기"가 지금 도는
+    감시 스레드에 바로 전달되게 하려면 같은 객체여야 한다).
     """
     state = {"thread": None, "stop_event": threading.Event(), "running": False}
 
@@ -152,7 +161,8 @@ def make_watch_controller(args, *, auto_start: bool = True):
         # 새 Event 를 쓴다 — 옛 스레드가 아직 끝나기 전에 같은 Event 를 clear 하면 옛 감시가 계속 돈다.
         state["stop_event"] = threading.Event()
         thread = threading.Thread(
-            target=_run_watch_safely, args=(args, state["stop_event"]), daemon=True
+            target=_run_watch_safely, args=(args, state["stop_event"]),
+            kwargs={"failure_tracker": failure_tracker}, daemon=True,
         )
         state["thread"] = thread
         state["running"] = True
@@ -339,7 +349,11 @@ def _run_app(args, instance: SingleInstance) -> None:
         procs.lower_current_process_priority()
     autostart.apply_setting(cfg)
 
-    on_toggle_watch, watch_enabled = make_watch_controller(args)
+    resolved_paths = resolve_paths(cfg.paths)
+    resolved_paths.temp.mkdir(parents=True, exist_ok=True)
+    watch_failures = WatchFailureTracker(resolved_paths.temp / "watch_failures.json")
+
+    on_toggle_watch, watch_enabled = make_watch_controller(args, failure_tracker=watch_failures)
     threading.Thread(
         target=cleanup_loop, args=(make_cleanup_runner(args.config), threading.Event()), daemon=True
     ).start()
@@ -349,6 +363,7 @@ def _run_app(args, instance: SingleInstance) -> None:
         host="127.0.0.1",
         port=resolve_port(cfg.ui.port),
         config_path=resolve_config_path(args.config),
+        watch_failures=watch_failures,
         on_recording_root_changed=on_toggle_watch.restart,
         on_update_launched=quit_after_update_launch(lambda: _on_quit()),
     )
@@ -392,13 +407,20 @@ WATCH_RETRY_SEC = 10.0
 RESTART_JOIN_SEC = 15.0
 
 
-def _run_watch_safely(args, stop_event: threading.Event, *, run_fn=None, retry_sec: float = WATCH_RETRY_SEC) -> None:
+def _run_watch_safely(
+    args, stop_event: threading.Event, *,
+    run_fn=None, retry_sec: float = WATCH_RETRY_SEC,
+    failure_tracker: WatchFailureTracker | None = None,
+) -> None:
     """녹화 폴더가 아직 없는 첫 실행처럼 시작 조건이 안 맞으면, 첫 실행 화면에서 설정을 고칠 때까지 기다렸다 다시 시도한다."""
     run_fn = run_fn or run
+    kwargs = {"should_stop": stop_event.is_set}
+    if failure_tracker is not None:
+        kwargs["failure_tracker"] = failure_tracker
     last_error = None
     while not stop_event.is_set():
         try:
-            run_fn(args, should_stop=stop_event.is_set)
+            run_fn(args, **kwargs)
             return
         except SystemExit as exc:
             if str(exc) != last_error:

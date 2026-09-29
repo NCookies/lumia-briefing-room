@@ -29,9 +29,11 @@ from lumia_briefing_room.config import (
 )
 from lumia_briefing_room.detect.counter import load_templates
 from lumia_briefing_room.pipeline.clip import ClipCutError
+from lumia_briefing_room.pipeline.ffmpeg_errors import describe_clip_error, is_disk_full_error
 from lumia_briefing_room.pipeline.nickname import learn_nickname
 from lumia_briefing_room.pipeline.orchestrator import process_match
 from lumia_briefing_room.pipeline.playerlog import MatchBoundary
+from lumia_briefing_room.pipeline.watch_failures import WatchFailureTracker
 from lumia_briefing_room.pipeline.watcher import (
     ProcessCallback,
     ProcessedState,
@@ -113,6 +115,7 @@ def run(
     *,
     now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
     should_stop: Callable[[], bool] = lambda: False,
+    failure_tracker: WatchFailureTracker | None = None,
 ) -> None:
     cfg = load_config(args.config)
     ffmpeg_path = args.ffmpeg or discover_ffmpeg()
@@ -144,9 +147,16 @@ def run(
     resolved.temp.mkdir(parents=True, exist_ok=True)
     state_path = resolved.temp / "processed_matches.json"
     buffer_minutes = resolve_buffer_minutes(cfg, recording_root)
+    tracker = failure_tracker or WatchFailureTracker(resolved.temp / "watch_failures.json")
 
     def read_matches():
         return discover_backlog(player_log, player_prev_log, local_tz=local_tz)
+
+    def handle_failure(key: str, match: MatchBoundary, exc: BaseException) -> None:
+        tracker.record_failure(
+            key, match_start_utc=match.start_utc,
+            message=describe_clip_error(exc), disk_full=is_disk_full_error(exc),
+        )
 
     state = ProcessedState.load(state_path)
     log.info("Player.log 감시 시작(%.1f초마다 훑는다): %s", cfg.watch.poll_interval_ms / 1000, player_log)
@@ -160,6 +170,9 @@ def run(
         poll_interval_sec=cfg.watch.poll_interval_ms / 1000,
         should_stop=should_stop,
         once=args.once,
+        on_failure=handle_failure,
+        on_success=tracker.record_success,
+        retry_requested=tracker.pop_retry_requests,
     )
 
 

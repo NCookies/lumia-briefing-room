@@ -152,6 +152,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     app.state.config_path = config_path
     app.state.log_dir = None
     app.state.on_recording_root_changed = None
+    app.state.watch_failures = None
     lock = threading.RLock()
     app.state.lock = lock
     app.state.request_count = 0
@@ -621,6 +622,24 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     @app.get("/api/activity")
     def get_activity():
         return {"tasks": activity.registry.snapshot()}
+
+    @app.get("/api/watch/failures")
+    def get_watch_failures():
+        """실시간 감시가 매치를 처리하다 실패한 내역 - 새로고침해도 남아있다(watch_failures.py).
+
+        감시가 아직 시작되지 않았으면(watch_failures 가 None) 빈 목록을 돌려준다.
+        """
+        tracker = app.state.watch_failures
+        return {"failures": tracker.list() if tracker is not None else []}
+
+    @app.post("/api/watch/failures/{key}/retry")
+    def retry_watch_failure(key: str):
+        """"계속하기": 다음 폴링에서 재시도 횟수 제한과 무관하게 그 매치를 바로 다시 시도하게 한다."""
+        tracker = app.state.watch_failures
+        if tracker is None:
+            raise HTTPException(409, "실시간 감시가 실행 중이 아닙니다")
+        tracker.request_retry(key)
+        return {"key": key, "retrying": True}
 
     @app.get("/api/cleanup/preview")
     def get_cleanup_preview():

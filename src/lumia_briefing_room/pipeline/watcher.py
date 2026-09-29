@@ -204,12 +204,20 @@ def run_polling(
     sleep: Callable[[float], None] = time.sleep,
     max_failures: int = 3,
     once: bool = False,
+    on_failure: Callable[[str, MatchBoundary, BaseException], None] | None = None,
+    on_success: Callable[[str], None] | None = None,
+    retry_requested: Callable[[], set[str]] | None = None,
 ) -> ProcessedState:
     """로그를 주기적으로 통째로 다시 읽어, 끝난 지 `delay_sec` 이 지난 처리 안 된 매치를 오래된 것부터 처리한다.
 
     줄 단위로 실시간 감시하지 않는다: 분석이 몇 분씩 걸리는 동안 시작하고 끝난 경기, 게임 재실행으로 바뀐 로그, 앱을 켜기
     전 경기를 전부 같은 경로로 잡는다. 처리 이력(`state`)이 중복을 막는다. 세션이 없는 매치는 다시 시도하지 않고(원본이 없다),
     처리가 예외로 실패한 매치는 `max_failures` 번까지만 다시 시도한다(감시가 죽지 않게 한다). `once` 면 처리할 게 없어지는 즉시 돌려준다.
+
+    `on_failure`/`on_success` 는 실패·성공을 화면에 보여줄 영속 상태로 남기라는 신호일 뿐,
+    재시도 여부 자체는 여전히 `failures`/`max_failures` 가 결정한다(watch_failures.py 참고).
+    `retry_requested` 는 사용자가 "계속하기"를 눌러 재시도를 요청한 매치 키 집합을 돌려준다 -
+    그 매치는 `max_failures` 를 이미 다 썼어도 실패 횟수를 초기화해 바로 다시 시도한다.
     """
     failures: dict[str, int] = {}
     no_session: set[str] = set()
@@ -217,6 +225,9 @@ def run_polling(
 
     while True:
         ran = False
+        if retry_requested is not None:
+            for key in retry_requested():
+                failures[key] = 0
         due = [
             m for m in unprocessed_matches(read_matches(), state)
             if match_key(m) not in no_session and failures.get(match_key(m), 0) < max_failures and now() - m.end_utc >= delay
@@ -232,12 +243,16 @@ def run_polling(
             try:
                 with activity_registry.track("watch", label):
                     process(session_dir, m, should_rescue(margin, rescue_threshold_min))
-            except Exception:
+            except Exception as exc:
                 failures[key] = failures.get(key, 0) + 1
                 log.exception("매치 %s 처리 실패 (%d/%d)", key, failures[key], max_failures)
+                if on_failure is not None:
+                    on_failure(key, m, exc)
             else:
                 state = state.with_added(key)
                 state.save(state_path)
+                if on_success is not None:
+                    on_success(key)
             ran = True
             break
         if ran:
