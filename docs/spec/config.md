@@ -15,7 +15,7 @@
 | `paths.steamRecording` | 자동 탐지 | 탐지 실패 시 수동 |
 | `paths.thumbnails` | `<clips>\.thumbs` | |
 | `paths.proxies` | `<clips>\.proxy` | 미사용 — 프록시는 항상 `<클립 폴더>\.proxy` |
-| `paths.minFreeGB` | 20 | 미사용 — 풀영상 부족 알림에서 쓸 예정([plan-fullvideo.md](../plan-fullvideo.md)) |
+| `paths.minFreeGb` | 20 | 미사용 — 풀영상 부족 알림에서 쓸 예정([plan-fullvideo.md](../plan-fullvideo.md)) |
 
 ## 감시 `watch.*`
 
@@ -35,8 +35,8 @@
 | 키 | 기본값 | 설명 |
 |---|---|---|
 | `filter.preset` | `all` | `all`/`won`(kill\|assist)/`lost`(death)/`custom` |
-| `filter.tags.include` / `.exclude` | `[]` | |
-| `filter.phaseMin` / `phaseMax` | `null` | `phaseIndex` 범위 |
+| `filter.tags.include` / `filter.tags.exclude` | `[]` | |
+| `filter.phaseMin` / `filter.phaseMax` | `null` | `phaseIndex` 범위 |
 | `filter.dayNight` | `any` | |
 | `filter.reviveCost` | `any` | `free`(≤3)/`credit`(≥4) |
 | `filter.minPvpScore` | 0.0 | 이 점수 미만은 만들지 않는다. **라벨로 검증되기 전까지 0**(생성에서 버리면 영구 손실) |
@@ -53,7 +53,7 @@
 | 키 | 기본값 | 설명 |
 |---|---|---|
 | `clip.mode` | `combat` | `combat`/`fixed` |
-| `clip.prerollSec` / `postrollSec` | 5 / 8 | 코발트는 적용 안 함 |
+| `clip.prerollSec` / `clip.postrollSec` | 5 / 8 | 코발트는 적용 안 함 |
 | `clip.fixedPrerollSec` | 30 | `fixed` 모드, 팀 전투 신호 포화 구간 |
 | `clip.mergeGapSec` | 10 | |
 | `clip.includeAudio` | `true` | |
@@ -67,7 +67,7 @@
 | `encode.proxy.height` | 1080 | 원본보다 키우지 않는다 |
 | `encode.proxy.crf` | 23 | `libx264` 일 때만. `h264_mf` 는 비트레이트(1080p 8000k, 면적 비례, 최소 1500) |
 | `encode.proxy.enabled` | `false` | 미사용 — 프록시는 재생 불가 판별 시 자동 |
-| `encode.thumbnail.enabled` / `offsetRatio` / `width` | `true` / 0.35 / 480 | |
+| `encode.thumbnail.enabled` / `encode.thumbnail.offsetRatio` / `encode.thumbnail.width` | `true` / 0.35 / 480 | |
 | `encode.reencode` | `false` | 미사용 |
 
 ## 보관·자동 정리 `retention.*` (스팀 클립만)
@@ -75,15 +75,19 @@
 | 키 | 기본값 | 설명 |
 |---|---|---|
 | `retention.autoCleanEnabled` | `false` | |
-| `retention.maxAgeDays` / `maxTotalGB` / `maxCount` | `null` | 기준별, `null` = 미적용 |
+| `retention.maxAgeDays` / `retention.maxTotalGb` / `retention.maxCount` | `null` | 기준별, `null` = 미적용 |
 | `retention.deleteMode` | `permanent` | 자동 정리 전용(`recycle`/`permanent`) |
 | `retention.protectPinned` | `true` | |
 | `retention.protectTags` | `[]` | 기본은 고정만 보호(2026-09-25 변경, 기존 설정은 유지) |
 | `retention.keepGameRecords` | `true` | 클립이 다 지워진 경기 요약·결과표를 `.games` 에 남김 |
 
-## 내보내기 `export.*` — 전부 미사용
+## 내보내기 `export.*` — 전부 미사용 (지금 저장은 mp4 만 복사)
 
-`copyMetadata`(true), `copyThumbnail`(true), `mode`(`copy`), `nameTemplate`(`{date}_{title}`). 지금 저장은 mp4 만 복사한다.
+| 키 | 기본값 |
+|---|---|
+| `export.copyMetadata` / `export.copyThumbnail` | `true` |
+| `export.mode` | `copy` |
+| `export.nameTemplate` | `{date}_{title}` |
 
 ## UI `ui.*`
 
@@ -111,9 +115,9 @@
 |---|---|---|
 | `vod.sources` | `[]` | 파일·폴더 경로 |
 | `vod.recursive` | `false` | |
-| `vod.gameGapSec` / `minGameSec` | 30 / 60 | 게임 분할 |
+| `vod.gameGapSec` / `vod.minGameSec` | 30 / 60 | 게임 분할 |
 | `vod.hwaccel` | `null` | 디코딩 가속(과거 녹화 분석도 이 값) |
-| `vod.streamers` / `videoDates` | `{}` | 영상별 스트리머 표시명 / 사용자가 고친 날짜 |
+| `vod.streamers` / `vod.videoDates` | `{}` | 영상별 스트리머 표시명 / 사용자가 고친 날짜 |
 | `vod.deleteSourceAfter` | `ask` | `ask`/`always`/`never` |
 | `vod.deleteSourceMode` | `trash` | `trash`/`permanent` |
 | `vod.autoAnalyze` | `false` | 미사용 |
@@ -124,13 +128,13 @@
 |---|---|---|
 | `consent.version` | 0 | 답한 동의 화면 버전(현재 3) |
 | `update.check` | `false` | 자동 업데이트 확인 |
-| `telemetry.sendLabels` / `sendLogs` | `false` | |
+| `telemetry.sendLabels` / `telemetry.sendLogs` | `false` | |
 | `telemetry.installId` | 무작위 UUID | 익명 설치 ID |
-| `telemetry.serverUrl` / `apiToken` | `""` | 개발·시험용 덮어쓰기(진단 zip 에서 토큰 제외) |
+| `telemetry.serverUrl` / `telemetry.apiToken` | `""` | 개발·시험용 덮어쓰기(진단 zip 에서 토큰 제외) |
 | `telemetry.allowDevSend` | `false` | 개발 모드 전송 허용(`mode=dev`) |
 
 ## 디스크 감각
 
 - 스팀 버퍼 2시간 ≈ 17~23GB(스팀이 점유).
-- 클립 60~80MB/개, 매치당 0.4~0.8GB(분당 약 190MB). `retention.maxTotalGB` 를 권한다.
+- 클립 60~80MB/개, 매치당 0.4~0.8GB(분당 약 190MB). `retention.maxTotalGb` 를 권한다.
 - 프록시는 원본의 대략 1/4~1/5.

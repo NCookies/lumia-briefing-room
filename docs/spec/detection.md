@@ -99,7 +99,7 @@
 | `kill` / `assist` | 구간 안에서 확정 K / A 증가 |
 | `death` | 구간 중 내 사망(관전 전환) |
 | `teammate_death` | 구간 앞뒤 8초 안에 팀원 사망(살아 있다가 죽은 순간만) |
-| `team_wipe` | (미구현 — 전멸 배너) 메타데이터 `teamWipe` 는 항상 `null` |
+| `team_wipe` | 붙지 않는다 — 전멸 배너를 아직 읽지 않아 메타데이터 `teamWipe` 는 항상 `null`([plan.md §3](../plan.md)) |
 | `no_result` | 위가 다 없음 — 사냥과 "아무도 안 죽고 끝난 교전"이 섞인 자리. 판별은 태그가 아니라 `pvpScore` 로 |
 
 태그는 배타적이지 않다(킬 내고 죽기).

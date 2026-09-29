@@ -411,6 +411,7 @@ git push origin v0.1.4
 | `tools/eval_pvp.py` | UI 에서 찍은 교전/사냥 라벨로 점수를 평가 (가중치·임계 튜닝, `--source steam\|vod\|all`, 기본 `steam`) |
 | `tools/eval_detect.py` | 라벨셋 대비 검출 정확도 리포트 |
 | `tools/pull_labels.py` | 서버에 쌓인 라벨을 로컬로 받아 `eval_pvp.py` 가 읽는 `.labels/` 형태로 저장 (관리자 토큰은 환경변수 `LUMIA_ADMIN_TOKEN`, 증분 수집, `--full`·`--mode dev`) |
+| `tools/check_docs.py` | 문서 어긋남 검사(끊긴 링크, plan 에 남은 완료 체크, spec 의 계획 표현, 설정 스키마 ↔ `spec/config.md` 키 목록). pytest(`tests/test_check_docs.py`)에도 들어 있다 |
 | `tools/release_tools.py` | 릴리스 파이프라인 보조(태그·버전·패치노트 확인, SHA-256 파일, 릴리스 본문, VirusTotal 업로드). 워크플로가 부른다 — 아래 "13" |
 
 가상환경을 활성화한 상태에서 실행할 것.
