@@ -39,6 +39,7 @@ from lumia_briefing_room.pipeline.game_store import FULL_VIDEO
 from lumia_briefing_room.pipeline.legacy_games import migrate_legacy_games
 from lumia_briefing_room.pipeline.legacy_vod_games import migrate_legacy_vod_games
 from lumia_briefing_room.pipeline.rebuild_full_video import RebuildError, can_rebuild, rebuild_full_video
+from lumia_briefing_room.pipeline.reanalyze_game import ReanalyzeError, reanalyze_game, reanalyze_mode
 from lumia_briefing_room.steam_paths import resolve_recording_root
 
 log = logging.getLogger(__name__)
@@ -286,6 +287,57 @@ def register_game_routes(
         if game.get("source") == "vod":
             return vod_control().status(game["vodId"], int(game["vodGameIndex"]))
         return rebuild_jobs.get(key) or {"state": "idle", "message": "", "fraction": 0.0}
+
+    reanalyze_jobs: dict[str, dict] = {}
+
+    @app.get("/api/games/{key}/reanalyze")
+    def reanalyze_plan(key: str):
+        """다시 분석하면 무엇을 하는지: full(원본 녹화에서 풀영상·후보 전부), candidates(원본이 없어 풀영상에서 후보만), None(불가)."""
+        game = load_or_404(key)
+        if game.get("source") == "vod":
+            return {"mode": None}
+        root = resolve_recording_root(current_config().paths.steam_recording)
+        return {"mode": reanalyze_mode(game, games_dir(key), root)}
+
+    @app.post("/api/games/{key}/reanalyze", status_code=202)
+    def start_reanalyze(key: str):
+        """게임의 풀영상·후보·결과·초상화를 다시 만든다(원본이 없으면 풀영상에서 후보만). 한 번에 하나만 돈다."""
+        game = load_or_404(key)
+        if game.get("source") == "vod":
+            raise HTTPException(409, "영상 파일 게임은 영상 묶음에서 다시 분석합니다")
+        if any(j["state"] == "running" for j in [*rebuild_jobs.values(), *reanalyze_jobs.values()]):
+            raise HTTPException(409, "다른 게임을 처리하는 중입니다. 끝난 뒤 다시 시도하세요")
+        cfg = current_config()
+        ffmpeg = _ffmpeg()
+        resolved = resolve_paths(cfg.paths)
+        root = resolve_recording_root(cfg.paths.steam_recording)
+        job = {"state": "running", "message": "", "fraction": 0.0, "mode": None}
+        reanalyze_jobs[key] = job
+        gdir, cdir, staging = games_dir(key), clips_dir(), resolved.staging_games
+
+        def run() -> None:
+            try:
+                with activity.registry.track("reanalyze-game", f"게임 다시 분석 중 ({key})"):
+                    job["mode"] = reanalyze_game(
+                        games_dir=gdir, clips_dir=cdir, key=key, recording_root=root, cfg=cfg, ffmpeg_path=ffmpeg,
+                        staging_dir=staging, on_progress=lambda f: job.update(fraction=f),
+                    )
+                job.update(state="done", fraction=1.0)
+            except (ReanalyzeError, RebuildError) as exc:
+                job.update(state="error", message=str(exc))
+            except Exception as exc:
+                log.exception("게임 다시 분석 실패: %s", key)
+                job.update(state="error", message=f"다시 분석에 실패했습니다: {exc}")
+            finally:
+                cleanup_preview_registry.notify_clips_changed()
+
+        threading.Thread(target=run, daemon=True).start()
+        return job
+
+    @app.get("/api/games/{key}/reanalyze/status")
+    def reanalyze_status(key: str):
+        load_or_404(key)
+        return reanalyze_jobs.get(key) or {"state": "idle", "message": "", "fraction": 0.0, "mode": None}
 
     @app.get("/api/games/{key}/video")
     def get_game_video(key: str):
