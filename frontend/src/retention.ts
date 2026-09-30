@@ -7,12 +7,15 @@ export interface RetentionSettings {
   protectPinned: boolean
   protectTags: string[]
   keepGameRecords: boolean
+  preserveBeforeDelete: boolean
 }
 
 export interface CleanupResult {
   toDelete: number
   bytesToFree: number
   applied: boolean
+  preserveClips?: number
+  heldBack?: number
 }
 
 export function parseLimit(text: string): number | null {
@@ -28,6 +31,9 @@ export function formatBytes(bytes: number): string {
 }
 
 export function describeCleanup(result: CleanupResult): string {
-  if (result.toDelete === 0) return '정리할 항목이 없습니다'
-  return `${result.toDelete}개 삭제 · ${formatBytes(result.bytesToFree)}`
+  const notes: string[] = []
+  if (result.toDelete > 0) notes.push(`${result.toDelete}개 삭제 · ${formatBytes(result.bytesToFree)}`)
+  if (result.preserveClips) notes.push(`지우기 전에 클립 ${result.preserveClips}개를 남깁니다`)
+  if (result.heldBack) notes.push(`클립을 남기지 못한 ${result.heldBack}개는 지우지 않았습니다`)
+  return notes.length > 0 ? notes.join(' · ') : '정리할 항목이 없습니다'
 }

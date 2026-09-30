@@ -20,6 +20,7 @@ interface Draft {
   protectPinned: boolean
   protectTags: string[]
   keepGameRecords: boolean
+  preserveBeforeDelete: boolean
 }
 
 const toDraft = (r: RetentionSettings): Draft => ({
@@ -34,6 +35,7 @@ const toDraft = (r: RetentionSettings): Draft => ({
   protectPinned: r.protectPinned,
   protectTags: r.protectTags,
   keepGameRecords: r.keepGameRecords ?? true,
+  preserveBeforeDelete: r.preserveBeforeDelete ?? false,
 })
 
 const toSettings = (d: Draft): RetentionSettings => ({
@@ -45,6 +47,7 @@ const toSettings = (d: Draft): RetentionSettings => ({
   protectPinned: d.protectPinned,
   protectTags: d.protectTags,
   keepGameRecords: d.keepGameRecords,
+  preserveBeforeDelete: d.preserveBeforeDelete,
 })
 
 export function CleanupPanel() {
@@ -238,6 +241,21 @@ export function CleanupPanel() {
         </div>
         <p className="text-xs text-zinc-500">선택한 태그가 붙은 후보가 있는 게임의 풀영상은 정리하지 않습니다.</p>
       </section>
+      <section className="flex flex-col gap-2">
+        <h3 className="text-sm font-medium text-zinc-200">지우기 전에</h3>
+        <label className="flex items-center gap-2 text-sm text-zinc-300">
+          <input
+            type="checkbox"
+            checked={draft.preserveBeforeDelete}
+            onChange={(e) => patch({ preserveBeforeDelete: e.target.checked })}
+          />
+          풀영상을 지우기 전에 확실한 교전 후보를 클립으로 남기기
+        </label>
+        <p className="text-xs text-zinc-500">
+          킬·어시·사망이 있는 후보 중 아직 저장하지 않은 것을 풀영상에서 클립으로 잘라 남긴 뒤 풀영상을 지웁니다. 하나라도 남기지 못하면 그 풀영상은 이번에 지우지 않고 다음 정리 때 다시 시도합니다. 남긴 클립은 자동으로 지워지지 않습니다.
+        </p>
+      </section>
+
       </fieldset>
 
       <section className="flex flex-col gap-2">

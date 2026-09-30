@@ -3,6 +3,7 @@ export type CleanupReason = 'age' | 'count' | 'size'
 export interface CleanupPreviewEntry {
   reason: CleanupReason
   dueAt: string | null
+  preserveCount?: number
 }
 
 export type CleanupPreviewMap = Record<string, CleanupPreviewEntry>
@@ -32,4 +33,18 @@ export function gameCleanupEntry(clipIds: string[], preview: CleanupPreviewMap):
     return ageEntries.reduce((soonest, e) => (e.dueAt! < soonest.dueAt! ? e : soonest))
   }
   return entries[0]
+}
+
+/** 켜져 있으면 삭제 예정인(풀영상이 있고 미리보기에 오른) 게임만 남긴다. */
+export function onlyDueGames<T extends { key: string; hasFullVideo: boolean }>(
+  games: T[],
+  preview: CleanupPreviewMap,
+  dueOnly: boolean,
+): T[] {
+  return dueOnly ? games.filter((g) => g.hasFullVideo && preview[g.key] !== undefined) : games
+}
+
+/** 지우기 전 보존이 켜져 있을 때 그 게임에서 남길 클립 수 안내. */
+export function preserveLabel(entry: CleanupPreviewEntry): string | null {
+  return entry.preserveCount ? `지우기 전에 클립 ${entry.preserveCount}개를 남깁니다` : null
 }

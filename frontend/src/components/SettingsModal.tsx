@@ -4,10 +4,13 @@ import {
   getExportDefault,
   getNickname,
   getProxyPrefetch,
+  getSaveMode,
   setAutoStart,
   setExportDefault,
   setNickname,
   setProxyPrefetch,
+  setSaveMode,
+  type SaveMode,
 } from '../exportApi'
 import { needsPermanentSkipWarning, type DeleteMode } from '../deleteConfirm'
 import { AboutPanel } from './AboutPanel'
@@ -55,6 +58,8 @@ function GeneralPanel({
   const [autoStart, setAutoStartState] = useState(true)
   const [autoStartError, setAutoStartError] = useState<string | null>(null)
   const [prefetch, setPrefetchState] = useState(true)
+  const [saveMode, setSaveModeState] = useState<SaveMode>('auto')
+  const [saveModeError, setSaveModeError] = useState<string | null>(null)
 
   useEffect(() => {
     getNickname()
@@ -66,7 +71,22 @@ function GeneralPanel({
     getProxyPrefetch()
       .then(setPrefetchState)
       .catch(() => {})
+    getSaveMode()
+      .then(setSaveModeState)
+      .catch(() => {})
   }, [])
+
+  const changeSaveMode = async (value: SaveMode) => {
+    const previous = saveMode
+    setSaveModeState(value)
+    setSaveModeError(null)
+    try {
+      await setSaveMode(value)
+    } catch (e) {
+      setSaveModeState(previous)
+      setSaveModeError((e as Error).message)
+    }
+  }
 
   const changeAutoStart = async (value: boolean) => {
     const previous = autoStart
@@ -115,6 +135,40 @@ function GeneralPanel({
       description="게임이 끝날 때마다 만드는 클립이 저장되는 폴더입니다. 비워 두면 기본 위치(내 비디오 폴더의 LumiaBriefingRoom)를 씁니다."
       onChanged={onClipsDirChanged}
     />
+    <section className="flex flex-col gap-2">
+      <h3 className="text-sm font-medium text-zinc-200">클립 저장 방식</h3>
+      <label className="flex items-start gap-2 text-sm text-zinc-300">
+        <input
+          type="radio"
+          name="saveMode"
+          className="mt-1"
+          checked={saveMode === 'auto'}
+          onChange={() => void changeSaveMode('auto')}
+        />
+        <span>
+          자동 저장 (기본)
+          <span className="block text-xs text-zinc-500">
+            게임 분석이 끝나면 교전 후보를 전부 클립으로 저장합니다. 저장된 클립은 자동으로 지워지지 않아 게임마다 1.5~2GB 씩 쌓입니다.
+          </span>
+        </span>
+      </label>
+      <label className="flex items-start gap-2 text-sm text-zinc-300">
+        <input
+          type="radio"
+          name="saveMode"
+          className="mt-1"
+          checked={saveMode === 'manual'}
+          onChange={() => void changeSaveMode('manual')}
+        />
+        <span>
+          직접 저장
+          <span className="block text-xs text-zinc-500">
+            클립을 자동으로 만들지 않습니다. 게임의 풀영상 화면에서 남기고 싶은 교전 후보만 골라 저장합니다. 이미 저장한 클립에는 영향이 없습니다.
+          </span>
+        </span>
+      </label>
+      {saveModeError && <p className="text-xs text-rose-300">{saveModeError}</p>}
+    </section>
     <section className="flex flex-col gap-2">
       <h3 className="text-sm font-medium text-zinc-200">삭제</h3>
       <label className="flex items-center gap-2 text-sm text-zinc-300">

@@ -1,4 +1,4 @@
-import { cleanupReasonLabel, cleanupReasonTooltip, type CleanupPreviewEntry } from '../cleanupPreview'
+import { cleanupReasonLabel, cleanupReasonTooltip, preserveLabel, type CleanupPreviewEntry } from '../cleanupPreview'
 import { gameHeadline, matchTypeLabel, type GameSummary } from '../games'
 import { gameAssetUrl } from '../gamesApi'
 import { formatBytes } from '../retention'
@@ -82,6 +82,7 @@ export function GameRow({ game: g, time, due, onOpen, onPin }: Props) {
         {due && g.hasFullVideo && (
           <span className="rounded bg-rose-600/30 px-1.5 text-xs text-rose-200" title={cleanupReasonTooltip(due)}>
             {cleanupReasonLabel(due)}
+            {preserveLabel(due) && <span className="ml-1 text-rose-100/80">· {preserveLabel(due)}</span>}
           </span>
         )}
         {g.legacy && !g.hasFullVideo ? (

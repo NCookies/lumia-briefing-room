@@ -30,3 +30,17 @@ test('describeCleanup summarizes what a run would do', () => {
   )
   assert.equal(describeCleanup({ toDelete: 0, bytesToFree: 0, applied: false }), '정리할 항목이 없습니다')
 })
+
+test('describeCleanup mentions clips kept before deleting and videos held back', () => {
+  const base = { bytesToFree: 2 * 1024 ** 3, applied: true }
+  assert.equal(
+    describeCleanup({ ...base, toDelete: 2, preserveClips: 3, heldBack: 0 }),
+    '2개 삭제 · 2.00 GB · 지우기 전에 클립 3개를 남깁니다',
+  )
+  assert.equal(
+    describeCleanup({ ...base, toDelete: 1, preserveClips: 0, heldBack: 1 }),
+    '1개 삭제 · 2.00 GB · 클립을 남기지 못한 1개는 지우지 않았습니다',
+  )
+  assert.equal(describeCleanup({ ...base, toDelete: 0, preserveClips: 0, heldBack: 2 }), '클립을 남기지 못한 2개는 지우지 않았습니다')
+  assert.equal(describeCleanup({ ...base, toDelete: 0 }), '정리할 항목이 없습니다')
+})

@@ -49,3 +49,25 @@ test('game entry falls back to a count/size reason when no clip has an age reaso
   }
   assert.deepEqual(gameCleanupEntry(['a', 'b'], preview), { reason: 'count', dueAt: null })
 })
+
+test('onlyDueGames keeps games with a preview entry and a full video', async () => {
+  const { onlyDueGames } = await import('../src/cleanupPreview.ts')
+  const games = [
+    { key: 'a', hasFullVideo: true },
+    { key: 'b', hasFullVideo: true },
+    { key: 'c', hasFullVideo: false },
+  ]
+  const preview: CleanupPreviewMap = {
+    a: { reason: 'size', dueAt: null },
+    c: { reason: 'size', dueAt: null },
+  }
+  assert.deepEqual(onlyDueGames(games, preview, true).map((g) => g.key), ['a'])
+  assert.equal(onlyDueGames(games, preview, false).length, 3)
+})
+
+test('preserveLabel shows how many clips are kept before deleting', async () => {
+  const { preserveLabel } = await import('../src/cleanupPreview.ts')
+  assert.equal(preserveLabel({ reason: 'size', dueAt: null, preserveCount: 3 }), '지우기 전에 클립 3개를 남깁니다')
+  assert.equal(preserveLabel({ reason: 'size', dueAt: null, preserveCount: 0 }), null)
+  assert.equal(preserveLabel({ reason: 'size', dueAt: null }), null)
+})

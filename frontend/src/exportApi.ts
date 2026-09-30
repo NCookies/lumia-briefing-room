@@ -60,6 +60,17 @@ export async function runCleanup(dryRun: boolean): Promise<CleanupResult> {
   return jsonOrThrow(await postJson(`${BASE}/cleanup`, { dryRun }), '자동 정리')
 }
 
+export type SaveMode = 'auto' | 'manual'
+
+export async function getSaveMode(): Promise<SaveMode> {
+  const cfg = await jsonOrThrow<{ clip?: { saveMode?: SaveMode } }>(await fetch(`${BASE}/config`), '설정 불러오기')
+  return cfg.clip?.saveMode === 'manual' ? 'manual' : 'auto'
+}
+
+export async function setSaveMode(saveMode: SaveMode): Promise<void> {
+  await jsonOrThrow(await postJson(`${BASE}/config`, { clip: { saveMode } }, 'PUT'), '설정 저장')
+}
+
 export async function getConfirmDelete(): Promise<boolean> {
   const cfg = await jsonOrThrow<{ ui?: { confirmDelete?: boolean } }>(await fetch(`${BASE}/config`), '설정 불러오기')
   return cfg.ui?.confirmDelete ?? true
