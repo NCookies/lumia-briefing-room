@@ -98,7 +98,7 @@ def _summary(game: dict, games_dir: Path, *, can_rebuild_full: bool = False) -> 
         "candidateCount": len(active),
         "certainCount": sum(1 for c in active if c.get("certain")),
         "savedClipCount": sum(1 for c in cands if (c.get("user") or {}).get("savedClipId")),
-        "unsavedEditCount": sum(1 for c in active if gcand.range_changed(c, float(video.get("durationSec") or 0.0))),
+        "unsavedEditCount": sum(1 for c in active if (c.get("user") or {}).get("savedClipId") and gcand.range_changed(c, float(video.get("durationSec") or 0.0))),
     }
 
 

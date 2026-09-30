@@ -159,17 +159,21 @@ def test_a_clip_saved_before_range_records_existed_counts_the_detected_range_as_
     assert len(client.cuts) == 2
 
 
-def test_summary_counts_candidates_edited_but_not_saved(client):
+def test_summary_counts_only_archived_candidates_edited_after_saving(client):
     url = f"/api/games/{KEY}/candidates/{KEY}_01"
+    other = f"/api/games/{KEY}/candidates/{KEY}_02"
     assert client.get("/api/games").json()["games"][0]["unsavedEditCount"] == 0
     client.patch(url, json={"start": 95.0})
-    assert client.get("/api/games").json()["games"][0]["unsavedEditCount"] == 1
+    assert client.get("/api/games").json()["games"][0]["unsavedEditCount"] == 0, "보관하지 않은 후보의 수정은 바로 기억되므로 저장 대기가 아니다"
     client.post(f"{url}/save")
     assert client.get("/api/games").json()["games"][0]["unsavedEditCount"] == 0
     client.patch(url, json={"end": 150.0})
-    client.patch(f"/api/games/{KEY}/candidates/{KEY}_02", json={"start": 310.0})
+    client.patch(other, json={"start": 310.0})
+    assert client.get("/api/games").json()["games"][0]["unsavedEditCount"] == 1
+    client.post(f"{other}/save")
+    client.patch(other, json={"start": 305.0})
     assert client.get("/api/games").json()["games"][0]["unsavedEditCount"] == 2
-    client.patch(f"/api/games/{KEY}/candidates/{KEY}_02", json={"dismissed": True})
+    client.patch(other, json={"dismissed": True})
     assert client.get("/api/games").json()["games"][0]["unsavedEditCount"] == 1
 
 
