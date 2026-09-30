@@ -4,6 +4,7 @@ import { AdminPanel } from './components/AdminPanel'
 import { BackfillDialog } from './components/BackfillDialog'
 import type { ClipSource } from './components/ClipBrowser'
 import { ClipArchive } from './components/ClipArchive'
+import { GuideDialog } from './components/GuideDialog'
 import { FirstRunScreen } from './components/FirstRunScreen'
 import { GameList } from './components/GameList'
 import { SettingsModal } from './components/SettingsModal'
@@ -51,6 +52,7 @@ export default function App() {
   const tab: Tab = savedTab === 'admin' && !isDev ? 'steam' : savedTab
   const navTabs: { id: Tab; label: string }[] = isDev ? [...TABS, ADMIN_TAB] : TABS
   const [showSettings, setShowSettings] = useState(false)
+  const [showGuide, setShowGuide] = useState(false)
   const [settingsTab, setSettingsTab] = useState<'general' | 'vod' | 'about'>('general')
   const [browserKey, setBrowserKey] = useState(0)
   const [confirmDelete, setConfirmDeleteState] = useState(true)
@@ -168,6 +170,15 @@ export default function App() {
         <div className="mb-2 flex items-center gap-2">
           <button
             type="button"
+            className="rounded-full border border-zinc-600 px-2 py-1 text-sm leading-none text-zinc-300 hover:bg-zinc-700"
+            aria-label="사용 안내"
+            title="풀영상·후보·클립이 무엇인지 안내"
+            onClick={() => setShowGuide(true)}
+          >
+            ?
+          </button>
+          <button
+            type="button"
             className="rounded border border-zinc-600 px-2 py-1 text-sm text-zinc-300 hover:bg-zinc-700"
             onClick={() => {
               setSettingsTab('general')
@@ -245,6 +256,7 @@ export default function App() {
         />
       )}
 
+      {showGuide && <GuideDialog onClose={() => setShowGuide(false)} />}
       {showSettings && (
         <SettingsModal
           confirmDelete={confirmDelete}

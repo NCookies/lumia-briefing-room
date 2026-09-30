@@ -17,6 +17,7 @@ import { completeFirstRun, getFirstRun, setRecordingRoot } from '../onboardingAp
 import { ConsentChoicesForm } from './ConsentChoicesForm'
 import { StorageSection } from './StorageSection'
 import { FolderPicker } from './FolderPicker'
+import { GuideContent } from './GuideContent'
 import { useLabelingState } from '../labelingContext'
 
 const TONE_CLASS = {
@@ -272,6 +273,13 @@ export function FirstRunScreen({ onDone }: { onDone: (backfillStarted: boolean) 
             <ConsentChoicesForm choices={choices} pending={info.pendingItems} onChange={setChoices} />
           </section>
         )}
+
+        <details className="rounded border border-zinc-700 p-3">
+          <summary className="cursor-pointer text-sm text-zinc-300">사용 방법 미리 보기 (건너뛰어도 됩니다)</summary>
+          <div className="mt-3">
+            <GuideContent />
+          </div>
+        </details>
 
         {error && <p className="text-sm text-rose-300">{error}</p>}
         <div className="flex justify-end">
