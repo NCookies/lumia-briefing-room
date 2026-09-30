@@ -73,8 +73,8 @@ export function CleanupPanel() {
     if (checked && !draft.autoCleanEnabled) {
       const message =
         draft.deleteMode === 'recycle'
-          ? '자동 정리를 켜면 기준에 해당하는 클립이 확인 없이 Windows 휴지통으로 보내집니다. 목록의 빨간 "삭제 예정" 표시로 미리 확인하세요.'
-          : '자동 정리를 켜면 기준에 해당하는 클립이 확인 없이 영구 삭제됩니다. 목록의 빨간 "삭제 예정" 표시로 미리 확인하세요.'
+          ? '자동 정리를 켜면 기준에 해당하는 게임의 풀영상이 확인 없이 Windows 휴지통으로 보내집니다. 저장한 클립은 지워지지 않습니다.'
+          : '자동 정리를 켜면 기준에 해당하는 게임의 풀영상이 확인 없이 영구 삭제됩니다. 저장한 클립은 지워지지 않습니다.'
       const confirmed = await ask({ message, confirmLabel: '켜기', danger: true })
       if (!confirmed.ok) return
     }
@@ -127,7 +127,7 @@ export function CleanupPanel() {
           자동 정리 켜기
         </label>
         <p className="text-xs text-zinc-500">
-          켜면 1시간마다 아래 기준을 넘은 클립을 자동으로 정리합니다. 끄면 클립과 휴지통의 파일이 자동으로 삭제되지 않습니다.
+          켜면 1시간마다 아래 기준을 넘은 게임의 풀영상을 자동으로 정리합니다. 저장한 클립은 정리 대상이 아니고, 게임 기록(후보·결과표)도 남습니다. 끄면 풀영상이 계속 쌓입니다.
         </p>
         {!on && (
           <p className="rounded border border-zinc-600 bg-zinc-800/60 px-3 py-1.5 text-xs text-zinc-300">
@@ -157,7 +157,7 @@ export function CleanupPanel() {
             value={draft.maxAgeDays}
             onChange={(e) => patch({ maxAgeDays: e.target.value })}
           />
-          일이 지난 클립
+          일이 지난 풀영상
         </label>
         <label className="flex items-center gap-2 text-sm text-zinc-300">
           <input
@@ -166,7 +166,7 @@ export function CleanupPanel() {
             checked={draft.countOn}
             onChange={(e) => patch({ countOn: e.target.checked })}
           />
-          클립 수가
+          풀영상이
           <input
             className={INPUT}
             inputMode="numeric"
@@ -174,7 +174,7 @@ export function CleanupPanel() {
             value={draft.maxCount}
             onChange={(e) => patch({ maxCount: e.target.value })}
           />
-          개를 넘으면 오래된 클립부터 정리
+          개를 넘으면 오래된 풀영상부터 정리
         </label>
         <label className="flex items-center gap-2 text-sm text-zinc-300">
           <input
@@ -191,7 +191,7 @@ export function CleanupPanel() {
             value={draft.maxTotalGb}
             onChange={(e) => patch({ maxTotalGb: e.target.value })}
           />
-          GB를 넘으면 오래된 클립부터 정리
+          GB를 넘으면 오래된 풀영상부터 정리 (권장 40GB, 게임 하나 약 2~5GB)
         </label>
       </section>
 
@@ -218,7 +218,7 @@ export function CleanupPanel() {
             checked={draft.protectPinned}
             onChange={(e) => patch({ protectPinned: e.target.checked })}
           />
-          고정한 클립
+          고정한 게임
         </label>
         <div className="flex flex-wrap gap-1">
           {PROTECTABLE.map((tag) => (
@@ -236,7 +236,7 @@ export function CleanupPanel() {
             </button>
           ))}
         </div>
-        <p className="text-xs text-zinc-500">선택한 태그가 붙은 클립은 정리하지 않습니다.</p>
+        <p className="text-xs text-zinc-500">선택한 태그가 붙은 후보가 있는 게임의 풀영상은 정리하지 않습니다.</p>
       </section>
       </fieldset>
 
