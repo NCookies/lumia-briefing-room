@@ -71,7 +71,21 @@ class BatchSave(BaseModel):
     category: str | None = None
 
 
+_PORTRAIT_SLOTS = ("me", "teammate1", "teammate2")
+
+
+def with_existing_portraits(game: dict, folder: Path) -> dict:
+    """`game.json` 이 이름을 잃었어도(다시 분석 등) 게임 폴더에 초상화 파일이 남아 있으면 그 이름을 쓴다."""
+    portraits = dict(game.get("portraits") or {})
+    for slot in _PORTRAIT_SLOTS:
+        name = f"portrait_{slot}.jpg"
+        if not portraits.get(slot) and (folder / name).is_file():
+            portraits[slot] = name
+    return {**game, "portraits": portraits}
+
+
 def _summary(game: dict, games_dir: Path, *, can_rebuild_full: bool = False) -> dict:
+    game = with_existing_portraits(game, game_dir(games_dir, game["gameKey"]))
     cands = gcand.all_candidates(game)
     active = [c for c in cands if not (c.get("user") or {}).get("dismissed")]
     video = game.get("fullVideo") or {}
@@ -206,6 +220,7 @@ def register_game_routes(
         else:
             can = can_rebuild(game, games_dir(key), resolve_recording_root(current_config().paths.steam_recording))
         self_saved_category(game)
+        game = with_existing_portraits(game, game_dir(games_dir(key), key))
         return {**game, "hasFullVideo": has_full_video(games_dir(key), key), "canRebuildFullVideo": can}
 
     def category_of_clip(game: dict, clip_id: str) -> str | None:
@@ -505,6 +520,10 @@ def register_game_routes(
         remove_orphan_result_images(library)
         return found_video
 
+    def _drop_candidate(data: dict, candidate_id: str) -> None:
+        for field in ("candidates", "userCandidates"):
+            data[field] = [c for c in data.get(field) or [] if c.get("id") != candidate_id]
+
     def _clear_saved_marks(key: str, *, only: str | None = None, dismiss: bool = False) -> None:
         def change(data: dict) -> None:
             for cand in gcand.all_candidates(data):
@@ -561,16 +580,16 @@ def register_game_routes(
 
     @app.post("/api/games/{key}/candidates/{candidate_id}/unsave")
     def unsave_candidate(key: str, candidate_id: str):
-        """보관 해제: 클립 영상을 지우고 후보를 보관 전 상태로 되돌린다. 삭제·무시가 아니라 후보는 목록에 그대로 남고 고친 범위도 유지된다."""
+        """클립 삭제: 이 후보로 만든 클립 영상을 지우고 그 구간(후보)도 목록에서 없앤다. 풀영상·다른 후보는 그대로다(되돌릴 수 없다)."""
         game = load_or_404(key)
         cand = gcand.find_candidate(game, candidate_id)
         if cand is None:
             raise HTTPException(404, "후보를 찾을 수 없습니다")
         clip_id = (cand.get("user") or {}).get("savedClipId")
         if not clip_id:
-            raise HTTPException(409, "보관한 클립이 아닙니다")
+            raise HTTPException(409, "이 후보로 만든 클립이 없습니다")
         with lock:
             _remove_saved_clip(game, clip_id)
-            _clear_saved_marks(key, only=candidate_id)
+            update_game(games_dir(key), key, lambda data: _drop_candidate(data, candidate_id))
         cleanup_preview_registry.notify_clips_changed()
-        return gcand.find_candidate(load_or_404(key), candidate_id)
+        return {"id": candidate_id, "deleted": True}

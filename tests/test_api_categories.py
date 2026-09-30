@@ -198,3 +198,12 @@ def test_legacy_layout_saved_clips_count_as_archived(tmp_path, monkeypatch):
     client = make_client(tmp_path, monkeypatch, paths)
     save(client, "01")
     assert _user(client, "01")["archived"] is True
+
+
+def test_listing_categories_creates_the_two_default_folders_so_the_clip_tab_can_open_them(client):
+    root = client.resolved.clips_root
+    assert not (root / "보관함").exists()
+    client.get("/api/categories")
+    assert (root / "보관함").is_dir() and (root / "자동 보관").is_dir()
+    assert client.get("/api/library", params={"path": "보관함"}).status_code == 200
+    assert client.get("/api/library", params={"path": "자동 보관"}).status_code == 200

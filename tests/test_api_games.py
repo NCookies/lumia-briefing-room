@@ -193,3 +193,15 @@ def test_a_renamed_candidate_is_saved_under_the_new_title(client):
     client.post(f"{url}/save")
     meta = json.loads((client.library / f"{KEY}_02.json").read_text(encoding="utf-8"))
     assert meta["title"] == "내 이름"
+
+
+def test_portrait_files_left_in_the_folder_are_shown_even_if_game_json_lost_the_names(client):
+    folder = client.tmp / "games" / KEY
+    (folder / "portrait_me.jpg").write_bytes(b"me")
+    (folder / "portrait_teammate2.jpg").write_bytes(b"mate")
+    (game,) = client.get("/api/games").json()["games"]
+    assert game["portraits"]["me"] == "portrait_me.jpg" and game["portraits"]["teammate2"] == "portrait_teammate2.jpg"
+    assert game["portraits"].get("teammate1") is None
+    detail = client.get(f"/api/games/{KEY}").json()
+    assert detail["portraits"]["me"] == "portrait_me.jpg"
+    assert client.get(f"/api/games/{KEY}/asset/portrait_me.jpg").content == b"me"

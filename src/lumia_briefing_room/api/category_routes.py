@@ -46,6 +46,8 @@ def register_category_routes(app: FastAPI, *, lock, current_config: Callable[[],
             return {"enabled": False, "categories": []}
         root = cats.clips_root(cfg)
         with lock:
+            for name in (ARCHIVE_FOLDER, AUTO_ARCHIVE_FOLDER):
+                (root / name).mkdir(parents=True, exist_ok=True)
             index = light_index(cfg)
             result = []
             for name in cats.category_names(cfg):
