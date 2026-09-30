@@ -234,6 +234,18 @@ python -m lumia_briefing_room.cli.analyze_vod "<영상.mp4>" \
 - 스트리머 이름은 `--streamer` 또는 설정 `vod.streamers` 에 영상 id 로 넣는다. `vod.gameGapSec`(게임 안 끊김 허용, 기본 30초)·`vod.minGameSec`(기본 60초)로 게임 분할을 조절한다.
 - 결과 화면(순위 등)에는 RapidOCR 가 필요하다(위 "개발 환경" 참고). 없거나 실패해도 클립은 만들어진다.
 
+### 참고. 앱 전용 정보 파일 이전 도구 (`cli.library_migrate`)
+
+옛 클립 폴더에 mp4 와 섞여 있던 정보 파일(`*.json`, `.thumbs`, `.labels`, `.games`, `.vods`)을 `%LOCALAPPDATA%\LumiaBriefingRoom\library\{steam,vod}\` 로 옮기는 도구다. 영상(mp4)·`.proxy` 는 건드리지 않는다. 아직 앱이 시작할 때 자동으로 돌지는 않고(읽는 코드가 아직 옛 자리를 본다) 손으로 돌린다.
+
+```bash
+python -m lumia_briefing_room.cli.library_migrate [--config PATH] [--dry-run] [--undo] [--old PATH --lib PATH]
+```
+
+- 기본은 설정의 옛 경로 두 곳(`paths.clips`·`paths.vodClips`)을 각각 `library\steam`·`libraryod` 로. `--dry-run` 은 옮길 개수만 센다. 두 번 돌려도 같고, 중간에 꺼져도 이어서 한다(파일마다 임시 복사 → 크기 확인 → 교체 → 원본 삭제 → 기록).
+- 목적지에 내용이 다른 같은 이름이 있으면 전체를 거부한다. 옛 `.trash` 에 클립이 남아 있으면 앱의 옛 휴지통 처리를 먼저 하라고 멈춘다.
+- `--undo` 는 `library\*\migration.jsonl` 기록을 거꾸로 돌려 원래 자리로 되돌린다(옛 앱 버전으로 돌아갈 때).
+
 ### 참고. 게임 기록 보관
 
 자동 정리·완전 삭제로 클립이 다 사라져도 그 경기의 순위·전적·결과표는 `clips/.games/` 에 남아 목록에 "클립 삭제됨" 행으로 보인다(`retention.keepGameRecords`, 옵션 > 자동 정리의 "게임 기록은 유지"). 게임 행의 "기록 삭제"·게임 "완전 삭제"로 지운다. 프론트를 고쳤으면 `npm run build`.
