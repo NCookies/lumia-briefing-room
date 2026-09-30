@@ -221,3 +221,9 @@ def test_read_result_screen_saves_result_without_placement():
     assert result.placement is None and result.total is None
     assert (result.match_type, result.outcome, result.nickname) == ("normal", "실험 종료", "내테스트닉")
     assert result.stats["tk"] == 13
+
+
+def test_parse_panel_without_outcome_line_does_not_crash():
+    parsed = parse_panel([line("4/7", 40), line("|내테스트닉", 372)])
+    assert parsed.outcome is None and parsed.nickname_line.text == "|내테스트닉"
+    assert parse_panel([line("TK", 10), line("|닉", 20)]) is None

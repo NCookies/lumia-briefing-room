@@ -89,7 +89,7 @@ def _parse_after(placement: int | None, total: int | None, rest: list[TextLine],
     nickname_line = next((l for l in rest if _BAR_PREFIX.match(l.text)), None)
     above = rest[: rest.index(nickname_line)] if nickname_line else rest
     candidates = [l for l in above if _is_outcome(l)]
-    outcome_line = candidates[-1] if nickname_line else (candidates[0] if candidates else None)
+    outcome_line = (candidates[-1] if nickname_line else candidates[0]) if candidates else None
     return PanelParse(
         placement, total, outcome_line.text.strip() if outcome_line else None, nickname_line, parse_stats(ordered)
     )
