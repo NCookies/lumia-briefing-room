@@ -3,6 +3,7 @@ export interface CandidateUser {
   end?: number
   dismissed?: boolean
   label?: 'combat' | 'hunt'
+  title?: string
   savedClipId?: string
   savedStart?: number
   savedEnd?: number
@@ -161,7 +162,14 @@ export const MARKER_LABEL: Record<Marker['kind'], string> = {
   teammate_death: '팀원 사망',
 }
 
+const COBALT_OUTCOMES = ['승리', '패배']
+
 export function gameHeadline(result: MatchResult | null): string {
+  if (result?.outcome && COBALT_OUTCOMES.includes(result.outcome)) return result.outcome
   if (!result || result.placement == null) return '결과 미확인'
-  return result.total ? `${result.placement}등 / ${result.total}` : `${result.placement}등`
+  return `#${result.placement}`
+}
+
+export function candidateTitle(c: Candidate): string {
+  return c.user.title || c.title
 }

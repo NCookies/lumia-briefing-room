@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { effectiveRange, formatClock, gameHeadline, isDismissed, isSaved, neighborCandidate, visibleCandidates, type Candidate, type GameDetail } from '../games'
+import { candidateTitle, effectiveRange, formatClock, gameHeadline, isDismissed, isSaved, neighborCandidate, visibleCandidates, type Candidate, type GameDetail } from '../games'
 import {
   addCandidate,
   deleteCandidate,
@@ -286,6 +286,7 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
       onSelect={select}
       onSave={saveOne}
       onDismiss={dismissOrDelete}
+      onRename={(id, title) => void run(() => patchCandidate(gameKey, id, { title }))}
       onDelete={(id) => void run(() => deleteCandidate(gameKey, id))}
       onSaveModified={saveModified}
     />
@@ -394,7 +395,7 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
             <div className="flex items-center gap-2 pt-1">
               <span className="min-w-0 flex-1 truncate text-xs text-zinc-500">
                 {selectedCand
-                  ? `선택: ${selectedCand.title} — 양 끝 손잡이를 끌어 범위를 바꾸고, 저장을 눌러야 클립에 반영됩니다`
+                  ? `선택: ${candidateTitle(selectedCand)} — 양 끝 손잡이를 끌어 범위를 바꾸고, 저장을 눌러야 클립에 반영됩니다`
                   : '막대에서 노란 구간을 누르면 선택됩니다. 초록 킬 · 파랑 어시 · 빨강 사망 · 주황 팀원 사망'}
               </span>
               <div className="flex shrink-0 items-center gap-1 text-white">

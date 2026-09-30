@@ -37,7 +37,7 @@ export async function setGamePinned(key: string, pinned: boolean): Promise<GameS
   return jsonOrThrow(await send('PATCH', `${BASE}/${key}`, { pinned }), '고정')
 }
 
-export type CandidatePatch = Partial<Pick<CandidateUser, 'start' | 'end' | 'dismissed'>> & { label?: 'combat' | 'hunt' | null }
+export type CandidatePatch = Partial<Pick<CandidateUser, 'start' | 'end' | 'dismissed' | 'title'>> & { label?: 'combat' | 'hunt' | null }
 
 export async function patchCandidate(key: string, id: string, patch: CandidatePatch): Promise<Candidate> {
   return jsonOrThrow(await send('PATCH', `${BASE}/${key}/candidates/${id}`, patch), '후보 수정')

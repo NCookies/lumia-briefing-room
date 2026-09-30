@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react'
-import { effectiveRange, formatClock, isDismissed, isSaved, type Candidate } from '../games'
+import { useEffect, useRef, useState } from 'react'
+import { candidateTitle, effectiveRange, formatClock, isDismissed, isSaved, type Candidate } from '../games'
 import { rangeModified } from '../playerBar'
+import { EditIcon } from './ViewerIcons'
 
 interface Props {
   cands: Candidate[]
@@ -14,11 +15,20 @@ interface Props {
   onSave: (id: string) => void
   onDismiss: (c: Candidate) => void
   onDelete: (id: string) => void
+  onRename: (id: string, title: string) => void
   onSaveModified: () => void
 }
 
 export function ViewerCandidates(p: Props) {
   const list = useRef<HTMLUListElement>(null)
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null)
+
+  const commitRename = () => {
+    if (!editing) return
+    const target = p.cands.find((c) => c.id === editing.id)
+    setEditing(null)
+    if (target && editing.text.trim() !== candidateTitle(target)) p.onRename(editing.id, editing.text)
+  }
   const pending = p.cands.filter((c) => !isDismissed(c) && !isSaved(c)).length
 
   useEffect(() => {
@@ -27,7 +37,10 @@ export function ViewerCandidates(p: Props) {
   }, [p.currentId])
 
   return (
-    <aside data-testid="viewer-candidates" className="flex w-80 shrink-0 flex-col gap-2 overflow-hidden rounded border border-zinc-700 bg-zinc-800/60 p-2">
+    <aside
+      data-testid="viewer-candidates"
+      className="flex w-80 shrink-0 flex-col gap-2 overflow-hidden rounded border border-zinc-700 bg-zinc-800/60 p-2"
+    >
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-medium">후보 {pending}개 저장 대기</h3>
         <button
@@ -41,7 +54,11 @@ export function ViewerCandidates(p: Props) {
         </button>
       </div>
       <ul ref={list} className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-        {p.cands.length === 0 && <li className="text-xs text-zinc-500">교전 후보가 없습니다. 영상에서 원하는 곳으로 가서 "+ 여기서 구간 추가"를 누르세요.</li>}
+        {p.cands.length === 0 && (
+          <li className="text-xs text-zinc-500">
+            교전 후보가 없습니다. 영상에서 원하는 곳으로 가서 "+ 여기서 구간 추가"를 누르세요.
+          </li>
+        )}
         {p.cands.map((c) => {
           const [s, e] = effectiveRange(c, p.duration)
           const saved = isSaved(c)
@@ -53,13 +70,52 @@ export function ViewerCandidates(p: Props) {
               key={c.id}
               data-cand={c.id}
               className={`flex flex-col gap-1 rounded border px-2 py-1.5 text-xs ${
-                selected ? 'border-white bg-zinc-700' : p.currentId === c.id ? 'border-yellow-400/70 bg-yellow-400/10' : modified ? 'border-orange-400/70' : 'border-zinc-700'
+                selected
+                  ? 'border-white bg-zinc-700'
+                  : p.currentId === c.id
+                    ? 'border-yellow-400/70 bg-yellow-400/10'
+                    : modified
+                      ? 'border-orange-400/70'
+                      : 'border-zinc-700'
               } ${dismissed ? 'opacity-50' : ''}`}
             >
               <div className="flex items-center gap-2">
-                <button type="button" className="min-w-0 flex-1 truncate text-left text-sm hover:underline" title={c.title} onClick={() => p.onSelect(c)}>
-                  {c.title}
-                </button>
+                {editing?.id === c.id ? (
+                  <input
+                    autoFocus
+                    maxLength={100}
+                    aria-label="클립 이름"
+                    className="min-w-0 flex-1 rounded border border-sky-500 bg-zinc-900 px-1 py-0.5 text-sm text-white outline-none"
+                    value={editing.text}
+                    onChange={(e) => setEditing({ id: c.id, text: e.target.value })}
+                    onBlur={commitRename}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commitRename()
+                      else if (e.key === 'Escape') setEditing(null)
+                    }}
+                  />
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="min-w-0 flex-1 truncate text-left text-sm hover:underline"
+                      title={candidateTitle(c)}
+                      onClick={() => p.onSelect(c)}
+                    >
+                      {candidateTitle(c)}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={p.busy}
+                      className="shrink-0 text-zinc-400 hover:text-white disabled:opacity-40"
+                      title="이름 바꾸기"
+                      aria-label="이름 바꾸기"
+                      onClick={() => setEditing({ id: c.id, text: candidateTitle(c) })}
+                    >
+                      <EditIcon />
+                    </button>
+                  </>
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-1 text-zinc-400">
                 <span>
@@ -88,7 +144,12 @@ export function ViewerCandidates(p: Props) {
                     </button>
                   )}
                   {c.id.includes('_u') ? (
-                    <button type="button" disabled={p.busy} className="rounded border border-zinc-600 px-2 py-0.5 hover:bg-zinc-600" onClick={() => p.onDelete(c.id)}>
+                    <button
+                      type="button"
+                      disabled={p.busy}
+                      className="rounded border border-zinc-600 px-2 py-0.5 hover:bg-zinc-600"
+                      onClick={() => p.onDelete(c.id)}
+                    >
                       삭제
                     </button>
                   ) : (

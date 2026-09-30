@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MARKER_LABEL, dragRange, effectiveRange, formatClock, isDismissed, type Candidate, type DragKind, type Marker } from '../games'
+import { MARKER_LABEL, candidateTitle, dragRange, effectiveRange, formatClock, isDismissed, type Candidate, type DragKind, type Marker } from '../games'
 import { barPct, candidateAtTime, panView, rangeModified, tickStep, timeFromBar, type View } from '../playerBar'
 
 const MARKER_COLOR: Record<string, string> = {
@@ -189,7 +189,7 @@ export function ViewerBar({ duration, view, time, cands, selectedId, markers, ov
           style={{ left: `${barPct(hover, view)}%` }}
         >
           {formatClock(hover)}
-          {hovered && ` · ${hovered.title}`}
+          {hovered && ` · ${candidateTitle(hovered)}`}
         </span>
       )}
     </div>

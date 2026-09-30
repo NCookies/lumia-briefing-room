@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   dragRange,
+  candidateTitle,
   effectiveRange,
   formatClock,
   gameHeadline,
@@ -79,8 +80,16 @@ test('clock text uses m:ss under an hour and h:mm:ss above', () => {
   assert.equal(formatClock(-4), '0:00')
 })
 
-test('the headline shows the placement or says the result is unknown', () => {
-  assert.equal(gameHeadline({ placement: 1, total: 7 }), '1등 / 7')
-  assert.equal(gameHeadline({ placement: 3 }), '3등')
+test('the headline shows the placement as #N, win/loss for cobalt, or says the result is unknown', () => {
+  assert.equal(gameHeadline({ placement: 1, total: 7 }), '#1')
+  assert.equal(gameHeadline({ placement: 7 }), '#7')
+  assert.equal(gameHeadline({ placement: 2, outcome: '승리' }), '승리')
+  assert.equal(gameHeadline({ outcome: '패배' }), '패배')
+  assert.equal(gameHeadline({ placement: 3, outcome: '탈출' }), '#3')
   assert.equal(gameHeadline(null), '결과 미확인')
+})
+
+test('the users title wins over the detected one', () => {
+  assert.equal(candidateTitle(c('a', 1, 5, { title: '1일차 낮 교전' })), '1일차 낮 교전')
+  assert.equal(candidateTitle(c('a', 1, 5, { title: '1일차 낮 교전', user: { title: '내 이름' } })), '내 이름')
 })
