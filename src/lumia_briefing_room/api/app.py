@@ -16,6 +16,9 @@ from pydantic import BaseModel
 from lumia_briefing_room import __version__, activity, autostart, native_dialog, paths, video_formats
 from lumia_briefing_room.appmode import resolve_mode
 from lumia_briefing_room.api.clips import find_clip, scan_clips, to_summary_dict
+from lumia_briefing_room.api.unknown_clips import ensure_thumbnail as ensure_unknown_thumbnail
+from lumia_briefing_room.api.unknown_clips import summary_of as summary_of_unknown
+from lumia_briefing_room.pipeline.clip_files import find_unknown, unknown_videos
 from lumia_briefing_room.pipeline.clip_uid import ensure_clip_uid
 from lumia_briefing_room.api.export import (
     export_video,
@@ -154,6 +157,9 @@ def _locate(app: FastAPI, clip_id: str):
         clip = find_clip(root, clip_id, resolved.clip_roots)
         if clip is not None:
             return root, clip
+    unknown = find_unknown(clip_id, (resolved.library_steam, resolved.library_vod), resolved.clip_roots)
+    if unknown is not None:
+        return resolved.library_steam, summary_of_unknown(unknown, resolved.library_steam, discover_ffmpeg())
     return None
 
 
@@ -202,10 +208,19 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         source: str = "steam",
         q: str | None = None,
     ):
-        clips_dir = _source_root(app, source)
-        summaries = scan_clips(clips_dir, _video_roots(app))
+        resolved = resolve_paths(app.state.config.paths)
+        if source in ("all", "other"):
+            libraries = (resolved.library_steam, resolved.library_vod)
+            summaries = [] if source == "other" else [c for lib in libraries for c in scan_clips(lib, resolved.clip_roots)]
+            ffmpeg = discover_ffmpeg()
+            summaries += [
+                summary_of_unknown(u, resolved.library_steam, ffmpeg)
+                for u in unknown_videos(libraries, resolved.clip_roots)
+            ]
+        else:
+            summaries = scan_clips(_source_root(app, source), _video_roots(app))
         for clip in summaries:
-            if not clip.meta.get("clipUid"):
+            if not clip.meta.get("clipUid") and not clip.meta.get("unknownVideo"):
                 try:
                     ensure_clip_uid(clip.meta_path)
                 except (OSError, ValueError):
@@ -265,6 +280,8 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             meta["matchResultSource"] = "manual"
         if "matchResultSource" in body and body["matchResultSource"] is None:
             meta["matchResultSource"] = None
+        meta.pop("unknownVideo", None)
+        clip.meta_path.parent.mkdir(parents=True, exist_ok=True)
         clip.meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
         if "pinned" in body:
             cleanup_preview_registry.notify_clips_changed()
@@ -418,6 +435,8 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         if clip is None:
             raise HTTPException(404, "클립을 찾을 수 없습니다")
         thumb = resolve_thumbnail(clip.meta_path, clip.meta)
+        if clip.meta.get("unknownVideo") or (clip.meta.get("videoFingerprint") and (thumb is None or not thumb.exists())):
+            thumb = ensure_unknown_thumbnail(clip, current_config().encode, discover_ffmpeg()) or thumb
         if thumb is None or not thumb.exists():
             raise HTTPException(404, "썸네일이 없습니다")
         return FileResponse(thumb, media_type="image/jpeg")
@@ -516,6 +535,8 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         if found is None:
             raise HTTPException(404, "클립을 찾을 수 없습니다")
         clip_root, clip = found
+        if clip.meta.get("unknownVideo"):
+            raise HTTPException(409, "이 앱이 만든 클립이 아니라 자르거나 나눌 수 없습니다. 먼저 내보내기로 복사해 쓰세요")
         try:
             start, end = float(body["start"]), float(body["end"])
             validate_range(start, end, float(clip.meta.get("durationSec", 0.0)))
@@ -541,6 +562,8 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         if found is None:
             raise HTTPException(404, "클립을 찾을 수 없습니다")
         clip_root, clip = found
+        if clip.meta.get("unknownVideo"):
+            raise HTTPException(409, "이 앱이 만든 클립이 아니라 자르거나 나눌 수 없습니다. 먼저 내보내기로 복사해 쓰세요")
         try:
             ranges = [(float(r["start"]), float(r["end"])) for r in body["ranges"]]
             validate_ranges(ranges, float(clip.meta.get("durationSec", 0.0)))

@@ -122,3 +122,22 @@ def test_unknown_mode_falls_back_to_recycle(tmp_path, monkeypatch):
     delete_clip(meta_path, mode="not-a-real-mode")
 
     assert len(sent) > 0
+
+
+def test_a_video_without_info_is_deleted_by_itself(tmp_path, monkeypatch):
+    from lumia_briefing_room.pipeline import delete_helper as dh
+
+    video = tmp_path / "obs.mp4"
+    video.write_bytes(b"x")
+    proxy = tmp_path / "proxy.mp4"
+    proxy.write_bytes(b"p")
+    dh.delete_clip(tmp_path / "missing.json", mode=dh.PERMANENT, video=video, proxy=proxy)
+    assert not video.exists() and not proxy.exists()
+
+
+def test_nothing_is_deleted_when_neither_info_nor_video_is_given(tmp_path):
+    from lumia_briefing_room.pipeline import delete_helper as dh
+
+    (tmp_path / "keep.mp4").write_bytes(b"x")
+    dh.delete_clip(tmp_path / "keep.json", mode=dh.PERMANENT)
+    assert (tmp_path / "keep.mp4").exists()

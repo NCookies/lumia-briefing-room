@@ -71,6 +71,11 @@ def delete_clip(
     라벨·게임 기록은 파일을 지우기 전에 남겨야 하므로(둘 다 메타데이터를 다시 읽는다) 순서가 중요하다.
     """
     if not meta_path.exists():
+        # 앱이 만들지 않은 영상(정보 파일이 없음)은 영상 파일과 재생용 변환 영상만 지운다.
+        orphan = [f for f in (video, proxy) if f is not None and f.exists()]
+        if orphan:
+            (permanently_delete if mode == PERMANENT else send_to_recycle_bin)(orphan)
+            cleanup_preview_registry.notify_clips_changed()
         return
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
     archive_if_labeled(meta_path, archive_dir)
