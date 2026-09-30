@@ -199,3 +199,58 @@ def test_existing_clip_ids_of_a_legacy_game_near_the_window_start(tmp_path):
     (clips / f"{KEY}_02.json").unlink()
     assert lg.existing_clip_ids(games, clips, start) == {f"{KEY}_01"}
 
+
+
+def _new_game(games: Path, key: str, cands: list[dict], *, offset: float = 925.0) -> None:
+    folder = games / key
+    folder.mkdir(parents=True)
+    (folder / "full.mp4").write_bytes(b"v")
+    (folder / "game.json").write_text(json.dumps({
+        "gameKey": key, "matchStartUtc": "2026-09-28T15:59:25Z", "fullVideo": {"path": "full.mp4", "offsetSec": offset},
+        "candidates": cands,
+    }), encoding="utf-8")
+
+
+def _cand(cid, combat_start, combat_end):
+    return {"id": cid, "start": combat_start - 5, "end": combat_end + 5, "combatStart": combat_start, "combatEnd": combat_end, "user": {}}
+
+
+def test_adopting_links_old_clips_to_the_new_candidates_that_overlap_and_supersedes_the_old_record(tmp_path):
+    clips, games = _setup(tmp_path)
+    lg.migrate_legacy_games(clips, games)
+    legacy = json.loads((games / KEY / "game.json").read_text(encoding="utf-8"))
+    # 옛 클립: 세션 기준 전투 1005~1015 / 1305~1320. 새 게임은 풀영상 0초 = 세션 925초
+    _new_game(games, "20260928_155925", [_cand("20260928_155925_01", 1300 - 925, 1322 - 925), _cand("20260928_155925_02", 1003 - 925, 1014 - 925), _cand("x", 3000 - 925, 3010 - 925)])
+
+    lg.adopt_legacy_clips(games, legacy, "20260928_155925")
+
+    new = json.loads((games / "20260928_155925" / "game.json").read_text(encoding="utf-8"))
+    assert [c["user"] for c in new["candidates"]] == [{"savedClipId": f"{KEY}_02"}, {"savedClipId": f"{KEY}_01"}, {}]
+    assert json.loads((games / KEY / "game.json").read_text(encoding="utf-8"))["supersededBy"] == "20260928_155925"
+
+
+def test_adopting_into_the_same_key_keeps_the_game_and_only_links_clips(tmp_path):
+    clips, games = _setup(tmp_path)
+    lg.migrate_legacy_games(clips, games)
+    legacy = json.loads((games / KEY / "game.json").read_text(encoding="utf-8"))
+    (games / KEY / "full.mp4").write_bytes(b"v")
+    data = {**legacy, "legacy": None, "fullVideo": {"path": "full.mp4", "offsetSec": 925.975},
+            "candidates": [_cand("other", 1005 - 925.975, 1015 - 925.975)]}
+    (games / KEY / "game.json").write_text(json.dumps(data), encoding="utf-8")
+
+    lg.adopt_legacy_clips(games, legacy, KEY)
+
+    new = json.loads((games / KEY / "game.json").read_text(encoding="utf-8"))
+    assert new["candidates"][0]["user"] == {"savedClipId": f"{KEY}_01"} and "supersededBy" not in new
+
+
+def test_superseded_games_are_hidden_from_listings_and_are_not_legacy_matches(tmp_path):
+    clips, games = _setup(tmp_path)
+    lg.migrate_legacy_games(clips, games)
+    from lumia_briefing_room.pipeline.game_files import list_games
+
+    legacy = json.loads((games / KEY / "game.json").read_text(encoding="utf-8"))
+    (games / KEY / "game.json").write_text(json.dumps({**legacy, "supersededBy": "20260928_155925"}), encoding="utf-8")
+
+    assert list_games(games) == []
+    assert lg.migrate_legacy_games(clips, games) == []  # 다시 옛 게임으로 되살아나지 않는다

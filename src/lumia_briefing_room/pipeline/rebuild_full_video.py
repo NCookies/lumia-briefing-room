@@ -15,7 +15,7 @@ from pathlib import Path
 from lumia_briefing_room.config import Config
 from lumia_briefing_room.pipeline.backfill_runtime import staging_config
 from lumia_briefing_room.pipeline.game_files import GameNotFound, has_full_video, load_game, update_game
-from lumia_briefing_room.pipeline.legacy_games import existing_clip_ids
+from lumia_briefing_room.pipeline.legacy_games import adopt_legacy_clips, saved_clip_ids
 from lumia_briefing_room.pipeline.orchestrator import process_match
 from lumia_briefing_room.video.segments import existing_segment_numbers, segment_number_at
 from lumia_briefing_room.video.session import RecordingSession
@@ -99,19 +99,24 @@ def rebuild_full_video(
         raise RebuildError("이미 풀영상이 있는 게임입니다")
     session, start, end = _session_and_range(game, recording_root, load_session)
 
-    known = existing_clip_ids(games_dir, clips_dir, start, start)
+    known = saved_clip_ids(game, clips_dir)
     staging = clips_dir / STAGING_DIRNAME / uuid.uuid4().hex
     staging.mkdir(parents=True, exist_ok=True)
     try:
         process(
             session, start, end, staging_config(cfg), ffmpeg_path=ffmpeg_path, clips_dir=staging, games_dir=games_dir,
-            existing_clip_ids=known if known is not None else set(), on_progress=on_progress, cancel=cancel,
+            existing_clip_ids=known, on_progress=on_progress, cancel=cancel,
         )
     finally:
         shutil.rmtree(staging, ignore_errors=True)
 
     if not has_full_video(games_dir, key):
         raise RebuildError(load_game(games_dir, key).get("fullVideoError") or "풀영상을 만들지 못했습니다")
+
+    try:
+        adopt_legacy_clips(games_dir, game, key)
+    except Exception:
+        log.exception("옛 클립을 새 후보에 잇지 못했다: %s", key)
 
     if game.get("pinned"):
         update_game(games_dir, key, lambda d: d.update(pinned=True))

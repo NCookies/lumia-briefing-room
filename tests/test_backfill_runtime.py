@@ -176,18 +176,33 @@ def test_process_window_on_progress_defaults_to_none(monkeypatch, tmp_path: Path
     assert calls["on_progress"] is None
 
 
-def test_process_window_passes_the_clip_ids_that_already_exist_for_that_game(monkeypatch, tmp_path: Path):
+def test_process_window_passes_the_clip_ids_of_the_old_game_and_adopts_them(monkeypatch, tmp_path: Path):
+    calls, adopted = {}, []
+    monkeypatch.setattr(rt, "process_match", lambda *a, **kw: calls.update(kw) or [])
+    monkeypatch.setattr(rt.RecordingSession, "load", classmethod(lambda cls, d: "session"))
+    monkeypatch.setattr(rt, "learn_nickname", lambda *a: None)
+    monkeypatch.setattr(rt, "saved_clip_ids", lambda game, clips: {"x_01"})
+    monkeypatch.setattr(rt, "adopt_legacy_clips", lambda games, legacy, key: adopted.append((games, legacy, key)))
+    old = {"gameKey": "20260923_095900"}
+    process = rt.make_process_window(
+        Config(paths=PathsConfig(clips=Path("REAL"))), Path("ffmpeg"), k_templates=None, a_templates=None,
+        hwaccel=None, config_path=None, legacy_game=lambda w: old, games_dir=tmp_path / "g", clips_dir=tmp_path / "c",
+    )
+
+    process(Path("bg_1049590_x"), _window(), tmp_path, None)
+
+    assert calls["existing_clip_ids"] == {"x_01"}
+    assert adopted == [(tmp_path / "g", old, "20260923_100000")]
+
+
+def test_process_window_of_a_new_game_passes_nothing_special(monkeypatch, tmp_path: Path):
     calls = {}
     monkeypatch.setattr(rt, "process_match", lambda *a, **kw: calls.update(kw) or [])
     monkeypatch.setattr(rt.RecordingSession, "load", classmethod(lambda cls, d: "session"))
     monkeypatch.setattr(rt, "learn_nickname", lambda *a: None)
-    seen = []
     process = rt.make_process_window(
         Config(paths=PathsConfig(clips=Path("REAL"))), Path("ffmpeg"), k_templates=None, a_templates=None,
-        hwaccel=None, config_path=None, existing_clip_ids=lambda w: seen.append(w) or {"x_01"},
+        hwaccel=None, config_path=None, legacy_game=lambda w: None, games_dir=tmp_path, clips_dir=tmp_path,
     )
-    window = _window()
-
-    process(Path("bg_1049590_x"), window, tmp_path, None)
-
-    assert seen == [window] and calls["existing_clip_ids"] == {"x_01"}
+    process(Path("bg_1049590_x"), _window(), tmp_path, None)
+    assert calls["existing_clip_ids"] is None

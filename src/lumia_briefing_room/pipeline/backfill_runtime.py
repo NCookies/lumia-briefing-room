@@ -18,6 +18,8 @@ from lumia_briefing_room.detect.types import FrameState
 from lumia_briefing_room.pipeline.backfill import GameCancelled
 from lumia_briefing_room.pipeline.backfill_progress import DEFAULT_SCAN_SPEEDUP
 from lumia_briefing_room.pipeline.clip import ClipCutError
+from lumia_briefing_room.pipeline.game_store import game_key
+from lumia_briefing_room.pipeline.legacy_games import adopt_legacy_clips, saved_clip_ids
 from lumia_briefing_room.pipeline.nickname import learn_nickname
 from lumia_briefing_room.pipeline.orchestrator import process_match
 from lumia_briefing_room.pipeline.session_scan import (
@@ -132,9 +134,12 @@ def make_process_window(
     a_templates: dict | None,
     hwaccel: str | None,
     config_path: Path | None,
-    existing_clip_ids: Callable[[GameWindow], set[str] | None] | None = None,
+    legacy_game: Callable[[GameWindow], dict | None] | None = None,
+    games_dir: Path | None = None,
+    clips_dir: Path | None = None,
 ) -> Callable[[Path, GameWindow, Path, threading.Event | None, Callable[[float], None] | None], list[Path]]:
-    """`existing_clip_ids` 는 이전 버전이 이 구간의 게임에 이미 저장해 둔 클립 ID 를 돌려준다(그 클립은 다시 만들지 않고, 이전 버전 게임이 아니면 None)."""
+    """`legacy_game` 은 이 구간에서 시작한 옛 게임(이전 버전에서 클립만 만든 게임)의 기록을 돌려준다(없으면 None). 있으면 그 클립은 다시
+    만들지 않고, 새 후보에 겹치는 옛 클립을 이어 붙인 뒤 옛 게임 기록을 대체 표시한다."""
     staged = staging_config(cfg)
 
     def process(
@@ -142,21 +147,28 @@ def make_process_window(
         on_progress: Callable[[float], None] | None = None,
     ) -> list[Path]:
         session = RecordingSession.load(session_dir)
+        legacy = legacy_game(window) if legacy_game is not None else None
         try:
-            return process_match(
+            written = process_match(
                 session, window.start_utc, window.end_utc, staged,
                 ffmpeg_path=ffmpeg_path, game_mode=game_mode,
                 k_templates=k_templates, a_templates=a_templates, hwaccel=hwaccel,
                 clips_dir=staging, cancel=cancel, result_search_from=window.hud_end_utc,
                 on_result=lambda r: learn_nickname(config_path, r.nickname),
                 on_progress=on_progress,
-                existing_clip_ids=existing_clip_ids(window) if existing_clip_ids is not None else None,
+                existing_clip_ids=saved_clip_ids(legacy, clips_dir) if legacy is not None and clips_dir is not None else None,
             )
         except DetectionCancelled as exc:
             raise GameCancelled() from exc
         except ClipCutError as exc:
             log.warning("클립 생성 실패(세그먼트 없음): %s", exc)
             return []
+        if legacy is not None and games_dir is not None:
+            try:
+                adopt_legacy_clips(games_dir, legacy, game_key(window.start_utc))
+            except Exception:
+                log.exception("옛 클립을 새 게임에 잇지 못했다: %s", legacy.get("gameKey"))
+        return written
 
     return process
 

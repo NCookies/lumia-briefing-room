@@ -38,8 +38,8 @@ def load_game(games_dir: Path, key: str) -> dict:
     return data
 
 
-def list_games(games_dir: Path) -> list[dict]:
-    """최신 경기부터. 읽을 수 없는 폴더는 건너뛴다."""
+def list_games(games_dir: Path, *, include_superseded: bool = False) -> list[dict]:
+    """최신 경기부터. 읽을 수 없는 폴더는 건너뛴다. 새 기록으로 대체된 옛 게임(`supersededBy`)은 기본으로 뺀다."""
     try:
         folders = [p for p in games_dir.iterdir() if p.is_dir() and valid_key(p.name)]
     except OSError:
@@ -47,9 +47,11 @@ def list_games(games_dir: Path) -> list[dict]:
     games = []
     for folder in sorted(folders, key=lambda p: p.name, reverse=True):
         try:
-            games.append(load_game(games_dir, folder.name))
+            game = load_game(games_dir, folder.name)
         except GameNotFound:
             continue
+        if include_superseded or not game.get("supersededBy"):
+            games.append(game)
     return games
 
 

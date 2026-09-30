@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from lumia_briefing_room.pipeline.clip_assets import resolve_character_portrait, resolve_result_image
-from lumia_briefing_room.pipeline.game_files import list_games
+from lumia_briefing_room.pipeline.game_files import list_games, update_game
 from lumia_briefing_room.pipeline.game_store import FULL_VIDEO, GAME_JSON, SCHEMA_VERSION, game_key, is_certain, write_game_json
 from lumia_briefing_room.pipeline.game_records import RECORDS_DIRNAME
 
@@ -194,6 +194,28 @@ def migrate_legacy_games(clips_dir: Path, games_dir: Path) -> list[str]:
     return created
 
 
+def find_legacy_game(
+    games_dir: Path, window_start: datetime, window_end: datetime | None = None, tolerance_sec: float = 240.0
+) -> dict | None:
+    """이 구간에서 시작한, 풀영상이 없는 옛 게임의 기록. 없으면 None."""
+    lo = window_start - timedelta(seconds=tolerance_sec)
+    hi = window_end if window_end is not None else window_start + timedelta(seconds=tolerance_sec)
+    for game in list_games(games_dir):
+        start = _parse_utc(game.get("matchStartUtc"))
+        if start is not None and lo <= start <= hi and not game.get("fullVideo") and not game.get("fullVideoDeletedAt"):
+            return game
+    return None
+
+
+def saved_clip_ids(game: dict, clips_dir: Path) -> set[str]:
+    """옛 게임이 저장해 둔 클립 중 파일이 아직 있는 것."""
+    return {
+        clip_id
+        for cand in game.get("candidates") or []
+        if (clip_id := (cand.get("user") or {}).get("savedClipId")) and (clips_dir / f"{clip_id}.json").is_file()
+    }
+
+
 def existing_clip_ids(
     games_dir: Path, clips_dir: Path, window_start: datetime, window_end: datetime | None = None, tolerance_sec: float = 240.0
 ) -> set[str] | None:
@@ -201,16 +223,50 @@ def existing_clip_ids(
 
     풀영상을 새로 만들 때 클립을 두 번 만들지 않는 기준이다.
     """
-    lo = window_start - timedelta(seconds=tolerance_sec)
-    hi = window_end if window_end is not None else window_start + timedelta(seconds=tolerance_sec)
-    found: set[str] | None = None
-    for game in list_games(games_dir):
-        start = _parse_utc(game.get("matchStartUtc"))
-        if start is None or not lo <= start <= hi:
-            continue
-        found = found if found is not None else set()
-        for cand in game.get("candidates") or []:
-            clip_id = (cand.get("user") or {}).get("savedClipId")
-            if clip_id and (clips_dir / f"{clip_id}.json").is_file():
-                found.add(clip_id)
-    return found
+    game = find_legacy_game(games_dir, window_start, window_end, tolerance_sec)
+    return None if game is None else saved_clip_ids(game, clips_dir)
+
+
+def _session_span(game: dict, cand: dict, *, use_combat: bool = True) -> tuple[float, float]:
+    """후보의 전투 구간을 세션 기준 초로. 옛 게임은 게임 시작 - 세션 시작, 새 게임은 풀영상 `offsetSec` 를 더한다."""
+    start, end = cand.get("combatStart"), cand.get("combatEnd")
+    if not use_combat or start is None or end is None:
+        start, end = cand.get("start", 0.0), cand.get("end", 0.0)
+    base = (game.get("fullVideo") or {}).get("offsetSec")
+    if base is None:
+        match, session = _parse_utc(game.get("matchStartUtc")), _parse_utc(game.get("sessionStartUtc"))
+        base = (match - session).total_seconds() if match and session else 0.0
+    return float(start) + float(base), float(end) + float(base)
+
+
+def adopt_legacy_clips(games_dir: Path, legacy: dict, new_key: str) -> None:
+    """풀영상을 새로 만든 게임(`new_key`)의 후보에, 겹치는 옛 클립을 저장됨으로 이어 준다(후보 하나에 클립 하나).
+
+    새 게임의 시작이 옛 게임과 달라 키가 다르면(캐릭터 선택 확장 등) 옛 게임 기록은 `supersededBy` 로 대체 표시해 목록에서 뺀다.
+    표시만 하고 지우지 않으므로 옛 클립에서 다시 게임을 만들지 않는다(`migrate_legacy_games` 가 폴더 존재로 건너뛴다).
+    """
+    old = [
+        (cand["user"]["savedClipId"], _session_span(legacy, cand))
+        for cand in legacy.get("candidates") or []
+        if (cand.get("user") or {}).get("savedClipId")
+    ]
+
+    def link(data: dict) -> None:
+        free = dict(old)
+        for cand in data.get("candidates") or []:
+            if (cand.get("user") or {}).get("savedClipId"):
+                free.pop(cand["user"]["savedClipId"], None)
+        for cand in data.get("candidates") or []:
+            if (cand.get("user") or {}).get("savedClipId"):
+                continue
+            lo, hi = _session_span(data, cand)
+            best = max(
+                ((min(hi, e) - max(lo, s), clip_id) for clip_id, (s, e) in free.items()), default=(0.0, None),
+            )
+            if best[1] is not None and best[0] > 0:
+                cand["user"] = {**(cand.get("user") or {}), "savedClipId": best[1]}
+                free.pop(best[1])
+
+    update_game(games_dir, new_key, link)
+    if legacy["gameKey"] != new_key:
+        update_game(games_dir, legacy["gameKey"], lambda d: d.update(supersededBy=new_key))
