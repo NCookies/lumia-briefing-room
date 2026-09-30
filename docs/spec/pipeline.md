@@ -147,7 +147,7 @@ result.jpg / portrait_{me,teammate1,teammate2}.jpg   클립 쪽 썸네일 폴더
 
 - **순서**(`process_match`): 검출 → **풀영상 컷(클립 컷보다 먼저 - 링버퍼가 원본을 지우기 전)** → 결과 화면·초상화 → 후보 이름 붙이기 → `clip.saveMode` 에 따라 클립 컷 → `game.json`. 후보가 0개인 게임도 풀영상과 `game.json` 은 남는다.
 - **풀영상이 실패해도(디스크 부족·세그먼트 없음·ffmpeg 오류) 후보 기록과 클립 저장은 계속한다.** 컷 전에 원본 청크 크기로 필요 용량을 어림해 여유(+512MB)가 없으면 건너뛰고 `fullVideoError` 에 이유를 남기며 `on_full_video_error` 로 알린다. 이때는 `saveMode` 와 무관하게 **확실한 후보(킬·어시·사망 태그)만** 클립으로 저장한다.
-- `clip.saveMode`: `auto`(기본, 후보 전부 클립으로 - 기존 방식) / `manual`(클립을 안 자름 - 수동 저장 UI 는 아직 없다).
+- `clip.saveMode`: `auto`(기본, 후보 전부 클립으로 - 기존 방식) / `manual`(클립을 안 자름 - 풀영상 화면에서 후보를 골라 저장).
 - `game.json` 필드: `fullVideo{path,sizeBytes,durationSec,offsetSec,segmentStart/End,sourceIncomplete,audioStatus}`, `candidates[]`(시각은 풀영상 기준 초 - 후보 범위 `start/end`, 교전 `combatStart/End`, `certain`, 태그·pvp·지역·일차, `user{savedClipId}`), `userCandidates[]`(비어 있음), `markers[]{t,kind}`(kill/assist/death/teammate_death - 검출이 이미 읽는 값), 결과표·초상화 파일명. 풀영상 0초 = 세션 기준 `offsetSec`(첫 세그먼트 시작)라 후보 시각 = 세션 기준 시각 - `offsetSec`.
 - 스테이징(다시 분석·백필)으로 클립만 옮기는 경우에도 `games/` 는 스테이징을 거치지 않고 바로 쓴다(같은 경기키를 덮어쓴다).
 - 실측(2026-09-30, 스팀 녹화 24분 게임): 검출 + 풀영상 컷 + 클립 12개 전체 81초, 풀영상 4.02GB.
