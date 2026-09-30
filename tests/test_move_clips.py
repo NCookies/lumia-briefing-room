@@ -6,54 +6,47 @@ import pytest
 from fastapi.testclient import TestClient
 
 from lumia_briefing_room.api.app import create_app
-from lumia_briefing_room.config import Config, PathsConfig
+from lumia_briefing_room.config import Config, PathsConfig, resolve_paths
 from lumia_briefing_room.pipeline.move_clips import MoveError, move_clips_dir
 
 
-def _write_clip(root: Path, clip_id: str, *, stored_thumb: str | None = None) -> None:
+def _write_clip(root: Path, clip_id: str, *, info: Path | None = None) -> None:
+    """영상은 `root` 에, 정보(json·썸네일)는 `info`(앱 데이터 library)에 둔다."""
     root.mkdir(parents=True, exist_ok=True)
     (root / f"{clip_id}.mp4").write_bytes(b"video")
-    (root / ".thumbs").mkdir(exist_ok=True)
-    (root / ".thumbs" / f"{clip_id}.jpg").write_bytes(b"\xff\xd8thumb")
-    meta = {
-        "title": clip_id, "tags": [], "pinned": False, "deletedAt": None,
-        "thumbnailPath": stored_thumb or f".thumbs/{clip_id}.jpg",
-    }
-    (root / f"{clip_id}.json").write_text(json.dumps(meta), encoding="utf-8")
+    if info is None:
+        return
+    (info / ".thumbs").mkdir(parents=True, exist_ok=True)
+    (info / ".thumbs" / f"{clip_id}.jpg").write_bytes(bytes([0xFF, 0xD8]) + b"thumb")
+    meta = {"title": clip_id, "tags": [], "pinned": False, "deletedAt": None, "thumbnailPath": f".thumbs/{clip_id}.jpg"}
+    (info / f"{clip_id}.json").write_text(json.dumps(meta), encoding="utf-8")
 
 
-def test_moves_clips_thumbnails_and_side_folders(tmp_path):
+def test_moves_videos_keeping_subfolders_and_the_proxy_cache(tmp_path):
     old, new = tmp_path / "old", tmp_path / "new"
     _write_clip(old, "a")
-    _write_clip(old / ".trash", "t")
+    _write_clip(old / "캐릭터" / "아야", "b")
     (old / ".proxy").mkdir()
     (old / ".proxy" / "a.mp4").write_bytes(b"proxy")
-    (old / ".games").mkdir()
-    (old / ".games" / "g.json").write_text("{}", encoding="utf-8")
 
     moved = move_clips_dir(old, new)
 
-    assert moved == 1
-    assert (new / "a.json").exists() and (new / "a.mp4").exists()
-    assert (new / ".thumbs" / "a.jpg").exists()
-    assert (new / ".trash" / "t.json").exists() and (new / ".trash" / ".thumbs" / "t.jpg").exists()
+    assert moved == 2
+    assert (new / "a.mp4").exists() and (new / "캐릭터" / "아야" / "b.mp4").exists()
     assert (new / ".proxy" / "a.mp4").exists()
-    assert (new / ".games" / "g.json").exists()
-    assert not (old / "a.json").exists()
-    assert not (old / ".thumbs").exists()
+    assert not (old / "a.mp4").exists() and not (old / ".proxy").exists()
 
 
-def test_leaves_unrelated_files_alone(tmp_path):
+def test_leaves_non_video_files_alone_but_every_video_is_a_clip(tmp_path):
     old, new = tmp_path / "old", tmp_path / "new"
     _write_clip(old, "a")
     (old / "notes.txt").write_text("mine", encoding="utf-8")
-    (old / "vacation.mp4").write_bytes(b"not a clip")
+    (old / "vacation.mp4").write_bytes(b"obs recording")
 
     move_clips_dir(old, new)
 
-    assert (old / "notes.txt").exists()
-    assert (old / "vacation.mp4").exists()
-    assert not (new / "vacation.mp4").exists()
+    assert (old / "notes.txt").exists() and not (new / "notes.txt").exists()
+    assert (new / "vacation.mp4").exists(), "정보 파일이 없는 영상도 클립으로 본다"
 
 
 def test_refuses_when_target_already_has_same_file(tmp_path):
@@ -64,7 +57,7 @@ def test_refuses_when_target_already_has_same_file(tmp_path):
     with pytest.raises(MoveError):
         move_clips_dir(old, new)
 
-    assert (old / "a.json").exists()
+    assert (old / "a.mp4").exists()
 
 
 def test_refuses_nested_folders(tmp_path):
@@ -119,7 +112,7 @@ def test_progress_reports_bytes_up_to_total(tmp_path):
 
 
 def test_api_moves_clips_and_updates_config(client, tmp_path):
-    _write_clip(tmp_path / "clips", "a", stored_thumb=str(tmp_path / "clips" / ".thumbs" / "a.jpg"))
+    _write_clip(tmp_path / "clips", "a", info=resolve_paths(client.app.state.config.paths).library_steam)
     new = tmp_path / "elsewhere"
 
     resp, status = _start_move(client, "steam", new)
@@ -130,6 +123,7 @@ def test_api_moves_clips_and_updates_config(client, tmp_path):
     assert client.get("/api/config").json()["paths"]["clips"] == str(new)
     assert [c["id"] for c in client.get("/api/clips").json()] == ["a"]
     assert client.get("/api/clips/a/thumbnail").status_code == 200
+    assert (new / "a.mp4").exists() and not (tmp_path / "clips" / "a.mp4").exists()
 
 
 def test_api_conflict_keeps_old_config(client, tmp_path):
@@ -151,7 +145,7 @@ def test_api_moves_vod_clips(client, tmp_path):
 
     assert status["state"] == "done"
     assert client.get("/api/config").json()["paths"]["vodClips"] == str(tmp_path / "vod2")
-    assert (tmp_path / "vod2" / "vod_a.json").exists()
+    assert (tmp_path / "vod2" / "vod_a.mp4").exists()
 
 
 def test_api_nothing_to_move_still_switches_folder(client, tmp_path):

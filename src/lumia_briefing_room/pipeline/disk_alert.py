@@ -15,7 +15,7 @@ FULL_VIDEO_FAILED = "full_video_failed"
 
 
 def disk_status(cfg: Config) -> DiskStatus:
-    return check_disk(resolve_paths(cfg.paths).games, min_free_gb=cfg.paths.min_free_gb)
+    return check_disk(resolve_paths(cfg.paths).games_steam, min_free_gb=cfg.paths.min_free_gb)
 
 
 def check_and_notify(cfg: Config, center: NoticeCenter = notices) -> DiskStatus | None:

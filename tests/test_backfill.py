@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from lumia_briefing_room.pipeline import backfill
+from lumia_briefing_room.pipeline import clip_files as backfill_files
 from lumia_briefing_room.pipeline.backfill_progress import (
     DEFAULT_AVG_GAME_SEC,
     DEFAULT_SCAN_SPEEDUP,
@@ -119,8 +120,8 @@ def test_commit_moves_the_json_after_the_video_and_thumbnail(tmp_path: Path, mon
     (staging / "a.json").write_text("{}", encoding="utf-8")
     (staging / ".thumbs" / "a.jpg").write_bytes(b"t")
     order = []
-    real_move = backfill.shutil.move
-    monkeypatch.setattr(backfill.shutil, "move", lambda src, dst: (order.append(Path(src).name), real_move(src, dst))[1])
+    real_move = backfill_files.move_file
+    monkeypatch.setattr(backfill_files, "move_file", lambda src, dst: (order.append(Path(src).name), real_move(src, dst))[1])
 
     backfill.commit_staging(staging, clips)
 

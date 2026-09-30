@@ -1,7 +1,7 @@
-"""클립 저장 폴더를 바꿀 때 기존 클립을 새 폴더로 옮긴다.
+"""클립 저장 폴더를 바꿀 때 기존 클립 영상을 새 폴더로 옮긴다.
 
-클립 목록은 설정된 폴더만 읽으므로, 폴더만 바꾸면 이전 클립이 화면에서 사라진다.
-클립 폴더가 아닌 파일(사용자가 같은 폴더에 둔 다른 영상 등)은 건드리지 않는다.
+클립 정보(json·썸네일 등)는 앱 데이터 library 에 있어 따라 옮기지 않는다. 영상 파일은 하위 폴더 구조 그대로 옮기고, 재생용 변환 영상
+(`.proxy`)은 다시 만들 수 있지만 같이 옮긴다. 영상이 아닌 파일(사용자가 같은 폴더에 둔 문서 등)은 건드리지 않는다.
 """
 
 import shutil
@@ -9,11 +9,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from lumia_briefing_room.pipeline.clip_assets import THUMBS_DIRNAME, TRASH_DIRNAME
-from lumia_briefing_room.pipeline.game_records import RECORDS_DIRNAME
-from lumia_briefing_room.pipeline.label_archive import ARCHIVE_DIRNAME
+from lumia_briefing_room.pipeline.clip_files import walk_videos
 
-SIDE_DIRNAMES = (THUMBS_DIRNAME, TRASH_DIRNAME, ".proxy", RECORDS_DIRNAME, ARCHIVE_DIRNAME)
+SIDE_DIRNAMES = (".proxy",)
 
 
 class MoveError(Exception):
@@ -47,11 +45,8 @@ def plan_move(old: Path, new: Path) -> MovePlan | None:
 
     pairs: list[tuple[Path, Path]] = []
     clips = 0
-    for meta in sorted(old.glob("*.json")):
-        video = meta.with_suffix(".mp4")
-        if video.exists():
-            pairs.append((video, new / video.name))
-        pairs.append((meta, new / meta.name))
+    for video in walk_videos([old]):
+        pairs.append((video, new / video.relative_to(old)))
         clips += 1
     for name in SIDE_DIRNAMES:
         side = old / name

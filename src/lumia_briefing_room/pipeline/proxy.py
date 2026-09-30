@@ -38,6 +38,11 @@ def proxy_path(clips_dir: Path, clip_id: str) -> Path:
     return proxy_dir(clips_dir) / f"{clip_id}.mp4"
 
 
+def proxy_file(cache_dir: Path, clip_id: str) -> Path:
+    """재생용 변환 영상 위치. `cache_dir` 는 `resolve_paths().proxy_cache`(영상 드라이브의 캐시 폴더)."""
+    return cache_dir / f"{clip_id}.mp4"
+
+
 def is_proxy_fresh(proxy: Path, source: Path) -> bool:
     """자르기로 원본이 바뀌면(mtime 이 더 새로우면) 옛 프록시는 못 쓴다."""
     try:
@@ -146,12 +151,13 @@ def remove_proxy(clips_dir: Path, clip_id: str) -> None:
     proxy_path(clips_dir, clip_id).unlink(missing_ok=True)
 
 
-def remove_orphan_proxies(clips_dir: Path) -> list[Path]:
-    """클립이 더는 없는 프록시와 만들다 만 임시 파일을 지운다."""
-    directory = proxy_dir(clips_dir)
+def remove_orphan_proxies(clips_dir: Path, *, directory: Path | None = None, alive: set[str] | None = None) -> list[Path]:
+    """클립이 더는 없는 프록시와 만들다 만 임시 파일을 지운다. `directory`·`alive` 를 주면 그 캐시 폴더와 살아 있는 클립 ID 를 쓴다."""
+    directory = directory or proxy_dir(clips_dir)
     if not directory.exists():
         return []
-    alive = {c.id for c in scan_clips(clips_dir)}
+    if alive is None:
+        alive = {c.id for c in scan_clips(clips_dir)}
     removed = []
     for path in directory.glob("*.mp4"):
         if path.name.split(".", 1)[0] not in alive:

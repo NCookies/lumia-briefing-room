@@ -32,8 +32,8 @@ def read_fail_stats(cfg: Config) -> dict[str, int]:
     resolved = resolve_paths(cfg.paths)
     stats = {"clips_total": 0, "no_match_result": 0, "no_my_character": 0, "no_region": 0, "no_game_day": 0,
              "no_match_kills": 0, "source_incomplete": 0}
-    for root in (resolved.clips, resolved.vod_clips):
-        for clip in scan_clips(root):
+    for root in (resolved.library_steam, resolved.library_vod):
+        for clip in scan_clips(root, resolved.clip_roots):
             meta = clip.meta
             stats["clips_total"] += 1
             stats["no_match_result"] += not meta.get("matchResult")

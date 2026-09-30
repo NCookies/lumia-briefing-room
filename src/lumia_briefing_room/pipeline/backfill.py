@@ -28,6 +28,7 @@ from lumia_briefing_room.pipeline.backfill_progress import (
     estimate_game_count,
     overall_fraction,
 )
+from lumia_briefing_room.pipeline.clip_files import commit_staged_clips
 from lumia_briefing_room.pipeline.game_files import has_full_video, list_games
 from lumia_briefing_room.pipeline.session_scan import GameWindow, ScanCancelled, window_key
 
@@ -108,14 +109,14 @@ def _starts_in(folder: Path) -> list[datetime]:
     return starts
 
 
-def collect_known_starts(clips_dir: Path, games_dir: Path | None = None) -> list[datetime]:
+def collect_known_starts(clips_dir: Path, games_dir: Path | None = None, *, trash_dir: Path | None = None) -> list[datetime]:
     """이미 처리한 경기의 시작 시각. 같은 경기를 두 번 만들지 않는 기준이다.
 
     `games_dir` 를 주면 **풀영상이 있는(또는 자동 정리로 지운) 게임만** 처리된 것으로 본다. 풀영상이 없는 게임(이전 버전에서 클립만
     만든 게임, 풀영상 저장에 실패한 게임)은 원본이 남아 있으면 풀영상을 새로 만든다. 클립·휴지통·게임 기록에만 있고 게임 기록
     (`game.json`)이 없는 경기(휴지통에 버린 게임 등)는 처리된 것으로 본다. 안 주면 예전 방식(클립·휴지통·게임 기록이 있으면 처리됨).
     """
-    clip_side = [s for folder in (clips_dir, clips_dir / ".trash", clips_dir / ".games") for s in _starts_in(folder)]
+    clip_side = [s for folder in (clips_dir, trash_dir or clips_dir / ".trash", clips_dir / ".games") for s in _starts_in(folder)]
     if games_dir is None:
         return clip_side
     done, tracked = [], []
@@ -171,19 +172,10 @@ def clean_staging(staging_root: Path) -> None:
             shutil.rmtree(child, ignore_errors=True)
 
 
-def commit_staging(staging: Path, clips_dir: Path) -> int:
-    """만든 클립을 클립 폴더로 옮긴다. mp4 → 썸네일·결과표 이미지 → json 순서라, json 이 보일 때는 나머지가 다 있다."""
+def commit_staging(staging: Path, clips_dir: Path, video_dir: Path | None = None) -> int:
+    """만든 클립을 제자리로 옮긴다(정보는 `clips_dir`, 영상은 `video_dir`). 영상 → 썸네일·결과표 이미지 → json 순서라, json 이 보일 때는 나머지가 다 있다."""
     clips_dir.mkdir(parents=True, exist_ok=True)
-    moved_json = 0
-    ordered = [p for p in sorted(staging.rglob("*")) if p.is_file()]
-    ordered.sort(key=lambda p: (p.suffix == ".json", p.suffix != ".mp4"))
-    for path in ordered:
-        target = clips_dir / path.relative_to(staging)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(path), str(target))
-        if path.suffix == ".json":
-            moved_json += 1
-    return moved_json
+    return len(commit_staged_clips(staging, clips_dir, video_dir or clips_dir))
 
 
 def run_backfill(
@@ -197,6 +189,7 @@ def run_backfill(
     cancel: threading.Event | None = None,
     on_progress: Callable[[BackfillProgress], None] | None = None,
     scan_speedup: float = DEFAULT_SCAN_SPEEDUP,
+    video_dir: Path | None = None,
 ) -> BackfillResult:
     """B8(plan-backfill.md §0): 진행률은 "예상 작업 시간" 비율로 계산하고(스캔=영상 길이÷배속,
     분석=게임 수×게임당 평균 시간), 재계산으로 계산값이 줄어도 화면 표시값은 단조 증가만 한다."""
@@ -313,7 +306,7 @@ def run_backfill(
             continue
 
         adaptive.record(time.monotonic() - started_at)
-        result.clips_created += commit_staging(staging, clips_dir)
+        result.clips_created += commit_staging(staging, clips_dir, video_dir)
         shutil.rmtree(staging, ignore_errors=True)
         state.done.add(key)
         state.failures.pop(key, None)

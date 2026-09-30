@@ -89,17 +89,25 @@ def register_game_routes(
 ) -> None:
     migrate_lock = threading.Lock()
 
-    def games_dir() -> Path:
-        return resolve_paths(current_config().paths).games
+    def games_dir(key: str) -> Path:
+        """게임 키로 풀영상 폴더를 고른다(영상 파일 게임 키는 `vod_` 로 시작). 옛 경로 모드에선 둘이 같은 폴더다."""
+        resolved = resolve_paths(current_config().paths)
+        return resolved.games_vod if key.startswith("vod_") else resolved.games_steam
+
+    def games_dirs(source: str) -> list[Path]:
+        resolved = resolve_paths(current_config().paths)
+        wanted = {"steam": [resolved.games_steam], "vod": [resolved.games_vod]}.get(source, [resolved.games_steam, resolved.games_vod])
+        return list(dict.fromkeys(wanted))
 
     def clips_dir() -> Path:
-        return resolve_paths(current_config().paths).clips
+        """클립 정보(library) 폴더."""
+        return resolve_paths(current_config().paths).library_steam
 
     def vod_clips_dir() -> Path:
-        return resolve_paths(current_config().paths).vod_clips
+        return resolve_paths(current_config().paths).library_vod
 
     def clips_dir_for(game: dict) -> Path:
-        """영상 파일 게임에서 저장한 클립은 스팀 클립과 섞이지 않게 영상 클립 폴더에 둔다."""
+        """영상 파일 게임에서 저장한 클립은 스팀 클립과 섞이지 않게 영상 클립 정보 폴더에 둔다."""
         return vod_clips_dir() if game.get("source") == "vod" else clips_dir()
 
     migrated: set[tuple[Path, Path]] = set()
@@ -107,7 +115,7 @@ def register_game_routes(
 
     def migrate_vod_once() -> None:
         """영상 파일 탭이 처음 게임 목록을 볼 때 이전 버전에서 분석한 영상 게임을 게임 기록으로 옮긴다(스팀 쪽과 같은 이유)."""
-        pair = (vod_clips_dir(), games_dir())
+        pair = (vod_clips_dir(), resolve_paths(current_config().paths).games_vod)
         with migrate_lock:
             if pair in migrated_vod:
                 return
@@ -122,7 +130,7 @@ def register_game_routes(
 
         시작 시 자동보다 목록 요청 때가 안전하다: 경로를 옵션에서 바꾼 뒤에도 따라가고, 서버가 뜨는 동안 파일을 건드리지 않는다.
         """
-        pair = (clips_dir(), games_dir())
+        pair = (clips_dir(), resolve_paths(current_config().paths).games_steam)
         with migrate_lock:
             if pair in migrated:
                 return
@@ -134,7 +142,7 @@ def register_game_routes(
 
     def load_or_404(key: str) -> dict:
         try:
-            return load_game(games_dir(), key)
+            return load_game(games_dir(key), key)
         except GameNotFound:
             raise HTTPException(404, "게임을 찾을 수 없습니다")
 
@@ -151,30 +159,33 @@ def register_game_routes(
             migrate_once()
         if source in ("vod", "all"):
             migrate_vod_once()
-        root = games_dir()
-        games = [g for g in list_games(root) if source == "all" or (g.get("source") or "steam") == source]
+        listed = [g for d in games_dirs(source) for g in list_games(d)]
+        games = sorted(
+            (g for g in listed if source == "all" or (g.get("source") or "steam") == source),
+            key=lambda g: g.get("gameKey") or "", reverse=True,
+        )
         recording_root = resolve_recording_root(current_config().paths.steam_recording)
 
         def rebuildable(g: dict) -> bool:
             """목록에서 "풀영상 만들기"를 보일 옛 스팀 게임만 원본이 남았는지 본다(영상 게임은 영상 묶음 머리 버튼)."""
             return (
                 bool(g.get("legacy")) and (g.get("source") or "steam") == "steam"
-                and can_rebuild(g, root, recording_root)
+                and can_rebuild(g, games_dir(g["gameKey"]), recording_root)
             )
 
-        return {"games": [_summary(g, root, can_rebuild_full=rebuildable(g)) for g in games]}
+        return {"games": [_summary(g, games_dir(g["gameKey"]), can_rebuild_full=rebuildable(g)) for g in games]}
 
     @app.get("/api/games/{key}")
     def get_game(key: str):
         game = load_or_404(key)
         if game.get("source") == "vod":
             can = (
-                not game.get("fullVideoDeletedAt") and not has_full_video(games_dir(), key)
+                not game.get("fullVideoDeletedAt") and not has_full_video(games_dir(key), key)
                 and vod_control().can_build(game["vodId"])
             )
         else:
-            can = can_rebuild(game, games_dir(), resolve_recording_root(current_config().paths.steam_recording))
-        return {**game, "hasFullVideo": has_full_video(games_dir(), key), "canRebuildFullVideo": can}
+            can = can_rebuild(game, games_dir(key), resolve_recording_root(current_config().paths.steam_recording))
+        return {**game, "hasFullVideo": has_full_video(games_dir(key), key), "canRebuildFullVideo": can}
 
     rebuild_jobs: dict[str, dict] = {}
 
@@ -188,19 +199,19 @@ def register_game_routes(
         game = load_or_404(key)
         cfg = current_config()
         if game.get("source") == "vod":
-            if game.get("fullVideoDeletedAt") or has_full_video(games_dir(), key):
+            if game.get("fullVideoDeletedAt") or has_full_video(games_dir(key), key):
                 raise HTTPException(409, "이미 풀영상이 있거나 자동 정리로 지운 게임입니다")
             vod_control().start(game["vodId"], {int(game["vodGameIndex"])})
             return {"state": "running", "message": "", "fraction": 0.0}
         root = resolve_recording_root(cfg.paths.steam_recording)
-        if not can_rebuild(game, games_dir(), root):
+        if not can_rebuild(game, games_dir(key), root):
             raise HTTPException(409, "원본 녹화가 남아 있지 않거나 이미 풀영상이 있는 게임입니다")
         if any(j["state"] == "running" for j in rebuild_jobs.values()):
             raise HTTPException(409, "다른 게임의 풀영상을 만드는 중입니다. 끝난 뒤 다시 시도하세요")
         ffmpeg = _ffmpeg()
         job = {"state": "running", "message": "", "fraction": 0.0}
         rebuild_jobs[key] = job
-        gdir, cdir = games_dir(), clips_dir()
+        gdir, cdir = games_dir(key), clips_dir()
 
         def run() -> None:
             try:
@@ -229,7 +240,7 @@ def register_game_routes(
     @app.get("/api/games/{key}/video")
     def get_game_video(key: str):
         load_or_404(key)
-        path = game_dir(games_dir(), key) / FULL_VIDEO
+        path = game_dir(games_dir(key), key) / FULL_VIDEO
         if not path.is_file():
             raise HTTPException(404, "풀영상이 없습니다(자동 정리로 지워졌거나 저장하지 못했습니다)")
         return FileResponse(path, media_type="video/mp4")
@@ -239,7 +250,7 @@ def register_game_routes(
         load_or_404(key)
         if name not in _ASSETS:
             raise HTTPException(404, "파일을 찾을 수 없습니다")
-        path = game_dir(games_dir(), key) / name
+        path = game_dir(games_dir(key), key) / name
         if not path.is_file():
             raise HTTPException(404, "파일을 찾을 수 없습니다")
         return FileResponse(path, media_type="image/jpeg")
@@ -248,9 +259,9 @@ def register_game_routes(
     def patch_game(key: str, body: GamePatch):
         load_or_404(key)
         if body.pinned is not None:
-            update_game(games_dir(), key, lambda d: d.update(pinned=body.pinned))
+            update_game(games_dir(key), key, lambda d: d.update(pinned=body.pinned))
             cleanup_preview_registry.notify_clips_changed()
-        return _summary(load_or_404(key), games_dir())
+        return _summary(load_or_404(key), games_dir(key))
 
     def _rename_saved_clip(game: dict, cand: dict) -> None:
         clip_id = (cand.get("user") or {}).get("savedClipId")
@@ -278,7 +289,7 @@ def register_game_routes(
             except ValueError as exc:
                 error.append(str(exc))
 
-        updated = update_game(games_dir(), key, change)
+        updated = update_game(games_dir(key), key, change)
         if error:
             raise HTTPException(400, error[0])
         result = gcand.find_candidate(updated, candidate_id)
@@ -303,7 +314,7 @@ def register_game_routes(
             data.setdefault("userCandidates", []).append(cand)
             made.append(cand)
 
-        update_game(games_dir(), key, change)
+        update_game(games_dir(key), key, change)
         if error:
             raise HTTPException(400, error[0])
         return made[0]
@@ -318,19 +329,19 @@ def register_game_routes(
             data["userCandidates"] = [c for c in data.get("userCandidates") or [] if c.get("id") != candidate_id]
             removed.append(len(data["userCandidates"]) < before)
 
-        update_game(games_dir(), key, change)
+        update_game(games_dir(key), key, change)
         if not removed[0]:
             raise HTTPException(404, "직접 추가한 구간만 지울 수 있습니다(자동 후보는 '무시'를 쓰세요)")
         return {"id": candidate_id, "deleted": True}
 
     def _save_one(key: str, candidate_id: str, ffmpeg: Path) -> str:
         cfg = current_config()
-        game = load_game(games_dir(), key)
+        game = load_game(games_dir(key), key)
         cand = gcand.find_candidate(game, candidate_id)
         if cand is None:
             raise HTTPException(404, "후보를 찾을 수 없습니다")
         try:
-            clip_id = save_and_mark(games_dir(), key, game, cand, cfg=cfg, ffmpeg_path=ffmpeg)
+            clip_id = save_and_mark(games_dir(key), key, game, cand, cfg=cfg, ffmpeg_path=ffmpeg)
         except FullVideoMissing:
             raise HTTPException(409, "풀영상이 없어 클립을 저장할 수 없습니다")
         except ValueError as exc:

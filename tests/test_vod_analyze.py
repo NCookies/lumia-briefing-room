@@ -4,7 +4,7 @@ import threading
 
 import pytest
 
-from lumia_briefing_room.config import Config
+from lumia_briefing_room.config import Config, resolve_paths
 from lumia_briefing_room.detect.result import ResultScreen
 from lumia_briefing_room.detect.types import FrameState
 from lumia_briefing_room.pipeline.vod_analyze import VodCancelled, analyze_vod
@@ -92,7 +92,7 @@ def run(base, vod_file, **kw):
 def test_analyze_makes_clips_metadata_and_index(vod_file, tmp_path):
     index, cfg = run(tmp_path, vod_file, find_result=lambda v, s, n: screen())
 
-    root = cfg.paths.vod_clips
+    root = resolve_paths(cfg.paths).library_vod
     metas = sorted(root.glob("vod_*.json"))
     assert index["status"] == "done"
     assert len(index["games"]) == 1 and len(metas) >= 1
@@ -101,7 +101,7 @@ def test_analyze_makes_clips_metadata_and_index(vod_file, tmp_path):
     assert meta["vodGameIndex"] == 1
     assert "kill" in meta["tags"] and meta["gameDay"] == 2
     assert meta["myCharacter"] is None and meta["matchResult"]["placement"] == 1
-    assert metas[0].with_suffix(".mp4").exists()
+    assert (resolve_paths(cfg.paths).clips_vod / f"{metas[0].stem}.mp4").exists()
     assert (root / ".thumbs" / f"{metas[0].stem}.jpg").exists()
     assert load_index(root, vod_id(vod_file))["clips"] == [m.stem for m in metas]
 
@@ -181,7 +181,7 @@ def test_delete_source_decision_persists_in_the_index_for_a_later_resumed_call(v
             vod_file, cfg, ffmpeg_path=FFMPEG_PATH, read_frame=read_frame,
             find_result=no_result, cancel=cancel, delete_source=True,
         )
-    index = load_index(cfg.paths.vod_clips, vod_id(vod_file))
+    index = load_index(resolve_paths(cfg.paths).library_vod, vod_id(vod_file))
     assert index["deleteSourceOnSuccess"] is True
     assert vod_file.exists()
 
@@ -309,8 +309,8 @@ def test_cancel_saves_progress_and_resume_gives_the_same_result(vod_file, tmp_pa
     with pytest.raises(VodCancelled):
         analyze_vod(vod_file, cfg, ffmpeg_path=FFMPEG_PATH, read_frame=cancelling,
                     find_result=no_result, cancel=cancel)
-    partial = load_index(cfg.paths.vod_clips, vod_id(vod_file))
-    assert partial["status"] == "cancelled" and not list(cfg.paths.vod_clips.glob("vod_*.json"))
+    partial = load_index(resolve_paths(cfg.paths).library_vod, vod_id(vod_file))
+    assert partial["status"] == "cancelled" and not list(resolve_paths(cfg.paths).library_vod.glob("vod_*.json"))
 
     resumed_frames = []
 
@@ -345,7 +345,7 @@ def test_second_run_on_a_done_vod_does_nothing(vod_file, tmp_path):
 @requires_ffmpeg
 def test_rebuild_reuses_cache_and_replaces_old_clips(vod_file, tmp_path):
     first, cfg = run(tmp_path, vod_file)
-    root = cfg.paths.vod_clips
+    root = resolve_paths(cfg.paths).library_vod
     old_duration = json.loads((root / f"{first['clips'][0]}.json").read_text(encoding="utf-8"))["durationSec"]
     calls = []
 
@@ -398,7 +398,7 @@ def test_streamer_name_comes_from_config(vod_file, tmp_path):
     cfg.vod.streamers = {vod_id(vod_file): "설정 이름"}
 
     index, _ = run(tmp_path, vod_file, cfg=cfg)
-    meta = json.loads((cfg.paths.vod_clips / f"{index['clips'][0]}.json").read_text(encoding="utf-8"))
+    meta = json.loads((resolve_paths(cfg.paths).library_vod / f"{index['clips'][0]}.json").read_text(encoding="utf-8"))
 
     assert index["streamer"] == "설정 이름" and meta["streamer"] == "설정 이름"
 
@@ -413,7 +413,7 @@ def test_error_is_recorded_in_the_index_and_reraised(vod_file, tmp_path):
     with pytest.raises(RuntimeError):
         analyze_vod(vod_file, cfg, ffmpeg_path=FFMPEG_PATH, read_frame=boom, find_result=no_result)
 
-    index = load_index(cfg.paths.vod_clips, vod_id(vod_file))
+    index = load_index(resolve_paths(cfg.paths).library_vod, vod_id(vod_file))
     assert index["status"] == "error" and "판독 실패" in index["error"]
 
 
@@ -434,7 +434,7 @@ def test_disk_full_during_cut_is_recorded_with_a_friendly_message(vod_file, tmp_
     with pytest.raises(subprocess.CalledProcessError):
         analyze_vod(vod_file, cfg, ffmpeg_path=FFMPEG_PATH, read_frame=read_frame, find_result=no_result)
 
-    index = load_index(cfg.paths.vod_clips, vod_id(vod_file))
+    index = load_index(resolve_paths(cfg.paths).library_vod, vod_id(vod_file))
     assert index["status"] == "error"
     assert index["errorKind"] == "disk_full"
     assert "저장 공간" in index["error"]
@@ -463,11 +463,11 @@ def test_index_records_the_analysis_version(vod_file, tmp_path):
 @requires_ffmpeg
 def test_rebuild_redecodes_when_the_cache_comes_from_an_older_reader(vod_file, tmp_path):
     first, cfg = run(tmp_path, vod_file)
-    stale = load_index(cfg.paths.vod_clips, vod_id(vod_file))
+    stale = load_index(resolve_paths(cfg.paths).library_vod, vod_id(vod_file))
     stale["analysisVersion"] = 1
     from lumia_briefing_room.pipeline.vod_store import save_index
 
-    save_index(cfg.paths.vod_clips, stale)
+    save_index(resolve_paths(cfg.paths).library_vod, stale)
     calls = []
 
     def spy(frame, t):
@@ -482,11 +482,11 @@ def test_rebuild_redecodes_when_the_cache_comes_from_an_older_reader(vod_file, t
 @requires_ffmpeg
 def test_done_vod_with_an_older_reader_is_left_alone_without_rebuild(vod_file, tmp_path):
     _, cfg = run(tmp_path, vod_file)
-    stale = load_index(cfg.paths.vod_clips, vod_id(vod_file))
+    stale = load_index(resolve_paths(cfg.paths).library_vod, vod_id(vod_file))
     stale["analysisVersion"] = 1
     from lumia_briefing_room.pipeline.vod_store import save_index
 
-    save_index(cfg.paths.vod_clips, stale)
+    save_index(resolve_paths(cfg.paths).library_vod, stale)
     calls = []
 
     def spy(frame, t):
@@ -515,9 +515,9 @@ def test_partial_cache_from_an_older_reader_is_discarded_on_resume(vod_file, tmp
     with pytest.raises(VodCancelled):
         analyze_vod(vod_file, cfg, ffmpeg_path=FFMPEG_PATH, read_frame=cancelling,
                     find_result=no_result, cancel=cancel)
-    partial = load_index(cfg.paths.vod_clips, vod_id(vod_file))
+    partial = load_index(resolve_paths(cfg.paths).library_vod, vod_id(vod_file))
     partial["analysisVersion"] = 1
-    save_index(cfg.paths.vod_clips, partial)
+    save_index(resolve_paths(cfg.paths).library_vod, partial)
     resumed = []
 
     def counting(frame, t):
@@ -532,7 +532,7 @@ def test_partial_cache_from_an_older_reader_is_discarded_on_resume(vod_file, tmp
 @requires_ffmpeg
 def test_rebuild_carries_user_labels_over_to_the_overlapping_new_clips(vod_file, tmp_path):
     first, cfg = run(tmp_path, vod_file)
-    root = cfg.paths.vod_clips
+    root = resolve_paths(cfg.paths).library_vod
     old_id = first["clips"][0]
     meta_path = root / f"{old_id}.json"
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
@@ -557,5 +557,5 @@ def test_labels_are_not_migrated_across_a_different_vod_or_when_nothing_was_labe
                         find_result=no_result, rebuild=True)
 
     assert again["labelsMigrated"] == 0
-    new_meta = json.loads((cfg.paths.vod_clips / f"{again['clips'][0]}.json").read_text(encoding="utf-8"))
+    new_meta = json.loads((resolve_paths(cfg.paths).library_vod / f"{again['clips'][0]}.json").read_text(encoding="utf-8"))
     assert new_meta["userLabel"] is None

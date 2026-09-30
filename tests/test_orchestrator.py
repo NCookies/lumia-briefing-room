@@ -167,25 +167,23 @@ def test_resolve_clip_range_cobalt_mode_uses_the_interval_bounds_exactly():
 
 
 def test_resolve_clip_paths_thumbnails_follow_explicit_clips_dir_override():
-    # 회귀 테스트: clips_dir 를 오버라이드했는데 썸네일이 cfg.paths.clips
-    # (설정 파일 기본 경로)를 따라가던 버그. 실제 녹화본으로 처음 돌려봤을 때
-    # 지정한 clips_dir 가 아니라 %USERPROFILE%\Videos\... 에 썸네일이 생겨 발견했다.
-    cfg = Config()
-    clips_root, thumbnails_root = _resolve_clip_paths(cfg, Path("D:/my_clips"))
-    assert clips_root == Path("D:/my_clips")
+    # 회귀 테스트: clips_dir 를 오버라이드했는데 썸네일이 설정의 기본 경로를 따라가던 버그.
+    meta_root, video_root, thumbnails_root = _resolve_clip_paths(Config(), Path("D:/my_clips"))
+    assert meta_root == video_root == Path("D:/my_clips")
     assert thumbnails_root == Path("D:/my_clips/.thumbs")
 
 
-def test_resolve_clip_paths_uses_default_when_no_override():
-    cfg = Config()
-    clips_root, thumbnails_root = _resolve_clip_paths(cfg, None)
-    assert thumbnails_root == clips_root / ".thumbs"
+def test_resolve_clip_paths_default_splits_info_and_video():
+    cfg = Config(paths=PathsConfig(clips=Path("D:/clips"), vod_clips=Path("D:/vod")))
+    meta_root, video_root, thumbnails_root = _resolve_clip_paths(cfg, None)
+    assert video_root == Path("D:/clips")
+    assert meta_root.parts[-2:] == ("library", "steam")
+    assert thumbnails_root == meta_root / ".thumbs"
 
 
-def test_resolve_clip_paths_respects_explicit_thumbnails_config():
-    cfg = Config(paths=PathsConfig(thumbnails=Path("E:/custom_thumbs")))
-    clips_root, thumbnails_root = _resolve_clip_paths(cfg, Path("D:/my_clips"))
-    assert thumbnails_root == Path("E:/custom_thumbs")
+def test_resolve_clip_paths_video_dir_separates_video_from_work_folder():
+    meta_root, video_root, _ = _resolve_clip_paths(Config(), Path("D:/stage"), Path("D:/videos"))
+    assert (meta_root, video_root) == (Path("D:/stage"), Path("D:/videos"))
 
 
 def test_plan_clips_sorts_out_of_order_input():

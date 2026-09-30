@@ -172,18 +172,17 @@ def _plan_clips(intervals: list[CombatInterval], cfg: ClipConfig, *, game_mode: 
     return plans
 
 
-def _resolve_clip_paths(cfg: Config, clips_dir: Path | None) -> tuple[Path, Path]:
-    """clips_dir 를 오버라이드해도 썸네일이 그 아래(`.thumbs`)를 따라가게 한다.
+def _resolve_clip_paths(cfg: Config, clips_dir: Path | None, video_dir: Path | None = None) -> tuple[Path, Path, Path]:
+    """(정보 폴더, 영상 폴더, 썸네일 폴더). 썸네일은 정보 폴더의 `.thumbs` 다.
 
-    resolve_paths(cfg.paths) 만 쓰면 cfg.paths.clips(설정 파일 기본 경로) 기준으로
-    고정돼, 호출자가 clips_dir 인자로 다른 위치를 지정해도 무시된다 — 실제
-    녹화본으로 처음 돌려봤을 때 썸네일이 지정한 곳이 아니라 기본 경로에
-    생기는 것으로 발견한 버그다.
+    `clips_dir` 를 주면(작업 폴더) 정보와 영상이 모두 거기에 만들어진다. 안 주면 정보는 앱 데이터 library, 영상은 저장 폴더.
     """
-    resolved = resolve_paths(cfg.paths)
-    clips_root = clips_dir or resolved.clips
-    thumbnails_root = cfg.paths.thumbnails or (clips_root / ".thumbs")
-    return clips_root, thumbnails_root
+    if clips_dir is not None:
+        meta_root, video_root = clips_dir, video_dir or clips_dir
+    else:
+        resolved = resolve_paths(cfg.paths)
+        meta_root, video_root = resolved.library_steam, video_dir or resolved.clips_steam
+    return meta_root, video_root, meta_root / ".thumbs"
 
 
 def _read_result_tail(
@@ -399,6 +398,7 @@ def process_match(
     k_templates: dict[int, np.ndarray] | None = None,
     a_templates: dict[int, np.ndarray] | None = None,
     clips_dir: Path | None = None,
+    video_dir: Path | None = None,
     hwaccel: str | None = None,
     on_result: Callable[[ResultScreen], None] | None = None,
     cancel: threading.Event | None = None,
@@ -439,9 +439,10 @@ def process_match(
     filtered = apply_filter(detection.intervals, cfg.filter, game_mode=game_mode)
 
     resolved = resolve_paths(cfg.paths)
-    clips_root, thumbnails_root = _resolve_clip_paths(cfg, clips_dir)
-    game_folder = (games_dir or resolved.games) / game_key(match_start)
+    clips_root, video_root, thumbnails_root = _resolve_clip_paths(cfg, clips_dir, video_dir)
+    game_folder = (games_dir or resolved.games_steam) / game_key(match_start)
     clips_root.mkdir(parents=True, exist_ok=True)
+    video_root.mkdir(parents=True, exist_ok=True)
     resolved.temp.mkdir(parents=True, exist_ok=True)
 
     # 링버퍼가 원본을 지우기 전에 끝나야 하므로 풀영상 컷이 클립 컷보다 먼저다. 실패해도 나머지는 계속한다.
@@ -480,7 +481,7 @@ def process_match(
     written: list[Path] = []
     try:
         for n, cand in enumerate(to_save, start=1):
-            clip_path = clips_root / f"{cand.clip_id}.mp4"
+            clip_path = video_root / f"{cand.clip_id}.mp4"
             cut_result = cut_clip(
                 session, cand.plan.range, clip_path,
                 ffmpeg_path=ffmpeg_path, include_audio=cfg.clip.include_audio,
@@ -521,7 +522,7 @@ def process_match(
                     p for p in (portrait_paths["teammate1"], portrait_paths["teammate2"]) if p
                 ],
             )
-            meta_path = clip_path.with_suffix(".json")
+            meta_path = clips_root / f"{cand.clip_id}.json"
             write_metadata(meta, meta_path)
             written.append(meta_path)
             saved_ids[cand.candidate_id] = cand.clip_id

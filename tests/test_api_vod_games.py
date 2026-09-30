@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from lumia_briefing_room.api import game_routes
 from lumia_briefing_room.api import vods as vods_module
 from lumia_briefing_room.api.app import create_app
-from lumia_briefing_room.config import Config, PathsConfig, save_config
+from lumia_briefing_room.config import Config, PathsConfig, resolve_paths, save_config
 from lumia_briefing_room.pipeline import clip_from_full as cff
 from lumia_briefing_room.pipeline.vod_store import cache_path, save_index, vod_id
 
@@ -72,7 +72,8 @@ def env(tmp_path, monkeypatch):
         cff, "make_thumbnail", lambda clip, out, **kw: out.parent.mkdir(parents=True, exist_ok=True) or out.write_bytes(b"t")
     )
     client.cuts, client.vid, client.key, client.a, client.tmp = cuts, vid, key, a, tmp_path
-    client.vod_dir, client.games = vod_dir, games
+    client.vod_dir, client.games = resolve_paths(cfg.paths).library_vod, games
+    client.vod_videos = vod_dir
     return client
 
 
@@ -118,7 +119,8 @@ def test_saving_a_candidate_of_a_vod_game_makes_a_vod_clip_in_the_vod_clip_folde
     clip_id = env.post(f"/api/games/{env.key}/candidates/{cid}/save").json()["clipId"]
 
     assert clip_id == cid
-    assert (env.vod_dir / f"{cid}.mp4").is_file() and not (env.tmp / "clips" / f"{cid}.json").exists()
+    assert (env.vod_videos / f"{cid}.mp4").is_file(), "영상은 영상 파일 클립 자리에 놓인다"
+    assert not (env.tmp / "clips" / f"{cid}.mp4").exists() and not (env.vod_dir / f"{cid}.mp4").exists()
     meta = json.loads((env.vod_dir / f"{cid}.json").read_text(encoding="utf-8"))
     assert meta["source"] == "vod" and meta["vodId"] == env.vid and meta["vodFile"] == str(env.a)
     assert meta["vodGameIndex"] == 1 and meta["streamer"] == "하이용가리"

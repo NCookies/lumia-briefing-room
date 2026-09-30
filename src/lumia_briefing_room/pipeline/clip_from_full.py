@@ -9,11 +9,13 @@ from __future__ import annotations
 import json
 import os
 import shutil
+from collections.abc import Iterable
 from pathlib import Path
 
 from lumia_briefing_room.config import Config
 from lumia_briefing_room.pipeline.clip import make_thumbnail
 from lumia_briefing_room.pipeline.clip_assets import stored_asset_path
+from lumia_briefing_room.pipeline.clip_files import find_video
 from lumia_briefing_room.pipeline.clip_uid import new_clip_uid
 from lumia_briefing_room.pipeline.game_candidates import effective_range, effective_title
 from lumia_briefing_room.pipeline.game_store import FULL_VIDEO
@@ -39,9 +41,10 @@ class FullVideoMissing(Exception):
     """풀영상이 없다(자동 정리로 지워졌거나 만들지 못했다)."""
 
 
-def _unique_clip_id(clips_dir: Path, wanted: str) -> str:
+def _unique_clip_id(clips_dir: Path, wanted: str, video_roots: Iterable[Path] = ()) -> str:
+    roots = tuple(video_roots)
     clip_id, n = wanted, 1
-    while (clips_dir / f"{clip_id}.json").exists() or (clips_dir / f"{clip_id}.mp4").exists():
+    while (clips_dir / f"{clip_id}.json").exists() or find_video(clips_dir, clip_id, roots) is not None:
         n += 1
         clip_id = f"{wanted}-r{n}"
     return clip_id
@@ -131,9 +134,12 @@ def save_candidate_clip(
     ffmpeg_path: Path,
     thumbnails_root: Path | None = None,
     replace_clip_id: str | None = None,
+    video_dir: Path | None = None,
+    video_roots: Iterable[Path] = (),
 ) -> str:
-    """후보 하나를 클립으로 저장하고 클립 ID 를 돌려준다. `replace_clip_id` 가 있으면 그 클립을 새 범위로 교체한다
-    (같은 파일 이름·클립 ID·제목·라벨·고정 상태 유지)."""
+    """후보 하나를 클립으로 저장하고 클립 ID 를 돌려준다. `clips_dir` 는 정보(json·썸네일) 폴더, `video_dir` 는 새 영상이 놓일 폴더(기본 `clips_dir`).
+    `replace_clip_id` 가 있으면 그 클립을 새 범위로 교체한다(같은 영상 파일·클립 ID·제목·라벨·고정 상태 유지 - 영상은 `video_roots` 아래
+    지금 있는 자리에서 바꾼다)."""
     video = game.get("fullVideo")
     full = game_folder / FULL_VIDEO
     if not video or not full.is_file():
@@ -143,11 +149,13 @@ def save_candidate_clip(
     if end <= start:
         raise ValueError("구간이 올바르지 않습니다")
 
-    thumbnails_root = thumbnails_root or cfg.paths.thumbnails or (clips_dir / ".thumbs")
-    clip_id = replace_clip_id or _unique_clip_id(clips_dir, cand["id"])
-    clip_path = clips_dir / f"{clip_id}.mp4"
+    roots = tuple(video_roots)
+    video_root = video_dir or clips_dir
+    thumbnails_root = thumbnails_root or (clips_dir / ".thumbs")
+    clip_id = replace_clip_id or _unique_clip_id(clips_dir, cand["id"], roots)
+    clip_path = (find_video(clips_dir, clip_id, roots) if replace_clip_id else None) or video_root / f"{clip_id}.mp4"
     if replace_clip_id:
-        staged = clips_dir / f"{clip_id}.replace.mp4"
+        staged = clip_path.with_name(f"{clip_id}.replace.mp4")
         try:
             cut_from_full(full, staged, start, end, ffmpeg_path=ffmpeg_path)
             os.replace(staged, clip_path)
@@ -173,7 +181,7 @@ def save_candidate_clip(
     combat_start = offset + float(cand.get("combatStart", start))
     combat_end = offset + float(cand.get("combatEnd", end))
 
-    json_path = clip_path.with_suffix(".json")
+    json_path = clips_dir / f"{clip_id}.json"
     if game.get("source") == "vod":
         vod_meta = _vod_clip_metadata(
             game, cand, start=start, end=end, offset=offset, thumb_rel=thumb_rel, result=result,

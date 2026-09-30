@@ -4,7 +4,7 @@ from pathlib import Path
 from jsonschema import Draft202012Validator
 
 from lumia_briefing_room import __version__
-from lumia_briefing_room.config import Config, dataclass_from_camel_dict
+from lumia_briefing_room.config import Config, dataclass_from_camel_dict, resolve_paths
 from lumia_briefing_room.telemetry import endpoint as endpoint_module
 from lumia_briefing_room.telemetry import environment
 from lumia_briefing_room.telemetry.endpoint import load_endpoint
@@ -67,9 +67,11 @@ def test_state_survives_reload_and_recovers_from_a_corrupt_file(tmp_path):
 
 
 def test_read_fail_stats_counts_clips_missing_readings(tmp_path):
-    clips, vod = tmp_path / "clips", tmp_path / "vod"
-    clips.mkdir()
-    vod.mkdir()
+    config = dataclass_from_camel_dict(Config, {"paths": {"clips": str(tmp_path / "clips"), "vodClips": str(tmp_path / "vod")}})
+    library = resolve_paths(config.paths)
+    clips, vod = library.library_steam, library.library_vod
+    clips.mkdir(parents=True)
+    vod.mkdir(parents=True)
     full = {"matchResult": {"placement": 1}, "myCharacter": "아야", "region": "학교", "gameDay": 1, "matchKills": 2}
     (clips / "a.json").write_text(json.dumps(full), encoding="utf-8")
     (clips / "b.json").write_text(json.dumps({"sourceIncomplete": True}), encoding="utf-8")
@@ -77,7 +79,6 @@ def test_read_fail_stats_counts_clips_missing_readings(tmp_path):
     trash = clips / ".trash"
     trash.mkdir()
     (trash / "t.json").write_text("{}", encoding="utf-8")
-    config = dataclass_from_camel_dict(Config, {"paths": {"clips": str(clips), "vodClips": str(vod)}})
     stats = environment.read_fail_stats(config)
     assert stats == {"clips_total": 3, "no_match_result": 2, "no_my_character": 2, "no_region": 1, "no_game_day": 2,
                      "no_match_kills": 2, "source_incomplete": 1}

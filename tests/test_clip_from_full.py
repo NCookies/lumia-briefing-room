@@ -132,3 +132,45 @@ def test_replacing_a_saved_clip_recuts_the_same_file_and_keeps_its_identity(tmp_
     assert new_meta["durationSec"] == 60.0 and new_meta["videoOffsetSec"] == 390.0
     assert new_meta["title"] == "내가 바꾼 제목" and new_meta["userLabel"] == "combat" and new_meta["pinned"] is True
     assert new_meta["clipUid"] == uid
+
+
+def test_info_goes_to_the_info_folder_and_video_to_the_video_folder(tmp_path, fake_ffmpeg):
+    folder, game, cand = _game(tmp_path)
+    cfg = Config(paths=PathsConfig(clips=tmp_path / "clips"))
+    clip_id = cff.save_candidate_clip(
+        game, cand, game_folder=folder, clips_dir=tmp_path / "lib", cfg=cfg, ffmpeg_path=Path("ffmpeg"),
+        video_dir=tmp_path / "clips", video_roots=[tmp_path / "clips"],
+    )
+    assert (tmp_path / "clips" / f"{clip_id}.mp4").read_bytes() == b"clip"
+    assert (tmp_path / "lib" / f"{clip_id}.json").exists() and (tmp_path / "lib" / ".thumbs" / f"{clip_id}.jpg").exists()
+    assert not (tmp_path / "lib" / f"{clip_id}.mp4").exists() and not (tmp_path / "clips" / f"{clip_id}.json").exists()
+
+
+def test_replacing_recuts_the_video_where_the_user_moved_it(tmp_path, fake_ffmpeg):
+    folder, game, cand = _game(tmp_path)
+    cfg = Config(paths=PathsConfig(clips=tmp_path / "clips"))
+    kw = dict(game_folder=folder, clips_dir=tmp_path / "lib", cfg=cfg, ffmpeg_path=Path("ffmpeg"),
+              video_dir=tmp_path / "clips", video_roots=[tmp_path / "clips"])
+    clip_id = cff.save_candidate_clip(game, cand, **kw)
+    moved = tmp_path / "clips" / "아야" / f"{clip_id}.mp4"
+    moved.parent.mkdir()
+    (tmp_path / "clips" / f"{clip_id}.mp4").rename(moved)
+
+    cand["user"] = {"start": 90.0, "end": 150.0}
+    same = cff.save_candidate_clip(game, cand, replace_clip_id=clip_id, **kw)
+
+    assert same == clip_id
+    assert moved.read_bytes() == b"clip" and not (tmp_path / "clips" / f"{clip_id}.mp4").exists()
+    assert not list((tmp_path / "clips").rglob("*.replace.mp4"))
+
+
+def test_a_clip_id_used_by_a_moved_video_is_not_reused(tmp_path, fake_ffmpeg):
+    folder, game, cand = _game(tmp_path)
+    (tmp_path / "clips" / "sub").mkdir(parents=True)
+    (tmp_path / "clips" / "sub" / f"{cand['id']}.mp4").write_bytes(b"old")
+    cfg = Config(paths=PathsConfig(clips=tmp_path / "clips"))
+    clip_id = cff.save_candidate_clip(
+        game, cand, game_folder=folder, clips_dir=tmp_path / "lib", cfg=cfg, ffmpeg_path=Path("ffmpeg"),
+        video_dir=tmp_path / "clips", video_roots=[tmp_path / "clips"],
+    )
+    assert clip_id == f"{cand['id']}-r2"

@@ -17,9 +17,9 @@ def collect_labels(cfg: Config, install_id: str) -> list[tuple[str, dict, str]]:
     """(clipKey, 계약 라벨, 내용 지문) 목록. 휴지통에 있는 클립은 빼고, 같은 ID 는 지금 있는 클립이 보관소보다 우선한다."""
     resolved = resolve_paths(cfg.paths)
     found: dict[str, dict] = {}
-    for root in (resolved.clips, resolved.vod_clips):
+    for root in (resolved.library_steam, resolved.library_vod):
         live_ids: set[str] = set()
-        for clip in scan_clips(root):
+        for clip in scan_clips(root, resolved.clip_roots):
             live_ids.add(clip.id)
             label = build_label(clip.meta, clip_id=clip.id, install_id=install_id)
             if label:

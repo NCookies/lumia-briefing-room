@@ -71,7 +71,7 @@ def register_onboarding_routes(
             "answeredVersion": answered,
             "currentVersion": CONSENT_VERSION,
             "recording": _recording_report(cfg),
-            "clipsDir": str(resolve_paths(cfg.paths).clips),
+            "clipsDir": str(resolve_paths(cfg.paths).clips_steam),
             "ffmpegFound": discover_ffmpeg() is not None,
             "disk": disk_report(cfg),
         }

@@ -20,7 +20,7 @@ log = logging.getLogger("lumia_briefing_room.api.clip_uid_startup")
 def backfill_clip_uids_locked(app: FastAPI) -> int:
     resolved = resolve_paths(app.state.config.paths)
     filled = 0
-    for root in (resolved.clips, resolved.vod_clips):
+    for root in (resolved.library_steam, resolved.library_vod):
         with app.state.lock:
             try:
                 filled += backfill_clip_uids(root)

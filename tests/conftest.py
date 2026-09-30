@@ -63,6 +63,12 @@ def ffmpeg_path() -> Path | None:
 
 
 @pytest.fixture(autouse=True)
+def _per_test_local_appdata(tmp_path_factory, monkeypatch):
+    """클립 정보(library)가 앱 데이터 폴더에 놓이므로 테스트마다 따로 둔다 - 테스트끼리 클립이 섞이지 않게."""
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path_factory.mktemp("local_appdata")))
+
+
+@pytest.fixture(autouse=True)
 def _no_real_recycle_bin(monkeypatch):
     """`delete_helper.send_to_recycle_bin()` 이 실제 Windows 휴지통을 건드리지 않게 한다.
 

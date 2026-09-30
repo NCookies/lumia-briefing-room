@@ -26,6 +26,7 @@ from lumia_briefing_room.detect.result import ResultScreen
 from lumia_briefing_room.detect.types import FrameState, PortraitCrops
 from lumia_briefing_room.pipeline.clip import ClipRange, make_thumbnail
 from lumia_briefing_room.pipeline.clip_assets import stored_asset_path
+from lumia_briefing_room.pipeline.clip_files import commit_staged_clips, find_video
 from lumia_briefing_room.pipeline.ffmpeg_errors import describe_clip_error, is_disk_full_error
 from lumia_briefing_room.pipeline.filters import apply_filter
 from lumia_briefing_room.pipeline.game_store import GAME_JSON, is_certain, plans_to_save, vod_game_key
@@ -202,15 +203,13 @@ def _existing_clip_paths(root: Path, vod: str) -> list[Path]:
     return sorted(root.glob(f"vod_{vod}_*.json"))
 
 
-def _move_staged_tree(staging: Path, dest_root: Path) -> None:
-    for path in sorted(staging.rglob("*")):
-        if path.is_dir():
-            continue
-        rel = path.relative_to(staging)
-        dest = dest_root / rel
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(path), str(dest))
-    shutil.rmtree(staging, ignore_errors=True)
+@dataclass(frozen=True)
+class ClipPlacement:
+    """영상 클립이 놓이는 곳. 정보(json·썸네일·색인)는 `root`(library), 영상은 `video_dir`, 작업 폴더는 `staging_base`."""
+
+    video_dir: Path
+    video_roots: tuple[Path, ...]
+    staging_base: Path
 
 
 def analyze_vod(
@@ -219,6 +218,7 @@ def analyze_vod(
     *,
     ffmpeg_path: Path,
     clips_dir: Path | None = None,
+    video_dir: Path | None = None,
     streamer: str | None = None,
     hwaccel: str | None = None,
     force: bool = False,
@@ -245,8 +245,13 @@ def analyze_vod(
     """
     video_path = Path(video_path)
     resolved = resolve_paths(cfg.paths)
-    root = clips_dir or resolved.vod_clips
-    games_root = games_dir or resolved.games
+    root = clips_dir or resolved.library_vod
+    games_root = games_dir or resolved.games_vod
+    place = ClipPlacement(
+        video_dir=video_dir or (root if clips_dir is not None else resolved.clips_vod),
+        video_roots=resolved.clip_roots,
+        staging_base=root / STAGING_DIRNAME if clips_dir is not None else resolved.staging_vod_clips,
+    )
     root.mkdir(parents=True, exist_ok=True)
     ffprobe_path = find_ffprobe(ffmpeg_path)
     info = probe_video(video_path, ffprobe_path=ffprobe_path)
@@ -299,7 +304,7 @@ def analyze_vod(
             video_path, cfg, ffmpeg_path, root, games_root, index, states, info,
             find_result or _default_find_result(ffmpeg_path, info.width, info.height, hwaccel),
             find_portraits or _default_find_portraits(ffmpeg_path, info.width, info.height, hwaccel),
-            cancel, report,
+            cancel, report, place,
         )
     except VodCancelled:
         index.update(status="cancelled", updatedAt=_now_iso())
@@ -429,6 +434,7 @@ def _make_clips(
     find_portraits: FindPortraits,
     cancel: threading.Event | None,
     report: Callable[..., None],
+    place: ClipPlacement,
 ) -> None:
     """게임마다 풀영상(`games/<키>/full.mp4`)과 `game.json` 을 만들고, `clip.saveMode` 가 auto 면 후보를 클립으로도 자른다.
 
@@ -451,7 +457,7 @@ def _make_clips(
     olds = load_metas(old_paths)
     old_ids = {p.stem for p in old_paths}
     keep_old = save_mode == "manual"
-    staging = root / STAGING_DIRNAME / uuid.uuid4().hex
+    staging = place.staging_base / uuid.uuid4().hex
     thumbs = staging / ".thumbs"
     games: list[dict] = []
     clip_ids: list[str] = []
@@ -604,8 +610,11 @@ def _make_clips(
         report_labels = migrate_labels(olds, [staging / f"{cid}.json" for cid in clip_ids])
         archive_dir = archive_dir_for(root)
         for meta_path in old_paths:
-            delete_clip(meta_path, mode=cfg.ui.delete_mode, archive_dir=archive_dir)
-    _move_staged_tree(staging, root)
+            delete_clip(
+                meta_path, mode=cfg.ui.delete_mode, archive_dir=archive_dir,
+                video=find_video(root, meta_path.stem, place.video_roots),
+            )
+    commit_staged_clips(staging, root, place.video_dir)
 
     for folder, data in pending_games:
         write_vod_game(folder, _keep_pinned(folder, data))

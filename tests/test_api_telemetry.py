@@ -5,7 +5,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from lumia_briefing_room.api.app import create_app
-from lumia_briefing_room.config import Config, dataclass_from_camel_dict, load_config, save_config
+from lumia_briefing_room.config import (
+    Config,
+    PathsConfig,
+    dataclass_from_camel_dict,
+    load_config,
+    resolve_paths,
+    save_config,
+)
 from lumia_briefing_room.telemetry.client import ReceiverClient
 from lumia_briefing_room.telemetry.outbox import Outbox
 from lumia_briefing_room.telemetry.sender import TelemetrySender
@@ -17,6 +24,8 @@ class Fake:
         self.config_path = tmp_path / "config.json"
         (tmp_path / "clips").mkdir()
         (tmp_path / "vod").mkdir()
+        self.library = resolve_paths(PathsConfig(clips=tmp_path / "clips", vod_clips=tmp_path / "vod")).library_steam
+        self.library.mkdir(parents=True)
         self.outbox = Outbox(tmp_path / "outbox.jsonl")
         self.recent = Outbox(tmp_path / "recent.jsonl")
         self.status = 200
@@ -59,7 +68,7 @@ def client(fake):
 def add_label(fake, clip_id="c1", **over):
     meta = {"userLabel": "pvp", "labelNote": "메모", "title": "제목", "sessionDir": "s", "matchStartUtc": "t"}
     meta.update(over)
-    (fake.tmp / "clips" / f"{clip_id}.json").write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+    (fake.library / f"{clip_id}.json").write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
 
 
 def test_status_reports_ids_consent_and_pending_counts(client, fake):

@@ -61,9 +61,10 @@ from lumia_briefing_room.pipeline.clip_assets import (
     resolve_thumbnail,
 )
 from lumia_briefing_room.pipeline.delete_helper import delete_clip
+from lumia_briefing_room.pipeline.library_startup import migrate_legacy_layout
 from lumia_briefing_room.pipeline.legacy_trash import count_legacy_trash, recycle_legacy_trash, restore_legacy_trash
 from lumia_briefing_room.pipeline.move_clips import MoveError, execute_move, plan_move
-from lumia_briefing_room.pipeline.proxy import create_proxy, is_proxy_fresh, proxy_path, remove_orphan_proxies
+from lumia_briefing_room.pipeline.proxy import create_proxy, is_proxy_fresh, proxy_file, remove_orphan_proxies
 from lumia_briefing_room.pipeline.proxy_queue import DIRECT, PREFETCH, PriorityGate, Ticket
 from lumia_briefing_room.pipeline.reprocess import GameRef, ReprocessError, reprocess_game
 from lumia_briefing_room.pipeline.trim import split_clip, trim_clip, validate_range, validate_ranges
@@ -125,15 +126,20 @@ def _notify_recording_root_changed(app: FastAPI) -> None:
 
 
 def _clips_dir(app: FastAPI) -> Path:
-    return resolve_paths(app.state.config.paths).clips
+    """스팀 클립 정보(json·썸네일·라벨·게임 기록)가 있는 앱 데이터 폴더. 영상은 `_video_roots` 아래에 있다."""
+    return resolve_paths(app.state.config.paths).library_steam
+
+
+def _video_roots(app: FastAPI) -> tuple[Path, ...]:
+    return resolve_paths(app.state.config.paths).clip_roots
 
 
 def _source_root(app: FastAPI, source: str) -> Path:
     resolved = resolve_paths(app.state.config.paths)
     if source == "steam":
-        return resolved.clips
+        return resolved.library_steam
     if source == "vod":
-        return resolved.vod_clips
+        return resolved.library_vod
     raise HTTPException(400, "source 는 steam 또는 vod 여야 합니다")
 
 
@@ -143,8 +149,8 @@ def _locate(app: FastAPI, clip_id: str):
     (그 클립이 있는 폴더, 클립) 을 돌려준다.
     """
     resolved = resolve_paths(app.state.config.paths)
-    for root in (resolved.clips, resolved.vod_clips):
-        clip = find_clip(root, clip_id)
+    for root in (resolved.library_steam, resolved.library_vod):
+        clip = find_clip(root, clip_id, resolved.clip_roots)
         if clip is not None:
             return root, clip
     return None
@@ -160,6 +166,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     lock = threading.RLock()
     app.state.lock = lock
     app.state.request_count = 0
+    migrate_legacy_layout(cfg)
 
     @app.middleware("http")
     async def count_api_requests(request, call_next):
@@ -193,7 +200,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         q: str | None = None,
     ):
         clips_dir = _source_root(app, source)
-        summaries = scan_clips(clips_dir)
+        summaries = scan_clips(clips_dir, _video_roots(app))
         for clip in summaries:
             if not clip.meta.get("clipUid"):
                 try:
@@ -267,17 +274,25 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         if found is None:
             raise HTTPException(404, "클립을 찾을 수 없습니다")
         clips_dir, clip = found
-        proxy = proxy_path(clips_dir, clip_id)
+        proxy = proxy_file(proxy_cache_dir(), clip_id)
         delete_clip(
             clip.meta_path,
             mode=current_config().ui.delete_mode,
             archive_dir=archive_dir_for(clips_dir),
             records_dir=records_dir_if_kept(clips_dir),
             proxy=proxy if proxy.exists() else None,
+            video=clip.video,
         )
         remove_orphan_result_images(clips_dir)
-        remove_orphan_proxies(clips_dir)
+        remove_orphan_proxies(clips_dir, directory=proxy_cache_dir(), alive=alive_clip_ids())
         return {"id": clip_id, "deleted": True}
+
+    def proxy_cache_dir() -> Path:
+        return resolve_paths(current_config().paths).proxy_cache
+
+    def alive_clip_ids() -> set[str]:
+        resolved = resolve_paths(current_config().paths)
+        return {c.id for root in (resolved.library_steam, resolved.library_vod) for c in scan_clips(root, resolved.clip_roots)}
 
     def records_dir_if_kept(clips_dir: Path) -> Path | None:
         if clips_dir != _clips_dir(app) or not current_config().retention.keep_game_records:
@@ -289,7 +304,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     def list_game_records():
         """클립이 다 지워진 경기의 기록. 살아있는 클립이 있는 경기는 그 클립이 게임 행을 그리므로 뺀다."""
         clips_dir = _clips_dir(app)
-        live = {game_key(c.meta.get("sessionDir"), c.meta.get("matchStartUtc")) for c in scan_clips(clips_dir)}
+        live = {game_key(c.meta.get("sessionDir"), c.meta.get("matchStartUtc")) for c in scan_clips(clips_dir, _video_roots(app))}
         return [r for r in load_records(records_dir_for(clips_dir)) if r["id"] not in live]
 
     def _record_image(record_id: str) -> Path:
@@ -323,10 +338,10 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         if found is None:
             raise HTTPException(404, "클립을 찾을 수 없습니다")
         root, clip = found
-        source = clip.meta_path.with_suffix(".mp4")
+        source = clip.video
         if not proxy:
             return _serve_range(source, request, media_type="video/mp4")
-        proxied = proxy_path(root, clip_id)
+        proxied = proxy_file(proxy_cache_dir(), clip_id)
         if not is_proxy_fresh(proxied, source):
             raise HTTPException(409, "재생용 영상이 아직 없습니다")
         return _serve_range(proxied, request, media_type="video/mp4")
@@ -339,7 +354,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         if found is None:
             raise HTTPException(404, "클립을 찾을 수 없습니다")
         root, clip = found
-        return clip, clip.meta_path.with_suffix(".mp4"), proxy_path(root, clip_id)
+        return clip, clip.video, proxy_file(proxy_cache_dir(), clip_id)
 
     @app.get("/api/clips/{clip_id}/proxy")
     def proxy_status(clip_id: str):
@@ -480,7 +495,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         stem = str(body.get("filename") or clip.meta.get("title") or clip_id)
         if stem.lower().endswith(".mp4"):
             stem = stem[:-4]
-        saved = export_video(clip.meta_path.with_suffix(".mp4"), directory, stem)
+        saved = export_video(clip.video, directory, stem)
         put_config({"paths": {"exportDefault": str(directory)}})
         return {"path": str(saved)}
 
@@ -509,10 +524,12 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         if ffmpeg is None:
             raise HTTPException(503, "ffmpeg를 찾을 수 없습니다")
         try:
-            trim_clip(clip.meta_path, start, end, ffmpeg_path=ffmpeg, thumbnail=current_config().encode.thumbnail)
+            trim_clip(
+                clip.meta_path, start, end, ffmpeg_path=ffmpeg, thumbnail=current_config().encode.thumbnail, video=clip.video
+            )
         except (OSError, subprocess.CalledProcessError) as e:
             raise HTTPException(500, f"자르기에 실패했습니다: {e}")
-        return _serialize(find_clip(clip_root, clip_id))
+        return _serialize(find_clip(clip_root, clip_id, _video_roots(app)))
 
     @app.post("/api/clips/{clip_id}/split")
     @locked
@@ -535,17 +552,17 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             pieces = split_clip(
                 clip.meta_path, ranges, ffmpeg_path=ffmpeg,
                 thumbnail=current_config().encode.thumbnail,
-                delete_mode=current_config().ui.delete_mode, archive_dir=archive_dir_for(clip_root),
+                delete_mode=current_config().ui.delete_mode, archive_dir=archive_dir_for(clip_root), video=clip.video,
             )
         except (OSError, subprocess.CalledProcessError) as e:
             raise HTTPException(500, f"자르기에 실패했습니다: {e}")
-        return [_serialize(find_clip(clip_root, p.stem)) for p in pieces]
+        return [_serialize(find_clip(clip_root, p.stem, _video_roots(app))) for p in pieces]
 
     @app.get("/api/legacy-trash")
     @locked
     def legacy_trash_status():
         resolved = resolve_paths(current_config().paths)
-        return {"count": count_legacy_trash(resolved.clips, resolved.vod_clips)}
+        return {"count": count_legacy_trash(resolved.clips_steam, resolved.clips_vod)}
 
     @app.post("/api/legacy-trash/migrate")
     @locked
@@ -555,7 +572,8 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             raise HTTPException(400, "action 은 restore 또는 recycle 이어야 합니다")
         resolved = resolve_paths(current_config().paths)
         fn = restore_legacy_trash if action == "restore" else recycle_legacy_trash
-        migrated = sum(fn(root) for root in (resolved.clips, resolved.vod_clips))
+        migrated = sum(fn(root) for root in (resolved.clips_steam, resolved.clips_vod))
+        migrate_legacy_layout(current_config())
         return {"migrated": migrated}
 
     @app.post("/api/games/reprocess", status_code=202)
@@ -563,7 +581,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         clip_id = body.get("clipId")
         if not clip_id:
             raise HTTPException(400, "다시 분석할 게임의 클립을 지정해야 합니다")
-        clip = find_clip(_clips_dir(app), clip_id)
+        clip = find_clip(_clips_dir(app), clip_id, _video_roots(app))
         if clip is None:
             raise HTTPException(404, "클립을 찾을 수 없습니다")
         if any(j["state"] == "running" for j in jobs.values()):
@@ -581,6 +599,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         job = {"state": "running", "message": "", "clips": 0}
         jobs[key] = job
         clips_dir = _clips_dir(app)
+        resolved_paths = resolve_paths(cfg.paths)
         try:
             match_start = datetime.fromisoformat(ref.match_start.replace("Z", "+00:00"))
             label = f"게임 다시 분석 중 ({match_start.astimezone().strftime('%m/%d %H:%M')} 시작)"
@@ -593,6 +612,8 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
                     written = reprocess_game(
                         clips_dir=clips_dir, ref=ref, recording_root=recording_root,
                         boundaries=read_boundaries(cfg), cfg=cfg, ffmpeg_path=ffmpeg, guard=lock,
+                        video_dir=resolved_paths.clips_steam, video_roots=resolved_paths.clip_roots,
+                        staging_root=resolved_paths.staging_clips,
                     )
                 job.update(state="done", clips=len(written))
             except ReprocessError as e:
@@ -616,10 +637,10 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         resolved = resolve_paths(cfg.paths)
         dry_run = bool(body.get("dryRun"))
         if dry_run:
-            plan = plan_game_cleanup(resolved.games, cfg.retention)
+            plan = plan_game_cleanup(resolved.games_dirs, cfg.retention)
         else:
             preserve = make_preserver(cfg, discover_ffmpeg()) if cfg.retention.preserve_before_delete else None
-            plan = run_game_cleanup(resolved.games, cfg.retention, preserve=preserve)
+            plan = run_game_cleanup(resolved.games_dirs, cfg.retention, preserve=preserve)
         return {
             "toDelete": len(plan.to_delete),
             "bytesToFree": plan.bytes_to_free,
@@ -709,7 +730,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         if any(j["state"] == "running" for j in jobs.values()):
             raise HTTPException(409, "게임을 분석하는 중에는 클립을 옮길 수 없습니다. 끝난 뒤 다시 시도하세요")
         resolved = resolve_paths(current_config().paths)
-        old = resolved.clips if source == "steam" else resolved.vod_clips
+        old = resolved.clips_steam if source == "steam" else resolved.clips_vod
         try:
             plan = plan_move(old, Path(raw))
         except MoveError as e:
@@ -762,7 +783,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     register_backfill_routes(app, current_config=current_config)
 
     cleanup_preview_registry.configure(
-        lambda: (resolve_paths(current_config().paths).games, current_config().retention), game_cleanup_preview
+        lambda: (resolve_paths(current_config().paths).games_dirs, current_config().retention), game_cleanup_preview
     )
     cleanup_preview_registry.recompute_now()
     return app

@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from lumia_briefing_room.api import vods as vods_module
 from lumia_briefing_room.api.app import create_app
-from lumia_briefing_room.config import Config, PathsConfig, load_config
+from lumia_briefing_room.config import Config, PathsConfig, load_config, resolve_paths
 from lumia_briefing_room.pipeline.vod_analyze import VodCancelled, VodProgress
 from lumia_briefing_room.pipeline.vod_store import save_index, vod_id
 from lumia_briefing_room.video.vod import VideoInfo
@@ -38,8 +38,8 @@ def env(tmp_path, monkeypatch):
     a = write_video(videos / "a.mp4", b"A" * 3000)
     b = write_video(videos / "sub" / "b.mkv", b"B" * 4000)
     write_video(videos / "notes.txt", b"not a video")
-    vod_dir = tmp_path / "vod"
-    cfg = Config(paths=PathsConfig(clips=tmp_path / "clips", vod_clips=vod_dir, temp=tmp_path / "tmp"))
+    cfg = Config(paths=PathsConfig(clips=tmp_path / "clips", vod_clips=tmp_path / "vod", temp=tmp_path / "tmp"))
+    vod_dir = resolve_paths(cfg.paths).library_vod  # 영상 클립 정보(색인·json)는 앱 데이터 library 에 있다
     cfg.vod.sources = [str(videos)]
     config_path = tmp_path / "config.json"
     from lumia_briefing_room.config import save_config

@@ -101,15 +101,13 @@ def test_load_config_with_partial_json_keeps_other_defaults(tmp_path):
 def test_resolve_paths_fills_defaults_when_unset():
     resolved = resolve_paths(PathsConfig())
     assert resolved.clips.name == "clips"
-    assert resolved.thumbnails == resolved.clips / ".thumbs"
-    assert resolved.proxies == resolved.clips / ".proxy"
+    assert resolved.proxy_cache == resolved.clips / ".proxy"
 
 
 def test_resolve_paths_respects_explicit_clips_dir():
     cfg = PathsConfig(clips=Path("E:/my_clips"))
     resolved = resolve_paths(cfg)
     assert resolved.clips == Path("E:/my_clips")
-    assert resolved.thumbnails == Path("E:/my_clips/.thumbs")
 
 
 def test_resolve_paths_respects_explicit_temp_dir():

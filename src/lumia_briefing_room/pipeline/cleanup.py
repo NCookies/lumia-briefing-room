@@ -135,7 +135,7 @@ def make_cleanup_runner(config_path: Path | None) -> Callable[[], object]:
         cfg = load_config(config_path)
         resolved = resolve_paths(cfg.paths)
         preserve = make_preserver(cfg, discover_ffmpeg()) if cfg.retention.preserve_before_delete else None
-        return run_game_cleanup(resolved.games, cfg.retention, preserve=preserve)
+        return run_game_cleanup(resolved.games_dirs, cfg.retention, preserve=preserve)
 
     return run
 

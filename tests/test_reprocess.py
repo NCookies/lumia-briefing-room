@@ -255,3 +255,31 @@ def test_find_match_end_also_matches_clips_made_before_the_boundary_was_widened(
 
     assert find_match_end(START, [boundary]) == END
     assert find_match_end(START - timedelta(seconds=80), [boundary]) == END
+
+
+def test_reprocess_splits_info_and_video_and_replaces_old_video_wherever_it_is(tmp_path, monkeypatch):
+    from lumia_briefing_room.pipeline import delete_helper
+
+    monkeypatch.setattr(delete_helper, "_send2trash", lambda p: Path(p).unlink())
+    lib, videos = tmp_path / "lib", tmp_path / "videos"
+    write_clip(lib, "a_01")
+    (lib / "a_01.mp4").rename(tmp_path / "moved_a_01.mp4")
+    (videos / "캐릭터").mkdir(parents=True)
+    (tmp_path / "moved_a_01.mp4").rename(videos / "캐릭터" / "a_01.mp4")
+
+    def process(session, start, end, cfg, *, ffmpeg_path, clips_dir):
+        write_clip(clips_dir, "a_01", title="새 클립")
+        return [clips_dir / "a_01.json"]
+
+    written = reprocess_game(
+        clips_dir=lib, ref=REF, recording_root=make_recording(tmp_path),
+        boundaries=[MatchBoundary(start_utc=START, end_utc=END)], cfg=Config(), ffmpeg_path=Path("ffmpeg"),
+        process=process, load_session=fake_session, video_dir=videos, video_roots=[videos],
+        staging_root=videos / ".staging",
+    )
+
+    assert written == [lib / "a_01.json"]
+    assert (videos / "a_01.mp4").read_bytes() == b"old-a_01" and not (lib / "a_01.mp4").exists()
+    assert not (videos / "캐릭터" / "a_01.mp4").exists(), "옛 영상은 사용자가 옮긴 자리에서 지운다"
+    assert json.loads((lib / "a_01.json").read_text(encoding="utf-8"))["title"] == "새 클립"
+    assert not (videos / ".staging").exists() or not list((videos / ".staging").iterdir())

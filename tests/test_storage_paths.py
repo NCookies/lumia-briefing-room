@@ -89,10 +89,14 @@ def test_new_layout_has_single_clip_root(tmp_path):
     assert r.clip_roots == (tmp_path / "s" / "클립",)
 
 
-def test_old_fields_still_resolve_in_legacy_layout(tmp_path):
-    r = resolve_paths(PathsConfig(clips=tmp_path / "clips"))
-    assert r.clips == tmp_path / "clips"
-    assert r.thumbnails == tmp_path / "clips" / ".thumbs"
+def test_legacy_layout_vod_staging_stays_next_to_vod_clips(tmp_path):
+    r = resolve_paths(PathsConfig(clips=tmp_path / "clips", vod_clips=tmp_path / "vod"))
+    assert r.staging_vod_clips == tmp_path / "vod" / ".staging"
+
+
+def test_new_layout_shares_one_clip_staging(tmp_path):
+    r = resolve_paths(PathsConfig(root=tmp_path / "s"))
+    assert r.staging_vod_clips == r.staging_clips == tmp_path / "s" / ".staging"
 
 
 def test_suggested_root_for_fresh_install_is_videos_folder(tmp_path):

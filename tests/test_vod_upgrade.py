@@ -4,6 +4,7 @@ from dataclasses import replace
 
 import pytest
 
+from lumia_briefing_room.config import resolve_paths
 from lumia_briefing_room.detect.types import FrameState
 from lumia_briefing_room.pipeline.legacy_vod_games import migrate_legacy_vod_games
 from lumia_briefing_room.pipeline.vod_analyze import analyze_vod
@@ -33,7 +34,7 @@ def portraits_none(video, span):
 def legacy_setup(tmp_path, vod_file):
     """예전 방식으로 분석된 상태를 만든다: 클립·색인·판독 캐시만 있고 게임 폴더는 없다."""
     index, cfg = run(tmp_path, vod_file, find_result=lambda v, s, n: screen())
-    root = cfg.paths.vod_clips
+    root = resolve_paths(cfg.paths).library_vod
     shutil.rmtree(cfg.paths.games)
     for game in index["games"]:
         for key in ("gameKey", "fullVideo", "fullStartSec", "fullEndSec"):
@@ -46,7 +47,7 @@ def legacy_setup(tmp_path, vod_file):
 
 def upgrade(cfg, vod_file, index, **kw):
     args = dict(
-        ffmpeg_path=FFMPEG_PATH, root=cfg.paths.vod_clips, games_dir=cfg.paths.games, index=index,
+        ffmpeg_path=FFMPEG_PATH, root=resolve_paths(cfg.paths).library_vod, games_dir=cfg.paths.games, index=index,
         find_result=lambda v, s, n: replace(screen(), t=56.0), find_portraits=portraits_none, find_selection=selection,
     )
     args.update(kw)
@@ -57,7 +58,7 @@ def upgrade(cfg, vod_file, index, **kw):
 def test_upgrade_makes_full_videos_from_the_known_game_positions_and_cached_reads(vod_file, tmp_path):
     index, cfg = legacy_setup(tmp_path, vod_file)
 
-    created = upgrade(cfg, vod_file, load_index(cfg.paths.vod_clips, vod_id(vod_file)))
+    created = upgrade(cfg, vod_file, load_index(resolve_paths(cfg.paths).library_vod, vod_id(vod_file)))
 
     key = f"vod_{vod_id(vod_file)}_g01"
     assert created == [key]
@@ -73,7 +74,7 @@ def test_upgrade_makes_full_videos_from_the_known_game_positions_and_cached_read
 @requires_ffmpeg
 def test_upgrade_keeps_the_old_clips_and_links_them_to_the_new_candidates(vod_file, tmp_path):
     index, cfg = legacy_setup(tmp_path, vod_file)
-    root = cfg.paths.vod_clips
+    root = resolve_paths(cfg.paths).library_vod
     old = sorted(p.name for p in root.glob("vod_*"))
 
     upgrade(cfg, vod_file, load_index(root, vod_id(vod_file)))
@@ -86,7 +87,7 @@ def test_upgrade_keeps_the_old_clips_and_links_them_to_the_new_candidates(vod_fi
 @requires_ffmpeg
 def test_upgrade_updates_the_index_and_running_twice_changes_nothing(vod_file, tmp_path):
     index, cfg = legacy_setup(tmp_path, vod_file)
-    root = cfg.paths.vod_clips
+    root = resolve_paths(cfg.paths).library_vod
 
     first = upgrade(cfg, vod_file, load_index(root, vod_id(vod_file)))
     after_first = load_index(root, vod_id(vod_file))
@@ -102,7 +103,7 @@ def test_upgrade_updates_the_index_and_running_twice_changes_nothing(vod_file, t
 def test_upgrade_falls_back_to_the_old_result_when_the_result_screen_is_not_found_again(vod_file, tmp_path):
     index, cfg = legacy_setup(tmp_path, vod_file)
 
-    upgrade(cfg, vod_file, load_index(cfg.paths.vod_clips, vod_id(vod_file)), find_result=no_result)
+    upgrade(cfg, vod_file, load_index(resolve_paths(cfg.paths).library_vod, vod_id(vod_file)), find_result=no_result)
 
     data = json.loads((cfg.paths.games / f"vod_{vod_id(vod_file)}_g01" / "game.json").read_text(encoding="utf-8"))
     assert data["matchResult"]["placement"] == 1
@@ -114,7 +115,7 @@ def test_upgrade_skips_practice_games(vod_file, tmp_path):
     index, cfg = legacy_setup(tmp_path, vod_file)
 
     created = upgrade(
-        cfg, vod_file, load_index(cfg.paths.vod_clips, vod_id(vod_file)), find_selection=lambda v, s, f: (1.0, True)
+        cfg, vod_file, load_index(resolve_paths(cfg.paths).library_vod, vod_id(vod_file)), find_selection=lambda v, s, f: (1.0, True)
     )
 
     assert created == []
@@ -125,45 +126,46 @@ def test_upgrade_skips_practice_games(vod_file, tmp_path):
 def test_upgrade_can_be_limited_to_one_game(vod_file, tmp_path):
     index, cfg = legacy_setup(tmp_path, vod_file)
 
-    assert upgrade(cfg, vod_file, load_index(cfg.paths.vod_clips, vod_id(vod_file)), only={9}) == []
-    assert len(upgrade(cfg, vod_file, load_index(cfg.paths.vod_clips, vod_id(vod_file)), only={1})) == 1
+    assert upgrade(cfg, vod_file, load_index(resolve_paths(cfg.paths).library_vod, vod_id(vod_file)), only={9}) == []
+    assert len(upgrade(cfg, vod_file, load_index(resolve_paths(cfg.paths).library_vod, vod_id(vod_file)), only={1})) == 1
 
 
 @requires_ffmpeg
 def test_upgrade_refuses_without_the_source_or_the_read_cache(vod_file, tmp_path):
     index, cfg = legacy_setup(tmp_path, vod_file)
-    loaded = load_index(cfg.paths.vod_clips, vod_id(vod_file))
-    assert can_upgrade(loaded, vod_file, cfg.paths.vod_clips)
+    loaded = load_index(resolve_paths(cfg.paths).library_vod, vod_id(vod_file))
+    assert can_upgrade(loaded, vod_file, resolve_paths(cfg.paths).library_vod)
 
     missing = vod_file.with_name("없음.mp4")
-    assert not can_upgrade(loaded, missing, cfg.paths.vod_clips)
+    assert not can_upgrade(loaded, missing, resolve_paths(cfg.paths).library_vod)
     with pytest.raises(UpgradeError):
         upgrade(cfg, missing, loaded)
 
     from lumia_briefing_room.pipeline.vod_store import cache_path
 
-    cache_path(cfg.paths.vod_clips, vod_id(vod_file)).unlink()
-    assert not can_upgrade(loaded, vod_file, cfg.paths.vod_clips)
+    cache_path(resolve_paths(cfg.paths).library_vod, vod_id(vod_file)).unlink()
+    assert not can_upgrade(loaded, vod_file, resolve_paths(cfg.paths).library_vod)
     with pytest.raises(UpgradeError):
         upgrade(cfg, vod_file, loaded)
 
 
 @requires_ffmpeg
-def test_upgrade_reports_progress_and_can_be_cancelled(vod_file, tmp_path):
+def test_upgrade_reports_progress_and_can_be_cancelled(vod_file, tmp_path, monkeypatch):
     import threading
 
     index, cfg = legacy_setup(tmp_path, vod_file)
     seen = []
-    upgrade(cfg, vod_file, load_index(cfg.paths.vod_clips, vod_id(vod_file)), on_progress=lambda f, m: seen.append(f))
+    upgrade(cfg, vod_file, load_index(resolve_paths(cfg.paths).library_vod, vod_id(vod_file)), on_progress=lambda f, m: seen.append(f))
     assert seen and seen[-1] == 1.0 and seen == sorted(seen)
 
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "second_appdata"))
     index2, cfg2 = legacy_setup(tmp_path / "again", vod_file)
     cancel = threading.Event()
     cancel.set()
     from lumia_briefing_room.pipeline.vod_analyze import VodCancelled
 
     with pytest.raises(VodCancelled):
-        upgrade(cfg2, vod_file, load_index(cfg2.paths.vod_clips, vod_id(vod_file)), cancel=cancel)
+        upgrade(cfg2, vod_file, load_index(resolve_paths(cfg2.paths).library_vod, vod_id(vod_file)), cancel=cancel)
 
 
 def test_old_clips_with_other_ids_are_linked_to_the_candidate_they_overlap_most():
@@ -195,5 +197,5 @@ def test_upgrade_does_not_recreate_a_full_video_that_auto_cleanup_removed(vod_fi
     data.update(fullVideo=None, fullVideoDeletedAt="2026-09-30T00:00:00Z")
     (folder / "game.json").write_text(json.dumps(data), encoding="utf-8")
 
-    assert upgrade(cfg, vod_file, load_index(cfg.paths.vod_clips, vod_id(vod_file))) == []
+    assert upgrade(cfg, vod_file, load_index(resolve_paths(cfg.paths).library_vod, vod_id(vod_file))) == []
     assert not (folder / "full.mp4").exists()

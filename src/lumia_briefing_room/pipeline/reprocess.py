@@ -11,12 +11,13 @@ import json
 import logging
 import shutil
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
 from lumia_briefing_room.config import Config
+from lumia_briefing_room.pipeline.clip_files import commit_staged_clips, find_video
 from lumia_briefing_room.pipeline.delete_helper import delete_clip
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for
 from lumia_briefing_room.pipeline.label_migrate import load_metas, migrate_labels
@@ -67,21 +68,6 @@ def _game_meta_paths(directory: Path, ref: GameRef) -> list[Path]:
     return paths
 
 
-def _move_staged_tree(staging: Path, dest_root: Path) -> list[Path]:
-    """스테이징 폴더의 파일을 상대 구조를 유지하며 실제 클립 폴더로 옮기고, 스테이징을 지운다."""
-    moved: list[Path] = []
-    for path in sorted(staging.rglob("*")):
-        if path.is_dir():
-            continue
-        rel = path.relative_to(staging)
-        dest = dest_root / rel
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(path), str(dest))
-        moved.append(dest)
-    shutil.rmtree(staging, ignore_errors=True)
-    return moved
-
-
 def _apply_locked_result(written: list[Path], locked_result: dict | None) -> None:
     """사용자가 `manual` 로 잠근 순위·결과는 다시 분석해 새로 만든 클립에도 그대로 이어간다(SPEC §2.13 수동 보정)."""
     for path in written:
@@ -105,8 +91,14 @@ def reprocess_game(
     process: Callable = process_match,
     load_session: Callable[[Path], RecordingSession] = RecordingSession.load,
     guard=None,
+    video_dir: Path | None = None,
+    video_roots: Iterable[Path] = (),
+    staging_root: Path | None = None,
 ) -> list[Path]:
-    """`guard` 는 기존 클립을 지우고 새 클립을 옮기는 구간만 감싸는 락이다(오래 걸리는 분석 동안은 잡지 않는다)."""
+    """`clips_dir` 는 클립 정보(library) 폴더, `video_dir` 은 새 영상이 놓일 폴더(기본 `clips_dir`), `video_roots` 는 옛 영상을 찾을 자리,
+    `staging_root` 는 작업 폴더를 만들 곳(기본 `clips_dir/.staging` - 영상이 놓일 드라이브에 두는 게 좋다).
+
+    `guard` 는 기존 클립을 지우고 새 클립을 옮기는 구간만 감싸는 락이다(오래 걸리는 분석 동안은 잡지 않는다)."""
     guard = guard or contextlib.nullcontext()
 
     old = _game_meta_paths(clips_dir, ref)
@@ -134,7 +126,7 @@ def reprocess_game(
     if not existing_segment_numbers(session, 0, first, first + START_PROBE_SEGMENTS):
         raise ReprocessError("원본 녹화가 이미 삭제되어 다시 분석할 수 없습니다")
 
-    staging = clips_dir / STAGING_DIRNAME / uuid.uuid4().hex
+    staging = (staging_root or clips_dir / STAGING_DIRNAME) / uuid.uuid4().hex
     staging.mkdir(parents=True, exist_ok=True)
     try:
         written = process(session, start, end, cfg, ffmpeg_path=ffmpeg_path, clips_dir=staging)
@@ -157,8 +149,12 @@ def reprocess_game(
 
     with guard:
         archive_dir = archive_dir_for(clips_dir)
+        roots = tuple(video_roots)
         for path in old:
-            delete_clip(path, mode=cfg.ui.delete_mode, archive_dir=archive_dir)
-        final = _move_staged_tree(staging, clips_dir)
+            delete_clip(
+                path, mode=cfg.ui.delete_mode, archive_dir=archive_dir,
+                video=find_video(clips_dir, path.stem, roots),
+            )
+        final = commit_staged_clips(staging, clips_dir, video_dir or clips_dir)
 
-    return sorted(p for p in final if p.suffix == ".json")
+    return sorted(final)

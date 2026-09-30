@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from lumia_briefing_room.api.app import create_app
-from lumia_briefing_room.config import Config, PathsConfig
+from lumia_briefing_room.config import Config, PathsConfig, resolve_paths
 
 
 def write_clip(root: Path, clip_id: str, **meta):
@@ -24,8 +24,9 @@ def write_clip(root: Path, clip_id: str, **meta):
 
 @pytest.fixture
 def env(tmp_path):
-    steam, vod = tmp_path / "clips", tmp_path / "vod"
-    cfg = Config(paths=PathsConfig(clips=steam, vod_clips=vod, temp=tmp_path / "tmp"))
+    cfg = Config(paths=PathsConfig(clips=tmp_path / "clips", vod_clips=tmp_path / "vod", temp=tmp_path / "tmp"))
+    resolved = resolve_paths(cfg.paths)
+    steam, vod = resolved.library_steam, resolved.library_vod
     app = create_app(cfg, config_path=tmp_path / "config.json")
     write_clip(steam, "steam_a")
     write_clip(vod, "vod_x_g01_000010", source="vod", vodId="x", vodGameIndex=1)

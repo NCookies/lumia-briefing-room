@@ -13,7 +13,6 @@ from datetime import datetime
 from pathlib import Path
 
 from lumia_briefing_room.config import Config
-from lumia_briefing_room.pipeline.backfill_runtime import staging_config
 from lumia_briefing_room.pipeline.game_files import GameNotFound, has_full_video, load_game, update_game
 from lumia_briefing_room.pipeline.legacy_games import adopt_legacy_clips, saved_clip_ids
 from lumia_briefing_room.pipeline.orchestrator import process_match
@@ -104,7 +103,7 @@ def rebuild_full_video(
     staging.mkdir(parents=True, exist_ok=True)
     try:
         process(
-            session, start, end, staging_config(cfg), ffmpeg_path=ffmpeg_path, clips_dir=staging, games_dir=games_dir,
+            session, start, end, cfg, ffmpeg_path=ffmpeg_path, clips_dir=staging, games_dir=games_dir,
             existing_clip_ids=known, on_progress=on_progress, cancel=cancel,
         )
     finally:

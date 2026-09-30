@@ -7,7 +7,7 @@ import httpx
 import pytest
 from jsonschema import Draft202012Validator
 
-from lumia_briefing_room.config import Config, dataclass_from_camel_dict, load_config, save_config
+from lumia_briefing_room.config import Config, PathsConfig, dataclass_from_camel_dict, load_config, resolve_paths, save_config
 from lumia_briefing_room.telemetry.client import ReceiverClient
 from lumia_briefing_room.telemetry.outbox import Outbox
 from lumia_briefing_room.telemetry.sender import DAY, TelemetrySender
@@ -37,10 +37,15 @@ class Env:
     def __init__(self, tmp_path):
         self.tmp = tmp_path
         self.config_path = tmp_path / "config.json"
-        self.clips = tmp_path / "clips"
-        self.vod = tmp_path / "vod"
-        self.clips.mkdir()
-        self.vod.mkdir()
+        self.clip_videos = tmp_path / "clips"
+        self.vod_videos = tmp_path / "vod"
+        self.clip_videos.mkdir()
+        self.vod_videos.mkdir()
+        library = resolve_paths(PathsConfig(clips=self.clip_videos, vod_clips=self.vod_videos))
+        self.clips = library.library_steam
+        self.vod = library.library_vod
+        self.clips.mkdir(parents=True)
+        self.vod.mkdir(parents=True)
         self.outbox = Outbox(tmp_path / "outbox" / "errors.jsonl")
         self.recent = Outbox(tmp_path / "outbox" / "errors_recent.jsonl")
         self.clock = Clock()
@@ -53,7 +58,7 @@ class Env:
     def configure(self, *, labels=True, logs=True, token="tok", allow_dev=False, mode="auto", url="https://r.example"):
         cfg = dataclass_from_camel_dict(Config, {
             "app": {"mode": mode},
-            "paths": {"clips": str(self.clips), "vodClips": str(self.vod)},
+            "paths": {"clips": str(self.clip_videos), "vodClips": str(self.vod_videos)},
             "player": {"nickname": self.nickname},
             "telemetry": {"sendLabels": labels, "sendLogs": logs, "apiToken": token, "serverUrl": url,
                           "allowDevSend": allow_dev},

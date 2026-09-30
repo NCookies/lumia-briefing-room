@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from lumia_briefing_room.api import backfill_routes as routes
 from lumia_briefing_room.api.app import create_app
-from lumia_briefing_room.config import Config, PathsConfig
+from lumia_briefing_room.config import Config, PathsConfig, resolve_paths
 from lumia_briefing_room.pipeline.backfill import BackfillProgress, BackfillResult
 
 
@@ -91,8 +91,10 @@ def test_start_passes_the_right_folders_and_the_known_games(env):
     _wait_state(client, {"done"})
 
     call = fake.calls[0]
-    assert call["clips_dir"] == tmp / "clips"
-    assert call["staging_root"].parent == call["state_dir"].parent
+    resolved = resolve_paths(PathsConfig(clips=tmp / "clips", temp=tmp / "tmp"))
+    assert call["clips_dir"] == resolved.library_steam, "클립 정보는 앱 데이터 library 에 만든다"
+    assert call["video_dir"] == tmp / "clips", "영상은 저장 폴더에 만든다"
+    assert call["staging_root"].parent == resolved.staging_clips, "작업 폴더는 영상이 놓일 드라이브에 둔다"
     assert datetime(2026, 9, 24, 6, 6, tzinfo=timezone.utc) in call["known_starts"], "로그로 아는 경기도 제외 대상이다"
     assert call["scanner"] == "scanner" and call["process_window"] == "process"
 

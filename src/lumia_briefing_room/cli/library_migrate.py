@@ -15,7 +15,6 @@ from pathlib import Path
 
 from lumia_briefing_room.config import load_config, resolve_paths
 from lumia_briefing_room.pipeline.library_migrate import (
-    MigrationBlocked,
     MigrationConflict,
     migrate_library,
     pending_files,
@@ -52,8 +51,6 @@ def main(argv: list[str] | None = None) -> None:
                 print(f"{old} -> {lib}: {migrate_library(old, lib)}개 옮김")
         except MigrationConflict as e:
             raise SystemExit(f"같은 이름에 내용이 다른 파일이 있어 아무것도 옮기지 않았다: {e}")
-        except MigrationBlocked as e:
-            raise SystemExit(f"옛 휴지통에 클립이 남아 있다. 앱을 켜서 먼저 처리한다: {e}")
 
 
 if __name__ == "__main__":

@@ -36,11 +36,8 @@ def preserve_candidates(folder: Path, game: dict, save_one: Callable[[dict, dict
 
 
 def make_preserver(cfg: Config, ffmpeg_path: Path | None) -> Preserver:
-    from lumia_briefing_room.config import resolve_paths
-
-    games_dir = resolve_paths(cfg.paths).games
-
     def preserve(folder: Path) -> bool:
+        games_dir = folder.parent
         try:
             game = load_game(games_dir, folder.name)
         except GameNotFound:

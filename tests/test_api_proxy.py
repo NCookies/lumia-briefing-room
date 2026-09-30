@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from lumia_briefing_room.api import app as app_module
 from lumia_briefing_room.api.app import create_app
-from lumia_briefing_room.config import Config, PathsConfig
+from lumia_briefing_room.config import Config, PathsConfig, resolve_paths
 from lumia_briefing_room.pipeline import proxy
 
 from conftest import FFMPEG_PATH, requires_ffmpeg
@@ -25,8 +25,10 @@ def _write_clip(clips_dir: Path, clip_id: str, video: bytes = b"video", **meta) 
 @pytest.fixture
 def client(tmp_path):
     clips_dir = tmp_path / "clips"
-    app = create_app(Config(paths=PathsConfig(clips=clips_dir, temp=tmp_path / "tmp")), config_path=tmp_path / "c.json")
-    app.state.clips_dir_for_test = clips_dir
+    cfg = Config(paths=PathsConfig(clips=clips_dir, temp=tmp_path / "tmp"))
+    app = create_app(cfg, config_path=tmp_path / "c.json")
+    app.state.clips_dir_for_test = resolve_paths(cfg.paths).library_steam
+    app.state.proxy_dir_for_test = resolve_paths(cfg.paths).proxy_cache
     return TestClient(app)
 
 
@@ -75,7 +77,7 @@ def test_post_builds_proxy_in_background_then_serves_it(client, monkeypatch):
     assert _wait_ready(client, "a")["state"] == "ready"
 
     assert calls == [("a.mp4", 1080, 23, 4.0)]
-    assert (clips / ".proxy" / "a.mp4").read_bytes() == b"proxy-bytes"
+    assert (client.app.state.proxy_dir_for_test / "a.mp4").read_bytes() == b"proxy-bytes"
     served = client.get("/api/clips/a/video", params={"proxy": 1})
     assert served.status_code == 200 and served.content == b"proxy-bytes"
     assert client.get("/api/clips/a/video").content == b"original hevc"
@@ -148,14 +150,14 @@ def test_deleting_a_clip_removes_its_proxy(client, monkeypatch):
         _write_clip(clips, cid)
         client.post(f"/api/clips/{cid}/proxy")
         _wait_ready(client, cid)
-    assert (clips / ".proxy" / "a.mp4").exists()
+    assert (client.app.state.proxy_dir_for_test / "a.mp4").exists()
 
     client.delete("/api/clips/a")
-    assert not (clips / ".proxy" / "a.mp4").exists()
-    assert (clips / ".proxy" / "b.mp4").exists()
+    assert not (client.app.state.proxy_dir_for_test / "a.mp4").exists()
+    assert (client.app.state.proxy_dir_for_test / "b.mp4").exists()
 
     client.delete("/api/clips/b")
-    assert not (clips / ".proxy" / "b.mp4").exists()
+    assert not (client.app.state.proxy_dir_for_test / "b.mp4").exists()
 
 
 @requires_ffmpeg

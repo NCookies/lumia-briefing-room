@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from lumia_briefing_room.api.app import create_app
-from lumia_briefing_room.config import Config, PathsConfig, RetentionConfig
+from lumia_briefing_room.config import Config, PathsConfig, RetentionConfig, resolve_paths
 from lumia_briefing_room.pipeline.game_records import load_records, records_dir_for
 
 RESULT = {"matchType": "rank", "matchLabel": "랭크", "placement": 2, "total": 8, "outcome": None, "nickname": "me", "character": "아야"}
@@ -24,9 +24,10 @@ def write_clip(root, clip_id, *, start="2026-09-01T10:00:00Z"):
 
 
 def make_client(tmp_path, *, keep=True):
-    clips = tmp_path / "clips"
-    cfg = Config(paths=PathsConfig(clips=clips, temp=tmp_path / "tmp"), retention=RetentionConfig(keep_game_records=keep))
-    return TestClient(create_app(cfg, config_path=tmp_path / "config.json")), clips
+    cfg = Config(
+        paths=PathsConfig(clips=tmp_path / "clips", temp=tmp_path / "tmp"), retention=RetentionConfig(keep_game_records=keep)
+    )
+    return TestClient(create_app(cfg, config_path=tmp_path / "config.json")), resolve_paths(cfg.paths).library_steam
 
 
 def test_deleting_the_last_clip_leaves_a_record_row(tmp_path):

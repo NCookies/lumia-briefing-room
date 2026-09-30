@@ -58,8 +58,9 @@ def collect_log_starts(cfg: Config) -> list[datetime]:
 
 
 def _dirs(cfg: Config) -> tuple[Path, Path, Path]:
+    """(클립 정보 폴더, 판독 캐시 폴더, 작업 폴더). 작업 폴더는 영상이 놓일 드라이브에 둔다."""
     resolved = resolve_paths(cfg.paths)
-    return resolved.clips, resolved.temp / STATE_DIRNAME, resolved.temp / STAGING_DIRNAME
+    return resolved.library_steam, resolved.temp / STATE_DIRNAME, resolved.staging_clips / STAGING_DIRNAME
 
 
 def _result_dict(result: BackfillResult | None) -> dict | None:
@@ -146,7 +147,7 @@ def register_backfill_routes(app: FastAPI, *, current_config: Callable[[], Confi
         def run() -> None:
             try:
                 scanner = SteamSessionScanner(root, ffmpeg, state_dir=state_dir, hwaccel=cfg.vod.hwaccel)
-                games_dir = resolve_paths(cfg.paths).games
+                games_dir = resolve_paths(cfg.paths).games_steam
                 migrate_legacy_games(clips_dir, games_dir)
                 process = make_process_window(
                     cfg, ffmpeg, k_templates=None, a_templates=None,
@@ -154,10 +155,13 @@ def register_backfill_routes(app: FastAPI, *, current_config: Callable[[], Confi
                     legacy_game=lambda w: find_legacy_game(games_dir, w.start_utc, w.end_utc),
                     games_dir=games_dir, clips_dir=clips_dir,
                 )
-                known = collect_known_starts(clips_dir, games_dir) + collect_log_starts(cfg)
+                known = collect_known_starts(
+                    clips_dir, games_dir, trash_dir=resolve_paths(cfg.paths).clips_steam / ".trash"
+                ) + collect_log_starts(cfg)
                 result = run_backfill(
                     scanner=scanner, process_window=process, clips_dir=clips_dir, state_dir=state_dir,
                     staging_root=staging_root, known_starts=known, cancel=cancel, on_progress=on_progress,
+                    video_dir=resolve_paths(cfg.paths).clips_steam,
                 )
             except Exception as exc:
                 log.exception("과거 녹화 분석 실패")

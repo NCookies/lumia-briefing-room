@@ -51,15 +51,16 @@ def validate_ranges(ranges: list[tuple[float, float]], duration: float) -> list[
 
 
 def trim_clip(
-    meta_path: Path, start: float, end: float, *, ffmpeg_path: Path, thumbnail: ThumbnailConfig
+    meta_path: Path, start: float, end: float, *, ffmpeg_path: Path, thumbnail: ThumbnailConfig,
+    video: Path | None = None,
 ) -> dict:
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
     duration = float(meta["durationSec"])
     validate_range(start, end, duration)
     end = min(end, duration)
 
-    mp4 = meta_path.with_suffix(".mp4")
-    tmp = meta_path.with_suffix(".trim.mp4")
+    mp4 = video or meta_path.with_suffix(".mp4")
+    tmp = mp4.with_name(f"{mp4.stem}.trim.mp4")
     cmd = [
         str(ffmpeg_path), "-hide_banner", "-v", "error", "-y",
         "-ss", f"{start:.3f}", "-to", f"{end:.3f}", "-i", str(mp4),
@@ -88,12 +89,12 @@ def trim_clip(
     return meta
 
 
-def _free_piece_ids(meta_path: Path, count: int) -> list[str]:
+def _free_piece_ids(meta_path: Path, count: int, video_folder: Path) -> list[str]:
     ids: list[str] = []
     n = 1
     while len(ids) < count:
         candidate = f"{meta_path.stem}-p{n}"
-        taken = any((meta_path.parent / f"{candidate}{suffix}").exists() for suffix in (".json", ".mp4"))
+        taken = (meta_path.parent / f"{candidate}.json").exists() or (video_folder / f"{candidate}.mp4").exists()
         if not taken:
             ids.append(candidate)
         n += 1
@@ -108,14 +109,15 @@ def split_clip(
     thumbnail: ThumbnailConfig,
     delete_mode: str = "recycle",
     archive_dir: Path | None = None,
+    video: Path | None = None,
 ) -> list[Path]:
-    """구간마다 새 클립을 만들고 원본은 지운다(설정한 삭제 방식). 하나라도 실패하면 만든 조각을 지우고 원본은 그대로 둔다."""
+    """구간마다 새 클립을 만들고 원본은 지운다(설정한 삭제 방식). 조각 영상은 원본 영상 옆에 만든다. 하나라도 실패하면 만든 조각을 지우고 원본은 그대로 둔다."""
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
     duration = float(meta["durationSec"])
     ordered = validate_ranges(ranges, duration)
-    src_mp4 = meta_path.with_suffix(".mp4")
+    src_mp4 = video or meta_path.with_suffix(".mp4")
     folder = meta_path.parent
-    ids = _free_piece_ids(meta_path, len(ordered))
+    ids = _free_piece_ids(meta_path, len(ordered), src_mp4.parent)
     parent_uid = meta.get(UID_KEY) or new_clip_uid()
     uids = piece_uids(parent_uid, collect_uids(folder, folder / ARCHIVE_DIRNAME), len(ordered))
 
@@ -124,7 +126,7 @@ def split_clip(
         for piece_id, piece_uid, (start, end) in zip(ids, uids, ordered):
             end = min(end, duration)
             piece_meta_path = folder / f"{piece_id}.json"
-            piece_mp4 = piece_meta_path.with_suffix(".mp4")
+            piece_mp4 = src_mp4.parent / f"{piece_id}.mp4"
             created.append(piece_mp4)
             cmd = [
                 str(ffmpeg_path), "-hide_banner", "-v", "error", "-y",
@@ -156,7 +158,7 @@ def split_clip(
             piece_meta_path.write_text(json.dumps(piece, ensure_ascii=False, indent=2), encoding="utf-8")
         if not meta.get(UID_KEY):
             write_json_atomic(meta_path, meta | {UID_KEY: parent_uid})
-        delete_clip(meta_path, mode=delete_mode, archive_dir=archive_dir)
+        delete_clip(meta_path, mode=delete_mode, archive_dir=archive_dir, video=src_mp4)
     except BaseException:
         for f in created:
             f.unlink(missing_ok=True)

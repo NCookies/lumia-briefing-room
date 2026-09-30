@@ -10,10 +10,12 @@ from lumia_briefing_room.pipeline.clip_from_full import save_candidate_clip
 from lumia_briefing_room.pipeline.game_files import game_dir, update_game
 
 
-def clips_dir_for(game: dict, cfg: Config) -> Path:
-    """영상 파일 게임에서 저장한 클립은 스팀 클립과 섞이지 않게 영상 클립 폴더에 둔다."""
+def clip_dirs_for(game: dict, cfg: Config) -> tuple[Path, Path]:
+    """(정보 폴더, 새 영상이 놓일 폴더). 영상 파일 게임에서 저장한 클립은 스팀 클립과 섞이지 않게 영상 클립 자리에 둔다."""
     resolved = resolve_paths(cfg.paths)
-    return resolved.vod_clips if game.get("source") == "vod" else resolved.clips
+    if game.get("source") == "vod":
+        return resolved.library_vod, resolved.clips_vod
+    return resolved.library_steam, resolved.clips_steam
 
 
 def save_and_mark(games_dir: Path, key: str, game: dict, cand: dict, *, cfg: Config, ffmpeg_path: Path) -> str:
@@ -23,10 +25,10 @@ def save_and_mark(games_dir: Path, key: str, game: dict, cand: dict, *, cfg: Con
     if existing and not gcand.range_changed(cand, duration):
         return existing
     used = gcand.effective_range(cand, duration)
-    target = clips_dir_for(game, cfg)
+    meta_dir, video_dir = clip_dirs_for(game, cfg)
     clip_id = save_candidate_clip(
-        game, cand, game_folder=game_dir(games_dir, key), clips_dir=target, cfg=cfg, ffmpeg_path=ffmpeg_path,
-        thumbnails_root=target / ".thumbs" if game.get("source") == "vod" else None, replace_clip_id=existing,
+        game, cand, game_folder=game_dir(games_dir, key), clips_dir=meta_dir, cfg=cfg, ffmpeg_path=ffmpeg_path,
+        replace_clip_id=existing, video_dir=video_dir, video_roots=resolve_paths(cfg.paths).clip_roots,
     )
 
     def mark(data: dict) -> None:

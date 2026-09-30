@@ -3,7 +3,6 @@ import json
 import pytest
 
 from lumia_briefing_room.pipeline.library_migrate import (
-    MigrationBlocked,
     MigrationConflict,
     migrate_library,
     undo_migration,
@@ -87,19 +86,19 @@ def test_identical_file_already_at_destination_is_accepted(tmp_path):
     assert (lib / ".thumbs" / "a.jpg").read_bytes() == b"jpg"
 
 
-def test_non_empty_legacy_trash_blocks_migration(tmp_path):
+def test_legacy_trash_is_left_untouched_and_does_not_block(tmp_path):
     old, lib = _make_old(tmp_path / "old"), tmp_path / "lib"
     (old / ".trash").mkdir()
     (old / ".trash" / "x.json").write_text("{}", encoding="utf-8")
-    with pytest.raises(MigrationBlocked):
-        migrate_library(old, lib)
-    assert (old / "a.json").exists()
+    assert migrate_library(old, lib) == 4
+    assert (old / ".trash" / "x.json").exists() and not (lib / "x.json").exists()
 
 
-def test_empty_legacy_trash_does_not_block(tmp_path):
+def test_empty_legacy_trash_folder_is_removed(tmp_path):
     old, lib = _make_old(tmp_path / "old"), tmp_path / "lib"
     (old / ".trash").mkdir()
-    assert migrate_library(old, lib) == 4
+    migrate_library(old, lib)
+    assert not (old / ".trash").exists()
 
 
 def test_non_empty_staging_is_left_alone(tmp_path):

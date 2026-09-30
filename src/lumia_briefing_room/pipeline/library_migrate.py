@@ -1,6 +1,6 @@
 """옛 클립 폴더에 섞여 있던 앱 전용 정보 파일을 앱 데이터의 library 폴더로 옮긴다. (plan-fullvideo.md §3.10a)
 
-영상(mp4)·`.proxy`·`.trash` 는 건드리지 않는다. 한 파일씩 임시 이름으로 복사 → 크기 확인 → `os.replace` →
+영상(mp4)·`.proxy`·`.trash`(옛 휴지통 - 복원하면 정보 파일이 옛 자리로 돌아오니 그때 다시 돌린다)는 건드리지 않는다. 한 파일씩 임시 이름으로 복사 → 크기 확인 → `os.replace` →
 원본 삭제 → 기록 순이라 중간에 꺼져도 깨지지 않고, 다시 돌리면 이어서 한다.
 """
 
@@ -20,10 +20,6 @@ STAGING_DIRNAME = ".staging"
 
 class MigrationConflict(Exception):
     """목적지에 내용이 다른 같은 이름의 파일이 있다. 아무것도 옮기지 않는다."""
-
-
-class MigrationBlocked(Exception):
-    """옛 휴지통에 클립이 남아 있다. 그 절차(legacy_trash)가 먼저 끝나야 한다."""
 
 
 def _same_content(a: Path, b: Path) -> bool:
@@ -81,9 +77,6 @@ def migrate_library(old: Path, lib: Path, *, on_file: Callable[[Path, Path], Non
     """옮긴 파일 수. 충돌이 하나라도 있으면 아무것도 옮기기 전에 `MigrationConflict`."""
     if not old.is_dir():
         return 0
-    trash = old / TRASH_DIRNAME
-    if trash.is_dir() and any(p.is_file() for p in trash.rglob("*")):
-        raise MigrationBlocked(str(trash))
     pairs = _pairs(old, lib)
     for src, dst in pairs:
         if dst.exists() and not _same_content(src, dst):
@@ -103,7 +96,7 @@ def migrate_library(old: Path, lib: Path, *, on_file: Callable[[Path, Path], Non
     for name in INFO_DIRS:
         _remove_empty_tree(old / name)
     _remove_empty_tree(old / STAGING_DIRNAME)
-    _remove_empty_tree(trash)
+    _remove_empty_tree(old / TRASH_DIRNAME)
     return moved
 
 

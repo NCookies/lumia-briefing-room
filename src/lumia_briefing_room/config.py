@@ -46,8 +46,6 @@ def discover_ffmpeg() -> Path | None:
 class PathsConfig:
     temp: Path | None = None
     clips: Path | None = None
-    thumbnails: Path | None = None
-    proxies: Path | None = None
     export_default: Path | None = None
     steam_recording: Path | None = None
     vod_clips: Path | None = None
@@ -61,8 +59,6 @@ class PathsConfig:
 class ResolvedPaths:
     temp: Path
     clips: Path
-    thumbnails: Path
-    proxies: Path
     export_default: Path
     vod_clips: Path
     games: Path
@@ -78,7 +74,13 @@ class ResolvedPaths:
     staging_games: Path
     staging_library_steam: Path
     staging_library_vod: Path
+    staging_vod_clips: Path
     proxy_cache: Path
+
+    @property
+    def games_dirs(self) -> tuple[Path, ...]:
+        """풀영상 폴더 전부(스팀·영상 파일). 옛 경로 모드에선 같은 폴더라 하나."""
+        return tuple(dict.fromkeys((self.games_steam, self.games_vod)))
 
 
 def _default_local_appdata() -> Path:
@@ -138,8 +140,6 @@ def resolve_paths(cfg: PathsConfig) -> ResolvedPaths:
         proxy_cache = root / ".cache" / "proxy"
         return ResolvedPaths(
             clips=clips_steam,
-            thumbnails=library / "steam" / ".thumbs",
-            proxies=proxy_cache,
             vod_clips=clips_vod,
             games=full / STEAM_FOLDER,
             clips_steam=clips_steam,
@@ -149,6 +149,7 @@ def resolve_paths(cfg: PathsConfig) -> ResolvedPaths:
             games_steam=full / STEAM_FOLDER,
             games_vod=full / VOD_FOLDER,
             staging_clips=root / STAGING_FOLDER,
+            staging_vod_clips=root / STAGING_FOLDER,
             staging_games=full / STAGING_FOLDER,
             proxy_cache=proxy_cache,
             **common,
@@ -158,8 +159,6 @@ def resolve_paths(cfg: PathsConfig) -> ResolvedPaths:
     games = cfg.games or (clips.parent / "games")
     return ResolvedPaths(
         clips=clips,
-        thumbnails=cfg.thumbnails or (clips / ".thumbs"),
-        proxies=cfg.proxies or (clips / ".proxy"),
         vod_clips=vod_clips,
         games=games,
         clips_steam=clips,
@@ -169,6 +168,7 @@ def resolve_paths(cfg: PathsConfig) -> ResolvedPaths:
         games_steam=games,
         games_vod=games,
         staging_clips=clips / STAGING_FOLDER,
+        staging_vod_clips=vod_clips / STAGING_FOLDER,
         staging_games=games / STAGING_FOLDER,
         proxy_cache=clips / ".proxy",
         **common,

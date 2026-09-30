@@ -23,15 +23,6 @@ def _window(minutes: float = 12) -> GameWindow:
     )
 
 
-def test_staging_config_never_writes_thumbnails_outside_the_staging_folder(tmp_path: Path):
-    cfg = Config(paths=PathsConfig(clips=tmp_path / "real", thumbnails=tmp_path / "elsewhere"))
-
-    staged = rt.staging_config(cfg)
-
-    assert staged.paths.thumbnails is None
-    assert cfg.paths.thumbnails == tmp_path / "elsewhere", "원본 설정은 건드리지 않는다"
-
-
 def test_states_from_deleted_segments_are_dropped():
     """캐시에는 링버퍼가 이미 지운 구간의 판독이 남아 있을 수 있다 — 살아 있는 세그먼트만 경계 계산에 쓴다."""
     def st(t):
@@ -61,7 +52,7 @@ def _process(monkeypatch, behavior):
     monkeypatch.setattr(rt, "process_match", fake_process_match)
     monkeypatch.setattr(rt.RecordingSession, "load", classmethod(lambda cls, d: f"session:{d.name}"))
     monkeypatch.setattr(rt, "learn_nickname", lambda config_path, nickname: None)
-    cfg = Config(paths=PathsConfig(clips=Path("REAL"), thumbnails=Path("ELSEWHERE")))
+    cfg = Config(paths=PathsConfig(clips=Path("REAL")))
     process = rt.make_process_window(
         cfg, Path("ffmpeg"), game_mode="battle_royale", k_templates=None, a_templates=None,
         hwaccel=None, config_path=None,
@@ -81,7 +72,6 @@ def test_process_window_writes_into_the_staging_folder_with_the_window_bounds(mo
     assert (calls["start"], calls["end"]) == (window.hud_start_utc, window.end_utc)
     assert calls["result_search_from"] == window.hud_end_utc
     assert calls["clips_dir"] == tmp_path / "stage"
-    assert calls["cfg"].paths.thumbnails is None
     assert calls["cancel"] is cancel
 
 

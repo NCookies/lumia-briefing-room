@@ -61,11 +61,6 @@ def session_video_seconds(session_dir: Path) -> float:
     return count * seg_sec
 
 
-def staging_config(cfg: Config) -> Config:
-    """스테이징에 만든 썸네일이 실제 클립 폴더로 새어 나가지 않게, 썸네일 위치 오버라이드를 끈다."""
-    return dataclasses.replace(cfg, paths=dataclasses.replace(cfg.paths, thumbnails=None))
-
-
 def alive_states(states: list[FrameState], *, first_segment: int, seg_sec: float) -> list[FrameState]:
     """링버퍼가 이미 지운 구간의 캐시된 판독을 버린다. 그 구간의 경기는 클립을 만들 수 없다."""
     oldest = (first_segment - 1) * seg_sec
@@ -140,7 +135,6 @@ def make_process_window(
 ) -> Callable[[Path, GameWindow, Path, threading.Event | None, Callable[[float], None] | None], list[Path]]:
     """`legacy_game` 은 이 구간에서 시작한 옛 게임(이전 버전에서 클립만 만든 게임)의 기록을 돌려준다(없으면 None). 있으면 그 클립은 다시
     만들지 않고, 새 후보에 겹치는 옛 클립을 이어 붙인 뒤 옛 게임 기록을 대체 표시한다."""
-    staged = staging_config(cfg)
 
     def process(
         session_dir: Path, window: GameWindow, staging: Path, cancel: threading.Event | None,
@@ -150,7 +144,7 @@ def make_process_window(
         legacy = legacy_game(window) if legacy_game is not None else None
         try:
             written = process_match(
-                session, window.start_utc, window.end_utc, staged,
+                session, window.start_utc, window.end_utc, cfg,
                 ffmpeg_path=ffmpeg_path, game_mode=game_mode,
                 k_templates=k_templates, a_templates=a_templates, hwaccel=hwaccel,
                 clips_dir=staging, cancel=cancel, result_search_from=window.hud_end_utc,

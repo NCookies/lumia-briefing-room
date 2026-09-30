@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -41,11 +41,20 @@ def _parse_utc(text) -> datetime | None:
         return None
 
 
-def _entries(games_dir: Path) -> list[dict]:
-    try:
-        folders = sorted(p for p in games_dir.iterdir() if p.is_dir())
-    except OSError:
-        return []
+GamesDirs = Path | Sequence[Path]
+
+
+def _as_dirs(games_dirs: GamesDirs) -> list[Path]:
+    return [games_dirs] if isinstance(games_dirs, Path) else list(games_dirs)
+
+
+def _entries(games_dirs: GamesDirs) -> list[dict]:
+    folders: list[Path] = []
+    for games_dir in _as_dirs(games_dirs):
+        try:
+            folders += sorted(p for p in games_dir.iterdir() if p.is_dir())
+        except OSError:
+            continue
     entries = []
     for folder in folders:
         video = folder / FULL_VIDEO
@@ -74,7 +83,7 @@ def _entries(games_dir: Path) -> list[dict]:
     return entries
 
 
-def plan_game_cleanup(games_dir: Path, cfg: RetentionConfig, *, now: datetime | None = None) -> GameCleanupPlan:
+def plan_game_cleanup(games_dir: GamesDirs, cfg: RetentionConfig, *, now: datetime | None = None) -> GameCleanupPlan:
     now = now or datetime.now(timezone.utc)
     if not cfg.auto_clean_enabled:
         return GameCleanupPlan([], 0)
@@ -83,7 +92,7 @@ def plan_game_cleanup(games_dir: Path, cfg: RetentionConfig, *, now: datetime | 
     return GameCleanupPlan([e["_path"] for e in selected], sum(e["_size_bytes"] for e in selected), preserve)
 
 
-def game_cleanup_preview(games_dir: Path, cfg: RetentionConfig, *, now: datetime | None = None) -> dict[str, dict]:
+def game_cleanup_preview(games_dir: GamesDirs, cfg: RetentionConfig, *, now: datetime | None = None) -> dict[str, dict]:
     """다음 자동 정리 때 풀영상이 지워질 게임의 이유·예정 시각(경기 키 기준). 실제 정리와 같은 선정 함수를 쓴다."""
     now = now or datetime.now(timezone.utc)
     if not cfg.auto_clean_enabled:
@@ -122,7 +131,7 @@ def delete_full_video(folder: Path, *, mode: str) -> None:
 
 
 def run_game_cleanup(
-    games_dir: Path, cfg: RetentionConfig, *, now: datetime | None = None, preserve: Callable[[Path], bool] | None = None
+    games_dir: GamesDirs, cfg: RetentionConfig, *, now: datetime | None = None, preserve: Callable[[Path], bool] | None = None
 ) -> GameCleanupPlan:
     """`preserve(폴더)` 는 지우기 직전 남길 클립을 저장하고 성공 여부를 돌려준다. 보존이 켜졌는데 `preserve` 가
     없거나 실패하면 그 풀영상은 지우지 않는다."""

@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from lumia_briefing_room.api.app import create_app
-from lumia_briefing_room.config import Config, PathsConfig
+from lumia_briefing_room.config import Config, PathsConfig, resolve_paths
 
 
 def _write_clip(clips_dir: Path, clip_id: str, *, video: bytes = b"fake video bytes 0123456789", **meta_overrides):
@@ -29,7 +29,10 @@ def client(tmp_path):
     cfg = Config(paths=PathsConfig(clips=clips_dir, vod_clips=tmp_path / "vod", temp=tmp_path / "tmp"))
     config_path = tmp_path / "config.json"
     app = create_app(cfg, config_path=config_path)
-    app.state.clips_dir_for_test = clips_dir  # 테스트 편의
+    resolved = resolve_paths(cfg.paths)
+    app.state.clips_dir_for_test = resolved.library_steam  # 테스트 편의: 클립 정보(library) 폴더, 영상은 그 옆에 둬도 찾는다
+    app.state.video_dir_for_test = resolved.clips_steam
+    app.state.games_dir_for_test = resolved.games_steam
     return TestClient(app)
 
 
@@ -449,7 +452,7 @@ def _enable_cleanup(client, **retention):
 def _write_game(client, key, *, start, size=100, pinned=False):
     import json
 
-    games = client.app.state.clips_dir_for_test.parent / "games"
+    games = client.app.state.games_dir_for_test
     folder = games / key
     folder.mkdir(parents=True)
     (folder / "full.mp4").write_bytes(b"x" * size)
@@ -870,20 +873,21 @@ def test_legacy_trash_status_is_zero_when_nothing_is_left(client):
 
 def test_legacy_trash_migrate_restore_moves_clips_back_to_the_list(client):
     clips_dir = client.app.state.clips_dir_for_test
-    _write_clip(clips_dir / ".trash", "a")
+    old_dir = client.app.state.video_dir_for_test
+    _write_clip(old_dir / ".trash", "a")
 
     resp = client.post("/api/legacy-trash/migrate", json={"action": "restore"})
 
     assert resp.json() == {"migrated": 1}
-    assert (clips_dir / "a.json").exists()
+    assert (clips_dir / "a.json").exists(), "복원한 정보 파일은 앱 데이터 library 로 옮겨진다"
+    assert (old_dir / "a.mp4").exists()
     assert client.get("/api/legacy-trash").json() == {"count": 0}
 
 
 def test_legacy_trash_migrate_recycle_sends_clips_to_the_recycle_bin(client, monkeypatch):
     from lumia_briefing_room.pipeline import delete_helper
 
-    clips_dir = client.app.state.clips_dir_for_test
-    _write_clip(clips_dir / ".trash", "a")
+    _write_clip(client.app.state.video_dir_for_test / ".trash", "a")
     sent = []
     monkeypatch.setattr(delete_helper, "_send2trash", lambda path: sent.append(Path(path).name))
 

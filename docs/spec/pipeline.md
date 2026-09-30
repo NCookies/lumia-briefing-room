@@ -43,7 +43,7 @@ Player.log 폴링 ─ 경기 경계(GAME→LOBBY) ─▶ 녹화 세션 결정(�
 - 코발트: 프리롤·포스트롤 없이 구간 그대로.
 - `clip.mergeGapSec(10)` 보다 가까운 범위는 병합. **길이 상한 없음**(90초 상한이 126초 교전의 추격 장면을 잘라 2026-09-24 폐지).
 - 컷은 필요한 세그먼트만 병합해 `ffmpeg -c copy`. 3초 키프레임 격자에 붙어 앞뒤로 최대 3초 늘어나고, 메타데이터에는 실제 경계를 남긴다.
-- 썸네일: 클립 길이의 35% 지점, 폭 480 JPEG, `<clips>/.thumbs/`.
+- 썸네일: 클립 길이의 35% 지점, 폭 480 JPEG, `library\steam\.thumbs\`(클립 정보 폴더).
 - 모든 subprocess 는 `procs.py` 도우미로 부른다(콘솔 창 숨김, 낮은 우선순위, 앱 종료 시 작업 개체로 함께 종료).
 
 ## 5. 생성 필터 (`pipeline/filters.py`)
@@ -67,14 +67,14 @@ Player.log 폴링 ─ 경기 경계(GAME→LOBBY) ─▶ 녹화 세션 결정(�
 
 ## 7. 다시 분석 (`pipeline/reprocess.py`, `POST /api/games/reprocess`)
 
-- 원본 존재와 종료 시각(`matchEndUtc` 또는 로그)을 확인한 뒤 새 클립을 **스테이징 폴더(`.staging/<uuid>`)에 만들고, 성공해야** 기존 클립을 설정 삭제 방식으로 지우고 옮긴다. 새로 만든 게 0개면 기존을 보존하고 오류. (파일명이 결정적이라 기존을 먼저 지우면 충돌한다.)
+- 원본 존재와 종료 시각(`matchEndUtc` 또는 로그)을 확인한 뒤 새 클립을 **스테이징 폴더(`<작업 폴더>/<uuid>` — 영상이 놓일 드라이브의 `.staging`, 정보와 영상이 함께 만들어진다)에 만들고, 성공해야** 기존 클립을 설정 삭제 방식으로 지우고 옮긴다. 새로 만든 게 0개면 기존을 보존하고 오류. (파일명이 결정적이라 기존을 먼저 지우면 충돌한다.)
 - 라벨 이관(`pipeline/label_migrate.py`): 같은 세션에서 3초 이상 겹치는 옛 클립 중 하나라도 pvp 면 pvp, 섞이면 pvp + `labelConflict`. 사용자가 새 클립에 직접 찍은 라벨은 덮어쓰지 않는다. 이관이 실패해도 새 클립은 유지.
 - 수동 보정 잠금(`matchResultSource="manual"`)은 새 클립에 그대로 옮긴다.
 - 한 번에 하나(`409`). 진행 중엔 `activity.py` 레지스트리(`kind="reprocess"`)에 올라 공통 활동 배너에 보인다.
 
 ## 8. 클립 메타데이터
 
-클립 하나 = `<id>.json` + `<id>.mp4` + `.thumbs/<id>.jpg`. 클립 ID = 파일 이름(`20260920_134809_03` = 경기 시작 시각 + 번호, VOD 는 `vod_<vodId>_g<게임>_<시작초>`, 분할 조각 `<원본>-pN`).
+클립 하나 = 정보 `<id>.json` + `.thumbs/<id>.jpg`(앱 데이터 `library\steam`·`libraryod`) + 영상 `<id>.mp4`(저장 폴더의 클립 영상 자리, 하위 폴더 어디든 - 파일 이름 줄기로 찾는다, `pipeline/clip_files.py`). 정보 폴더와 영상 폴더가 같은 작업 폴더·옛 테스트 구조에서는 정보 파일 옆 영상을 먼저 찾는다. 클립 ID = 파일 이름(`ClipSummary.video` 가 영상 경로)(`20260920_134809_03` = 경기 시작 시각 + 번호, VOD 는 `vod_<vodId>_g<게임>_<시작초>`, 분할 조각 `<원본>-pN`).
 
 ```json
 {
@@ -99,7 +99,7 @@ Player.log 폴링 ─ 경기 경계(GAME→LOBBY) ─▶ 녹화 세션 결정(�
 ```
 
 - `sessionDir` + `segmentStart/End` 가 있어야 원본을 다시 찾는다.
-- `thumbnailPath`·`imagePath`·초상화 경로는 **클립 폴더 기준 상대경로**(`pipeline/clip_assets.py` 가 메타 위치 기준으로 찾고, 옛 절대경로도 그 폴더의 `.thumbs` 에서 파일명으로 찾는다) → 폴더를 옮겨도 안 깨진다.
+- `thumbnailPath`·`imagePath`·초상화 경로는 **클립 정보 폴더(library) 기준 상대경로**(`pipeline/clip_assets.py` 가 메타 위치 기준으로 찾고, 옛 절대경로도 그 폴더의 `.thumbs` 에서 파일명으로 찾는다) → 폴더를 옮겨도 안 깨진다.
 - `myCharacter`/`teamCharacters` 는 캐릭터 OCR 폐기 후 항상 `null`/`[]`(옛 클립·전송 계약 호환용으로만 남김). 코발트는 초상화 경로가 비어 있다.
 - `gameDay`/`dayNight` 와 `cobaltPhase` 는 모드별로 한쪽만 채워진다.
 - `deletedAt` 은 없다(앱 휴지통 폐지).
@@ -120,13 +120,13 @@ Player.log 폴링 ─ 경기 경계(GAME→LOBBY) ─▶ 녹화 세션 결정(�
 ## 9. 삭제·보관·자동 정리
 
 - **삭제는 한 번에 끝난다**: Windows 휴지통(`Send2Trash`, pywin32 없이 동작) 또는 영구 삭제. 앱 자체 휴지통·유예 기간·복구 버튼은 없다(2026-09-28). 모든 삭제 경로(수동·게임 단위·자동 정리·다시 분석·분할 원본·VOD)가 `pipeline/delete_helper.py` 를 거친다. 휴지통을 못 쓰는 드라이브는 앱이 따로 처리하지 않는다.
-- 옛 버전의 `clips/.trash` 는 첫 실행에 `pipeline/legacy_trash.py` 가 복구/Windows 휴지통/나중에 로 묻는다(비면 더 안 묻는다).
-- **라벨 보관소**: 지우기 직전(방식 무관) `userLabel` 이 있는 클립은 경로 필드를 뺀 메타 사본을 `clips/.labels/<id>.json` 에 남긴다. 평가·전송의 자료다. `scan_clips` 는 하위 폴더를 안 보므로 목록에 안 뜬다.
-- **게임 기록**(`pipeline/game_records.py`, `retention.keepGameRecords` 기본 켬): 클립이 다 지워져도 경기 요약(순위·모드·TK/K/A·결과표 이미지)을 `clips/.games/<경기키>.json` 에 남겨 "클립 삭제됨" 게임 행으로 보인다. 결과표를 못 읽은 경기는 요약하지 않는다. 기록만 지우려면 `DELETE /api/games/records/{id}`.
+- 옛 버전의 `<클립 영상 폴더>/.trash` 는 첫 실행에 `pipeline/legacy_trash.py` 가 복구/Windows 휴지통/나중에 로 묻는다(비면 더 안 묻는다).
+- **라벨 보관소**: 지우기 직전(방식 무관) `userLabel` 이 있는 클립은 경로 필드를 뺀 메타 사본을 `library\steam\.labels\<id>.json` 에 남긴다(영상 파일 클립은 `libraryod`). 평가·전송의 자료다. `scan_clips` 는 하위 폴더를 안 보므로 목록에 안 뜬다.
+- **게임 기록**(`pipeline/game_records.py`, `retention.keepGameRecords` 기본 켬): 클립이 다 지워져도 경기 요약(순위·모드·TK/K/A·결과표 이미지)을 `library\steam\.games\<경기키>.json` 에 남겨 "클립 삭제됨" 게임 행으로 보인다. 결과표를 못 읽은 경기는 요약하지 않는다. 기록만 지우려면 `DELETE /api/games/records/{id}`.
 - **자동 정리**(`pipeline/game_cleanup.py`, 스팀 게임): 1시간마다 설정을 다시 읽어 **풀영상(`games/<경기키>/full.mp4`)** 에 나이(`matchStartUtc` 기준)·총 용량·개수 한도를 오래된 것부터 적용한다(선정 규칙은 `retention.select_for_auto_clean` 공용). **저장한 클립은 대상이 아니다.** 풀영상만 지우고 `game.json`(후보·마커·결과)과 결과·초상화 이미지는 남기며 `fullVideo:null`·`fullVideoDeletedAt` 을 기록한다. 고정(`game.json` 의 `pinned`)·보호 태그(후보 태그 합집합)는 제외. 방식 기본은 **영구 삭제**. 기본값은 자동 정리 **켬 + 총 용량 40GB**(새 설치만 — 저장된 설정은 그대로). **삭제 직전 보존**(`retention.preserveBeforeDelete`, 기본 꺼짐, `pipeline/preserve_before_delete.py`): 켜면 지우기 직전 그 게임의 확실한(`certain`) 후보 중 무시하지 않았고 아직 저장 안 된 것을 게임 API 와 같은 `game_clip_save.save_and_mark` 로 클립 저장하고 `savedClipId` 를 남긴다(영상 게임은 영상 클립 폴더). **하나라도 실패하면 그 풀영상은 지우지 않고**(`GameCleanupPlan.held_back`) 다음 정리 때 다시 시도하며, 보존이 켜졌는데 보존 함수가 없어도 지우지 않는다. 미리보기 항목의 `preserveCount`·dry-run 의 `preserveClips` 는 남길 클립 수. `POST /api/cleanup {dryRun}` 로 미리보기·즉시 실행(`preserveClips`·`heldBack` 도 돌려준다). 옛 클립 정리 함수(`cleanup.py::run_cleanup` 등)는 F5 까지 코드에 남아 있으나 아무도 부르지 않는다.
 - **삭제 예정 미리 계산**(`pipeline/cleanup_registry.py`): 게임 기록 생성·정리 실행·설정 변경·앱 시작 때 `notify_clips_changed()` → 1.5초 디바운스로 실제 정리와 **같은 함수**로 재계산해 메모리에 캐시, `GET /api/cleanup/preview` 는 읽기만 한다. **키는 경기 키**(`YYYYMMDD_HHMMSS`)이고 나이 기준은 예정 시각을 같이 준다. 옛 클립 카드의 "삭제 예정" 배지는 이 키와 맞지 않아 더 뜨지 않는다(새 게임 목록이 대신한다, F4).
-- **클립 폴더 이동**(`pipeline/move_clips.py`, `POST /api/clips-dir/move`, 202 + 진행률): mp4·json·썸네일·`.proxy`·`.games`·`.labels` 를 옮긴 뒤 설정을 바꾼다. 같은 이름 파일이 있거나 폴더가 겹치면 409 로 아무것도 안 옮긴다.
-- **정보 파일 이전**(`pipeline/library_migrate.py`, `cli/library_migrate.py`): 옛 클립 폴더의 `*.json`·`.thumbs`·`.labels`·`.games`·`.vods` 를 앱 데이터 `library\{steam,vod}` 로 옮긴다(영상·`.proxy` 제외). 파일마다 임시 복사 → 크기 확인 → `os.replace` → 원본 삭제 → `migration.jsonl` 기록이라 두 번 돌려도 같고 중간에 꺼져도 이어 한다. 내용이 다른 같은 이름이 있으면 `MigrationConflict` 로 아무것도 안 옮기고, 옛 `.trash` 에 파일이 있으면 `MigrationBlocked`. 비지 않은 `.staging` 은 그대로 둔다(중간 작업물이라 지우지 않는다). `undo_migration` 이 기록을 거꾸로 돌리되 원래 자리에 다른 파일이 생겼으면 거부한다. 앱 시작에 연결하는 것과 읽는 코드의 전환은 아직이다.
+- **클립 폴더 이동**(`pipeline/move_clips.py`, `POST /api/clips-dir/move`, 202 + 진행률): 영상 파일(하위 폴더 구조 그대로)과 재생용 변환 영상 `.proxy` 만 옮긴 뒤 설정을 바꾼다(정보는 앱 데이터 library 라 따라 옮기지 않는다). 같은 이름 파일이 있거나 폴더가 겹치면 409 로 아무것도 안 옮긴다.
+- **정보 파일 이전**(`pipeline/library_migrate.py`, `cli/library_migrate.py`): 옛 클립 폴더의 `*.json`·`.thumbs`·`.labels`·`.games`·`.vods` 를 앱 데이터 `library\{steam,vod}` 로 옮긴다(영상·`.proxy` 제외). 파일마다 임시 복사 → 크기 확인 → `os.replace` → 원본 삭제 → `migration.jsonl` 기록이라 두 번 돌려도 같고 중간에 꺼져도 이어 한다. 내용이 다른 같은 이름이 있으면 `MigrationConflict` 로 아무것도 안 옮기고, 옛 `.trash`(옛 휴지통)는 건드리지 않는다 - 복원하면 정보 파일이 옛 자리로 돌아오므로 그 API 끝에서 다시 옮긴다. 비지 않은 `.staging` 은 그대로 둔다(중간 작업물이라 지우지 않는다). `undo_migration` 이 기록을 거꾸로 돌리되 원래 자리에 다른 파일이 생겼으면 거부한다. `create_app` 이 시작할 때 `library_startup.migrate_legacy_layout` 으로 옛 경로 모드의 두 폴더(스팀·영상 파일)를 옮기고, 실패하면 알림(`library_migration_failed`)을 올린다(앱은 켜진다). 읽는 코드는 전부 library(정보)와 영상 자리를 따로 본다.
 
 ## 10. 트레이 앱 (`cli/app.py`)
 
@@ -138,7 +138,7 @@ Player.log 폴링 ─ 경기 경계(GAME→LOBBY) ─▶ 녹화 세션 결정(�
 
 ## 11. 게임 폴더·풀영상 (`pipeline/game_store.py`, `full_video.py`)
 
-게임 하나 = `paths.games\<경기키>\`(경기키 = 게임 시작 시각 `YYYYMMDD_HHMMSS`, 클립 ID 앞부분과 같다).
+게임 하나 = 풀영상 폴더(`games_steam`·`games_vod`, 옛 경로 모드는 `paths.games` 하나)의 `<경기키>\`(경기키 = 게임 시작 시각 `YYYYMMDD_HHMMSS`, 클립 ID 앞부분과 같다).
 
 ```
 full.mp4      게임 전체(-c copy, 원본 화질, 4GB/24분 실측)
@@ -155,7 +155,7 @@ result.jpg / portrait_{me,teammate1,teammate2}.jpg   클립 쪽 썸네일 폴더
 
 ### 이전 버전 게임 통합 (`pipeline/legacy_games.py`)
 
-풀영상 전환 전에 만든 클립(`clips/*.json`)과 게임 기록(`clips/.games/*.json`)을 `games/<경기키>/game.json` 으로 옮긴다. 경기키는 `matchStartUtc` 로 만든다.
+풀영상 전환 전에 만든 클립 정보(`library\steam\*.json`)와 게임 기록(`library\steam\.games\*.json`)을 `games/<경기키>/game.json` 으로 옮긴다. 경기키는 `matchStartUtc` 로 만든다.
 
 - **언제**: 앱을 켠 뒤 `GET /api/games` 를 처음 부를 때(클립·게임 폴더 경로 조합마다 한 번). 시작 시 자동보다 옵션에서 경로를 바꾼 뒤에도 따라가고, 서버가 뜨는 동안 파일을 건드리지 않아서 이쪽이 안전하다. 몇 번 돌려도 같다.
 - 한 게임(`sessionDir`+`matchStartUtc`)의 클립들 → 후보(저장됨, `user.savedClipId` = 클립 ID, 태그·점수·제목 그대로). 후보 시각은 세션 기준 오프셋에서 게임 시작을 뺀 값(풀영상이 없어 표시용). 결과·초상화·결과표 이미지는 게임 폴더로 복사한다(`result.jpg`, `portrait_*.jpg`).

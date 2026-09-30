@@ -18,7 +18,7 @@ def disk_report(cfg: Config) -> dict:
         return {"available": False, "recommendedGb": list(RECOMMENDED_GB)}
     return {
         "available": True,
-        "path": str(resolve_paths(cfg.paths).games),
+        "path": str(resolve_paths(cfg.paths).games_steam),
         "freeBytes": status.free_bytes,
         "freeGb": round(status.free_bytes / GB, 1),
         "expectedGameBytes": status.expected_bytes,

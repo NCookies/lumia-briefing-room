@@ -84,10 +84,13 @@ def register_vod_routes(
     job: dict = {}
 
     def root() -> Path:
-        return resolve_paths(current_config().paths).vod_clips
+        return resolve_paths(current_config().paths).library_vod
+
+    def video_roots() -> tuple[Path, ...]:
+        return resolve_paths(current_config().paths).clip_roots
 
     def games_root() -> Path:
-        return resolve_paths(current_config().paths).games
+        return resolve_paths(current_config().paths).games_vod
 
     def file_id(path: Path) -> str | None:
         try:
@@ -126,7 +129,7 @@ def register_vod_routes(
 
     def clip_stats(directory: Path) -> dict[str, dict]:
         stats: dict[str, dict] = {}
-        for clip in scan_clips(directory):
+        for clip in scan_clips(directory, video_roots()):
             vid = clip.meta.get("vodId")
             if vid:
                 entry = stats.setdefault(vid, {"count": 0, "bytes": 0})
@@ -364,7 +367,7 @@ def register_vod_routes(
         return {"id": vid, "cancelling": True}
 
     def vod_clip_paths(directory: Path, vid: str) -> list:
-        return [c for c in scan_clips(directory) if c.meta.get("vodId") == vid]
+        return [c for c in scan_clips(directory, video_roots()) if c.meta.get("vodId") == vid]
 
     @app.delete("/api/vods/{vid}/clips")
     def delete_vod_clips(vid: str):
@@ -378,7 +381,7 @@ def register_vod_routes(
             archive_dir = archive_dir_for(base)
             mode = current_config().ui.delete_mode
             for clip in clips:
-                delete_clip(clip.meta_path, mode=mode, archive_dir=archive_dir)
+                delete_clip(clip.meta_path, mode=mode, archive_dir=archive_dir, video=clip.video)
             delete_vod_games(games_root(), vid, mode=mode)
             index = load_index(base, vid)
             if index is not None:
@@ -409,7 +412,7 @@ def register_vod_routes(
             archive_dir = archive_dir_for(base)
             mode = current_config().ui.delete_mode
             for clip in clips:
-                delete_clip(clip.meta_path, mode=mode, archive_dir=archive_dir)
+                delete_clip(clip.meta_path, mode=mode, archive_dir=archive_dir, video=clip.video)
             delete_vod_games(games_root(), vid, mode=mode)
             index_path(base, vid).unlink(missing_ok=True)
             cache_path(base, vid).unlink(missing_ok=True)
@@ -435,7 +438,7 @@ def register_vod_routes(
             archive_dir = archive_dir_for(base)
             mode = current_config().ui.delete_mode
             for clip in clips:
-                delete_clip(clip.meta_path, mode=mode, archive_dir=archive_dir)
+                delete_clip(clip.meta_path, mode=mode, archive_dir=archive_dir, video=clip.video)
             delete_vod_games(games_root(), vid, mode=mode, only_index=game_index)
             index["games"] = [g for g in games if g.get("index") != game_index]
             index["clips"] = [c for c in index.get("clips", []) if c not in clip_ids]

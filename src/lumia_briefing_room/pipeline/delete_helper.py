@@ -24,9 +24,9 @@ RECYCLE = "recycle"
 PERMANENT = "permanent"
 
 
-def clip_files(meta_path: Path, meta: dict, *, proxy: Path | None = None) -> list[Path]:
-    """클립 하나에 딸린, 실제로 존재하는 파일 전부(메타데이터·mp4·썸네일·재생용 프록시)."""
-    files = [meta_path, meta_path.with_suffix(".mp4")]
+def clip_files(meta_path: Path, meta: dict, *, proxy: Path | None = None, video: Path | None = None) -> list[Path]:
+    """클립 하나에 딸린, 실제로 존재하는 파일 전부(메타데이터·mp4·썸네일·재생용 프록시). 영상은 `video`(없으면 정보 파일 옆)."""
+    files = [meta_path, video or meta_path.with_suffix(".mp4")]
     thumb = resolve_thumbnail(meta_path, meta)
     if thumb is not None:
         files.append(thumb)
@@ -64,6 +64,7 @@ def delete_clip(
     archive_dir: Path | None = None,
     records_dir: Path | None = None,
     proxy: Path | None = None,
+    video: Path | None = None,
 ) -> None:
     """클립 하나를 지운다: 라벨 보관 → 게임 기록 → 실제 파일 삭제(휴지통 또는 영구) 순서.
 
@@ -74,7 +75,7 @@ def delete_clip(
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
     archive_if_labeled(meta_path, archive_dir)
     record_game(meta_path, records_dir)
-    files = clip_files(meta_path, meta, proxy=proxy)
+    files = clip_files(meta_path, meta, proxy=proxy, video=video)
     if mode == PERMANENT:
         permanently_delete(files)
     else:
