@@ -4,13 +4,26 @@ from __future__ import annotations
 
 import logging
 
-from lumia_briefing_room.config import Config, resolve_paths, uses_legacy_layout
+from pathlib import Path
+
+from lumia_briefing_room.config import Config, resolve_paths, save_config, suggested_root, uses_legacy_layout
 from lumia_briefing_room.pipeline.library_migrate import MigrationConflict, migrate_library
 from lumia_briefing_room.pipeline.notices import NoticeCenter, notices
 
 log = logging.getLogger(__name__)
 
 MIGRATION_FAILED = "library_migration_failed"
+
+
+def adopt_default_root(cfg: Config, config_path: Path | None) -> Config:
+    """새로 설치한 사용자(옛 경로 설정도 옛 기본 폴더도 없음)는 기본 저장 폴더 구조로 시작한다. 이미 쓰던 사용자는 그대로 둔다."""
+    root = suggested_root(cfg.paths)
+    if root is None:
+        return cfg
+    cfg.paths.root = root
+    if config_path is not None:
+        save_config(cfg, config_path)
+    return cfg
 
 
 def migrate_legacy_layout(cfg: Config, center: NoticeCenter = notices) -> int:

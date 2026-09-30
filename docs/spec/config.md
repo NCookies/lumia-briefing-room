@@ -9,7 +9,7 @@
 | 키 | 기본값 | 설명 |
 |---|---|---|
 | `paths.clips` | `%USERPROFILE%\Videos\LumiaBriefingRoom\clips` | 스팀 클립 **영상**이 놓이는 곳(옛 경로 모드). 하위 폴더까지 영상 파일 전부를 찾는다. 재생용 변환 영상은 그 안 `.proxy`, 작업 폴더는 `.staging`. 클립 **정보**(json·썸네일·라벨 보관소 `.labels`·게임 기록 `.games`)는 이 폴더가 아니라 앱 데이터 `%LOCALAPPDATA%\LumiaBriefingRoom\library\steam` 에 있다(시작할 때 옛 자리에서 옮긴다) |
-| `paths.root` | `null` | 저장 폴더 하나(새 구조). 있으면 `클립\{스팀 녹화,영상 파일}`(영상)·`풀영상\{스팀 녹화,영상 파일}` 으로 나눠 쓰고 `clips`·`vodClips`·`games` 는 무시한다. 재생용 변환 영상은 `<root>\.cache\proxy`, 영상 작업 폴더는 `<root>\.staging`. 설정 파일에 직접 적어야 한다(옵션 화면은 아직 없다) |
+| `paths.root` | `null` | 저장 폴더 하나(새 구조). 있으면 `클립\{스팀 녹화,영상 파일}`(영상)·`풀영상\{스팀 녹화,영상 파일}` 으로 나눠 쓰고 `clips`·`vodClips`·`games` 는 무시한다. 재생용 변환 영상은 `<root>\.cache\proxy`, 영상 작업 폴더는 `<root>\.staging`. 새로 설치한 사용자(옛 경로 설정도 옛 기본 폴더도 없음)는 앱이 시작할 때 기본값 `%USERPROFILE%\Videos\LumiaBriefingRoom` 을 넣는다(`adopt_default_root`). 이미 쓰던 사용자는 `POST /api/storage/migrate` 로 옮길 때 들어간다 |
 | `paths.fullVideos` | `null` | 풀영상 위치만 덮어쓰기(`root` 가 있을 때, 그 아래 `스팀 녹화`·`영상 파일`). 작업 폴더는 그 안 `.staging` |
 | `paths.games` | `<clips 의 상위>\games` | 풀영상·게임 기록 폴더(옛 경로 모드, 스팀·영상 파일 게임이 같은 폴더에 섞인다) `games\<경기키>\{full.mp4, game.json, 결과·초상화}` |
 | `paths.vodClips` | `…\LumiaBriefingRoomod` | 영상 파일 클립 **영상**(옛 경로 모드, 스팀과 섞지 않는다). 영상 색인·판독 캐시 `.vods` 와 클립 정보는 앱 데이터 `libraryod` |

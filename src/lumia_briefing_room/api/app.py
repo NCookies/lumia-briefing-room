@@ -32,6 +32,7 @@ from lumia_briefing_room.api.onboarding import register_onboarding_routes
 from lumia_briefing_room.api.app_info_routes import register_app_info_routes
 from lumia_briefing_room.api.telemetry_routes import register_telemetry_routes
 from lumia_briefing_room.api.update_routes import register_update_routes
+from lumia_briefing_room.api.storage_routes import register_storage_routes
 from lumia_briefing_room.api.vods import register_vod_routes
 from lumia_briefing_room.api.filters import ClipQuery, filter_clip_summaries, sort_clip_summaries
 from lumia_briefing_room.config import (
@@ -61,7 +62,7 @@ from lumia_briefing_room.pipeline.clip_assets import (
     resolve_thumbnail,
 )
 from lumia_briefing_room.pipeline.delete_helper import delete_clip
-from lumia_briefing_room.pipeline.library_startup import migrate_legacy_layout
+from lumia_briefing_room.pipeline.library_startup import adopt_default_root, migrate_legacy_layout
 from lumia_briefing_room.pipeline.legacy_trash import count_legacy_trash, recycle_legacy_trash, restore_legacy_trash
 from lumia_briefing_room.pipeline.move_clips import MoveError, execute_move, plan_move
 from lumia_briefing_room.pipeline.proxy import create_proxy, is_proxy_fresh, proxy_file, remove_orphan_proxies
@@ -166,6 +167,8 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     lock = threading.RLock()
     app.state.lock = lock
     app.state.request_count = 0
+    cfg = adopt_default_root(cfg, config_path)
+    app.state.config = cfg
     migrate_legacy_layout(cfg)
 
     @app.middleware("http")
@@ -775,6 +778,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     register_vod_routes(app, lock=lock, current_config=current_config, put_config=put_config)
     register_onboarding_routes(app, current_config=current_config, put_config=put_config)
     register_disk_routes(app, current_config=current_config)
+    register_storage_routes(app, lock=lock, current_config=current_config, put_config=put_config)
     register_game_routes(app, lock=lock, current_config=current_config)
     register_telemetry_routes(app)
     register_app_info_routes(app)

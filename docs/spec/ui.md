@@ -81,6 +81,7 @@
 | 클립 | `GET /api/clips`(`source`=steam 기본/vod, `vodId`, 태그·모드·라벨·`minPvpScore`·`q`…), `GET·PATCH·DELETE /api/clips/{id}`, `…/video`(**Range 필수** — 탐색바), `…/thumbnail`, `…/result-image`, `…/character-portrait/{me\|teammate1\|teammate2}`, `…/trim`, `…/split`, `…/export`, `…/proxy` |
 | 게임 | `GET /api/games/records`, `DELETE /api/games/records/{id}`, `…/result-image`, `POST /api/games/reprocess`, `GET /api/games/reprocess/{key}`, 풀영상 게임 API 는 [pipeline.md §11](pipeline.md) (`GET /api/games?source=steam\|vod\|all`, 기본 steam) |
 | 영상 파일 | `GET /api/vods`, `PATCH·DELETE /api/vods/{vid}`, `POST·GET /api/vods/{vid}/analyze`(`resume`/`rebuild`/`force`/`deleteSource`), `…/analyze/cancel`, `POST /api/vods/{vid}/full-videos`(이미 분석한 옛 영상의 풀영상 만들기), `DELETE /api/vods/{vid}/clips`, `DELETE /api/vods/{vid}/games/{i}`, `…/games/{i}/result-image` |
+| 저장 위치 | `GET /api/storage`, `POST·GET /api/storage/migrate`, `POST /api/storage/undo` |
 | 정리 | `POST /api/cleanup`, `GET /api/cleanup/preview`, `GET·POST /api/clips-dir/move`, `GET /api/legacy-trash`, `POST /api/legacy-trash/migrate` |
 | 작업 | `GET /api/activity`, `GET /api/backfill`, `GET /api/backfill/preview`, `POST /api/backfill/start·cancel`, `GET /api/watch/failures`, `POST /api/watch/failures/{key}/retry` |
 | 파일 선택 | `POST /api/fs/pick-folder`, `POST /api/fs/pick-videos` |

@@ -21,6 +21,7 @@ from lumia_briefing_room.consent import needs_first_run
 from lumia_briefing_room.logsetup import default_log_path
 from lumia_briefing_room.single_instance import SingleInstance
 from lumia_briefing_room.config import load_config, resolve_config_path, resolve_paths
+from lumia_briefing_room.pipeline.library_startup import adopt_default_root, migrate_legacy_layout
 from lumia_briefing_room.pipeline.cleanup import cleanup_loop, make_cleanup_runner
 from lumia_briefing_room.pipeline.watch_failures import WatchFailureTracker
 from lumia_briefing_room.pipeline.disk_alert import check_and_notify
@@ -345,7 +346,8 @@ def main(argv: list[str] | None = None) -> None:
 
 
 def _run_app(args, instance: SingleInstance) -> None:
-    cfg = load_config(args.config)
+    cfg = adopt_default_root(load_config(args.config), resolve_config_path(args.config))
+    migrate_legacy_layout(cfg)
     procs.kill_children_on_exit()
     if cfg.app.low_priority:
         procs.lower_current_process_priority()
