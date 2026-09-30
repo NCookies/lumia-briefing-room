@@ -10,13 +10,15 @@ from __future__ import annotations
 import json
 import logging
 import os
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from lumia_briefing_room.config import RetentionConfig
 from lumia_briefing_room.pipeline.delete_helper import PERMANENT, permanently_delete, send_to_recycle_bin
 from lumia_briefing_room.pipeline.game_store import FULL_VIDEO, GAME_JSON
+from lumia_briefing_room.pipeline.preserve_before_delete import candidates_to_preserve
 from lumia_briefing_room.pipeline.retention import select_for_auto_clean
 
 log = logging.getLogger(__name__)
@@ -24,8 +26,10 @@ log = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class GameCleanupPlan:
-    to_delete: list[Path]  # 풀영상을 지울 게임 폴더
+    to_delete: list[Path]  # 풀영상을 지울(지운) 게임 폴더
     bytes_to_free: int
+    preserve_clips: int = 0  # 지우기 전에 클립으로 남길(남긴) 후보 수 - `retention.preserveBeforeDelete` 가 켜졌을 때만
+    held_back: list[Path] = field(default_factory=list)  # 클립을 못 남겨 이번엔 지우지 않은 폴더
 
 
 def _parse_utc(text) -> datetime | None:
@@ -64,6 +68,7 @@ def _entries(games_dir: Path) -> list[dict]:
                 "_size_bytes": size,
                 "_path": folder,
                 "_key": folder.name,
+                "_preserve": len(candidates_to_preserve(data)),
             }
         )
     return entries
@@ -74,7 +79,8 @@ def plan_game_cleanup(games_dir: Path, cfg: RetentionConfig, *, now: datetime | 
     if not cfg.auto_clean_enabled:
         return GameCleanupPlan([], 0)
     selected = select_for_auto_clean(_entries(games_dir), cfg, now=lambda: now)
-    return GameCleanupPlan([e["_path"] for e in selected], sum(e["_size_bytes"] for e in selected))
+    preserve = sum(e["_preserve"] for e in selected) if cfg.preserve_before_delete else 0
+    return GameCleanupPlan([e["_path"] for e in selected], sum(e["_size_bytes"] for e in selected), preserve)
 
 
 def game_cleanup_preview(games_dir: Path, cfg: RetentionConfig, *, now: datetime | None = None) -> dict[str, dict]:
@@ -88,7 +94,11 @@ def game_cleanup_preview(games_dir: Path, cfg: RetentionConfig, *, now: datetime
         due_at = None
         if e["_reason"] == "age" and cfg.max_age_days is not None:
             due_at = (e["_created_at"] + timedelta(days=cfg.max_age_days)).isoformat().replace("+00:00", "Z")
-        preview[e["_key"]] = {"reason": e["_reason"], "dueAt": due_at}
+        preview[e["_key"]] = {
+            "reason": e["_reason"],
+            "dueAt": due_at,
+            "preserveCount": e["_preserve"] if cfg.preserve_before_delete else 0,
+        }
     return preview
 
 
@@ -111,15 +121,29 @@ def delete_full_video(folder: Path, *, mode: str) -> None:
     os.replace(tmp, path)
 
 
-def run_game_cleanup(games_dir: Path, cfg: RetentionConfig, *, now: datetime | None = None) -> GameCleanupPlan:
+def run_game_cleanup(
+    games_dir: Path, cfg: RetentionConfig, *, now: datetime | None = None, preserve: Callable[[Path], bool] | None = None
+) -> GameCleanupPlan:
+    """`preserve(폴더)` 는 지우기 직전 남길 클립을 저장하고 성공 여부를 돌려준다. 보존이 켜졌는데 `preserve` 가
+    없거나 실패하면 그 풀영상은 지우지 않는다."""
     plan = plan_game_cleanup(games_dir, cfg, now=now)
+    deleted: list[Path] = []
+    held: list[Path] = []
+    freed = 0
     for folder in plan.to_delete:
+        if cfg.preserve_before_delete and not (preserve is not None and preserve(folder)):
+            held.append(folder)
+            continue
         try:
+            size = (folder / FULL_VIDEO).stat().st_size
             delete_full_video(folder, mode=cfg.delete_mode)
         except OSError:
             log.exception("풀영상을 지우지 못했다: %s", folder)
-    if plan.to_delete:
+            continue
+        deleted.append(folder)
+        freed += size
+    if deleted or held:
         from lumia_briefing_room.pipeline.cleanup_registry import registry
 
         registry.notify_clips_changed()
-    return plan
+    return GameCleanupPlan(deleted, freed, plan.preserve_clips, held)

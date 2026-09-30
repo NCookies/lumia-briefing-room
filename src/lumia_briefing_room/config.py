@@ -174,6 +174,7 @@ class RetentionConfig:
     protect_pinned: bool = True
     protect_tags: list[str] = field(default_factory=list)
     keep_game_records: bool = True
+    preserve_before_delete: bool = False
 
 
 @dataclass

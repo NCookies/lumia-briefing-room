@@ -20,7 +20,8 @@ from pydantic import BaseModel
 from lumia_briefing_room import activity
 from lumia_briefing_room.config import Config, discover_ffmpeg, resolve_paths
 from lumia_briefing_room.pipeline import game_candidates as gcand
-from lumia_briefing_room.pipeline.clip_from_full import FullVideoMissing, save_candidate_clip
+from lumia_briefing_room.pipeline.clip_from_full import FullVideoMissing
+from lumia_briefing_room.pipeline.game_clip_save import save_and_mark
 from lumia_briefing_room.pipeline.cleanup_registry import registry as cleanup_preview_registry
 from lumia_briefing_room.pipeline.ffmpeg_errors import describe_clip_error
 from lumia_briefing_room.pipeline.game_files import GameNotFound, game_dir, has_full_video, list_games, load_game, update_game
@@ -318,34 +319,14 @@ def register_game_routes(
         cand = gcand.find_candidate(game, candidate_id)
         if cand is None:
             raise HTTPException(404, "후보를 찾을 수 없습니다")
-        user = cand.get("user") or {}
-        existing = user.get("savedClipId")
-        used = gcand.effective_range(cand, duration_of(game))
-        if existing and not gcand.range_changed(cand, duration_of(game)):
-            return existing
-        target = clips_dir_for(game)
         try:
-            clip_id = save_candidate_clip(
-                game, cand, game_folder=game_dir(games_dir(), key), clips_dir=target, cfg=cfg, ffmpeg_path=ffmpeg,
-                thumbnails_root=target / ".thumbs" if game.get("source") == "vod" else None, replace_clip_id=existing,
-            )
+            clip_id = save_and_mark(games_dir(), key, game, cand, cfg=cfg, ffmpeg_path=ffmpeg)
         except FullVideoMissing:
             raise HTTPException(409, "풀영상이 없어 클립을 저장할 수 없습니다")
         except ValueError as exc:
             raise HTTPException(400, str(exc))
         except (OSError, subprocess.CalledProcessError) as exc:
             raise HTTPException(500, f"클립 저장에 실패했습니다: {describe_clip_error(exc)}")
-
-        def mark(data: dict) -> None:
-            target = gcand.find_candidate(data, candidate_id)
-            target["user"] = {
-                **(target.get("user") or {}),
-                "savedClipId": clip_id,
-                "savedStart": round(used[0], 3),
-                "savedEnd": round(used[1], 3),
-            }
-
-        update_game(games_dir(), key, mark)
         cleanup_preview_registry.notify_clips_changed()
         return clip_id
 

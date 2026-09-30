@@ -81,6 +81,7 @@
 | `retention.deleteMode` | `permanent` | 자동 정리 전용(`recycle`/`permanent`) |
 | `retention.protectPinned` | `true` | `game.json` 의 `pinned` |
 | `retention.protectTags` | `[]` | 후보 태그 중 하나라도 있으면 그 게임의 풀영상을 보호. 기본은 고정만 보호 |
+| `retention.preserveBeforeDelete` | `false` | 켜면 자동 정리가 풀영상을 지우기 직전, 그 게임의 확실한 후보(킬·어시·사망) 중 아직 저장 안 된 것을 클립으로 남긴다. 하나라도 못 남기면 그 풀영상은 이번에 지우지 않는다 |
 | `retention.keepGameRecords` | `true` | 클립이 다 지워진 경기 요약·결과표를 `.games` 에 남김 |
 
 ## 내보내기 `export.*` — 전부 미사용 (지금 저장은 mp4 만 복사)

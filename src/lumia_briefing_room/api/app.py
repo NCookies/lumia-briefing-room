@@ -52,6 +52,7 @@ from lumia_briefing_room.pipeline.game_records import (
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for
 from lumia_briefing_room.pipeline.label_note import normalize_label_note
 from lumia_briefing_room.pipeline.cleanup import remove_orphan_result_images
+from lumia_briefing_room.pipeline.preserve_before_delete import make_preserver
 from lumia_briefing_room.pipeline.game_cleanup import game_cleanup_preview, plan_game_cleanup, run_game_cleanup
 from lumia_briefing_room.pipeline.cleanup_registry import registry as cleanup_preview_registry
 from lumia_briefing_room.pipeline.clip_assets import (
@@ -614,11 +615,16 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         cfg = current_config()
         resolved = resolve_paths(cfg.paths)
         dry_run = bool(body.get("dryRun"))
-        step = plan_game_cleanup if dry_run else run_game_cleanup
-        plan = step(resolved.games, cfg.retention)
+        if dry_run:
+            plan = plan_game_cleanup(resolved.games, cfg.retention)
+        else:
+            preserve = make_preserver(cfg, discover_ffmpeg()) if cfg.retention.preserve_before_delete else None
+            plan = run_game_cleanup(resolved.games, cfg.retention, preserve=preserve)
         return {
             "toDelete": len(plan.to_delete),
             "bytesToFree": plan.bytes_to_free,
+            "preserveClips": plan.preserve_clips,
+            "heldBack": len(plan.held_back),
             "applied": not dry_run and cfg.retention.auto_clean_enabled,
         }
 

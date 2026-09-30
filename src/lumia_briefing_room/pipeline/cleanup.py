@@ -15,13 +15,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from lumia_briefing_room.api.clips import scan_clips, to_summary_dict
-from lumia_briefing_room.config import RetentionConfig, load_config, resolve_paths
+from lumia_briefing_room.config import RetentionConfig, discover_ffmpeg, load_config, resolve_paths
 from lumia_briefing_room.pipeline.clip_assets import resolve_result_image
 from lumia_briefing_room.pipeline.delete_helper import delete_clip
 from lumia_briefing_room.pipeline.game_records import clear_records, record_game, records_dir_for
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for, archive_if_labeled
 from lumia_briefing_room.pipeline.proxy import remove_orphan_proxies
 from lumia_briefing_room.pipeline.game_cleanup import run_game_cleanup
+from lumia_briefing_room.pipeline.preserve_before_delete import make_preserver
 from lumia_briefing_room.pipeline.retention import select_for_auto_clean
 
 log = logging.getLogger(__name__)
@@ -133,7 +134,8 @@ def make_cleanup_runner(config_path: Path | None) -> Callable[[], object]:
     def run():
         cfg = load_config(config_path)
         resolved = resolve_paths(cfg.paths)
-        return run_game_cleanup(resolved.games, cfg.retention)
+        preserve = make_preserver(cfg, discover_ffmpeg()) if cfg.retention.preserve_before_delete else None
+        return run_game_cleanup(resolved.games, cfg.retention, preserve=preserve)
 
     return run
 
