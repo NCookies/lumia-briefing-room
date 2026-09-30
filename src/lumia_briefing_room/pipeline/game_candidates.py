@@ -23,6 +23,17 @@ def effective_range(cand: dict, duration_sec: float) -> tuple[float, float]:
     return max(0.0, start), min(duration_sec, end)
 
 
+def range_changed(cand: dict, duration_sec: float) -> bool:
+    """범위를 저장 당시(저장한 적 없으면 검출값)와 다르게 고쳤는가. 저장 범위 기록이 없는 옛 클립은 검출 범위로 만든 것으로 본다."""
+    user = cand.get("user") or {}
+    if "savedStart" in user and "savedEnd" in user and user.get("savedClipId"):
+        base = (float(user["savedStart"]), float(user["savedEnd"]))
+    else:
+        base = (max(0.0, float(cand["start"])), min(duration_sec, float(cand["end"])))
+    used = effective_range(cand, duration_sec)
+    return abs(base[0] - used[0]) > 0.001 or abs(base[1] - used[1]) > 0.001
+
+
 def apply_edit(cand: dict, patch: dict, duration_sec: float) -> None:
     unknown = set(patch) - _EDITABLE
     if unknown:

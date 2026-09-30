@@ -61,16 +61,8 @@ def _summary(game: dict, games_dir: Path) -> dict:
         "candidateCount": len(active),
         "certainCount": sum(1 for c in active if c.get("certain")),
         "savedClipCount": sum(1 for c in cands if (c.get("user") or {}).get("savedClipId")),
+        "unsavedEditCount": sum(1 for c in active if gcand.range_changed(c, float(video.get("durationSec") or 0.0))),
     }
-
-
-def _range_changed(cand: dict, used: tuple[float, float], duration: float) -> bool:
-    """저장 당시 범위와 지금 범위가 다른가. 저장 범위 기록이 없는 옛 클립은 검출 범위로 만들어졌다고 본다."""
-    user = cand.get("user") or {}
-    base = (float(user["savedStart"]), float(user["savedEnd"])) if "savedStart" in user and "savedEnd" in user else (
-        max(0.0, float(cand["start"])), min(duration, float(cand["end"]))
-    )
-    return abs(base[0] - used[0]) > 0.001 or abs(base[1] - used[1]) > 0.001
 
 
 def register_game_routes(
@@ -193,7 +185,7 @@ def register_game_routes(
         user = cand.get("user") or {}
         existing = user.get("savedClipId")
         used = gcand.effective_range(cand, duration_of(game))
-        if existing and not _range_changed(cand, used, duration_of(game)):
+        if existing and not gcand.range_changed(cand, duration_of(game)):
             return existing
         try:
             clip_id = save_candidate_clip(
