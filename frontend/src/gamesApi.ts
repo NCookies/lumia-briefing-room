@@ -72,3 +72,17 @@ export async function startRebuildFullVideo(key: string): Promise<RebuildStatus>
 export async function getRebuildStatus(key: string): Promise<RebuildStatus> {
   return jsonOrThrow(await fetch(`${BASE}/${key}/full-video/status`), '풀영상 만들기 상태 확인')
 }
+
+export interface DeleteGameResult {
+  deletedFullVideo: boolean
+  deletedClips: number
+  freedBytes: number
+}
+
+export async function deleteGameFiles(key: string, target: 'fullVideo' | 'clips' | 'both'): Promise<DeleteGameResult> {
+  return jsonOrThrow(await send('POST', `${BASE}/${key}/delete`, { target }), '삭제')
+}
+
+export async function unsaveCandidate(key: string, id: string): Promise<Candidate> {
+  return jsonOrThrow(await send('POST', `${BASE}/${key}/candidates/${id}/unsave`), '보관 해제')
+}

@@ -2,6 +2,7 @@ import { cleanupReasonLabel, cleanupReasonTooltip, preserveLabel, type CleanupPr
 import { gameHeadline, matchTypeLabel, type GameSummary } from '../games'
 import { gameAssetUrl } from '../gamesApi'
 import { formatBytes } from '../retention'
+import { GameMenu, type GameMenuItem } from './GameMenu'
 
 export interface RowTime {
   main: string
@@ -22,10 +23,11 @@ interface Props {
   onOpen: () => void
   onPin: () => void
   rebuild?: { label: string; disabled: boolean; onClick: () => void }
+  menu?: GameMenuItem[]
 }
 
 /** 게임 목록의 게임 한 줄. 스팀 녹화 탭과 영상 파일 탭이 같이 쓴다(시간 칸만 다르다). */
-export function GameRow({ game: g, time, due, onOpen, onPin, rebuild }: Props) {
+export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, menu }: Props) {
   return (
     <li
       className="flex cursor-pointer items-stretch overflow-hidden rounded border border-zinc-700 bg-zinc-800/60 hover:border-zinc-500 hover:bg-zinc-800"
@@ -131,6 +133,7 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild }: Props) {
           >
             {g.pinned ? '고정 해제' : '고정'}
           </button>
+          {menu && menu.length > 0 && <GameMenu items={menu} />}
         </span>
       </div>
     </li>

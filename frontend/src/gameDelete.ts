@@ -1,0 +1,41 @@
+import { formatBytes } from './retention.ts'
+
+export type DeleteTarget = 'fullVideo' | 'clips' | 'both'
+
+export interface DeletableGame {
+  hasFullVideo: boolean
+  fullVideoSizeBytes: number | null
+  savedClipCount: number
+  pinned: boolean
+}
+
+export interface DeleteMenuItem {
+  target: DeleteTarget
+  label: string
+  disabled: boolean
+}
+
+export function deleteMenuItems(game: DeletableGame): DeleteMenuItem[] {
+  const hasClips = game.savedClipCount > 0
+  return [
+    { target: 'fullVideo', label: '풀영상만 삭제', disabled: !game.hasFullVideo },
+    { target: 'clips', label: '클립만 전체 삭제', disabled: !hasClips },
+    { target: 'both', label: '풀영상과 클립 전체 삭제', disabled: !game.hasFullVideo && !hasClips },
+  ]
+}
+
+export function deleteWarning(game: DeletableGame, target: DeleteTarget): string {
+  const parts: string[] = []
+  if (target !== 'clips' && game.hasFullVideo) {
+    parts.push(game.fullVideoSizeBytes != null ? `풀영상 ${formatBytes(game.fullVideoSizeBytes)}` : '풀영상')
+  }
+  if (target !== 'fullVideo' && game.savedClipCount > 0) parts.push(`클립 ${game.savedClipCount}개`)
+  const lines = [`이 게임의 ${parts.join('과 ')}을(를) 삭제합니다. 게임 기록(결과·후보)은 남습니다.`]
+  if (game.pinned) lines.push('고정한 게임입니다. 자동 정리에서 제외해 둔 게임을 지우려는 것이 맞나요?')
+  return lines.join('\n')
+}
+
+/** 고정한 게임은 "다시 묻지 않기"를 켰어도 묻는다. */
+export function mustAskBeforeDelete(game: DeletableGame, confirmDelete: boolean): boolean {
+  return confirmDelete || game.pinned
+}

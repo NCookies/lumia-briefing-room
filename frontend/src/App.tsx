@@ -200,6 +200,10 @@ export default function App() {
           refreshTick={refreshTick}
           onBackfill={() => setShowBackfill(true)}
           backfillLabel={backfillRunning ? `과거 녹화 분석 중 ${progressPercent(backfill)}%` : '과거 녹화 분석'}
+          confirmDelete={confirmDelete}
+          onConfirmDeleteChange={changeConfirmDelete}
+          deleteMode={deleteMode}
+          onDeleteModeChange={changeDeleteMode}
         />
       </div>
 

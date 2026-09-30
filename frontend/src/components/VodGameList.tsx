@@ -5,6 +5,7 @@ import { onlyDueGames } from '../cleanupPreview'
 import { dayAnchorId, dayId } from '../dayFold'
 import type { GameSummary } from '../games'
 import { getGames, setGamePinned } from '../gamesApi'
+import { useGameDelete } from '../useGameDelete'
 import { formatBytes } from '../retention'
 import { useCleanupPreview } from '../useCleanupPreview'
 import { useStorageUsage } from '../useStorageUsage'
@@ -116,6 +117,15 @@ export function VodGameList({
     handledTick.current = refreshTick
     if (active) reload()
   }, [refreshTick, active, reload])
+
+  const gameDelete = useGameDelete({
+    confirmDelete,
+    onConfirmDeleteChange,
+    deleteMode,
+    onDeleteModeChange,
+    onDone: reload,
+    onError: setActionError,
+  })
 
   const runningVodId = vods.find((v) => v.status === 'analyzing')?.id ?? null
   const probe = probeProgress(vods)
@@ -397,6 +407,7 @@ export function VodGameList({
                           key={g.key}
                           game={g}
                           time={vodGameTime(g)}
+                          menu={gameDelete.menuFor(g.key, g)}
                           due={cleanup[g.key]}
                           onOpen={() => setOpen(g.key)}
                           onPin={() =>
@@ -414,6 +425,7 @@ export function VodGameList({
         ))}
       </div>
 
+      {gameDelete.dialog}
       {deleteRequest && (
         <DeleteConfirmDialog
           label={deleteRequest.label}

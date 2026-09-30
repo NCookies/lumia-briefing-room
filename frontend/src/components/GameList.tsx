@@ -9,7 +9,9 @@ import { formatBytes } from '../retention'
 import { useCleanupPreview } from '../useCleanupPreview'
 import { useStorageUsage } from '../useStorageUsage'
 import { useDayFold } from '../useDayFold'
+import { useGameDelete } from '../useGameDelete'
 import { useRebuildFullVideo } from '../useRebuildFullVideo'
+import type { DeleteMode } from '../deleteConfirm'
 import { DueOnlyToggle } from './DueOnlyToggle'
 import { GameDayHeader } from './GameDayHeader'
 import { GameRow } from './GameRow'
@@ -29,9 +31,22 @@ interface Props {
   refreshTick: number
   onBackfill: () => void
   backfillLabel: string
+  confirmDelete: boolean
+  onConfirmDeleteChange: (value: boolean) => void
+  deleteMode: DeleteMode
+  onDeleteModeChange: (value: DeleteMode) => void
 }
 
-export function GameList({ active, refreshTick, onBackfill, backfillLabel }: Props) {
+export function GameList({
+  active,
+  refreshTick,
+  onBackfill,
+  backfillLabel,
+  confirmDelete,
+  onConfirmDeleteChange,
+  deleteMode,
+  onDeleteModeChange,
+}: Props) {
   const [games, setGames] = useState<GameSummary[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState<string | null>(null)
@@ -53,6 +68,14 @@ export function GameList({ active, refreshTick, onBackfill, backfillLabel }: Pro
       .catch((e: Error) => setError(e.message))
   }, [])
   const rebuild = useRebuildFullVideo(load)
+  const gameDelete = useGameDelete({
+    confirmDelete,
+    onConfirmDeleteChange,
+    deleteMode,
+    onDeleteModeChange,
+    onDone: load,
+    onError: setError,
+  })
 
   useEffect(() => {
     if (active) load()
@@ -133,6 +156,7 @@ export function GameList({ active, refreshTick, onBackfill, backfillLabel }: Pro
                 game={g}
                 time={{ main: formatShort(g.matchStartUtc), sub: g.matchStartUtc ? formatAgo(g.matchStartUtc) : '' }}
                 due={cleanup[g.key]}
+                menu={gameDelete.menuFor(g.key, g)}
                 onOpen={() => setOpen(g.key)}
                 rebuild={
                   g.canRebuildFullVideo && !g.hasFullVideo
@@ -158,6 +182,7 @@ export function GameList({ active, refreshTick, onBackfill, backfillLabel }: Pro
         <p className={`text-sm ${rebuild.state.error ? 'text-rose-300' : 'text-emerald-300'}`}>{rebuild.state.text}</p>
       )}
       {error && <p className="text-sm text-rose-300">{error}</p>}
+      {gameDelete.dialog}
     </div>
   )
 }
