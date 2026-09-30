@@ -8,8 +8,8 @@
 
 - [ ] F4 — 나머지: 후보 라벨(교전/사냥)·태그 필터 UI. 후보 단위 라벨이 생기면 서버 전송 계약(`receiver.schema.json`)도 바꿔야 한다 — 라벨링을 다시 시작할 때 한다
 - [ ] F5 — 기존 카드 뷰 제거 (피드백 확인 후, 단독 커밋)
-- [ ] F7 — 클립 정리 탭: 클립 폴더를 실제 폴더 그대로 보여 주는 탐색 화면 (§3.9)
-- [ ] F8 — 저장 폴더 하나로 정리: `저장 폴더\클립\{스팀 녹화,영상 파일}`·`저장 폴더\풀영상\{스팀 녹화,영상 파일}`, 풀영상 위치만 고급 옵션 (§3.10, F7 과 함께)
+- [ ] F7 — 클립 정리 탭: 클립 폴더를 실제 폴더 그대로 보여 주는 탐색 화면 (§3.9). 남은 것: mp4 `clipUid` 태그 쓰기·읽기, 지문으로 옛 클립 잇기, 모르는 영상, 정리 탭 API·화면 (정보/영상 분리·하위 폴더 탐색은 구현됨)
+- [ ] F8 — 저장 폴더 하나로 정리: 남은 것은 첫 실행·옵션 화면(저장 폴더·고급 풀영상 위치)과 "새 구조로 옮기기"(§3.10a-(3)). 경로 해석·정보 이전·읽는 코드 전환은 구현됨
 - [ ] F9 — 안내 가이드: 풀영상·클립·자동 정리가 무엇인지 처음 쓰는 사람이 알 수 있게 (§3.11)
 
 ## 1. 결정 사항 (사용자, 2026-09-29)
@@ -126,22 +126,7 @@
 
 **핵심 단순화: 지금의 "클립 폴더" 를 둘로 쪼갠다.** 코드의 `clips_dir` 는 사실 (a) 영상(mp4)을 두는 곳과 (b) 정보·썸네일·라벨·게임 기록·작업 폴더를 두는 곳을 한 덩어리로 가리킨다. (b) 전체를 **구조 그대로** `%LOCALAPPDATA%\LumiaBriefingRoom\library\{steam,vod}\` 로 옮긴다(`<id>.json`, `.thumbs\`, `.labels\`, `.games\`, 정보 파일 임시 `.staging\`, vod 는 `.vods\`. **`.proxy` 와 영상 결과물 임시는 제외** — §3.10 표: 영상 드라이브에 둔다). 그러면 json 안의 상대 경로(`.thumbs/…`)·`clip_assets`·라벨 보관·게임 기록 코드는 **그대로** 동작하고, 바뀌는 곳은 "mp4 를 어디서 찾나" 뿐이다(`meta_path.with_suffix(".mp4")` 류 약 15곳).
 
-**(1) 경로 해석 (`config.resolve_paths`, 새 키 `paths.root`·`paths.fullVideos`)**
-
-| 모드 | 조건 | 스팀 클립 영상 | 영상 파일 클립 영상 | 풀영상(게임 폴더) |
-|---|---|---|---|---|
-| 새 구조 | `paths.root` 가 있음, 또는 옛 키·옛 기본 폴더가 전혀 없는 새 설치(기본 `%USERPROFILE%\Videos\LumiaBriefingRoom`) | `root\클립\스팀 녹화` | `root\클립\영상 파일` | `paths.fullVideos` 또는 `root\풀영상` 아래 `스팀 녹화`·`영상 파일` |
-| 옛 경로 인정 | `paths.root` 없음 + 옛 키(`clips`·`vodClips`·`games`) 중 하나라도 있거나 옛 기본 폴더가 있음 | `paths.clips` | `paths.vodClips` | `paths.games`(없으면 `clips` 상위의 `games`, 스팀·영상 게임이 한 폴더에 섞여 있다) |
-
-- `ResolvedPaths` 에 `clips_steam`·`clips_vod`(영상 자리), `library_steam`·`library_vod`(정보 자리), `games_steam`·`games_vod`(옛 경로 모드에선 같은 폴더)를 둔다. 기존 `clips`·`vod_clips`·`games` 를 쓰던 곳은 의미에 따라 나눠 옮긴다 — 정보·라벨·게임 기록·작업 폴더·프록시·썸네일은 `library_*`, 영상이 놓이는 곳(저장·자르기 결과·내보내기 기본 위치·클립 정리 탭)은 `clips_*`, 풀영상은 `games_*`. 게임 목록·용량 합계·자동 정리는 두 게임 폴더를 모두 본다(같으면 한 번).
-- 저장 공간 기준 드라이브(`disk_routes`·`disk_alert`): 새 구조는 풀영상 폴더 드라이브, `fullVideos` 가 다른 드라이브면 둘 다. 옛 경로 모드는 지금처럼 `games` 드라이브.
-- **영상 결과물의 임시는 결과물이 놓일 폴더의 드라이브에 둔다**(사용자 결정 2026-09-30, C: 에 수 GB 를 만들었다 복사하지 않게): 새 구조는 클립 `<root>\.staging`, 풀영상 `<풀영상 폴더>\.staging`(숨김 속성), 옛 경로 모드는 지금처럼 각 폴더 안 `.staging`. 정보 파일 임시만 `library_*\.staging`. **재생용 변환 영상은 새 구조 `<root>\.cache\proxy`(숨김), 옛 경로 모드는 지금처럼 클립 폴더 `.proxy`**. 재귀 스캔은 `.` 으로 시작하는 폴더와 `*.tmp.mp4`·`*.replace.mp4`·`*.trim.mp4`·`*.part` 를 무시한다.
-
-**(2) 앱 전용 데이터 이전 (`library_migrate`, 새 모듈)** — 옛 클립 폴더의 정보 파일을 `library_*` 로.
-- 대상: `*.json`, `.thumbs`, `.labels`, `.games`, `.vods`(영상 파일 색인·판독 캐시). **영상(mp4)은 건드리지 않는다.** `.staging` 은 비었을 때만 지우고 안 비었으면 버린다(중간 작업물). **`.trash` 는 이전하지 않는다**(폐지된 기능 — 남아 있으면 첫 실행의 `legacy_trash` 절차가 먼저 끝나야 이전을 시작한다). **`.proxy` 는 옮기지 않는다**(다시 만들 수 있는 캐시). 옛 경로 모드에선 그 자리 그대로 쓰고, "새 구조로 옮기기" 때만 옛 `.proxy` 를 지운다(새 자리 `<root>\.cache\proxy` 에 다시 만든다).
-- 한 파일씩: 목적지에 임시 이름으로 복사 → 크기 확인 → `os.replace` → 원본 삭제 → 기록(`library\migration.json`, 원본·목적지 쌍). 두 번 돌려도 같은 결과(기록에 있으면 건너뜀), 중간에 꺼져도 깨지지 않는다(원본이 남은 채로 재개). 목적지에 **내용이 다른** 같은 이름 파일이 있으면 그 파일만이 아니라 이전 전체를 거부한다(아무것도 안 옮김).
-- **언제**: 새 버전 첫 실행 때 자동으로 한 번(정보 파일 몇 MB, 영상은 안 옮김). 안 옮기면 새 스캔이 옛 클립을 못 찾으므로 선택 사항이 아니다. 끝나면 상단에 한 줄 알림.
-- **되돌리기**: 기록을 거꾸로 돌려 원래 자리로 옮기는 `undo` 를 같은 모듈에 둔다(CLI `python -m lumia_briefing_room.cli.library_migrate --undo`, 문서화). 옛 앱 버전으로 돌아갈 때 쓴다.
+**(1)(2) 경로 해석·앱 전용 정보 이전·읽는 코드 전환은 구현됐다**([spec/config.md](spec/config.md) `paths.*`, [spec/pipeline.md §8·§9](spec/pipeline.md)). 남은 것은 아래 (3) 이후와 첫 실행·옵션 화면이다. 새 구조(`paths.root`)는 설정 파일에 직접 적으면 동작하지만 화면은 아직 없다. 옛 경로 사용자에겐 첫 실행 화면이 뜨지 않으므로 옵션 화면의 "새 구조로 옮기기"가 유일한 입구다.
 
 **(3) "새 구조로 옮기기" (옵션, 사용자가 고른다)** — `POST /api/storage/migrate {root}`(202 + 진행률, `move_clips` 와 같은 방식). 옛 경로 모드에서만 나타난다.
 - 옮기는 것: 스팀 클립 mp4 → `root\클립\스팀 녹화`, 영상 파일 클립 mp4 → `root\클립\영상 파일`, 게임 폴더(`full.mp4`·`game.json`…) → `root\풀영상\스팀 녹화|영상 파일`(`source` 로 나눔). 같은 드라이브면 이름 바꾸기(즉시), 다르면 복사 → 크기 확인 → 원본 삭제. 파일 하나 끝날 때마다 기록. **충돌(같은 이름이 있음)·폴더 겹침이면 409 로 아무것도 안 옮긴다.** 끝에 설정(`paths.root` 설정, 옛 키는 기록에만 보관하고 비움)을 원자적으로 바꾼다.
@@ -168,21 +153,6 @@
 - 클립 저장(`export`)은 저장 창 기본 위치만 `클립\스팀 녹화|영상 파일` 또는 마지막 저장 폴더로 바꾼다. 클립 영역 밖에 저장하면 내보내기.
 
 **(7) 작업 순서와 커밋** — ①경로 해석(TDD) ②library 이전 도구(TDD) + 첫 실행 자동 이전 연결 ③옵션·첫 실행 화면 ④새 구조로 옮기기 백엔드 + 화면 ⑤mp4 태그 읽기·쓰기 ⑥클립 카탈로그(인식) ⑦정리 탭 API ⑧정리 탭 화면. 백엔드와 화면은 따로 커밋. 그중 ②와 ⑥은 데이터를 건드려 **실제 데이터 폴더의 복사본**(H: 의 `clips`·`vod` 중 json·썸네일·작은 영상 몇 개)으로 먼저 돌려 본 뒤에만 실제 데이터에 적용한다.
-
-**읽고 쓰는 곳 목록(조사 결과, 이 이전이 건드려야 하는 곳)**
-
-| 대상 | 코드 |
-|---|---|
-| 클립 json + mp4 읽기·쓰기 | `api/clips.py`(scan·find), `api/app.py`(영상·내보내기·프록시·삭제 라우트), `api/export.py`, `api/game_routes.py:257`, `pipeline/delete_helper.py`, `trim.py`, `clip_from_full.py`, `orchestrator.py`(클립 컷 483~524), `vod_analyze.py`(202·535~604), `game_backfill.py`, `legacy_games.py`, `legacy_vod_games.py`, `reprocess.py`, `backfill.py::commit_staging`, `move_clips.py`, `clip_uid.py`, `telemetry/collect.py` |
-| `.thumbs` | `clip_assets.py`, `orchestrator._resolve_clip_paths`, `clip_from_full.py`, `game_backfill.py`, `game_clip_save.py`, `cleanup.py`, `vod_analyze.py`, `move_clips.py`, `config.py` |
-| `.proxy` | `proxy.py`, `api/app.py`, `cleanup.py`, `move_clips.py` |
-| `.labels` | `label_archive.py`, `clip_uid.py`, `telemetry/collect.py`, `reprocess.py`, `api/app.py`, `move_clips.py` |
-| `.games`(게임 기록) | `game_records.py`, `legacy_games.py`, `backfill.py::collect_known_starts`, `api/app.py`, `cleanup.py`, `move_clips.py` |
-| `.staging` | `reprocess.py`, `rebuild_full_video.py`, `vod_analyze.py`, `api/backfill_routes.py` |
-| `.vods`(영상 색인·캐시) | `vod_store.py`, `legacy_vod_games.py`, `api/vods.py` |
-| 프론트 | `clipsDirApi.ts`·`ClipsDirSection.tsx`(클립 폴더 옮기기 → 새 구조 옮기기로 대체), `FirstRunScreen.tsx`·`onboarding.ts`(`clipsDir`), `vodApi.ts`·`VodSettingsPanel.tsx`(`vodClips`) |
-
-- 옛 설정 키(`paths.thumbnails`·`paths.proxies`)는 미사용이라 이 작업에서 지운다(spec/config.md 도 같이).
 
 ### 3.11 안내 가이드 (F9, 2026-09-30 사용자 요청)
 
