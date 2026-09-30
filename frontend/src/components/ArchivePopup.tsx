@@ -10,12 +10,14 @@ interface Props {
   current: string | null
   archived: boolean
   onPick: (category: string | undefined) => void
-  onUnarchive: () => void
+  onUnarchive?: () => void
+  createLabel?: string
   onClose: () => void
+  title?: string
 }
 
 /** 유튜브 "저장 위치"처럼 카테고리(= `clips\` 아래 폴더)를 골라 보관한다. 이미 보관한 후보면 카테고리 바꾸기·보관 해제. */
-export function ArchivePopup({ anchor, current, archived, onPick, onUnarchive, onClose }: Props) {
+export function ArchivePopup({ anchor, current, archived, onPick, onUnarchive, onClose, title = '보관 위치', createLabel }: Props) {
   const [categories, setCategories] = useState<Category[] | null>(null)
   const [enabled, setEnabled] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -61,12 +63,12 @@ export function ArchivePopup({ anchor, current, archived, onPick, onUnarchive, o
     <div className="fixed inset-0 z-[90]" onClick={onClose}>
       <div
         role="dialog"
-        aria-label="보관 위치"
+        aria-label={title}
         className="absolute flex max-h-[22rem] flex-col overflow-hidden rounded border border-zinc-600 bg-zinc-800 text-sm shadow-lg"
         style={{ ...position, left, width: WIDTH }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="border-b border-zinc-700 px-3 py-2 text-xs text-zinc-400">보관 위치</div>
+        <div className="border-b border-zinc-700 px-3 py-2 text-xs text-zinc-400">{title}</div>
         <ul className="min-h-0 flex-1 overflow-y-auto py-1">
           {!categories && !error && <li className="px-3 py-2 text-xs text-zinc-500">불러오는 중…</li>}
           {categories && !enabled && (
@@ -117,7 +119,7 @@ export function ArchivePopup({ anchor, current, archived, onPick, onUnarchive, o
                   onKeyDown={(e) => e.key === 'Enter' && void submitNew()}
                 />
                 <button type="button" className="rounded bg-sky-600 px-2 py-1 text-xs hover:bg-sky-500" onClick={() => void submitNew()}>
-                  {archived ? '만들고 옮기기' : '만들고 보관'}
+                  {createLabel ?? (archived ? '만들고 옮기기' : '만들고 보관')}
                 </button>
               </div>
             ) : (
@@ -127,7 +129,7 @@ export function ArchivePopup({ anchor, current, archived, onPick, onUnarchive, o
             )}
           </div>
         )}
-        {archived && (
+        {archived && onUnarchive && (
           <button
             type="button"
             className="border-t border-zinc-700 px-3 py-2 text-left text-rose-300 hover:bg-zinc-700"
