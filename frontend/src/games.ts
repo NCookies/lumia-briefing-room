@@ -39,6 +39,7 @@ export interface MatchResult {
   assists?: number
   tk?: number
   matchLabel?: string
+  matchType?: 'rank' | 'normal' | 'unknown'
 }
 
 export interface GameSummary {
@@ -168,6 +169,12 @@ export function gameHeadline(result: MatchResult | null): string {
   if (result?.outcome && COBALT_OUTCOMES.includes(result.outcome)) return result.outcome
   if (!result || result.placement == null) return '결과 미확인'
   return `#${result.placement}`
+}
+
+export function matchTypeLabel(result: MatchResult | null): string {
+  if (result?.matchType === 'rank') return '랭크'
+  if (result?.matchType === 'normal') return '일반'
+  return ''
 }
 
 export function candidateTitle(c: Candidate): string {

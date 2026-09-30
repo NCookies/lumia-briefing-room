@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { cleanupReasonLabel, cleanupReasonTooltip } from '../cleanupPreview'
 import { groupByDay } from '../gameDays'
-import { gameHeadline, type GameSummary } from '../games'
+import { gameHeadline, matchTypeLabel, type GameSummary } from '../games'
 import { gameAssetUrl, getGames, setGamePinned } from '../gamesApi'
 import { formatBytes } from '../retention'
 import { useCleanupPreview } from '../useCleanupPreview'
@@ -86,8 +86,10 @@ export function GameList({ active, refreshTick }: { active: boolean; refreshTick
                     <div className="flex flex-col">
                       <span className="font-medium">
                         {gameHeadline(g.matchResult)}
-                        {g.matchResult?.matchLabel && (
-                          <span className="ml-2 text-xs text-zinc-400">{g.matchResult.matchLabel}</span>
+                        {matchTypeLabel(g.matchResult) && (
+                          <span className="ml-2 rounded bg-zinc-700 px-1.5 py-0.5 text-xs font-normal text-zinc-200">
+                            {matchTypeLabel(g.matchResult)}
+                          </span>
                         )}
                       </span>
                       <span className="text-xs text-zinc-400">{formatStart(g.matchStartUtc)}</span>
@@ -99,14 +101,6 @@ export function GameList({ active, refreshTick }: { active: boolean; refreshTick
                     )}
                   </div>
                   <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
-                    <span className="text-xs text-zinc-300">저장한 클립 {g.savedClipCount}개</span>
-                    <span className="text-xs text-zinc-500">
-                      {g.hasFullVideo
-                        ? `풀영상 ${g.fullVideoSizeBytes != null ? formatBytes(g.fullVideoSizeBytes) : ''}`
-                        : g.fullVideoDeletedAt
-                          ? '풀영상 삭제됨'
-                          : '풀영상 없음'}
-                    </span>
                     {g.unsavedEditCount > 0 && (
                       <span
                         className="rounded bg-red-600 px-2 py-0.5 text-xs font-semibold text-white"
@@ -122,6 +116,14 @@ export function GameList({ active, refreshTick }: { active: boolean; refreshTick
                       </span>
                     )}
                     {g.fullVideoError && <span className="text-xs text-amber-300">{g.fullVideoError}</span>}
+                    <span className="text-xs text-zinc-300">저장한 클립 {g.savedClipCount}개</span>
+                    <span className="text-xs text-zinc-500">
+                      {g.hasFullVideo
+                        ? `풀영상 ${g.fullVideoSizeBytes != null ? formatBytes(g.fullVideoSizeBytes) : ''}`
+                        : g.fullVideoDeletedAt
+                          ? '풀영상 삭제됨'
+                          : '풀영상 없음'}
+                    </span>
                     <span className="flex gap-2">
                       <button
                         type="button"

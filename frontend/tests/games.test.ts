@@ -7,6 +7,7 @@ import {
   effectiveRange,
   formatClock,
   gameHeadline,
+  matchTypeLabel,
   neighborCandidate,
   positionPct,
   timeFromPointer,
@@ -87,6 +88,14 @@ test('the headline shows the placement as #N, win/loss for cobalt, or says the r
   assert.equal(gameHeadline({ outcome: '패배' }), '패배')
   assert.equal(gameHeadline({ placement: 3, outcome: '탈출' }), '#3')
   assert.equal(gameHeadline(null), '결과 미확인')
+})
+
+test('the match type shows as 랭크 or 일반 and stays hidden when unknown', () => {
+  assert.equal(matchTypeLabel({ matchType: 'rank' }), '랭크')
+  assert.equal(matchTypeLabel({ matchType: 'normal' }), '일반')
+  assert.equal(matchTypeLabel({ matchType: 'unknown', matchLabel: '' }), '')
+  assert.equal(matchTypeLabel({ placement: 1 }), '')
+  assert.equal(matchTypeLabel(null), '')
 })
 
 test('the users title wins over the detected one', () => {
