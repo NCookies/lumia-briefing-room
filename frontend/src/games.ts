@@ -5,6 +5,7 @@ export interface CandidateUser {
   label?: 'combat' | 'hunt'
   title?: string
   savedClipId?: string
+  savedCategory?: string
   savedStart?: number
   savedEnd?: number
 }

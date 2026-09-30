@@ -76,8 +76,8 @@ export function CleanupPanel() {
     if (checked && !draft.autoCleanEnabled) {
       const message =
         draft.deleteMode === 'recycle'
-          ? '자동 정리를 켜면 기준에 해당하는 게임의 풀영상이 확인 없이 Windows 휴지통으로 보내집니다. 저장한 클립은 지워지지 않습니다.'
-          : '자동 정리를 켜면 기준에 해당하는 게임의 풀영상이 확인 없이 영구 삭제됩니다. 저장한 클립은 지워지지 않습니다.'
+          ? '자동 정리를 켜면 기준에 해당하는 게임의 풀영상이 확인 없이 Windows 휴지통으로 보내집니다. 보관한 클립은 지워지지 않습니다.'
+          : '자동 정리를 켜면 기준에 해당하는 게임의 풀영상이 확인 없이 영구 삭제됩니다. 보관한 클립은 지워지지 않습니다.'
       const confirmed = await ask({ message, confirmLabel: '켜기', danger: true })
       if (!confirmed.ok) return
     }
@@ -130,7 +130,7 @@ export function CleanupPanel() {
           자동 정리 켜기
         </label>
         <p className="text-xs text-zinc-500">
-          켜면 1시간마다 아래 기준을 넘은 게임의 풀영상을 자동으로 정리합니다. 저장한 클립은 정리 대상이 아니고, 게임 기록(후보·결과표)도 남습니다. 끄면 풀영상이 계속 쌓입니다.
+          켜면 1시간마다 아래 기준을 넘은 게임의 풀영상을 자동으로 정리합니다. 보관한 클립은 정리 대상이 아니고, 게임 기록(후보·결과표)도 남습니다. 끄면 풀영상이 계속 쌓입니다.
         </p>
         {!on && (
           <p className="rounded border border-zinc-600 bg-zinc-800/60 px-3 py-1.5 text-xs text-zinc-300">

@@ -131,7 +131,7 @@ function GeneralPanel({
     </section>
     <StorageSection onChanged={onClipsDirChanged} />
     <section className="flex flex-col gap-2">
-      <h3 className="text-sm font-medium text-zinc-200">클립 저장 방식</h3>
+      <h3 className="text-sm font-medium text-zinc-200">클립 보관 방식</h3>
       <label className="flex items-start gap-2 text-sm text-zinc-300">
         <input
           type="radio"
@@ -141,9 +141,9 @@ function GeneralPanel({
           onChange={() => void changeSaveMode('auto')}
         />
         <span>
-          자동 저장 (기본)
+          자동 보관 (기본)
           <span className="block text-xs text-zinc-500">
-            게임 분석이 끝나면 교전 후보를 전부 클립으로 저장합니다. 저장된 클립은 자동으로 지워지지 않아 게임마다 1.5~2GB 씩 쌓입니다.
+            게임 분석이 끝나면 교전 후보를 전부 클립으로 만들어 `자동 보관` 카테고리에 보관합니다. 보관한 클립은 자동으로 지워지지 않아 게임마다 1.5~2GB 씩 쌓입니다.
           </span>
         </span>
       </label>
@@ -156,9 +156,9 @@ function GeneralPanel({
           onChange={() => void changeSaveMode('manual')}
         />
         <span>
-          직접 저장
+          직접 보관
           <span className="block text-xs text-zinc-500">
-            클립을 자동으로 만들지 않습니다. 게임의 풀영상 화면에서 남기고 싶은 교전 후보만 골라 저장합니다. 이미 저장한 클립에는 영향이 없습니다.
+            클립을 자동으로 만들지 않습니다. 게임의 풀영상 화면에서 남기고 싶은 교전 후보만 골라 보관합니다. 이미 보관한 클립에는 영향이 없습니다.
           </span>
         </span>
       </label>

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { candidateTitle, effectiveRange, formatClock, isDismissed, isSaved, type Candidate } from '../games'
+import { archiveState } from '../archive'
 import { rangeModified } from '../playerBar'
-import { EditIcon } from './ViewerIcons'
+import { BookmarkFilledIcon, BookmarkIcon, EditIcon } from './ViewerIcons'
 
 interface Props {
   cands: Candidate[]
@@ -12,7 +13,12 @@ interface Props {
   busy: boolean
   canSave: boolean
   onSelect: (c: Candidate) => void
-  onSave: (id: string) => void
+  showDismissed: boolean
+  onToggleDismissed: (value: boolean) => void
+  /** 보관 위치 팝업을 연다(보관 안 한 후보는 보관, 보관한 후보는 카테고리 바꾸기·보관 해제). */
+  onArchive: (id: string, anchor: DOMRect) => void
+  /** 보관한 클립에 고친 범위를 반영한다(다시 저장). */
+  onResave: (id: string) => void
   onDismiss: (c: Candidate) => void
   onDelete: (id: string) => void
   onRename: (id: string, title: string) => void
@@ -29,7 +35,7 @@ export function ViewerCandidates(p: Props) {
     setEditing(null)
     if (target && editing.text.trim() !== candidateTitle(target)) p.onRename(editing.id, editing.text)
   }
-  const pending = p.cands.filter((c) => !isDismissed(c) && !isSaved(c)).length
+  const active = p.cands.filter((c) => !isDismissed(c)).length
 
   useEffect(() => {
     if (!p.currentId) return
@@ -42,17 +48,24 @@ export function ViewerCandidates(p: Props) {
       className="flex w-80 shrink-0 flex-col gap-2 overflow-hidden rounded border border-zinc-700 bg-zinc-800/60 p-2"
     >
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-medium">후보 {pending}개 저장 대기</h3>
+        <h3 className="text-sm font-medium">
+          후보 {active}개
+          {p.modifiedCount > 0 && <span className="ml-1 text-xs font-normal text-orange-300">· {p.modifiedCount}개 저장 대기</span>}
+        </h3>
         <button
           type="button"
           disabled={p.busy || !p.canSave || p.modifiedCount === 0}
           className="rounded bg-sky-600 px-2 py-1 text-xs hover:bg-sky-500 disabled:opacity-40"
-          title="범위를 고친 후보를 전부 클립으로 저장(저장한 클립은 새 범위로 교체)"
+          title="범위를 고친 보관 클립에 새 범위를 전부 반영합니다"
           onClick={p.onSaveModified}
         >
           전부 저장{p.modifiedCount > 0 ? ` (${p.modifiedCount})` : ''}
         </button>
       </div>
+      <label className="flex items-center gap-1 text-xs text-zinc-400">
+        <input type="checkbox" checked={p.showDismissed} onChange={(e) => p.onToggleDismissed(e.target.checked)} />
+        무시한 후보도 보기
+      </label>
       <ul ref={list} className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
         {p.cands.length === 0 && (
           <li className="text-xs text-zinc-500">
@@ -64,6 +77,7 @@ export function ViewerCandidates(p: Props) {
           const saved = isSaved(c)
           const dismissed = isDismissed(c)
           const modified = rangeModified(c, p.duration)
+          const state = archiveState(saved, modified)
           const selected = p.selectedId === c.id
           return (
             <li
@@ -122,7 +136,7 @@ export function ViewerCandidates(p: Props) {
                   {formatClock(s)}~{formatClock(e)} ({Math.round(e - s)}초)
                 </span>
                 {modified && (
-                  <span className="rounded bg-orange-500/25 px-1.5 text-orange-300">{saved ? '수정됨 · 저장 전' : '수정됨'}</span>
+                  <span className="rounded bg-orange-500/25 px-1.5 text-orange-300">{saved ? '수정됨 · 저장 대기' : '수정됨'}</span>
                 )}
                 {c.certain && <span className="rounded bg-yellow-500/20 px-1.5 text-yellow-300">확실</span>}
                 {c.tags.map((t) => (
@@ -131,18 +145,32 @@ export function ViewerCandidates(p: Props) {
                   </span>
                 ))}
                 <span className="ml-auto flex gap-1">
-                  {saved && !modified ? (
-                    <span className="rounded bg-emerald-600/30 px-2 py-0.5 text-emerald-200">저장됨</span>
-                  ) : (
+                  {state === 'pending' && (
                     <button
                       type="button"
-                      disabled={p.busy || !p.canSave || dismissed}
+                      disabled={p.busy || !p.canSave}
                       className="rounded bg-sky-600 px-2 py-0.5 text-zinc-100 hover:bg-sky-500 disabled:opacity-40"
-                      onClick={() => p.onSave(c.id)}
+                      title="고친 범위를 보관한 클립에 반영합니다"
+                      onClick={() => p.onResave(c.id)}
                     >
-                      {saved ? '다시 저장' : '저장'}
+                      다시 저장
                     </button>
                   )}
+                  <button
+                    type="button"
+                    disabled={p.busy || (state === 'none' && (!p.canSave || dismissed))}
+                    aria-pressed={state !== 'none'}
+                    className={`flex items-center gap-1 rounded px-2 py-0.5 disabled:opacity-40 ${
+                      state === 'none'
+                        ? 'bg-sky-600 text-zinc-100 hover:bg-sky-500'
+                        : 'bg-emerald-600/30 text-emerald-200 hover:bg-emerald-600/40'
+                    }`}
+                    title={state === 'none' ? '클립으로 만들어 카테고리에 보관합니다' : `보관됨(${c.user.savedCategory ?? '카테고리 없음'}) — 카테고리 바꾸기·보관 해제`}
+                    onClick={(e) => p.onArchive(c.id, e.currentTarget.getBoundingClientRect())}
+                  >
+                    {state === 'none' ? <BookmarkIcon /> : <BookmarkFilledIcon />}
+                    {state === 'none' ? '보관' : '보관됨'}
+                  </button>
                   {c.id.includes('_u') ? (
                     <button
                       type="button"

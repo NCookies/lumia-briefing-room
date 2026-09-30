@@ -8,7 +8,9 @@ import {
   patchCandidate,
   saveCandidate,
   setGamePinned,
+  unsaveCandidate,
 } from '../gamesApi'
+import { moveClipsToCategory } from '../categoriesApi'
 import { applyMark, candidateAtTime, newRangeAround, rangeModified, zoomBy, zoomView, type View } from '../playerBar'
 import { loadVolume, saveVolume, type VolumeState } from '../volume'
 import { isLegacyWithoutVideo } from '../legacyGame'
@@ -16,6 +18,7 @@ import { vodGameHeading } from '../vodGames'
 import { LegacyGamePanel } from './LegacyGamePanel'
 import { ViewerBar, ViewerScroll } from './ViewerBar'
 import { ExitFullscreenIcon, FullscreenIcon, MuteIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon, VolumeIcon, ZoomInIcon, ZoomOutIcon } from './ViewerIcons'
+import { ArchivePopup } from './ArchivePopup'
 import { ViewerCandidates } from './ViewerCandidates'
 
 const SEEK_STEP_SEC = 5
@@ -49,6 +52,8 @@ export function GameViewer({
   const [overrides, setOverrides] = useState<Record<string, [number, number]>>({})
   const [vol, setVol] = useState<VolumeState>(loadVolume)
   const [fullscreen, setFullscreen] = useState(false)
+  const [showDismissed, setShowDismissed] = useState(false)
+  const [archiveTarget, setArchiveTarget] = useState<{ id: string; anchor: DOMRect } | null>(null)
   const video = useRef<HTMLVideoElement>(null)
   const shell = useRef<HTMLDivElement>(null)
 
@@ -65,7 +70,8 @@ export function GameViewer({
   }, [reload])
 
   const duration = game?.fullVideo?.durationSec ?? 0
-  const cands = useMemo(() => (game ? visibleCandidates(game) : []), [game])
+  const cands = useMemo(() => (game ? visibleCandidates(game, showDismissed) : []), [game, showDismissed])
+  const barCands = useMemo(() => cands.filter((c) => !isDismissed(c)), [cands])
   const selectedCand = cands.find((c) => c.id === selected) ?? null
   const rangeOf = (c: Candidate): [number, number] => overrides[c.id] ?? effectiveRange(c, duration)
   const view: View = zoomWindow ?? [0, duration]
@@ -151,8 +157,8 @@ export function GameViewer({
     setRange(id, next, () => setUndo((u) => [...u, { kind: 'range', id, prev }]))
     setNotice(
       saved && isSaved(saved)
-        ? '범위를 수정했습니다 — 이미 저장한 클립은 "다시 저장"을 눌러야 새 범위로 바뀝니다'
-        : '범위를 수정했습니다 — 클립은 "저장"을 눌러야 만들어집니다',
+        ? '범위를 수정했습니다 — 보관한 클립은 "다시 저장"을 눌러야 새 범위로 바뀝니다'
+        : '범위를 수정했습니다 — 보관하면 이 범위로 클립이 만들어집니다',
     )
   }
 
@@ -198,6 +204,10 @@ export function GameViewer({
   }
 
   const dismissOrDelete = (c: Candidate) => {
+    if (isDismissed(c)) {
+      void run(() => patchCandidate(gameKey, c.id, { dismissed: false }), '무시한 후보를 되살렸습니다')
+      return
+    }
     if (c.id.includes('_u')) {
       void run(() => deleteCandidate(gameKey, c.id))
       return
@@ -209,9 +219,26 @@ export function GameViewer({
     }, '후보를 무시했습니다 — Ctrl+Z 로 되돌릴 수 있습니다')
   }
 
-  const saveOne = (id: string) => {
-    const replaced = cands.some((c) => c.id === id && isSaved(c))
-    void run(() => saveCandidate(gameKey, id), replaced ? '클립을 새 범위로 교체했습니다' : '클립으로 저장했습니다')
+  const archive = (id: string, category?: string) => {
+    setArchiveTarget(null)
+    void run(async () => {
+      const saved = await saveCandidate(gameKey, id, category)
+      setNotice(saved.category ? `"${saved.category}"에 보관했습니다` : '보관했습니다')
+    })
+  }
+
+  const resave = (id: string) => void run(() => saveCandidate(gameKey, id), '고친 범위를 보관한 클립에 저장했습니다')
+
+  const moveArchived = (id: string, category: string) => {
+    const clipId = cands.find((c) => c.id === id)?.user.savedClipId
+    setArchiveTarget(null)
+    if (clipId) void run(() => moveClipsToCategory([clipId], category), `"${category}"로 옮겼습니다`)
+  }
+
+  const unarchive = (id: string) => {
+    setArchiveTarget(null)
+    setSelected((sel) => (sel === id ? null : sel))
+    void run(() => unsaveCandidate(gameKey, id), '보관을 해제했습니다 — 클립을 지우고 이 후보는 무시했습니다(무시한 후보도 보기에서 되살릴 수 있습니다)')
   }
 
   const zoomStep = (factor: number) => {
@@ -220,7 +247,7 @@ export function GameViewer({
     setZoomWindow(zoomBy(base, factor, center, duration))
   }
 
-  const modifiedIds = cands.filter((c) => rangeModified(c, duration)).map((c) => c.id)
+  const modifiedIds = cands.filter((c) => isSaved(c) && !isDismissed(c) && rangeModified(c, duration)).map((c) => c.id)
 
   const saveModified = () =>
     void run(async () => {
@@ -232,7 +259,7 @@ export function GameViewer({
           failed.push((e as Error).message)
         }
       }
-      setNotice(`${modifiedIds.length - failed.length}개 저장${failed.length ? `, ${failed.length}개 실패(${failed[0]})` : ''}`)
+      setNotice(`${modifiedIds.length - failed.length}개 저장했습니다${failed.length ? `, ${failed.length}개 실패(${failed[0]})` : ''}`)
     })
 
   const handleKey = (e: KeyboardEvent) => {
@@ -256,8 +283,10 @@ export function GameViewer({
         selectedCand &&
         !busy &&
         !isDismissed(selectedCand) &&
-        (!isSaved(selectedCand) || rangeModified({ ...selectedCand, user: { ...selectedCand.user, start: rangeOf(selectedCand)[0], end: rangeOf(selectedCand)[1] } }, duration)) &&
-        saveOne(selectedCand.id),
+        (!isSaved(selectedCand)
+          ? archive(selectedCand.id)
+          : rangeModified({ ...selectedCand, user: { ...selectedCand.user, start: rangeOf(selectedCand)[0], end: rangeOf(selectedCand)[1] } }, duration) &&
+            resave(selectedCand.id)),
       d: () => selectedCand && !busy && dismissOrDelete(selectedCand),
       i: () => mark('start'),
       o: () => mark('end'),
@@ -297,7 +326,10 @@ export function GameViewer({
       busy={busy}
       canSave={game.hasFullVideo}
       onSelect={select}
-      onSave={saveOne}
+      showDismissed={showDismissed}
+      onToggleDismissed={setShowDismissed}
+      onArchive={(id, anchor) => setArchiveTarget({ id, anchor })}
+      onResave={resave}
       onDismiss={dismissOrDelete}
       onRename={(id, title) => void run(() => patchCandidate(gameKey, id, { title }))}
       onDelete={(id) => void run(() => deleteCandidate(gameKey, id))}
@@ -332,8 +364,8 @@ export function GameViewer({
           />
         ) : !game.hasFullVideo ? (
           <p className="h-fit flex-1 rounded border border-amber-500/60 bg-amber-500/10 p-3 text-sm text-amber-200">
-            {game.fullVideoError ?? '풀영상이 없습니다(자동 정리로 지워졌거나 저장하지 못했습니다).'} 후보 목록은 남아 있지만 영상을 볼 수
-            없어 클립을 새로 저장할 수 없습니다.
+            {game.fullVideoError ?? '풀영상이 없습니다(자동 정리로 지워졌거나 만들지 못했습니다).'} 후보 목록은 남아 있지만 영상을 볼 수
+            없어 클립을 새로 보관할 수 없습니다.
           </p>
         ) : (
           <div ref={shell} data-testid="viewer-shell" className="flex min-w-0 flex-1 flex-col gap-1 bg-zinc-900 [&:fullscreen]:p-3">
@@ -403,7 +435,7 @@ export function GameViewer({
               duration={duration}
               view={view}
               time={time}
-              cands={cands}
+              cands={barCands}
               selectedId={selected}
               markers={game.markers}
               overrides={overrides}
@@ -416,7 +448,7 @@ export function GameViewer({
             <div className="flex items-center gap-2 pt-1">
               <span className="min-w-0 flex-1 truncate text-xs text-zinc-500">
                 {selectedCand
-                  ? `선택: ${candidateTitle(selectedCand)} — 양 끝 손잡이를 끌어 범위를 바꾸고, 저장을 눌러야 클립에 반영됩니다`
+                  ? `선택: ${candidateTitle(selectedCand)} — 양 끝 손잡이를 끌어 범위를 바꿉니다. 보관한 클립은 "다시 저장"을 눌러야 새 범위가 반영됩니다`
                   : '막대에서 노란 구간을 누르면 선택됩니다. 초록 킬 · 파랑 어시 · 빨강 사망 · 주황 팀원 사망'}
               </span>
               <div className="flex shrink-0 items-center gap-1 text-white">
@@ -437,6 +469,21 @@ export function GameViewer({
           </div>
         )}
         {!isLegacyWithoutVideo(game) && panel}
+        {archiveTarget &&
+          (() => {
+            const cand = cands.find((c) => c.id === archiveTarget.id)
+            const archived = cand ? isSaved(cand) : false
+            return (
+              <ArchivePopup
+                anchor={archiveTarget.anchor}
+                current={cand?.user.savedCategory ?? null}
+                archived={archived}
+                onPick={(category) => (archived && category ? moveArchived(archiveTarget.id, category) : archive(archiveTarget.id, category))}
+                onUnarchive={() => unarchive(archiveTarget.id)}
+                onClose={() => setArchiveTarget(null)}
+              />
+            )
+          })()}
       </div>
     </div>
   )

@@ -58,7 +58,7 @@
 | `clip.fixedPrerollSec` | 30 | `fixed` 모드, 팀 전투 신호 포화 구간 |
 | `clip.mergeGapSec` | 10 | |
 | `clip.includeAudio` | `true` | |
-| `clip.saveMode` | `auto` | `auto`=분석이 끝나면 후보를 전부 클립으로 저장(기존 방식) / `manual`=직접 저장. 풀영상을 못 만든 게임은 어느 쪽이든 확실한 후보(킬·어시·사망)만 저장 |
+| `clip.saveMode` | `auto` | `auto`=분석이 끝나면 후보를 전부 클립으로 만들어 `자동 보관` 에 보관(기존 방식) / `manual`=직접 보관(풀영상 화면의 북마크, 기본 `보관함`). 풀영상을 못 만든 게임은 어느 쪽이든 확실한 후보(킬·어시·사망)만 저장 |
 | `clip.snapToKeyframe` | `true` | 미사용 — 항상 `-c copy` |
 
 ## 인코딩 `encode.*`

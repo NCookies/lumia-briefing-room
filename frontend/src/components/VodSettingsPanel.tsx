@@ -189,7 +189,7 @@ export function VodSettingsPanel({ onClipsDirChanged }: { onClipsDirChanged: () 
       </section>
 
       <section className="flex flex-col gap-1">
-        <h3 className="text-sm font-medium text-zinc-200">영상 파일 클립 저장 위치</h3>
+        <h3 className="text-sm font-medium text-zinc-200">영상 파일 클립 폴더</h3>
         <p className="text-xs text-zinc-500">
           일반 탭의 저장 폴더 안 클립 폴더(영상 파일)에 저장됩니다. 저장 폴더를 바꾸려면 일반 탭에서 바꾸세요.
         </p>

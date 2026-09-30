@@ -76,9 +76,9 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, menu }: Pr
         {g.unsavedEditCount > 0 && (
           <span
             className="rounded bg-red-600 px-2 py-0.5 text-xs font-semibold text-white"
-            title="범위를 고쳤지만 아직 클립에 반영하지 않은 후보입니다. 열어서 저장하세요."
+            title="보관한 클립의 범위를 고쳤지만 아직 클립에 반영하지 않았습니다. 열어서 저장하세요(다시 저장)."
           >
-            편집 {g.unsavedEditCount}개 저장 안 됨
+            {g.unsavedEditCount}개 저장 대기
           </span>
         )}
         {g.pinned && <span className="rounded bg-sky-600/30 px-1.5 text-xs text-sky-200" title="자동 정리에서 제외됩니다">
@@ -101,7 +101,7 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, menu }: Pr
           <button
             type="button"
             className="rounded border border-sky-400 px-2 py-1 text-xs text-sky-100 hover:bg-sky-700/40 disabled:opacity-40"
-            title="원본 녹화가 남아 있어 풀영상을 새로 만들 수 있습니다. 저장된 클립은 그대로 둡니다."
+            title="원본 녹화가 남아 있어 풀영상을 새로 만들 수 있습니다. 보관한 클립은 그대로 둡니다."
             disabled={rebuild.disabled}
             onClick={(e) => {
               e.stopPropagation()
@@ -111,7 +111,7 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, menu }: Pr
             {rebuild.label}
           </button>
         )}
-        <span className="text-xs text-zinc-300">저장한 클립 {g.savedClipCount}개</span>
+        <span className="text-xs text-zinc-300">보관한 클립 {g.savedClipCount}개</span>
         <span className="text-xs text-zinc-500">
           {g.legacy && !g.hasFullVideo
             ? ''

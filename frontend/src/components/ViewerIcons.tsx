@@ -34,3 +34,21 @@ export const ZoomOutIcon = () => zoomSvg(<path d="M6.6 10h6.8" />)
 export const EditIcon = () => svg(<path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75zM20.7 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75z" />)
 export const FullscreenIcon = () => svg(<path d="M4 4h6v2H6v4H4zM14 4h6v6h-2V6h-4zM4 14h2v4h4v2H4zM18 14h2v6h-6v-2h4z" />)
 export const ExitFullscreenIcon = () => svg(<path d="M8 4h2v6H4V8h4zM14 4h2v4h4v2h-6zM4 14h6v6H8v-4H4zM14 14h6v2h-4v4h-2z" />)
+
+const bookmark = (filled: boolean) => (
+  <svg
+    viewBox="0 0 24 24"
+    width="16"
+    height="16"
+    fill={filled ? 'currentColor' : 'none'}
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    className="inline-block align-middle"
+  >
+    <path d="M6 3h12v18l-6-4.5L6 21z" />
+  </svg>
+)
+export const BookmarkIcon = () => bookmark(false)
+export const BookmarkFilledIcon = () => bookmark(true)

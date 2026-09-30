@@ -348,7 +348,7 @@ export function VodSection({
               title={
                 analysisBusy
                   ? '다른 영상 작업이 끝나면 시작할 수 있습니다'
-                  : '이전 버전에서 분석한 게임의 풀영상을 원본에서 잘라 만듭니다. 저장된 클립은 그대로 둡니다'
+                  : '이전 버전에서 분석한 게임의 풀영상을 원본에서 잘라 만듭니다. 보관한 클립은 그대로 둡니다'
               }
               onClick={onBuildFullVideos}
             >

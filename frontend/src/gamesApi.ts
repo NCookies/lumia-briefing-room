@@ -52,8 +52,14 @@ export async function deleteCandidate(key: string, id: string): Promise<void> {
   await jsonOrThrow(await send('DELETE', `${BASE}/${key}/candidates/${id}`), '구간 삭제')
 }
 
-export async function saveCandidate(key: string, id: string): Promise<string> {
-  return (await jsonOrThrow<{ clipId: string }>(await send('POST', `${BASE}/${key}/candidates/${id}/save`), '클립 저장')).clipId
+export interface ArchiveResult {
+  clipId: string
+  category: string | null
+}
+
+/** 후보를 클립으로 만들어 카테고리에 보관한다(이미 보관했으면 고친 범위를 반영해 다시 저장). */
+export async function saveCandidate(key: string, id: string, category?: string): Promise<ArchiveResult> {
+  return jsonOrThrow(await send('POST', `${BASE}/${key}/candidates/${id}/save`, { category }), '보관')
 }
 
 export interface BatchResult {
@@ -61,8 +67,8 @@ export interface BatchResult {
   failed: { candidateId: string; error: string }[]
 }
 
-export async function saveBatch(key: string, mode: 'all' | 'certain' | 'ids', ids?: string[]): Promise<BatchResult> {
-  return jsonOrThrow(await send('POST', `${BASE}/${key}/save`, { mode, ids }), '일괄 저장')
+export async function saveBatch(key: string, mode: 'all' | 'certain' | 'ids', ids?: string[], category?: string): Promise<BatchResult> {
+  return jsonOrThrow(await send('POST', `${BASE}/${key}/save`, { mode, ids, category }), '일괄 보관')
 }
 
 export async function startRebuildFullVideo(key: string): Promise<RebuildStatus> {

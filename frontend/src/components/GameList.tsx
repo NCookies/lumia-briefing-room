@@ -130,7 +130,7 @@ export function GameList({
       {dueOnly && shown.length === 0 && <p className="text-sm text-zinc-500">삭제 예정인 게임이 없습니다.</p>}
       {games.length === 0 && (
         <p className="text-sm text-zinc-500">
-          아직 저장된 게임이 없습니다. 게임을 한 판 마치면 전체 영상과 교전 후보가 여기에 쌓입니다.
+          아직 처리한 게임이 없습니다. 게임을 한 판 마치면 전체 영상과 교전 후보가 여기에 쌓입니다.
         </p>
       )}
       {dayGroups.map((dayGroup) => (
