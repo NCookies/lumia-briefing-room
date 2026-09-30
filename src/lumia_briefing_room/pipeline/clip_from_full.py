@@ -15,7 +15,7 @@ from pathlib import Path
 from lumia_briefing_room.config import Config
 from lumia_briefing_room.pipeline.clip import make_thumbnail
 from lumia_briefing_room.pipeline.clip_assets import stored_asset_path
-from lumia_briefing_room.pipeline.clip_files import find_video
+from lumia_briefing_room.pipeline.clip_files import find_video, find_video_for
 from lumia_briefing_room.pipeline.clip_uid import new_clip_uid
 from lumia_briefing_room.pipeline.mp4_tags import uid_metadata_args
 from lumia_briefing_room.pipeline.game_candidates import effective_range, effective_title
@@ -154,8 +154,8 @@ def save_candidate_clip(
     video_root = video_dir or clips_dir
     thumbnails_root = thumbnails_root or (clips_dir / ".thumbs")
     clip_id = replace_clip_id or _unique_clip_id(clips_dir, cand["id"], roots)
-    clip_path = (find_video(clips_dir, clip_id, roots) if replace_clip_id else None) or video_root / f"{clip_id}.mp4"
     json_path = clips_dir / f"{clip_id}.json"
+    clip_path = (find_video_for(json_path, roots) if replace_clip_id else None) or video_root / f"{clip_id}.mp4"
     old = _read_json(json_path) if replace_clip_id else {}
     uid = old.get("clipUid") or new_clip_uid()
     if replace_clip_id:

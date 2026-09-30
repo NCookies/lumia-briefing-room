@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from lumia_briefing_room.config import Config
-from lumia_briefing_room.pipeline.clip_files import commit_staged_clips, find_video
+from lumia_briefing_room.pipeline.clip_files import commit_staged_clips, find_video_for
 from lumia_briefing_room.pipeline.delete_helper import delete_clip
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for
 from lumia_briefing_room.pipeline.label_migrate import load_metas, migrate_labels
@@ -153,7 +153,7 @@ def reprocess_game(
         for path in old:
             delete_clip(
                 path, mode=cfg.ui.delete_mode, archive_dir=archive_dir,
-                video=find_video(clips_dir, path.stem, roots),
+                video=find_video_for(path, roots),
             )
         final = commit_staged_clips(staging, clips_dir, video_dir or clips_dir)
 

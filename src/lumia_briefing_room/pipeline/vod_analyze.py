@@ -26,7 +26,7 @@ from lumia_briefing_room.detect.result import ResultScreen
 from lumia_briefing_room.detect.types import FrameState, PortraitCrops
 from lumia_briefing_room.pipeline.clip import ClipRange, make_thumbnail
 from lumia_briefing_room.pipeline.clip_assets import stored_asset_path
-from lumia_briefing_room.pipeline.clip_files import commit_staged_clips, find_video
+from lumia_briefing_room.pipeline.clip_files import commit_staged_clips, find_video_for
 from lumia_briefing_room.pipeline.clip_uid import new_clip_uid
 from lumia_briefing_room.pipeline.ffmpeg_errors import describe_clip_error, is_disk_full_error
 from lumia_briefing_room.pipeline.filters import apply_filter
@@ -616,7 +616,7 @@ def _make_clips(
         for meta_path in old_paths:
             delete_clip(
                 meta_path, mode=cfg.ui.delete_mode, archive_dir=archive_dir,
-                video=find_video(root, meta_path.stem, place.video_roots),
+                video=find_video_for(meta_path, place.video_roots),
             )
     commit_staged_clips(staging, root, place.video_dir)
 

@@ -78,3 +78,15 @@ def test_api_requests_are_counted_so_the_app_can_tell_whether_a_page_is_alive(tm
     client.get("/api/app-info")
     client.get("/")
     assert app.state.request_count == 2
+
+
+def test_startup_also_records_fingerprints_of_untagged_legacy_clips(tmp_path):
+    lib = resolve_paths(_cfg(tmp_path).paths)
+    write_clip(lib.library_steam, "old")
+    (lib.library_steam / "old.mp4").rename(tmp_path / "moved.mp4")
+    (tmp_path / "clips").mkdir(exist_ok=True)
+    (tmp_path / "moved.mp4").rename(tmp_path / "clips" / "old.mp4")
+    app = make_app(tmp_path)
+    backfill_clip_uids_locked(app)
+    meta = read(lib.library_steam / "old.json")
+    assert meta["videoFingerprint"] and meta["videoSizeBytes"] == 1

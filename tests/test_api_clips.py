@@ -78,13 +78,13 @@ def test_scan_skips_files_that_vanish_or_are_unreadable_while_scanning(tmp_path,
     (tmp_path / "ok.json").write_text(_json.dumps({"title": "ok"}), encoding="utf-8")
     (tmp_path / "gone.json").write_text(_json.dumps({"title": "gone"}), encoding="utf-8")
     (tmp_path / "broken.json").write_text("{not json", encoding="utf-8")
-    original = clips_module._load_one
+    original = clips_module._summary
 
     def flaky(path, *args):
         if path.stem == "gone":
             raise FileNotFoundError(path)
         return original(path, *args)
 
-    monkeypatch.setattr(clips_module, "_load_one", flaky)
+    monkeypatch.setattr(clips_module, "_summary", flaky)
 
     assert [c.id for c in clips_module.scan_clips(tmp_path)] == ["ok"]

@@ -7,11 +7,15 @@
 from __future__ import annotations
 
 import errno
+import hashlib
+import json
 import os
 import shutil
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
+from lumia_briefing_room.pipeline.mp4_tags import read_clip_uid
 from lumia_briefing_room.video_formats import VIDEO_EXTENSIONS
 
 TEMP_MARKERS = (".tmp.", ".replace.", ".trim.", ".part")
@@ -35,17 +39,157 @@ def walk_videos(roots: Iterable[Path]) -> Iterable[Path]:
                     yield path
 
 
-def index_videos(meta_dir: Path, roots: Iterable[Path]) -> dict[str, Path]:
-    """파일 이름 줄기 → 영상 경로. 정보 파일 옆 영상이 먼저이고, 같은 이름이 둘이면 경로순으로 앞선 것."""
-    found: dict[str, Path] = {}
-    beside = {p.stem: p for p in meta_dir.glob("*.mp4") if not is_temp_video(p.name)} if meta_dir.is_dir() else {}
-    found.update(beside)
+def _beside(meta_dir: Path) -> list[Path]:
+    if not meta_dir.is_dir():
+        return []
+    return sorted(p for p in meta_dir.glob("*.mp4") if p.is_file() and not is_temp_video(p.name))
+
+
+_fp_cache: dict[str, tuple[int, int, str]] = {}
+
+
+def content_fingerprint(path: Path) -> str:
+    """파일 크기 + 앞·뒤 1MiB 해시(영상 파일 분석의 `vodId` 와 같은 방식). 내용으로 식별하므로 옮기고 이름을 바꿔도 같다."""
+    from lumia_briefing_room.pipeline.vod_store import vod_id
+
+    stat = path.stat()
+    hit = _fp_cache.get(str(path))
+    if hit and hit[0] == stat.st_size and hit[1] == stat.st_mtime_ns:
+        return hit[2]
+    value = vod_id(path)
+    _fp_cache[str(path)] = (stat.st_size, stat.st_mtime_ns, value)
+    return value
+
+
+def short_hash(path: Path) -> str:
+    return hashlib.sha1(str(path).encode("utf-8")).hexdigest()[:6]
+
+
+@dataclass(frozen=True)
+class UnknownVideo:
+    id: str
+    path: Path
+
+
+@dataclass
+class LinkResult:
+    primary: dict[tuple[Path, str], Path]
+    extras: list[tuple[Path, str, str, Path]]  # (정보 폴더, 표시 ID `<ID>~<해시>`, 원래 ID, 영상)
+    unlinked: list[Path]
+
+
+def link_all(
+    libraries: Sequence[tuple[Path, Sequence[tuple[str, dict]]]], roots: Iterable[Path]
+) -> LinkResult:
+    """클립 정보(json)와 영상 파일을 잇는다. 순서: ① 영상 안 `clipUid` 태그 ② (태그 없는 영상만) 파일 이름 줄기 ③ (태그 없는 영상만) 정보에
+    기록된 지문(`videoFingerprint`, 크기가 같은 영상만 읽는다). 같은 ID 태그가 붙은 영상이 여럿이면 경로순 첫째는 원래 ID, 나머지는 `<ID>~<해시>`."""
+    roots = tuple(roots)
+    videos: list[Path] = []
+    seen: set[Path] = set()
+    for meta_dir, _ in libraries:
+        for path in _beside(meta_dir):
+            if path not in seen:
+                seen.add(path)
+                videos.append(path)
     for path in walk_videos(roots):
-        found.setdefault(path.stem, path)
+        if path not in seen:
+            seen.add(path)
+            videos.append(path)
+    uids = {path: read_clip_uid(path) for path in videos}
+    by_uid: dict[str, list[Path]] = {}
+    for path in videos:
+        if uids[path]:
+            by_uid.setdefault(uids[path], []).append(path)
+
+    primary: dict[tuple[Path, str], Path] = {}
+    extras: list[tuple[Path, str, str, Path]] = []
+    claimed: set[Path] = set()
+    for meta_dir, items in libraries:
+        for clip_id, meta in items:
+            found = by_uid.get(meta.get("clipUid") or "")
+            if not found:
+                continue
+            primary[(meta_dir, clip_id)] = found[0]
+            extras.extend((meta_dir, f"{clip_id}~{short_hash(p)}", clip_id, p) for p in found[1:])
+            claimed.update(found)
+
+    untagged = [p for p in videos if not uids[p]]
+    stems: dict[str, Path] = {}
+    for path in untagged:
+        stems.setdefault(path.stem, path)
+    for meta_dir, items in libraries:
+        for clip_id, _ in items:
+            path = stems.get(clip_id)
+            if (meta_dir, clip_id) not in primary and path is not None and path not in claimed:
+                primary[(meta_dir, clip_id)] = path
+                claimed.add(path)
+
+    sizes: dict[Path, int] = {}
+    for meta_dir, items in libraries:
+        for clip_id, meta in items:
+            want_size, want_fp = meta.get("videoSizeBytes"), meta.get("videoFingerprint")
+            if (meta_dir, clip_id) in primary or not want_fp or not isinstance(want_size, int):
+                continue
+            for path in untagged:
+                if path in claimed:
+                    continue
+                if path not in sizes:
+                    try:
+                        sizes[path] = path.stat().st_size
+                    except OSError:
+                        sizes[path] = -1
+                if sizes[path] == want_size and content_fingerprint(path) == want_fp:
+                    primary[(meta_dir, clip_id)] = path
+                    claimed.add(path)
+                    break
+    return LinkResult(primary=primary, extras=extras, unlinked=[p for p in videos if p not in claimed])
+
+
+def load_metas(meta_dir: Path) -> list[tuple[str, dict]]:
+    items: list[tuple[str, dict]] = []
+    if not meta_dir.is_dir():
+        return items
+    for path in sorted(meta_dir.glob("*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict):
+            items.append((path.stem, data))
+    return items
+
+
+def unknown_videos(meta_dirs: Sequence[Path], roots: Iterable[Path]) -> list[UnknownVideo]:
+    """어떤 클립 정보와도 안 이어지는 영상(OBS 녹화 등). ID 는 내용 지문(`x_<지문>`)이라 옮겨도 같고, 같은 내용의 복사본은 `~<해시>` 로 구분한다."""
+    result = link_all([(d, load_metas(d)) for d in meta_dirs], roots)
+    found: list[UnknownVideo] = []
+    seen_ids: set[str] = set()
+    for path in result.unlinked:
+        try:
+            base = f"x_{content_fingerprint(path)}"
+        except OSError:
+            continue
+        clip_id = base if base not in seen_ids else f"{base}~{short_hash(path)}"
+        seen_ids.add(clip_id)
+        found.append(UnknownVideo(clip_id, path))
     return found
 
 
-def find_video(meta_dir: Path, clip_id: str, roots: Iterable[Path]) -> Path | None:
+def find_unknown(clip_id: str, meta_dirs: Sequence[Path], roots: Iterable[Path]) -> UnknownVideo | None:
+    if not clip_id.startswith("x_"):
+        return None
+    return next((u for u in unknown_videos(meta_dirs, roots) if u.id == clip_id), None)
+
+
+def find_video(meta_dir: Path, clip_id: str, roots: Iterable[Path], meta: dict | None = None) -> Path | None:
+    """`meta` 를 주면 태그·지문으로도 찾고, 안 주면 파일 이름으로만 찾는다."""
+    roots = tuple(roots)
+    if meta is not None:
+        base = clip_id.partition("~")[0]
+        result = link_all([(meta_dir, [(base, meta)])], roots)
+        if "~" in clip_id:
+            return next((p for _, cid, _, p in result.extras if cid == clip_id), None)
+        return result.primary.get((meta_dir, base))
     beside = meta_dir / f"{clip_id}.mp4"
     if beside.is_file():
         return beside
@@ -53,6 +197,15 @@ def find_video(meta_dir: Path, clip_id: str, roots: Iterable[Path]) -> Path | No
         if path.stem == clip_id:
             return path
     return None
+
+
+def find_video_for(meta_path: Path, roots: Iterable[Path]) -> Path | None:
+    """정보 파일(json) 하나에 이어지는 영상. 태그·지문·파일 이름 순으로 찾는다."""
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return find_video(meta_path.parent, meta_path.stem, roots)
+    return find_video(meta_path.parent, meta_path.stem, roots, meta if isinstance(meta, dict) else None)
 
 
 def move_file(src: Path, dst: Path, *, overwrite: bool = True) -> None:

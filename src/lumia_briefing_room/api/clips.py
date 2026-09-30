@@ -4,12 +4,12 @@
 """
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from collections.abc import Iterable
 from pathlib import Path
 
-from lumia_briefing_room.pipeline.clip_files import find_video, index_videos
+from lumia_briefing_room.pipeline.clip_files import find_video, link_all
 
 @dataclass(frozen=True)
 class ClipSummary:
@@ -39,31 +39,66 @@ def _load_one(meta_path: Path, video: Path | None = None) -> ClipSummary:
     )
 
 
+def _summary(meta_path: Path, meta: dict, video: Path | None) -> ClipSummary:
+    mp4_path = video or meta_path.with_suffix(".mp4")
+    try:
+        size = mp4_path.stat().st_size
+    except OSError:
+        size = 0
+    created_at = datetime.fromtimestamp(meta_path.stat().st_mtime, tz=timezone.utc)
+    return ClipSummary(
+        id=meta_path.stem, meta_path=meta_path, meta=meta, size_bytes=size, created_at=created_at, video_path=mp4_path
+    )
+
+
 def scan_clips(meta_dir: Path, video_roots: Iterable[Path] = ()) -> list[ClipSummary]:
     """meta_dir 바로 아래의 메타데이터를 전부 읽는다. 읽는 도중 지워졌거나 깨진 파일은 건너뛴다(동시에 삭제하는 요청과 겹칠 수 있다).
 
-    영상은 정보 파일 옆에서, 없으면 `video_roots` 아래에서 파일 이름으로 찾는다(정보는 library, 영상은 저장 폴더).
-    `glob("*.json")` 은 비재귀라 `.thumbs`/`.proxy` 서브폴더 안의 파일은 애초에 안 잡힌다.
+    영상은 `link_all` 이 잇는다: 영상 안 `clipUid` 태그 → 파일 이름 → 기록된 지문 순(정보는 library, 영상은 저장 폴더 어디든).
+    같은 ID 태그의 복사본은 `<ID>~<해시>` 로 따로 나온다. `glob("*.json")` 은 비재귀라 `.thumbs`/`.proxy` 서브폴더 안의 파일은 안 잡힌다.
     """
     if not meta_dir.exists():
         return []
-    roots = tuple(video_roots)
-    videos = index_videos(meta_dir, roots) if roots else {}
-    clips = []
+    loaded: list[tuple[Path, dict]] = []
     for path in sorted(meta_dir.glob("*.json")):
         try:
-            clips.append(_load_one(path, videos.get(path.stem)))
+            meta = json.loads(path.read_text(encoding="utf-8"))
+            path.stat()
         except (OSError, ValueError):
+            continue
+        if isinstance(meta, dict):
+            loaded.append((path, meta))
+    links = link_all([(meta_dir, [(p.stem, m) for p, m in loaded])], video_roots)
+    clips: list[ClipSummary] = []
+    by_id = {p.stem: (p, m) for p, m in loaded}
+    for path, meta in loaded:
+        try:
+            clips.append(_summary(path, meta, links.primary.get((meta_dir, path.stem))))
+        except OSError:
+            continue
+    for _, extra_id, base_id, video in links.extras:
+        path, meta = by_id[base_id]
+        try:
+            clips.append(replace(_summary(path, meta, video), id=extra_id))
+        except OSError:
             continue
     return clips
 
 
 def find_clip(meta_dir: Path, clip_id: str, video_roots: Iterable[Path] = ()) -> ClipSummary | None:
-    meta_path = meta_dir / f"{clip_id}.json"
+    base_id = clip_id.partition("~")[0]
+    meta_path = meta_dir / f"{base_id}.json"
     try:
-        return _load_one(meta_path, find_video(meta_dir, clip_id, video_roots))
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        if not isinstance(meta, dict):
+            return None
+        video = find_video(meta_dir, clip_id, video_roots, meta)
+        if video is None and "~" in clip_id:
+            return None
+        clip = _summary(meta_path, meta, video)
     except (OSError, ValueError):
         return None
+    return replace(clip, id=clip_id)
 
 
 def to_summary_dict(clip: ClipSummary) -> dict:
