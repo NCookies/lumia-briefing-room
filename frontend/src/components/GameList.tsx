@@ -65,7 +65,11 @@ export function GameList({ active, refreshTick }: { active: boolean; refreshTick
             {dayGroup.games.map((g) => {
               const due = cleanup[g.key]
               return (
-                <li key={g.key} className="flex flex-wrap items-center gap-3 rounded border border-zinc-700 bg-zinc-800/60 p-3">
+                <li
+              key={g.key}
+              className="flex cursor-pointer flex-wrap items-center gap-3 rounded border border-zinc-700 bg-zinc-800/60 p-3 hover:border-zinc-500 hover:bg-zinc-800"
+              onClick={() => setOpen(g.key)}
+            >
                   <div className="flex items-center gap-1">
                     {(['me', 'teammate1', 'teammate2'] as const).map((slot) =>
                       g.portraits[slot] ? (
@@ -93,7 +97,7 @@ export function GameList({ active, refreshTick }: { active: boolean; refreshTick
                     </span>
                   )}
                   <span className="text-xs text-zinc-300">
-                    후보 {g.candidateCount}개 (확실 {g.certainCount}) · 저장한 클립 {g.savedClipCount}개
+                    저장한 클립 {g.savedClipCount}개
                   </span>
                   <span className="text-xs text-zinc-500">
                     {g.hasFullVideo
@@ -102,6 +106,14 @@ export function GameList({ active, refreshTick }: { active: boolean; refreshTick
                         ? '풀영상 삭제됨'
                         : '풀영상 없음'}
                   </span>
+                  {g.unsavedEditCount > 0 && (
+                    <span
+                      className="rounded bg-red-600 px-2 py-0.5 text-xs font-semibold text-white"
+                      title="범위를 고쳤지만 아직 클립에 반영하지 않은 후보입니다. 열어서 저장하세요."
+                    >
+                      편집 {g.unsavedEditCount}개 저장 안 됨
+                    </span>
+                  )}
                   {g.pinned && <span className="rounded bg-sky-600/30 px-1.5 text-xs text-sky-200">고정</span>}
                   {due && g.hasFullVideo && (
                     <span className="rounded bg-rose-600/30 px-1.5 text-xs text-rose-200" title={cleanupReasonTooltip(due)}>
@@ -113,20 +125,14 @@ export function GameList({ active, refreshTick }: { active: boolean; refreshTick
                     <button
                       type="button"
                       className="rounded border border-zinc-600 px-2 py-1 text-xs hover:bg-zinc-700"
-                      onClick={() =>
+                      onClick={(e) => {
+                        e.stopPropagation()
                         void setGamePinned(g.key, !g.pinned)
                           .then(load)
-                          .catch((e: Error) => setError(e.message))
-                      }
+                          .catch((err: Error) => setError(err.message))
+                      }}
                     >
                       {g.pinned ? '고정 해제' : '고정'}
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded bg-sky-600 px-3 py-1 text-sm hover:bg-sky-500"
-                      onClick={() => setOpen(g.key)}
-                    >
-                      열기
                     </button>
                   </span>
                 </li>
