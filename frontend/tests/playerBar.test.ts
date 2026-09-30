@@ -137,3 +137,8 @@ test('a candidate counts as modified when its range differs from what was saved 
   assert.equal(rangeModified(saved, 600), false)
   assert.equal(rangeModified({ ...saved, user: { ...saved.user, end: 60 } }, 600), true)
 })
+
+test('풀영상이 없어 길이를 모를 때(0)는 범위를 깎지 않으므로 고친 것으로 보지 않는다', () => {
+  assert.equal(rangeModified(c('a', 199, 240), 0), false)
+  assert.equal(rangeModified(c('a', 199, 240, { user: { savedClipId: 'a' } }), 0), false)
+})

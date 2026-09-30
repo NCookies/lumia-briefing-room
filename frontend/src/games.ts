@@ -111,7 +111,7 @@ export function isSaved(c: Candidate): boolean {
 export function effectiveRange(c: Candidate, duration: number): [number, number] {
   const start = c.user.start ?? c.start
   const end = c.user.end ?? c.end
-  return [Math.max(0, start), Math.min(duration, end)]
+  return [Math.max(0, start), duration > 0 ? Math.min(duration, end) : end]
 }
 
 export function visibleCandidates(game: Pick<GameDetail, 'candidates' | 'userCandidates'>, showDismissed = false): Candidate[] {

@@ -30,6 +30,7 @@ test('the users adjusted range wins over the detected one and stays inside the v
   assert.deepEqual(effectiveRange(c('a', 10, 40), 600), [10, 40])
   assert.deepEqual(effectiveRange(c('a', 10, 40, { user: { start: 5, end: 50 } }), 600), [5, 50])
   assert.deepEqual(effectiveRange(c('a', -3, 700), 600), [0, 600])
+  assert.deepEqual(effectiveRange(c('a', 199, 240), 0), [199, 240], '풀영상이 없으면(길이 0) 범위를 깎지 않는다')
 })
 
 test('dismissed candidates are hidden unless asked for, and the rest are sorted by start', () => {

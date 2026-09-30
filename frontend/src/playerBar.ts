@@ -87,6 +87,6 @@ export function rangeModified(c: Candidate, duration: number): boolean {
   const [bs, be] =
     isSaved(c) && u.savedStart !== undefined && u.savedEnd !== undefined
       ? [u.savedStart, u.savedEnd]
-      : [Math.max(0, c.start), Math.min(duration, c.end)]
+      : [Math.max(0, c.start), duration > 0 ? Math.min(duration, c.end) : c.end]
   return Math.abs(s - bs) > 0.001 || Math.abs(e - be) > 0.001
 }

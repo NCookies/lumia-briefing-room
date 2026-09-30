@@ -21,6 +21,7 @@ import { LegacyGamePanel } from './LegacyGamePanel'
 import { ViewerBar, ViewerScroll } from './ViewerBar'
 import { ExitFullscreenIcon, FullscreenIcon, MuteIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon, VolumeIcon, ZoomInIcon, ZoomOutIcon } from './ViewerIcons'
 import { ArchivePopup } from './ArchivePopup'
+import { SavedClipPlayer } from './SavedClipPlayer'
 import { GameMenu, type GameMenuItem } from './GameMenu'
 import { ViewerCandidates } from './ViewerCandidates'
 
@@ -80,6 +81,10 @@ export function GameViewer({
   const cands = useMemo(() => (game ? visibleCandidates(game, showDismissed) : []), [game, showDismissed])
   const barCands = useMemo(() => cands.filter((c) => !isDismissed(c)), [cands])
   const selectedCand = cands.find((c) => c.id === selected) ?? null
+  const noVideoClip = useMemo(
+    () => (selectedCand?.user.savedClipId ? selectedCand : (cands.find((c) => c.user.savedClipId && !isDismissed(c)) ?? null)),
+    [cands, selectedCand],
+  )
   const rangeOf = (c: Candidate): [number, number] => overrides[c.id] ?? effectiveRange(c, duration)
   const view: View = zoomWindow ?? [0, duration]
   const currentId = candidateAtTime(cands, time, duration)?.id ?? null
@@ -387,10 +392,11 @@ export function GameViewer({
             }}
           />
         ) : !game.hasFullVideo ? (
-          <p className="h-fit flex-1 rounded border border-amber-500/60 bg-amber-500/10 p-3 text-sm text-amber-200">
-            {game.fullVideoError ?? '풀영상이 없습니다(자동 정리로 지워졌거나 만들지 못했습니다).'} 후보 목록은 남아 있지만 영상을 볼 수
-            없어 클립을 새로 보관할 수 없습니다.
-          </p>
+          <SavedClipPlayer
+            notice={`${game.fullVideoError ?? '풀영상이 없습니다(자동 정리로 지우거나 삭제했거나 만들지 못했습니다).'} 새로 보관할 수는 없지만, 이미 만든 클립은 오른쪽 목록에서 후보를 눌러 볼 수 있습니다.`}
+            clipId={noVideoClip?.user.savedClipId ?? null}
+            title={noVideoClip ? candidateTitle(noVideoClip) : null}
+          />
         ) : (
           <div ref={shell} data-testid="viewer-shell" className="flex min-w-0 flex-1 flex-col gap-1 bg-zinc-900 [&:fullscreen]:p-3">
             <video
