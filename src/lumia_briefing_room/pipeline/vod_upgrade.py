@@ -156,7 +156,7 @@ def upgrade_vod_games(
     todo = []
     for g in entries:
         folder = games_dir / vod_game_key(vod, g["index"])
-        if (folder / FULL_VIDEO).is_file() and _is_upgraded(folder):
+        if _is_settled(folder):
             continue
         todo.append(g)
 
@@ -227,14 +227,17 @@ def upgrade_vod_games(
     return created
 
 
-def _is_upgraded(folder: Path) -> bool:
+def _is_settled(folder: Path) -> bool:
+    """이미 새 형식이고 풀영상이 있거나(자동 정리로 지운 것도) 다시 만들 필요가 없는 게임."""
     import json
 
     try:
         data = json.loads((folder / GAME_JSON).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return False
-    return isinstance(data, dict) and not data.get("legacy") and bool(data.get("fullVideo"))
+    if not isinstance(data, dict) or data.get("legacy"):
+        return False
+    return bool(data.get("fullVideo")) and (folder / FULL_VIDEO).is_file() or bool(data.get("fullVideoDeletedAt"))
 
 
 def _keep_old_result(data: dict, folder: Path, root: Path, game: dict) -> None:

@@ -183,3 +183,17 @@ def test_old_clips_with_other_ids_are_linked_to_the_candidate_they_overlap_most(
     linked = _link_old_clips(cands, {"old_a": (300.0, 340.0), "vod_3df9b3313b4e_g01_000105": (104.0, 140.0)}, 0.0)
 
     assert linked == {cands[0].candidate_id: "vod_3df9b3313b4e_g01_000105", cands[1].candidate_id: "old_a"}
+
+
+@requires_ffmpeg
+def test_upgrade_does_not_recreate_a_full_video_that_auto_cleanup_removed(vod_file, tmp_path):
+    index, cfg = legacy_setup(tmp_path, vod_file)
+    key = f"vod_{vod_id(vod_file)}_g01"
+    folder = cfg.paths.games / key
+    data = json.loads((folder / "game.json").read_text(encoding="utf-8"))
+    data.pop("legacy", None)
+    data.update(fullVideo=None, fullVideoDeletedAt="2026-09-30T00:00:00Z")
+    (folder / "game.json").write_text(json.dumps(data), encoding="utf-8")
+
+    assert upgrade(cfg, vod_file, load_index(cfg.paths.vod_clips, vod_id(vod_file))) == []
+    assert not (folder / "full.mp4").exists()

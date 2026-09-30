@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import threading
+from types import SimpleNamespace
 from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Callable
 from pathlib import Path
@@ -20,7 +21,10 @@ from lumia_briefing_room.config import Config, discover_ffmpeg, resolve_paths
 from lumia_briefing_room.pipeline.delete_helper import delete_clip
 from lumia_briefing_room.pipeline.ffmpeg_errors import describe_clip_error
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for
+from lumia_briefing_room.pipeline.cleanup_registry import registry as cleanup_preview_registry
 from lumia_briefing_room.pipeline.vod_analyze import VodCancelled, VodProgress, analyze_vod
+from lumia_briefing_room.pipeline.vod_full_games import delete_vod_games
+from lumia_briefing_room.pipeline.vod_upgrade import UpgradeError, can_upgrade, upgrade_vod_games
 from lumia_briefing_room.pipeline.vod_dates import is_valid_iso_date, resolve_video_date
 from lumia_briefing_room.pipeline.vod_store import cache_path, index_path, load_index, save_index, vod_id
 from lumia_briefing_room.video.vod import VideoInfo, find_ffprobe, probe_video
@@ -81,6 +85,9 @@ def register_vod_routes(
 
     def root() -> Path:
         return resolve_paths(current_config().paths).vod_clips
+
+    def games_root() -> Path:
+        return resolve_paths(current_config().paths).games
 
     def file_id(path: Path) -> str | None:
         try:
@@ -169,6 +176,7 @@ def register_vod_routes(
             "error": (index or {}).get("error"),
             "errorKind": (index or {}).get("errorKind"),
             "sourceDeleted": (index or {}).get("sourceDeleted", False),
+            "canBuildFullVideos": exists and can_upgrade(index, path, root()),
             "streamer": cfg.vod.streamers.get(vid) or (index or {}).get("streamer"),
             "videoDate": video_date,
             "games": (index or {}).get("games", []),
@@ -255,7 +263,7 @@ def register_vod_routes(
         cancel = threading.Event()
         job.clear()
         job.update(
-            id=vid, state="running", phase="decode", fraction=0.0, games=0, clips=0,
+            id=vid, kind="analyze", state="running", phase="decode", fraction=0.0, games=0, clips=0,
             message="시작하는 중", cancel=cancel,
         )
         force, rebuild = bool(body.get("force")), bool(body.get("rebuild"))
@@ -279,6 +287,63 @@ def register_vod_routes(
                 job.update(state="error", message=describe_clip_error(exc))
 
         threading.Thread(target=run, daemon=True).start()
+        return {"id": vid}
+
+    def start_full_videos(vid: str, only: set[int] | None = None) -> None:
+        """이미 분석한 영상의 게임을 풀영상으로 만든다(분석 작업과 같은 슬롯: 한 번에 하나, 진행률·취소 공용)."""
+        path, index = require(vid)
+        if job.get("state") == "running":
+            raise HTTPException(409, "다른 영상 작업 중입니다. 끝난 뒤 다시 시도하세요")
+        if not path.exists() or not can_upgrade(index, path, root()):
+            raise HTTPException(409, "원본 영상이나 이전 분석 기록이 없어 풀영상을 만들 수 없습니다")
+        ffmpeg = discover_ffmpeg()
+        if ffmpeg is None:
+            raise HTTPException(503, "ffmpeg를 찾을 수 없습니다")
+        cfg = current_config()
+        base, gdir = root(), games_root()
+        cancel = threading.Event()
+        job.clear()
+        job.update(
+            id=vid, kind="fullVideos", state="running", phase="full", fraction=0.0, games=len(index["games"]), clips=0,
+            message="시작하는 중", cancel=cancel, only=sorted(only) if only else None,
+        )
+
+        def run() -> None:
+            try:
+                upgrade_vod_games(
+                    path, cfg, ffmpeg_path=ffmpeg, root=base, games_dir=gdir, index=load_index(base, vid), only=only,
+                    cancel=cancel, on_progress=lambda f, m: job.update(fraction=f, message=m),
+                )
+                job.update(state="done", fraction=1.0, message="")
+                cleanup_preview_registry.notify_clips_changed()
+            except VodCancelled:
+                job.update(state="cancelled", message="멈췄습니다. 다시 누르면 남은 게임부터 만듭니다.")
+            except UpgradeError as exc:
+                job.update(state="error", message=str(exc))
+            except Exception as exc:
+                job.update(state="error", message=describe_clip_error(exc))
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def full_video_status(vid: str, index: int) -> dict:
+        """게임 화면의 "풀영상 만들기" 버튼이 읽는 모양(스팀 쪽과 같다): state/message/fraction."""
+        if job.get("id") == vid and job.get("kind") == "fullVideos" and (not job.get("only") or index in job["only"]):
+            state = job.get("state")
+            return {
+                "state": "error" if state in ("error", "cancelled") else state,
+                "message": job.get("message", ""), "fraction": job.get("fraction", 0.0),
+            }
+        return {"state": "idle", "message": "", "fraction": 0.0}
+
+    def can_build(vid: str) -> bool:
+        found = collect().get(vid)
+        return found is not None and found[0].exists() and can_upgrade(found[1], found[0], root())
+
+    app.state.vod_full_videos = SimpleNamespace(start=start_full_videos, status=full_video_status, can_build=can_build)
+
+    @app.post("/api/vods/{vid}/full-videos", status_code=202)
+    def build_full_videos(vid: str):
+        start_full_videos(vid)
         return {"id": vid}
 
     def public_job() -> dict:
@@ -314,6 +379,7 @@ def register_vod_routes(
             mode = current_config().ui.delete_mode
             for clip in clips:
                 delete_clip(clip.meta_path, mode=mode, archive_dir=archive_dir)
+            delete_vod_games(games_root(), vid, mode=mode)
             index = load_index(base, vid)
             if index is not None:
                 # decodeDone/analyzedSec 은 그대로 둔다 - 프레임 판독 캐시는 영상 자체가
@@ -344,6 +410,7 @@ def register_vod_routes(
             mode = current_config().ui.delete_mode
             for clip in clips:
                 delete_clip(clip.meta_path, mode=mode, archive_dir=archive_dir)
+            delete_vod_games(games_root(), vid, mode=mode)
             index_path(base, vid).unlink(missing_ok=True)
             cache_path(base, vid).unlink(missing_ok=True)
         return {"id": vid, "deletedClips": len(clips)}
@@ -369,6 +436,7 @@ def register_vod_routes(
             mode = current_config().ui.delete_mode
             for clip in clips:
                 delete_clip(clip.meta_path, mode=mode, archive_dir=archive_dir)
+            delete_vod_games(games_root(), vid, mode=mode, only_index=game_index)
             index["games"] = [g for g in games if g.get("index") != game_index]
             index["clips"] = [c for c in index.get("clips", []) if c not in clip_ids]
             save_index(base, index)

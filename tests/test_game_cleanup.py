@@ -115,3 +115,18 @@ def test_preview_maps_game_keys_to_reason_and_due_time(tmp_path):
 
 def test_missing_games_folder_is_an_empty_plan(tmp_path):
     assert gc.plan_game_cleanup(tmp_path / "nope", cfg(max_age_days=1), now=NOW).to_delete == []
+
+
+def test_video_file_games_share_the_total_size_limit_with_steam_games(tmp_path):
+    games = tmp_path / "games"
+    old_steam = make_game(games, 5, 1000)
+    vod = games / "vod_3df9b3313b4e_g01"
+    vod.mkdir()
+    (vod / "full.mp4").write_bytes(b"x" * 1000)
+    (vod / "game.json").write_text(
+        json.dumps({"gameKey": vod.name, "source": "vod", "matchStartUtc": None, "candidates": []}), encoding="utf-8"
+    )
+
+    plan = gc.plan_game_cleanup(games, cfg(max_total_gb=1500 / 1024**3), now=NOW)
+
+    assert plan.to_delete == [old_steam] and plan.bytes_to_free == 1000

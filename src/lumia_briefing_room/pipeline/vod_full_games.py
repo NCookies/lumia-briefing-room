@@ -18,6 +18,7 @@ from lumia_briefing_room.detect.pvp import score_interval
 from lumia_briefing_room.detect.result import ResultScreen
 from lumia_briefing_room.detect.types import MatchDetection, PortraitCrops
 from lumia_briefing_room.pipeline.clip import ClipRange
+from lumia_briefing_room.pipeline.delete_helper import PERMANENT, permanently_delete, send_to_recycle_bin
 from lumia_briefing_room.pipeline.ffmpeg_errors import describe_clip_error
 from lumia_briefing_room.pipeline.game_store import (
     FULL_VIDEO,
@@ -244,3 +245,25 @@ def save_game_assets(
 
 def write_vod_game(folder: Path, data: dict) -> Path:
     return write_game_json(folder, data)
+
+
+def delete_vod_games(games_dir: Path, vod_id: str, *, mode: str, only_index: int | None = None) -> list[str]:
+    """이 영상의 게임 폴더(풀영상 + 게임 기록)를 지운다. 풀영상은 설정한 삭제 방식(휴지통/영구)으로, 나머지 작은 파일은 바로 지운다.
+
+    다른 영상·스팀 게임 폴더는 건드리지 않는다. 지운 폴더 이름 목록을 돌려준다.
+    """
+    prefix = f"vod_{vod_id}_g"
+    try:
+        folders = [p for p in games_dir.iterdir() if p.is_dir() and p.name.startswith(prefix)]
+    except OSError:
+        return []
+    removed = []
+    for folder in sorted(folders):
+        if only_index is not None and folder.name != vod_game_key(vod_id, only_index):
+            continue
+        video = folder / FULL_VIDEO
+        if video.is_file():
+            (permanently_delete if mode == PERMANENT else send_to_recycle_bin)([video])
+        shutil.rmtree(folder, ignore_errors=True)
+        removed.append(folder.name)
+    return removed

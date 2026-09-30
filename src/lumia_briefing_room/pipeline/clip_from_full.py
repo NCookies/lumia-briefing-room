@@ -17,7 +17,11 @@ from lumia_briefing_room.pipeline.clip_assets import stored_asset_path
 from lumia_briefing_room.pipeline.clip_uid import new_clip_uid
 from lumia_briefing_room.pipeline.game_candidates import effective_range, effective_title
 from lumia_briefing_room.pipeline.game_store import FULL_VIDEO
+from lumia_briefing_room.detect.pvp import PvpScore
+from lumia_briefing_room.detect.types import CombatInterval
+from lumia_briefing_room.pipeline.clip import ClipRange
 from lumia_briefing_room.pipeline.metadata import ClipMetadata, phase_index, revive_cost, write_metadata
+from lumia_briefing_room.pipeline.vod_clips import build_vod_metadata
 from lumia_briefing_room.procs import run_hidden
 
 PORTRAIT_SLOTS = ("me", "teammate1", "teammate2")
@@ -87,6 +91,36 @@ def _assets_for_clip(game: dict, game_folder: Path, thumbnails_root: Path, clips
     return result, paths["me"], [p for p in (paths["teammate1"], paths["teammate2"]) if p]
 
 
+def _vod_clip_metadata(
+    game: dict, cand: dict, *, start: float, end: float, offset: float, thumb_rel: str | None,
+    result: dict | None, me_portrait: str | None, mates: list[str],
+) -> dict:
+    """영상 파일 게임에서 저장한 클립: 영상 클립과 같은 형식(vodId·원본 안 위치)이라 영상 클립 화면·API 가 그대로 읽는다.
+    풀영상 0초 = 원본 영상 안 `vodStartSec` 라서 원본 안 위치 = `vodStartSec`(= offsetSec) + 풀영상 안 시각."""
+    interval = CombatInterval(
+        start=offset + float(cand.get("combatStart", start)), end=offset + float(cand.get("combatEnd", end)),
+        tags=frozenset(cand.get("tags") or []), k_delta=int(cand.get("killDelta") or 0),
+        a_delta=int(cand.get("assistDelta") or 0), died=bool(cand.get("died")), day_night=cand.get("dayNight"),
+        confidence=float(cand.get("detectorConfidence") or 0.0), region=cand.get("region"), game_day=cand.get("gameDay"),
+        enemy_ring_mean=cand.get("enemyRingMean"), ultimate_delta=cand.get("ultimateDelta"),
+        cobalt_phase=cand.get("cobaltPhase"),
+    )
+    meta = build_vod_metadata(
+        title=effective_title(cand), vod_id=game["vodId"], vod_file=game.get("vodFile") or "",
+        streamer=game.get("streamer"), game_mode=game.get("gameMode") or "battle_royale",
+        game_index=int(game.get("vodGameIndex") or 0),
+        game_start=float(game.get("spanStartSec") or offset), game_end=float(game.get("spanEndSec") or offset),
+        width=int(game.get("sourceWidth") or 0), height=int(game.get("sourceHeight") or 0), interval=interval,
+        clip_range=ClipRange(start=offset + start, end=offset + end, preroll_source=cand.get("prerollSource", "user")),
+        duration_sec=end - start, thumbnail_path=thumb_rel,
+        pvp=PvpScore(score=float(cand.get("pvpScore") or 0.0), signals=list(cand.get("pvpSignals") or [])),
+        match_kills=game.get("matchKills"), match_assists=game.get("matchAssists"), match_result=None,
+        result_image_path=None, my_character_portrait_path=me_portrait, teammate_portrait_paths=mates,
+    )
+    meta["matchResult"] = result
+    return meta
+
+
 def save_candidate_clip(
     game: dict,
     cand: dict,
@@ -139,6 +173,14 @@ def save_candidate_clip(
     combat_start = offset + float(cand.get("combatStart", start))
     combat_end = offset + float(cand.get("combatEnd", end))
 
+    json_path = clip_path.with_suffix(".json")
+    if game.get("source") == "vod":
+        vod_meta = _vod_clip_metadata(
+            game, cand, start=start, end=end, offset=offset, thumb_rel=thumb_rel, result=result,
+            me_portrait=me_portrait, mates=mates,
+        )
+        return _finish(json_path, json.dumps(vod_meta, ensure_ascii=False, indent=2), replace_clip_id, clip_id)
+
     meta = ClipMetadata(
         title=effective_title(cand),
         session_dir=game.get("sessionDir", ""),
@@ -190,11 +232,20 @@ def save_candidate_clip(
         teammate_portrait_paths=mates,
         match_result_source=None,
     )
-    json_path = clip_path.with_suffix(".json")
     old = _read_json(json_path) if replace_clip_id else {}
     write_metadata(meta, json_path)
+    return _merge_kept(json_path, old, clip_id)
+
+
+def _merge_kept(json_path: Path, old: dict, clip_id: str) -> str:
     if old:
         kept = {k: old[k] for k in _KEPT_ON_REPLACE if k in old}
         merged = {**json.loads(json_path.read_text(encoding="utf-8")), **kept}
         json_path.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
     return clip_id
+
+
+def _finish(json_path: Path, text: str, replace_clip_id: str | None, clip_id: str) -> str:
+    old = _read_json(json_path) if replace_clip_id else {}
+    json_path.write_text(text, encoding="utf-8")
+    return _merge_kept(json_path, old, clip_id)

@@ -145,3 +145,13 @@ def test_only_the_named_games_are_read(tmp_path):
     backfill_game_results(games, clips, find=lambda p: seen.append(p.parent.name) or None, keys=["20260929_110000"])
 
     assert seen == ["20260929_110000"]
+
+
+def test_leaves_video_file_games_alone(tmp_path):
+    games, clips = tmp_path / "games", tmp_path / "clips"
+    make_game(games, "vod_3df9b3313b4e_g01", source="vod")
+    seen = []
+
+    report = backfill_game_results(games, clips, find=lambda path: seen.append(path.name) or screen())
+
+    assert seen == [] and report.filled == 0
