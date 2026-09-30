@@ -56,6 +56,7 @@ export interface GameSummary {
   durationSec: number | null
   fullVideoError: string | null
   fullVideoDeletedAt: string | null
+  legacy: boolean
   candidateCount: number
   certainCount: number
   savedClipCount: number
@@ -64,6 +65,10 @@ export interface GameSummary {
 
 export interface GameDetail {
   gameKey: string
+  matchStartUtc: string | null
+  sessionDir?: string | null
+  legacy?: boolean
+  canRebuildFullVideo?: boolean
   hasFullVideo: boolean
   fullVideo: { durationSec: number; sizeBytes: number | null } | null
   fullVideoError: string | null

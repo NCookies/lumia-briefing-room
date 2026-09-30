@@ -131,10 +131,21 @@ export function GameList({ active, refreshTick }: { active: boolean; refreshTick
                         {cleanupReasonLabel(due)}
                       </span>
                     )}
-                    {g.fullVideoError && <span className="text-xs text-amber-300">{g.fullVideoError}</span>}
+                    {g.legacy && !g.hasFullVideo ? (
+                      <span
+                        className="rounded bg-amber-500/20 px-1.5 text-xs text-amber-200"
+                        title={g.fullVideoError ?? undefined}
+                      >
+                        풀영상 없음(이전 버전)
+                      </span>
+                    ) : (
+                      g.fullVideoError && <span className="text-xs text-amber-300">{g.fullVideoError}</span>
+                    )}
                     <span className="text-xs text-zinc-300">저장한 클립 {g.savedClipCount}개</span>
                     <span className="text-xs text-zinc-500">
-                      {g.hasFullVideo
+                      {g.legacy && !g.hasFullVideo
+                        ? ''
+                        : g.hasFullVideo
                         ? `풀영상 ${g.fullVideoSizeBytes != null ? formatBytes(g.fullVideoSizeBytes) : ''}`
                         : g.fullVideoDeletedAt
                           ? '풀영상 삭제됨'

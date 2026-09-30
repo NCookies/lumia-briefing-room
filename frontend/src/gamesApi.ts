@@ -1,3 +1,4 @@
+import type { RebuildStatus } from './legacyGame'
 import type { Candidate, CandidateUser, GameDetail, GameSummary } from './games'
 
 const BASE = '/api/games'
@@ -62,4 +63,12 @@ export interface BatchResult {
 
 export async function saveBatch(key: string, mode: 'all' | 'certain' | 'ids', ids?: string[]): Promise<BatchResult> {
   return jsonOrThrow(await send('POST', `${BASE}/${key}/save`, { mode, ids }), '일괄 저장')
+}
+
+export async function startRebuildFullVideo(key: string): Promise<RebuildStatus> {
+  return jsonOrThrow(await send('POST', `${BASE}/${key}/full-video`), '풀영상 만들기')
+}
+
+export async function getRebuildStatus(key: string): Promise<RebuildStatus> {
+  return jsonOrThrow(await fetch(`${BASE}/${key}/full-video/status`), '풀영상 만들기 상태 확인')
 }

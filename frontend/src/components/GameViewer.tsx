@@ -11,6 +11,8 @@ import {
 } from '../gamesApi'
 import { applyMark, candidateAtTime, newRangeAround, rangeModified, zoomBy, zoomView, type View } from '../playerBar'
 import { loadVolume, saveVolume, type VolumeState } from '../volume'
+import { isLegacyWithoutVideo } from '../legacyGame'
+import { LegacyGamePanel } from './LegacyGamePanel'
 import { ViewerBar, ViewerScroll } from './ViewerBar'
 import { ExitFullscreenIcon, FullscreenIcon, MuteIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon, VolumeIcon, ZoomInIcon, ZoomOutIcon } from './ViewerIcons'
 import { ViewerCandidates } from './ViewerCandidates'
@@ -309,7 +311,15 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
       </div>
 
       <div className="flex min-h-0 gap-3" style={{ height: 'calc(100vh - 9.5rem)', minHeight: 460 }}>
-        {!game.hasFullVideo ? (
+        {isLegacyWithoutVideo(game) ? (
+          <LegacyGamePanel
+            game={game}
+            onRebuilt={() => {
+              void reload()
+              onChanged()
+            }}
+          />
+        ) : !game.hasFullVideo ? (
           <p className="h-fit flex-1 rounded border border-amber-500/60 bg-amber-500/10 p-3 text-sm text-amber-200">
             {game.fullVideoError ?? '풀영상이 없습니다(자동 정리로 지워졌거나 저장하지 못했습니다).'} 후보 목록은 남아 있지만 영상을 볼 수
             없어 클립을 새로 저장할 수 없습니다.
@@ -415,7 +425,7 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
             </div>
           </div>
         )}
-        {panel}
+        {!isLegacyWithoutVideo(game) && panel}
       </div>
     </div>
   )
