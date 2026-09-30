@@ -59,7 +59,7 @@ import {
   vodGameResultImageUrl,
   type AnalysisJob,
 } from '../vodApi'
-import { matchesDateFilter, uniqueVideoDates } from '../vodDates'
+import { groupVodsByDate, matchesDateFilter, uniqueVideoDates } from '../vodDates'
 import { resolvedDeleteSource } from '../vodDeleteSource'
 import { formatDuration, formatGameRange, groupByVod, probeProgress, type Vod } from '../vodGrouping'
 
@@ -678,7 +678,22 @@ export function ClipBrowser({
               </section>
             ))}
           {source === 'vod' &&
-            vodGroups.map((vg) => {
+            groupVodsByDate(vodGroups, filter.sort).map((dateGroup) => (
+              <section key={dateGroup.day ?? 'unknown'} className="flex flex-col gap-3 [&+&]:mt-5">
+                <GameDayHeader
+                  day={dateGroup.day}
+                  videoCount={dateGroup.vods.length}
+                  gameCount={dateGroup.vods.reduce((n, vg) => n + (vg.vod?.games.length ?? vg.games.length), 0)}
+                  clipCount={dateGroup.vods.reduce(
+                    (n, vg) => n + (vg.vod?.clipCount ?? vg.games.reduce((m, g) => m + g.clips.length, 0)),
+                    0,
+                  )}
+                  clipBytes={dateGroup.vods.reduce(
+                    (n, vg) => n + (vg.vod?.clipBytes ?? vg.games.reduce((m, g) => m + totalSize(g.clips), 0)),
+                    0,
+                  )}
+                />
+                {dateGroup.vods.map((vg) => {
               const visible = vg.games.reduce((n, g) => n + g.clips.length, 0)
               const visibleBytes = vg.games.reduce((n, g) => n + totalSize(g.clips), 0)
               return (
@@ -710,7 +725,9 @@ export function ClipBrowser({
                   {vg.games.map((group) => renderGame(group))}
                 </VodSection>
               )
-            })}
+                })}
+              </section>
+            ))}
         </div>
       </main>
 
