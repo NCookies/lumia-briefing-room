@@ -9,6 +9,7 @@ import { formatBytes } from '../retention'
 import { useCleanupPreview } from '../useCleanupPreview'
 import { useStorageUsage } from '../useStorageUsage'
 import { useDayFold } from '../useDayFold'
+import { useRebuildFullVideo } from '../useRebuildFullVideo'
 import { DayShortcutBar } from './DayShortcutBar'
 import { DueOnlyToggle } from './DueOnlyToggle'
 import { GameDayHeader } from './GameDayHeader'
@@ -52,6 +53,7 @@ export function GameList({ active, refreshTick, onBackfill, backfillLabel }: Pro
       .then(setGames)
       .catch((e: Error) => setError(e.message))
   }, [])
+  const rebuild = useRebuildFullVideo(load)
 
   useEffect(() => {
     if (active) load()
@@ -134,6 +136,15 @@ export function GameList({ active, refreshTick, onBackfill, backfillLabel }: Pro
                 time={{ main: formatShort(g.matchStartUtc), sub: g.matchStartUtc ? formatAgo(g.matchStartUtc) : '' }}
                 due={cleanup[g.key]}
                 onOpen={() => setOpen(g.key)}
+                rebuild={
+                  g.canRebuildFullVideo && !g.hasFullVideo
+                    ? {
+                        label: rebuild.running === g.key ? rebuild.state.text ?? '만드는 중…' : '풀영상 만들기',
+                        disabled: rebuild.running !== null,
+                        onClick: () => rebuild.start(g.key),
+                      }
+                    : undefined
+                }
                 onPin={() =>
                   void setGamePinned(g.key, !g.pinned)
                     .then(load)
@@ -145,6 +156,9 @@ export function GameList({ active, refreshTick, onBackfill, backfillLabel }: Pro
           )}
         </section>
       ))}
+      {rebuild.state.text && rebuild.running === null && (
+        <p className={`text-sm ${rebuild.state.error ? 'text-rose-300' : 'text-emerald-300'}`}>{rebuild.state.text}</p>
+      )}
       {error && <p className="text-sm text-rose-300">{error}</p>}
     </div>
   )

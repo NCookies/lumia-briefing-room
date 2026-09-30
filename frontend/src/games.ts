@@ -63,6 +63,7 @@ export interface GameSummary {
   fullVideoError: string | null
   fullVideoDeletedAt: string | null
   legacy: boolean
+  canRebuildFullVideo?: boolean
   candidateCount: number
   certainCount: number
   savedClipCount: number

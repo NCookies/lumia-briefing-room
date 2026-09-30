@@ -21,10 +21,11 @@ interface Props {
   due?: CleanupPreviewEntry
   onOpen: () => void
   onPin: () => void
+  rebuild?: { label: string; disabled: boolean; onClick: () => void }
 }
 
 /** 게임 목록의 게임 한 줄. 스팀 녹화 탭과 영상 파일 탭이 같이 쓴다(시간 칸만 다르다). */
-export function GameRow({ game: g, time, due, onOpen, onPin }: Props) {
+export function GameRow({ game: g, time, due, onOpen, onPin, rebuild }: Props) {
   return (
     <li
       className="flex cursor-pointer items-stretch overflow-hidden rounded border border-zinc-700 bg-zinc-800/60 hover:border-zinc-500 hover:bg-zinc-800"
@@ -91,6 +92,20 @@ export function GameRow({ game: g, time, due, onOpen, onPin }: Props) {
           </span>
         ) : (
           g.fullVideoError && <span className="text-xs text-amber-300">{g.fullVideoError}</span>
+        )}
+        {rebuild && (
+          <button
+            type="button"
+            className="rounded border border-sky-400 px-2 py-1 text-xs text-sky-100 hover:bg-sky-700/40 disabled:opacity-40"
+            title="원본 녹화가 남아 있어 풀영상을 새로 만들 수 있습니다. 저장된 클립은 그대로 둡니다."
+            disabled={rebuild.disabled}
+            onClick={(e) => {
+              e.stopPropagation()
+              rebuild.onClick()
+            }}
+          >
+            {rebuild.label}
+          </button>
         )}
         <span className="text-xs text-zinc-300">저장한 클립 {g.savedClipCount}개</span>
         <span className="text-xs text-zinc-500">

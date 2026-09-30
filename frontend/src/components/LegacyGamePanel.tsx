@@ -59,7 +59,7 @@ export function LegacyGamePanel({ game, onRebuilt }: { game: GameDetail; onRebui
 
   return (
     <div className="flex min-h-0 flex-1 gap-3" data-testid="legacy-panel">
-      <div className="flex min-w-0 flex-1 flex-col gap-3">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
         <p className="rounded border border-amber-500/60 bg-amber-500/10 p-3 text-sm text-amber-200">
           이전 버전에서 분석한 게임이라 풀영상이 없습니다. 저장된 클립으로 볼 수 있습니다.
         </p>
@@ -79,7 +79,8 @@ export function LegacyGamePanel({ game, onRebuilt }: { game: GameDetail; onRebui
         {status && <p className={`text-sm ${rebuild?.state === 'error' ? 'text-rose-300' : 'text-emerald-300'}`}>{status}</p>}
         {error && <p className="text-sm text-rose-300">{error}</p>}
         {playing ? (
-          <div className="flex flex-col gap-1">
+          <div className="flex min-h-0 flex-1 flex-col gap-1">
+            <div className="min-h-0 flex-1 [&_video]:max-h-full">
             <ClipVideo
               key={playing.id}
               clipId={playing.id}
@@ -95,6 +96,7 @@ export function LegacyGamePanel({ game, onRebuilt }: { game: GameDetail; onRebui
                 saveVolume(volume.current)
               }}
             />
+            </div>
             <span className="text-sm text-zinc-300">{playing.title}</span>
           </div>
         ) : (
