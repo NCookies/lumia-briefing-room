@@ -18,6 +18,7 @@ class GameSpan:
     end: float
     confidence: float
     select_start: float | None = None
+    practice: bool = False
 
 
 def is_ingame(state: FrameState) -> bool:
@@ -96,26 +97,30 @@ def split_games(
             continue
         inside = states_in(states, GameSpan(0, start, end, 0.0))
         confidence = sum(is_ingame(s) for s in inside) / len(inside)
-        select_start = _selection_start(states, start, floor=prev_end)
+        select_start, practice = _selection(states, start, floor=prev_end)
         games.append(
-            GameSpan(index=len(games) + 1, start=start, end=end, confidence=confidence, select_start=select_start)
+            GameSpan(
+                index=len(games) + 1, start=start, end=end, confidence=confidence,
+                select_start=select_start, practice=practice,
+            )
         )
         prev_end = end
     return games
 
 
-def _selection_start(states: list[FrameState], game_start: float, *, floor: float) -> float | None:
-    """게임 바로 앞의 캐릭터·루트 선택 화면 덩어리의 첫 프레임. 뒤에 게임이 이어지지 않는 덩어리(닷지)는 여기 닿지 않는다."""
+def _selection(states: list[FrameState], game_start: float, *, floor: float) -> tuple[float | None, bool]:
+    """게임 바로 앞의 캐릭터·루트 선택 화면 덩어리의 (첫 프레임, 연습 모드 여부). 뒤에 게임이 이어지지 않는 덩어리(닷지)는 여기 닿지 않는다."""
     lo = max(game_start - SELECT_MAX_BEFORE_GAME_SEC, floor)
-    times = [s.t for s in states if s.select_screen and lo < s.t < game_start]
-    if not times:
-        return None
-    start = times[-1]
-    for t in reversed(times[:-1]):
-        if start - t > SELECT_MAX_GAP_SEC:
+    frames = [s for s in states if s.select_screen and lo < s.t < game_start]
+    if not frames:
+        return None, False
+    cluster = [frames[-1]]
+    for s in reversed(frames[:-1]):
+        if cluster[-1].t - s.t > SELECT_MAX_GAP_SEC:
             break
-        start = t
-    return start
+        cluster.append(s)
+    practice = sum(1 for s in cluster if s.select_practice) * 2 > len(cluster)
+    return cluster[-1].t, practice
 
 
 def states_in(states: list[FrameState], span: GameSpan) -> list[FrameState]:

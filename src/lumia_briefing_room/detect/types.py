@@ -37,6 +37,7 @@ class FrameState:
     cobalt_face_value: float | None = None
     cobalt_face_sat: float | None = None
     select_screen: bool | None = None
+    select_practice: bool | None = None
 
 
 @dataclass(frozen=True)

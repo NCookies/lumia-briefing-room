@@ -31,3 +31,27 @@ def test_title_only_is_not_enough():
 
 def test_bright_scene_in_title_area_is_rejected():
     assert read_select_screen(_timer(0.18), _title(0.9, base=120)) is False
+
+
+def _mode_crop(mask):
+    crop = np.full(mask.shape + (3,), (20, 30, 45), np.uint8)
+    crop[mask] = (140, 230, 255)
+    return crop
+
+
+def test_practice_text_is_recognised_and_normal_game_is_not():
+    from lumia_briefing_room.detect.select_screen import _practice_mask, read_practice_mode
+
+    ref = _practice_mask()
+    assert read_practice_mode(_mode_crop(ref)) is True
+    normal = np.zeros_like(ref)
+    normal[6:16, 5:170] = True
+    assert read_practice_mode(_mode_crop(normal)) is False
+    assert read_practice_mode(_mode_crop(np.zeros_like(ref))) is False
+
+
+def test_practice_reading_tolerates_a_scaled_crop():
+    from lumia_briefing_room.detect.select_screen import _practice_mask, read_practice_mode
+
+    ref = _practice_mask()
+    assert read_practice_mode(_mode_crop(np.repeat(np.repeat(ref, 2, 0), 2, 1))) is True

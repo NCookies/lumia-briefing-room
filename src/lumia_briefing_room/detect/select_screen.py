@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import base64
+import zlib
+
 import numpy as np
 
 from lumia_briefing_room.detect.color import channel_stats
@@ -23,3 +26,36 @@ def read_select_screen(timer_rgb: np.ndarray, title_rgb: np.ndarray) -> bool:
         TITLE_BRIGHT_RANGE[0] <= bright <= TITLE_BRIGHT_RANGE[1]
         and TITLE_MEAN_RANGE[0] <= mean <= TITLE_MEAN_RANGE[1]
     )
+
+
+# 상단 가운데 모드 글자(`NORMAL GAME`/`RANK GAME`/`PRACTICE`)의 밝은 하늘색 글자 마스크. 연습 모드의 `PRACTICE` 를 기준으로 삼는다.
+# 실측 2560x1440(ROI select_mode 190x24): 연습 IoU 0.985~1.0, `NORMAL GAME` 0.14~0.15.
+PRACTICE_MASK_SHAPE = (24, 190)
+PRACTICE_IOU_MIN = 0.6
+_PRACTICE_MASK_B64 = (
+    "eNq9zjEKwkAQheG3jCwWA9tuIeQKa2ch5CrjSdwQyHk8wgZBr6E3SGkRMooR3WBanWbgFR8/8Nsru/3FQc96cn15++x61bQlLQZf"
+    "dnp5z2QaMgcPwi5RxrD1bEXApgFne/AS1lVEsB4h29MuprN9fC9ImPDETz5SnPCrZRh510/rpR35TcZrq6ZqvnlYdsOLz+vhQ3mb"
+    "qYdIWs/Um6rGaY4nT64niB415jzLoujY1OoG/OnuDrRBfg=="
+)
+
+
+def _practice_mask() -> np.ndarray:
+    packed = np.frombuffer(zlib.decompress(base64.b64decode(_PRACTICE_MASK_B64)), dtype=np.uint8)
+    h, w = PRACTICE_MASK_SHAPE
+    return np.unpackbits(packed)[: h * w].reshape(h, w).astype(bool)
+
+
+def _resize_nearest(mask: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
+    ys = (np.arange(shape[0]) * mask.shape[0] / shape[0]).astype(int)
+    xs = (np.arange(shape[1]) * mask.shape[1] / shape[1]).astype(int)
+    return mask[np.ix_(ys, xs)]
+
+
+def read_practice_mode(mode_rgb: np.ndarray) -> bool:
+    s = channel_stats(mode_rgb)
+    mask = (s.b > 200) & (s.g > 190) & (s.r > 90)
+    if mask.shape != PRACTICE_MASK_SHAPE:
+        mask = _resize_nearest(mask, PRACTICE_MASK_SHAPE)
+    ref = _practice_mask()
+    union = int((mask | ref).sum())
+    return bool(union > 0 and (mask & ref).sum() / union >= PRACTICE_IOU_MIN)

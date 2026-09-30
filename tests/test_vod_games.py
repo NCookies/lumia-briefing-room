@@ -173,3 +173,17 @@ def test_selection_does_not_reach_into_the_previous_game():
     first, second = split_games(states)
     assert first.select_start is None
     assert second.select_start == 711.0
+
+
+def test_selection_cluster_marked_practice_marks_the_game_as_practice():
+    states = _game_with_selection([(500.0, 600.0)], (624.0, 1900.0), step=3.0)
+    states = [
+        FrameState(**{**s.__dict__, "select_practice": True}) if s.select_screen else s for s in states
+    ]
+    (game,) = split_games(states)
+    assert game.practice is True and game.select_start == 500.0
+
+
+def test_normal_selection_is_not_practice():
+    (game,) = split_games(_game_with_selection([(500.0, 600.0)], (624.0, 1900.0), step=3.0))
+    assert game.practice is False

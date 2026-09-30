@@ -88,6 +88,8 @@ def windows_from_states(
 
     windows = []
     for i, span in enumerate(spans):
+        if span.practice:
+            continue
         next_start = None
         if i + 1 < len(spans):
             nxt = spans[i + 1]

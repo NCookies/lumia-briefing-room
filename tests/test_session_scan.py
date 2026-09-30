@@ -77,6 +77,19 @@ def test_window_starts_at_the_character_selection_screen_when_it_was_seen():
     assert first.end_utc == _utc(1110)
 
 
+def test_practice_games_are_not_offered_as_windows_but_still_bound_the_previous_game():
+    states = _timeline((300, 900), (1200, 2400), end=3000)
+    picked = {s.t: FrameState(t=s.t, combat=None, face_value=None, face_sat=None, k=None, a=None,
+                              day_night=None, select_screen=True, select_practice=True)
+              for s in states if 1110 <= s.t <= 1170}
+    states = [picked.get(s.t, s) for s in states]
+
+    windows = scan.windows_from_states(states, session_start_utc=START, seg_sec=SEG, post_game_sec=300)
+
+    assert [w.hud_start_utc for w in windows] == [_utc(300)]
+    assert windows[0].end_utc == _utc(1110)
+
+
 def test_a_game_that_reaches_the_first_segment_is_marked_as_cut_at_the_start():
     """링버퍼가 경기 앞부분을 지웠다 — 시작을 알 수 없다."""
     states = _timeline((0, 600), (900, 1500), end=1800)
