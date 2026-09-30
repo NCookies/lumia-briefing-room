@@ -59,7 +59,10 @@ import {
   vodGameResultImageUrl,
   type AnalysisJob,
 } from '../vodApi'
-import { groupVodsByDate, matchesDateFilter, uniqueVideoDates } from '../vodDates'
+import { groupVodsByDate } from '../vodDates'
+import { dayAnchorId, dayId, shortcutDays } from '../dayFold'
+import { useDayFold } from '../useDayFold'
+import { DayShortcutBar } from './DayShortcutBar'
 import { resolvedDeleteSource } from '../vodDeleteSource'
 import { formatDuration, formatGameRange, groupByVod, probeProgress, type Vod } from '../vodGrouping'
 
@@ -91,8 +94,7 @@ const filterActive = (f: FilterState): boolean =>
   f.gameMode !== '' ||
   f.label !== '' ||
   f.minPvpScore > 0 ||
-  f.q.trim() !== '' ||
-  f.dates.length > 0
+  f.q.trim() !== ''
 
 interface DeleteRequest {
   label: string
@@ -460,13 +462,13 @@ export function ClipBrowser({
   const vodGroups = useMemo(
     () =>
       source === 'vod'
-        ? groupByVod(clips, vods, filter.sort, true).filter((vg) =>
-            matchesDateFilter(vg.vod?.videoDate ?? null, filter.dates),
-          )
+        ? groupByVod(clips, vods, filter.sort, true)
         : [],
-    [source, clips, vods, filter.sort, filter.dates],
+    [source, clips, vods, filter.sort],
   )
-  const dateOptions = useMemo(() => (source === 'vod' ? uniqueVideoDates(vods) : []), [source, vods])
+  const vodDateGroups = useMemo(() => groupVodsByDate(vodGroups, filter.sort), [vodGroups, filter.sort])
+  const vodDays = useMemo(() => vodDateGroups.map((d) => d.day), [vodDateGroups])
+  const dayFold = useDayFold('vod', vodDays)
   const groups = useMemo(
     () => (source === 'steam' ? steamGroups : vodGroups.flatMap((v) => v.games)),
     [source, steamGroups, vodGroups],
@@ -577,7 +579,6 @@ export function ClipBrowser({
           setViewMode(mode)
           saveViewMode(source, mode)
         }}
-        dateOptions={dateOptions}
         onRefresh={
           source === 'vod'
             ? () => {
@@ -663,6 +664,31 @@ export function ClipBrowser({
             {source === 'vod' && <VideoFormatHelp />}
           </div>
         )}
+        {source === 'vod' && (
+          <div className="mb-3 flex flex-wrap items-center gap-3 text-sm text-zinc-400">
+            {vodDays.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  className="rounded border border-zinc-600 px-2 py-0.5 hover:bg-zinc-700 disabled:opacity-40"
+                  disabled={dayFold.collapsed.size === 0}
+                  onClick={dayFold.expandAll}
+                >
+                  날짜 모두 펼치기
+                </button>
+                <button
+                  type="button"
+                  className="rounded border border-zinc-600 px-2 py-0.5 hover:bg-zinc-700 disabled:opacity-40"
+                  disabled={dayFold.allCollapsed}
+                  onClick={dayFold.collapseAll}
+                >
+                  날짜 모두 접기
+                </button>
+              </>
+            )}
+            <DayShortcutBar shortcuts={shortcutDays(vodDays, 'vod')} onGo={dayFold.go} />
+          </div>
+        )}
 
         <div className="flex flex-col gap-3">
           {source === 'steam' &&
@@ -678,8 +704,12 @@ export function ClipBrowser({
               </section>
             ))}
           {source === 'vod' &&
-            groupVodsByDate(vodGroups, filter.sort).map((dateGroup) => (
-              <section key={dateGroup.day ?? 'unknown'} className="flex flex-col gap-3 [&+&]:mt-5">
+            vodDateGroups.map((dateGroup) => (
+              <section
+                key={dateGroup.day ?? 'unknown'}
+                id={dayAnchorId('vod', dateGroup.day)}
+                className="flex flex-col gap-3 [&+&]:mt-5"
+              >
                 <GameDayHeader
                   day={dateGroup.day}
                   videoCount={dateGroup.vods.length}
@@ -692,8 +722,10 @@ export function ClipBrowser({
                     (n, vg) => n + (vg.vod?.clipBytes ?? vg.games.reduce((m, g) => m + totalSize(g.clips), 0)),
                     0,
                   )}
+                  collapsed={dayFold.collapsed.has(dayId(dateGroup.day))}
+                  onToggle={() => dayFold.toggle(dateGroup.day)}
                 />
-                {dateGroup.vods.map((vg) => {
+                {!dayFold.collapsed.has(dayId(dateGroup.day)) && dateGroup.vods.map((vg) => {
               const visible = vg.games.reduce((n, g) => n + g.clips.length, 0)
               const visibleBytes = vg.games.reduce((n, g) => n + totalSize(g.clips), 0)
               return (

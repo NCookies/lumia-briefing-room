@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cleanupReasonLabel, cleanupReasonTooltip } from '../cleanupPreview'
+import { dayAnchorId, dayId, shortcutDays } from '../dayFold'
 import { groupByDay } from '../gameDays'
 import { gameHeadline, matchTypeLabel, type GameSummary } from '../games'
 import { gameAssetUrl, getGames, setGamePinned } from '../gamesApi'
 import { formatAgo } from '../grouping'
 import { formatBytes } from '../retention'
 import { useCleanupPreview } from '../useCleanupPreview'
+import { useDayFold } from '../useDayFold'
+import { DayShortcutBar } from './DayShortcutBar'
 import { GameDayHeader } from './GameDayHeader'
 import { GameViewer } from './GameViewer'
 
@@ -36,6 +39,12 @@ export function GameList({ active, refreshTick, onBackfill, backfillLabel }: Pro
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState<string | null>(null)
   const cleanup = useCleanupPreview(active)
+  const dayGroups = useMemo(
+    () => groupByDay((games ?? []).map((g) => ({ ...g, matchStartUtc: g.matchStartUtc ?? '' }))),
+    [games],
+  )
+  const dayList = useMemo(() => dayGroups.map((d) => d.day), [dayGroups])
+  const fold = useDayFold('steam', dayList)
 
   const load = useCallback(() => {
     getGames()
@@ -60,6 +69,26 @@ export function GameList({ active, refreshTick, onBackfill, backfillLabel }: Pro
       <div className="flex items-baseline gap-3 text-sm text-zinc-300">
         <span>게임 {games.length}개</span>
         <span className="text-xs text-zinc-500">풀영상 {formatBytes(total)}</span>
+        {games.length > 0 && (
+          <>
+            <button
+              type="button"
+              className="rounded border border-zinc-600 px-2 py-0.5 text-xs hover:bg-zinc-700 disabled:opacity-40"
+              disabled={fold.collapsed.size === 0}
+              onClick={fold.expandAll}
+            >
+              모두 펼치기
+            </button>
+            <button
+              type="button"
+              className="rounded border border-zinc-600 px-2 py-0.5 text-xs hover:bg-zinc-700 disabled:opacity-40"
+              disabled={fold.allCollapsed}
+              onClick={fold.collapseAll}
+            >
+              모두 접기
+            </button>
+          </>
+        )}
         <button
           type="button"
           className="ml-auto rounded border border-zinc-600 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
@@ -74,15 +103,23 @@ export function GameList({ active, refreshTick, onBackfill, backfillLabel }: Pro
           아직 저장된 게임이 없습니다. 게임을 한 판 마치면 전체 영상과 교전 후보가 여기에 쌓입니다.
         </p>
       )}
-      {groupByDay(games.map((g) => ({ ...g, matchStartUtc: g.matchStartUtc ?? '' }))).map((dayGroup) => (
-        <section key={dayGroup.day ?? 'unknown'} className="flex flex-col gap-2 [&+&]:mt-4">
+      <DayShortcutBar shortcuts={shortcutDays(dayList, 'steam')} onGo={fold.go} />
+      {dayGroups.map((dayGroup) => (
+        <section
+          key={dayGroup.day ?? 'unknown'}
+          id={dayAnchorId('steam', dayGroup.day)}
+          className="flex flex-col gap-2 [&+&]:mt-4"
+        >
           <GameDayHeader
             day={dayGroup.day}
             gameCount={dayGroup.games.length}
             clipCount={dayGroup.games.reduce((n, g) => n + g.savedClipCount, 0)}
             clipBytes={dayGroup.games.reduce((n, g) => n + (g.fullVideoSizeBytes ?? 0), 0)}
             bytesLabel="풀영상 "
+            collapsed={fold.collapsed.has(dayId(dayGroup.day))}
+            onToggle={() => fold.toggle(dayGroup.day)}
           />
+          {!fold.collapsed.has(dayId(dayGroup.day)) && (
           <ul className="flex flex-col gap-2">
             {dayGroup.games.map((g) => {
               const due = cleanup[g.key]
@@ -185,6 +222,7 @@ export function GameList({ active, refreshTick, onBackfill, backfillLabel }: Pro
               )
             })}
           </ul>
+          )}
         </section>
       ))}
       {error && <p className="text-sm text-rose-300">{error}</p>}

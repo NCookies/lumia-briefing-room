@@ -4,7 +4,6 @@ import { useLabelingUi } from '../labelingContext'
 import { TAG_LABELS } from '../labels'
 import type { ClipSort } from '../grouping'
 import type { ViewMode } from '../viewMode'
-import { formatDateChip } from '../vodDates'
 import type { ClipTag } from '../types'
 
 const ALL_TAGS: ClipTag[] = ['kill', 'assist', 'death', 'teammate_death', 'no_result']
@@ -17,7 +16,6 @@ export interface FilterState {
   label: '' | 'unlabeled' | 'pvp' | 'pve' | 'conflict'
   minPvpScore: number
   q: string
-  dates: string[]
   cleanupOnly: boolean
 }
 
@@ -29,7 +27,6 @@ export const DEFAULT_FILTER: FilterState = {
   label: '',
   minPvpScore: 0,
   q: '',
-  dates: [],
   cleanupOnly: false,
 }
 
@@ -39,7 +36,6 @@ interface Props {
   variant?: 'steam' | 'vod'
   viewMode: ViewMode
   onViewModeChange: (mode: ViewMode) => void
-  dateOptions?: string[]
   onRefresh?: () => void
 }
 
@@ -51,7 +47,6 @@ export function FilterBar({
   variant = 'steam',
   viewMode,
   onViewModeChange,
-  dateOptions = [],
   onRefresh,
 }: Props) {
   const tuning = useTuningUi()
@@ -59,10 +54,6 @@ export function FilterBar({
   const toggleTag = (tag: ClipTag) => {
     const has = value.tags.includes(tag)
     onChange({ ...value, tags: has ? value.tags.filter((t) => t !== tag) : [...value.tags, tag] })
-  }
-  const toggleDate = (date: string) => {
-    const has = value.dates.includes(date)
-    onChange({ ...value, dates: has ? value.dates.filter((d) => d !== date) : [...value.dates, date] })
   }
 
   return (
@@ -92,26 +83,6 @@ export function FilterBar({
         value={value.q}
         onChange={(e) => onChange({ ...value, q: e.target.value })}
       />
-
-      {variant === 'vod' && dateOptions.length > 0 && (
-        <div className="flex flex-wrap gap-1" role="group" aria-label="영상 날짜">
-          {dateOptions.map((date) => (
-            <button
-              key={date}
-              type="button"
-              aria-pressed={value.dates.includes(date)}
-              onClick={() => toggleDate(date)}
-              className={`rounded border px-2 py-1 text-xs ${
-                value.dates.includes(date)
-                  ? 'border-sky-500 bg-sky-500/20 text-sky-200'
-                  : 'border-zinc-600 text-zinc-400 hover:border-zinc-400'
-              }`}
-            >
-              {formatDateChip(date)}
-            </button>
-          ))}
-        </div>
-      )}
 
       {onRefresh && (
         <button
