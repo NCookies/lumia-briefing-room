@@ -37,9 +37,9 @@ test('folderName is the last path component', () => {
 
 test('structureLines describes the folders and marks the full video override', () => {
   const plain = structureLines('H:\\store', null)
-  assert.ok(plain.some((l) => l.path === 'H:\\store\\클립' && l.note.includes('자동으로 지워지지 않')))
-  assert.ok(plain.some((l) => l.path === 'H:\\store\\풀영상' && l.note.includes('자동으로 지워')))
+  assert.ok(plain.some((l) => l.path === 'H:\\store\\clips' && l.note.includes('자동으로 지워지지 않')))
+  assert.ok(plain.some((l) => l.path === 'H:\\store\\full_video' && l.note.includes('자동으로 지워')))
   const moved = structureLines('H:\\store', 'D:\\big')
   assert.ok(moved.some((l) => l.path === 'D:\\big' && l.note.includes('자동으로 지워')))
-  assert.ok(!moved.some((l) => l.path === 'H:\\store\\풀영상'))
+  assert.ok(!moved.some((l) => l.path === 'H:\\store\\full_video'))
 })

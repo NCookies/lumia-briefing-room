@@ -139,7 +139,7 @@ export function StorageSection({ variant = 'options', onChanged }: Props) {
       {mode === 'pickRoot' && (
         <div className="flex flex-col gap-2 rounded border border-zinc-600 bg-zinc-900/60 p-3">
           <p className="text-xs text-zinc-400">
-            {isNew ? '새 저장 폴더를 고르세요.' : '클립과 풀영상을 모아 둘 폴더를 고르세요. 이 폴더 안에 클립·풀영상 폴더가 만들어집니다.'}
+            {isNew ? '새 저장 폴더를 고르세요.' : '클립과 풀영상을 모아 둘 폴더를 고르세요. 이 폴더 안에 clips·full_video 폴더가 만들어집니다.'}
           </p>
           <FolderPicker value={draft} onChange={setDraft} />
           <div className="flex justify-end gap-2">
@@ -189,7 +189,7 @@ export function StorageSection({ variant = 'options', onChanged }: Props) {
         <details className="rounded border border-zinc-700 bg-zinc-900/40 px-3 py-2 text-sm" open={info.fullVideos !== null}>
           <summary className="cursor-pointer text-zinc-300">고급: 풀영상 위치만 따로 두기</summary>
           <p className="mt-2 text-xs text-zinc-500">
-            풀영상은 한 판에 수 GB 라 큰 하드디스크로 빼고 싶을 때만 쓰세요. 기본은 저장 폴더 아래 풀영상 폴더입니다. 저장 공간 경고는 풀영상이 있는
+            풀영상은 한 판에 수 GB 라 큰 하드디스크로 빼고 싶을 때만 쓰세요. 기본은 저장 폴더 아래 full_video 폴더입니다. 저장 공간 경고는 풀영상이 있는
             드라이브 기준입니다.
           </p>
           <div className="mt-2 flex items-center gap-2">

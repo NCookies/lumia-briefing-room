@@ -38,11 +38,11 @@ export function joinPath(base: string, name: string): string {
 export function structureLines(root: string, fullVideos: string | null): StructureLine[] {
   return [
     {
-      path: joinPath(root, '클립'),
-      note: '남기기로 한 클립. 자동으로 지워지지 않고, 탐색기에서 폴더를 만들어 마음대로 정리해도 됩니다. (스팀 녹화 · 영상 파일 폴더에 저장됩니다)',
+      path: joinPath(root, 'clips'),
+      note: '남기기로 한 클립. 자동으로 지워지지 않고, 탐색기에서 폴더를 만들어 마음대로 정리해도 됩니다. (스팀 녹화·영상 파일 구분 없이 자동 보관 폴더에 저장됩니다)',
     },
     {
-      path: fullVideos || joinPath(root, '풀영상'),
+      path: fullVideos || joinPath(root, 'full_video'),
       note: '게임 전체 영상. 앱이 관리하며 용량 한도(기본 40GB)를 넘으면 오래된 것부터 자동으로 지워집니다.',
     },
   ]
