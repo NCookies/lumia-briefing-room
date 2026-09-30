@@ -62,6 +62,7 @@ def make_cfg(base):
     cfg = Config()
     cfg.paths.vod_clips = base / "vodclips"
     cfg.paths.games = base / "games"
+    cfg.clip.save_mode = "auto"
     cfg.vod.min_game_sec = 20.0
     cfg.clip.preroll_sec = 3
     cfg.clip.postroll_sec = 3

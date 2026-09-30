@@ -224,7 +224,7 @@ class ClipConfig:
     merge_gap_sec: float = 10.0
     include_audio: bool = True
     snap_to_keyframe: bool = True
-    save_mode: str = "auto"
+    save_mode: str = "manual"
 
 
 @dataclass

@@ -207,3 +207,7 @@ def test_config_with_a_utf8_bom_still_loads(tmp_path):
     path = tmp_path / "config.json"
     path.write_bytes(b"\xef\xbb\xbf" + '{"consent": {"version": 3}}'.encode("utf-8"))
     assert load_config(path).consent.version == 3
+
+
+def test_clips_are_not_archived_automatically_by_default():
+    assert Config().clip.save_mode == "manual"
