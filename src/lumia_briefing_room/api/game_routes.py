@@ -51,7 +51,7 @@ class BatchSave(BaseModel):
     ids: list[str] | None = None
 
 
-def _summary(game: dict, games_dir: Path) -> dict:
+def _summary(game: dict, games_dir: Path, *, can_rebuild_full: bool = False) -> dict:
     cands = gcand.all_candidates(game)
     active = [c for c in cands if not (c.get("user") or {}).get("dismissed")]
     video = game.get("fullVideo") or {}
@@ -75,6 +75,7 @@ def _summary(game: dict, games_dir: Path) -> dict:
         "durationSec": video.get("durationSec"),
         "fullVideoError": game.get("fullVideoError"),
         "legacy": bool(game.get("legacy")),
+        "canRebuildFullVideo": can_rebuild_full,
         "fullVideoDeletedAt": game.get("fullVideoDeletedAt"),
         "candidateCount": len(active),
         "certainCount": sum(1 for c in active if c.get("certain")),
@@ -152,7 +153,16 @@ def register_game_routes(
             migrate_vod_once()
         root = games_dir()
         games = [g for g in list_games(root) if source == "all" or (g.get("source") or "steam") == source]
-        return {"games": [_summary(g, root) for g in games]}
+        recording_root = resolve_recording_root(current_config().paths.steam_recording)
+
+        def rebuildable(g: dict) -> bool:
+            """목록에서 "풀영상 만들기"를 보일 옛 스팀 게임만 원본이 남았는지 본다(영상 게임은 영상 묶음 머리 버튼)."""
+            return (
+                bool(g.get("legacy")) and (g.get("source") or "steam") == "steam"
+                and can_rebuild(g, root, recording_root)
+            )
+
+        return {"games": [_summary(g, root, can_rebuild_full=rebuildable(g)) for g in games]}
 
     @app.get("/api/games/{key}")
     def get_game(key: str):
