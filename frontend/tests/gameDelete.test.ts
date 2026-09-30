@@ -11,12 +11,13 @@ const game = (extra: Partial<DeletableGame> = {}): DeletableGame => ({
   ...extra,
 })
 
-test('메뉴 세 항목 - 풀영상·클립이 있으면 모두 켜진다', () => {
+test('메뉴 네 항목 - 풀영상·클립이 있으면 모두 켜진다', () => {
   const items = deleteMenuItems(game())
   assert.deepEqual(items.map((i) => [i.target, i.label, i.disabled]), [
     ['fullVideo', '풀영상만 삭제', false],
     ['clips', '클립만 전체 삭제', false],
     ['both', '풀영상과 클립 전체 삭제', false],
+    ['all', '게임 전체 삭제 (목록에서도 지움)', false],
   ])
 })
 
@@ -28,7 +29,17 @@ test('풀영상이 없으면 풀영상만 삭제는 꺼지고, 클립이 없으�
   assert.equal(noClips[1].disabled, true)
   assert.equal(noClips[2].disabled, false)
   const nothing = deleteMenuItems(game({ hasFullVideo: false, savedClipCount: 0 }))
-  assert.equal(nothing.every((i) => i.disabled), true)
+  assert.deepEqual(nothing.map((i) => i.disabled), [true, true, true, false], '지울 게 없어도 게임 기록까지 지우는 항목은 켜져 있다')
+})
+
+test('게임 전체 삭제 경고는 기록까지 지워진다고 알리고 고정한 게임은 한 줄 더', () => {
+  const text = deleteWarning(game(), 'all')
+  assert.match(text, /목록에서 완전히 삭제/)
+  assert.match(text, /풀영상/)
+  assert.match(text, /클립 3개/)
+  assert.match(text, /게임 기록/)
+  assert.match(deleteWarning(game({ pinned: true }), 'all'), /고정한 게임입니다/)
+  assert.doesNotMatch(deleteWarning(game({ hasFullVideo: false, savedClipCount: 0 }), 'all'), /풀영상|클립/)
 })
 
 test('경고 창에는 지워질 풀영상 크기와 클립 수를 적는다', () => {

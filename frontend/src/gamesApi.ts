@@ -85,7 +85,7 @@ export interface DeleteGameResult {
   freedBytes: number
 }
 
-export async function deleteGameFiles(key: string, target: 'fullVideo' | 'clips' | 'both'): Promise<DeleteGameResult> {
+export async function deleteGameFiles(key: string, target: 'fullVideo' | 'clips' | 'both' | 'all'): Promise<DeleteGameResult> {
   return jsonOrThrow(await send('POST', `${BASE}/${key}/delete`, { target }), '삭제')
 }
 

@@ -142,12 +142,6 @@ export function ViewerCandidates(p: Props) {
                 {modified && (
                   <span className="rounded bg-orange-500/25 px-1.5 text-orange-300">{saved ? '수정됨 · 저장 대기' : '수정됨'}</span>
                 )}
-                {c.certain && <span className="rounded bg-yellow-500/20 px-1.5 text-yellow-300">확실</span>}
-                {c.tags.map((t) => (
-                  <span key={t} className="rounded bg-zinc-700 px-1.5 text-zinc-300">
-                    {t}
-                  </span>
-                ))}
                 <span className="ml-auto flex gap-1">
                   {saved && (
                     <button

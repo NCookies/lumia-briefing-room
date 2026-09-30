@@ -88,7 +88,7 @@ export function ArchivePopup({ anchor, current, archived, onPick, onUnarchive, o
               <button
                 type="button"
                 disabled={!row.selectable}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-zinc-700 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent"
+                className={`flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-zinc-700 disabled:cursor-default disabled:hover:bg-transparent ${row.dim ? 'opacity-60' : ''}`}
                 onClick={() => row.name !== current && onPick(row.name)}
               >
                 <span className="h-9 w-14 shrink-0 overflow-hidden rounded bg-zinc-900">
@@ -133,7 +133,7 @@ export function ArchivePopup({ anchor, current, archived, onPick, onUnarchive, o
           <button
             type="button"
             className="border-t border-zinc-700 px-3 py-2 text-left text-rose-300 hover:bg-zinc-700"
-            title="클립 영상을 지우고 이 후보는 무시한 후보로 옮깁니다"
+            title="클립 영상을 지우고 이 후보를 보관 전 상태로 되돌립니다(후보는 목록에 남습니다)"
             onClick={onUnarchive}
           >
             보관 해제

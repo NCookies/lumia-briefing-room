@@ -15,18 +15,17 @@ const cat = (name: string, extra: Partial<Category> = {}): Category => ({
 
 const cats = [cat('보관함', { default: true, clipCount: 2 }), cat('아야'), cat('자동 보관', { auto: true, clipCount: 9 })]
 
-test('자동 보관 칸은 그 칸에 있는 클립일 때만 보이고 직접 고를 수 없다', () => {
-  assert.deepEqual(popupRows(cats, null).map((r) => r.name), ['보관함', '아야'])
-  const rows = popupRows(cats, '자동 보관')
-  assert.deepEqual(rows.map((r) => [r.name, r.checked, r.selectable]), [
+test('자동 보관 칸도 항상 보이되 맨 아래에 흐리게', () => {
+  assert.deepEqual(popupRows(cats, null).map((r) => [r.name, r.dim, r.selectable]), [
     ['보관함', false, true],
     ['아야', false, true],
-    ['자동 보관', true, false],
+    ['자동 보관', true, true],
   ])
+  assert.deepEqual(popupRows(cats, '자동 보관').map((r) => r.checked), [false, false, true])
 })
 
 test('지금 있는 카테고리에 체크가 붙는다', () => {
-  assert.deepEqual(popupRows(cats, '아야').map((r) => r.checked), [false, true])
+  assert.deepEqual(popupRows(cats, '아야').map((r) => r.checked), [false, true, false])
 })
 
 test('보관 상태: 안 함 / 보관됨 / 범위를 고쳐 저장 대기', () => {

@@ -126,6 +126,17 @@ export function VodGameList({
     onDone: reload,
     onError: setActionError,
   })
+  const viewerDelete = useGameDelete({
+    confirmDelete,
+    onConfirmDeleteChange,
+    deleteMode,
+    onDeleteModeChange,
+    onDone: () => {
+      setOpen(null)
+      reload()
+    },
+    onError: setActionError,
+  })
 
   const runningVodId = vods.find((v) => v.status === 'analyzing')?.id ?? null
   const probe = probeProgress(vods)
@@ -268,7 +279,13 @@ export function VodGameList({
   }
 
   if (open) {
-    return <GameViewer gameKey={open} backLabel="← 영상 목록" onBack={() => setOpen(null)} onChanged={reloadGames} />
+    const summary = games?.find((g) => g.key === open)
+    return (
+      <>
+        <GameViewer gameKey={open} backLabel="← 영상 목록" onBack={() => setOpen(null)} onChanged={reloadGames} menu={summary && viewerDelete.menuFor(open, summary)} />
+        {viewerDelete.dialog}
+      </>
+    )
   }
 
   const allGames = games ?? []

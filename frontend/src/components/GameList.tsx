@@ -76,13 +76,30 @@ export function GameList({
     onDone: load,
     onError: setError,
   })
+  const viewerDelete = useGameDelete({
+    confirmDelete,
+    onConfirmDeleteChange,
+    deleteMode,
+    onDeleteModeChange,
+    onDone: () => {
+      setOpen(null)
+      load()
+    },
+    onError: setError,
+  })
 
   useEffect(() => {
     if (active) load()
   }, [active, load, refreshTick])
 
   if (open) {
-    return <GameViewer gameKey={open} onBack={() => setOpen(null)} onChanged={load} />
+    const summary = games?.find((g) => g.key === open)
+    return (
+      <>
+        <GameViewer gameKey={open} onBack={() => setOpen(null)} onChanged={load} menu={summary && viewerDelete.menuFor(open, summary)} />
+        {viewerDelete.dialog}
+      </>
+    )
   }
 
   if (!games) return <p className="p-4 text-sm text-zinc-400">{error ?? '불러오는 중…'}</p>

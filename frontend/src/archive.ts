@@ -6,18 +6,20 @@ export interface PopupRow {
   thumbnailClipId: string | null
   checked: boolean
   selectable: boolean
+  /** 앱이 자동으로 채우는 칸이라 흐리게 보인다. */
+  dim: boolean
 }
 
-/** "보관 위치" 팝업 줄. `자동 보관` 은 앱이 자동으로 채우는 칸이라 직접 고를 수 없고, 지금 거기 있는 클립일 때만 체크된 채 보인다. */
+/** "보관 위치" 팝업 줄. `자동 보관` 도 항상 보이며(맨 아래, 흐리게) 골라서 보관할 수 있다. */
 export function popupRows(categories: Category[], current: string | null): PopupRow[] {
   return categories
-    .filter((c) => !c.auto || c.name === current)
     .map((c) => ({
       name: c.name,
       clipCount: c.clipCount,
       thumbnailClipId: c.thumbnailClipId,
       checked: c.name === current,
-      selectable: !c.auto,
+      selectable: true,
+      dim: c.auto,
     }))
 }
 

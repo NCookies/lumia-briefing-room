@@ -64,7 +64,7 @@ export type SaveMode = 'auto' | 'manual'
 
 export async function getSaveMode(): Promise<SaveMode> {
   const cfg = await jsonOrThrow<{ clip?: { saveMode?: SaveMode } }>(await fetch(`${BASE}/config`), '설정 불러오기')
-  return cfg.clip?.saveMode === 'manual' ? 'manual' : 'auto'
+  return cfg.clip?.saveMode === 'auto' ? 'auto' : 'manual'
 }
 
 export async function setSaveMode(saveMode: SaveMode): Promise<void> {

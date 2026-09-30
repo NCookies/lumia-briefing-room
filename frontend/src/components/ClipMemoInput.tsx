@@ -27,7 +27,7 @@ export function ClipMemoInput({ clipId, value, onSave, rows = 3, compact = false
         className="w-full resize-y rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm"
         rows={rows}
         maxLength={CLIP_MEMO_MAX}
-        placeholder="이 클립의 좋았던 점·아쉬웠던 점을 적어 두세요"
+        placeholder="원하시는 내용을 작성해 주세요"
         value={draft}
         onChange={(e) => setDraft(clampMemo(e.target.value))}
         onBlur={commit}

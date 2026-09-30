@@ -26,11 +26,13 @@ interface Props {
   markers: Marker[]
   overrides: Record<string, [number, number]>
   onSeek: (t: number) => void
+  /** 마우스 휠로 배율을 바꾼다: 위로 굴리면 확대, 아래로 굴리면 축소. `center` 는 포인터가 가리키는 시각. */
+  onWheelZoom?: (direction: 'in' | 'out', center: number) => void
   onSelect: (id: string) => void
   onRangeCommit: (id: string, next: [number, number], prev: [number, number]) => void
 }
 
-export function ViewerBar({ duration, view, time, cands, selectedId, markers, overrides, onSeek, onSelect, onRangeCommit }: Props) {
+export function ViewerBar({ duration, view, time, cands, selectedId, markers, overrides, onSeek, onWheelZoom, onSelect, onRangeCommit }: Props) {
   const bar = useRef<HTMLDivElement>(null)
   const [scrubbing, setScrubbing] = useState(false)
   const [drag, setDrag] = useState<HandleDrag | null>(null)
@@ -43,6 +45,19 @@ export function ViewerBar({ duration, view, time, cands, selectedId, markers, ov
 
   const rangeOf = (c: Candidate): [number, number] =>
     drag && drag.id === c.id ? drag.live : (overrides[c.id] ?? effectiveRange(c, duration))
+
+  useEffect(() => {
+    const el = bar.current
+    if (!el || !onWheelZoom) return
+    const onWheel = (e: WheelEvent) => {
+      if (e.deltaY === 0) return
+      e.preventDefault()
+      onWheelZoom(e.deltaY < 0 ? 'in' : 'out', pointerTime(e.clientX))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onWheelZoom, view, duration])
 
   useEffect(() => {
     if (!scrubbing) return
@@ -136,9 +151,7 @@ export function ViewerBar({ duration, view, time, cands, selectedId, markers, ov
                   ? 'border-zinc-400 bg-zinc-500/30'
                   : modified
                     ? 'border-orange-400 bg-orange-500/60'
-                    : c.certain
-                      ? 'border-yellow-300 bg-yellow-400/70'
-                      : 'border-yellow-300 bg-yellow-300/30'
+                    : 'border-yellow-300 bg-yellow-300/30'
               } ${active ? 'border-y border-y-white' : ''}`}
               style={{ left: `${left}%`, width: `${Math.max(0.3, barPct(e, view) - left)}%` }}
             >

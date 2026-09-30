@@ -20,6 +20,7 @@ import { LegacyGamePanel } from './LegacyGamePanel'
 import { ViewerBar, ViewerScroll } from './ViewerBar'
 import { ExitFullscreenIcon, FullscreenIcon, MuteIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon, VolumeIcon, ZoomInIcon, ZoomOutIcon } from './ViewerIcons'
 import { ArchivePopup } from './ArchivePopup'
+import { GameMenu, type GameMenuItem } from './GameMenu'
 import { ViewerCandidates } from './ViewerCandidates'
 
 const SEEK_STEP_SEC = 5
@@ -34,11 +35,14 @@ export function GameViewer({
   onBack,
   onChanged,
   backLabel = '← 게임 목록',
+  menu,
 }: {
   gameKey: string
   onBack: () => void
   onChanged: () => void
   backLabel?: string
+  /** 머리줄 `⋯` 메뉴(게임 삭제 등). */
+  menu?: GameMenuItem[]
 }) {
   const [game, setGame] = useState<GameDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -239,13 +243,18 @@ export function GameViewer({
   const unarchive = (id: string) => {
     setArchiveTarget(null)
     setSelected((sel) => (sel === id ? null : sel))
-    void run(() => unsaveCandidate(gameKey, id), '보관을 해제했습니다 — 클립을 지우고 이 후보는 무시했습니다(무시한 후보도 보기에서 되살릴 수 있습니다)')
+    void run(() => unsaveCandidate(gameKey, id), '보관을 해제했습니다 — 클립 영상은 지웠고 후보는 그대로 남아 있습니다')
   }
 
   const zoomStep = (factor: number) => {
     const base: View = zoomWindow ?? [0, duration]
     const center = time >= base[0] && time <= base[1] ? time : (base[0] + base[1]) / 2
     setZoomWindow(zoomBy(base, factor, center, duration))
+  }
+
+  const wheelZoom = (direction: 'in' | 'out', center: number) => {
+    const base: View = zoomWindow ?? [0, duration]
+    setZoomWindow(zoomBy(base, direction === 'in' ? 0.75 : 1 / 0.75, center, duration))
   }
 
   const modifiedIds = cands.filter((c) => isSaved(c) && !isDismissed(c) && rangeModified(c, duration)).map((c) => c.id)
@@ -356,6 +365,7 @@ export function GameViewer({
           <input type="checkbox" checked={game.pinned} onChange={(e) => void run(() => setGamePinned(gameKey, e.target.checked))} />
           고정(자동 정리에서 제외)
         </label>
+        {menu && menu.length > 0 && <GameMenu items={menu} />}
       </div>
 
       <div className="flex min-h-0 gap-3" style={{ height: 'calc(100vh - 9.5rem)', minHeight: 460 }}>
@@ -445,6 +455,7 @@ export function GameViewer({
               markers={game.markers}
               overrides={overrides}
               onSeek={seek}
+              onWheelZoom={wheelZoom}
               onSelect={setSelected}
               onRangeCommit={commitRange}
             />
