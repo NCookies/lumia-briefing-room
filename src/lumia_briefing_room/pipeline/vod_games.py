@@ -97,7 +97,7 @@ def split_games(
             continue
         inside = states_in(states, GameSpan(0, start, end, 0.0))
         confidence = sum(is_ingame(s) for s in inside) / len(inside)
-        select_start, practice = _selection(states, start, floor=prev_end)
+        select_start, practice = selection_before(states, start, floor=prev_end)
         games.append(
             GameSpan(
                 index=len(games) + 1, start=start, end=end, confidence=confidence,
@@ -108,7 +108,7 @@ def split_games(
     return games
 
 
-def _selection(states: list[FrameState], game_start: float, *, floor: float) -> tuple[float | None, bool]:
+def selection_before(states: list[FrameState], game_start: float, *, floor: float) -> tuple[float | None, bool]:
     """게임 바로 앞의 캐릭터·루트 선택 화면 덩어리의 (첫 프레임, 연습 모드 여부). 뒤에 게임이 이어지지 않는 덩어리(닷지)는 여기 닿지 않는다."""
     lo = max(game_start - SELECT_MAX_BEFORE_GAME_SEC, floor)
     frames = [s for s in states if s.select_screen and lo < s.t < game_start]
