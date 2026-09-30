@@ -14,6 +14,7 @@ from pathlib import Path
 from lumia_briefing_room.pipeline.clip import ClipCutError, ClipRange, CutResult, cut_clip
 from lumia_briefing_room.pipeline.ffmpeg_errors import describe_clip_error
 from lumia_briefing_room.pipeline.game_store import FULL_VIDEO, has_room
+from lumia_briefing_room.pipeline.recording_stop import STOPPED_BEFORE_MESSAGE, recording_stop
 from lumia_briefing_room.video.segments import SegmentRange
 from lumia_briefing_room.video.session import RecordingSession
 
@@ -36,6 +37,7 @@ class FullVideo:
 class FullVideoOutcome:
     video: FullVideo | None
     error: str | None = None
+    recording_stopped: str | None = None  # "before" / "during" - recording_stop.py
 
 
 def estimate_source_bytes(session: RecordingSession, seg_range: SegmentRange) -> int:
@@ -98,7 +100,15 @@ def cut_full_video(
             max_bytes_per_sec=max_bytes_per_sec,
         )
         os.replace(tmp_out, final)
-    except (ClipCutError, OSError, subprocess.CalledProcessError) as exc:
+    except ClipCutError as exc:
+        tmp_out.unlink(missing_ok=True)
+        if recording_stop(session, seg_range) == "before":
+            log.error("스팀 녹화가 이 게임 전에 멈춰 녹화가 없다(%s): %s", session.directory.name, exc)
+            return FullVideoOutcome(None, STOPPED_BEFORE_MESSAGE, recording_stopped="before")
+        message = describe_clip_error(exc)
+        log.warning("풀영상 컷 실패 - 후보 기록과 클립 저장은 계속한다: %s", message)
+        return FullVideoOutcome(None, message)
+    except (OSError, subprocess.CalledProcessError) as exc:
         tmp_out.unlink(missing_ok=True)
         message = describe_clip_error(exc)
         log.warning("풀영상 컷 실패 - 후보 기록과 클립 저장은 계속한다: %s", message)
@@ -109,4 +119,7 @@ def cut_full_video(
     except OSError:
         size = None
     offset = (cut.segment_start - 1) * session.segment_duration_sec
-    return FullVideoOutcome(FullVideo(path=final, cut=cut, size_bytes=size, offset_sec=offset))
+    stopped = "during" if recording_stop(session, seg_range) == "during" else None
+    if stopped:
+        log.error("스팀 녹화가 게임 도중 멈춰 풀영상이 잘렸다(%s, 세그먼트 %d까지)", session.directory.name, cut.segment_end)
+    return FullVideoOutcome(FullVideo(path=final, cut=cut, size_bytes=size, offset_sec=offset), recording_stopped=stopped)

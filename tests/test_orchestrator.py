@@ -472,7 +472,7 @@ class _FakeSession:
     directory = Path("bg_1049590_20260924_060000")
 
 
-def _patch_pipeline(monkeypatch, orch, *, intervals, full_ok=True, markers=()):
+def _patch_pipeline(monkeypatch, orch, *, intervals, full_ok=True, markers=(), stopped=None):
     from lumia_briefing_room.pipeline.clip import CutResult
     from lumia_briefing_room.pipeline.full_video import FullVideo, FullVideoOutcome
 
@@ -486,10 +486,12 @@ def _patch_pipeline(monkeypatch, orch, *, intervals, full_ok=True, markers=()):
 
     def fake_full(session, seg_range, start, end, folder, **kw):
         cuts.append("full")
+        if stopped == "before":
+            return FullVideoOutcome(None, "스팀 녹화가 멈췄다", recording_stopped="before")
         if not full_ok:
             return FullVideoOutcome(None, "저장 공간이 부족해 풀영상을 만들지 못했습니다")
         cut = CutResult(segment_start=2, segment_end=5, duration_sec=12.0, source_incomplete=False)
-        return FullVideoOutcome(FullVideo(path=folder / "full.mp4", cut=cut, size_bytes=5, offset_sec=3.0))
+        return FullVideoOutcome(FullVideo(path=folder / "full.mp4", cut=cut, size_bytes=5, offset_sec=3.0), recording_stopped=stopped)
 
     def fake_cut(session, rng, out, **kw):
         cuts.append(out.stem)
@@ -566,6 +568,30 @@ def test_when_the_full_video_fails_only_certain_candidates_become_clips_and_the_
     assert game["fullVideo"] is None and "저장 공간이 부족" in game["fullVideoError"]
     assert len(game["candidates"]) == 2
     assert game["candidates"][0]["user"] and not game["candidates"][1]["user"]
+
+
+def test_a_stopped_steam_recording_is_reported_as_such_and_recorded_on_the_game(tmp_path, monkeypatch):
+    from lumia_briefing_room.pipeline import orchestrator as orch
+
+    _patch_pipeline(monkeypatch, orch, intervals=[], stopped="before")
+    stopped: list[str] = []
+    failed: list[str] = []
+    _, game = _run_process(orch, tmp_path, on_full_video_error=failed.append, on_recording_stopped=stopped.append)
+
+    assert stopped == ["스팀 녹화가 멈췄다"] and failed == []
+    assert game["recordingStopped"] == "before" and game["fullVideoError"] == "스팀 녹화가 멈췄다"
+
+
+def test_a_recording_that_stopped_during_the_game_is_reported_even_though_the_full_video_exists(tmp_path, monkeypatch):
+    from lumia_briefing_room.pipeline import orchestrator as orch
+    from lumia_briefing_room.pipeline.recording_stop import STOPPED_DURING_MESSAGE
+
+    _patch_pipeline(monkeypatch, orch, intervals=[], stopped="during")
+    stopped: list[str] = []
+    _, game = _run_process(orch, tmp_path, on_recording_stopped=stopped.append)
+
+    assert stopped == [STOPPED_DURING_MESSAGE]
+    assert game["recordingStopped"] == "during" and game["fullVideo"] is not None
 
 
 def test_existing_clip_ids_are_marked_saved_and_no_new_clip_is_cut(tmp_path, monkeypatch):

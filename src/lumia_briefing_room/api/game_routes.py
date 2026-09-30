@@ -20,6 +20,7 @@ from pydantic import BaseModel
 
 from lumia_briefing_room import activity
 from lumia_briefing_room.api.clips import find_clip
+from lumia_briefing_room.pipeline.recording_stop import error_of_record, stopped_of_record
 from lumia_briefing_room.pipeline import categories as cats
 from lumia_briefing_room.pipeline.library_fs import LibraryError
 from lumia_briefing_room.config import AUTO_ARCHIVE_FOLDER, Config, discover_ffmpeg, resolve_paths
@@ -107,7 +108,8 @@ def _summary(game: dict, games_dir: Path, *, can_rebuild_full: bool = False) -> 
         "hasFullVideo": has_full_video(games_dir, game["gameKey"]),
         "fullVideoSizeBytes": video.get("sizeBytes"),
         "durationSec": video.get("durationSec"),
-        "fullVideoError": game.get("fullVideoError"),
+        "fullVideoError": error_of_record(game),
+        "recordingStopped": stopped_of_record(game),
         "legacy": bool(game.get("legacy")),
         "canRebuildFullVideo": can_rebuild_full,
         "fullVideoDeletedAt": game.get("fullVideoDeletedAt"),
@@ -221,7 +223,10 @@ def register_game_routes(
             can = can_rebuild(game, games_dir(key), resolve_recording_root(current_config().paths.steam_recording))
         self_saved_category(game)
         game = with_existing_portraits(game, game_dir(games_dir(key), key))
-        return {**game, "hasFullVideo": has_full_video(games_dir(key), key), "canRebuildFullVideo": can}
+        return {
+            **game, "hasFullVideo": has_full_video(games_dir(key), key), "canRebuildFullVideo": can,
+            "fullVideoError": error_of_record(game), "recordingStopped": stopped_of_record(game),
+        }
 
     def category_of_clip(game: dict, clip_id: str) -> str | None:
         cfg = current_config()

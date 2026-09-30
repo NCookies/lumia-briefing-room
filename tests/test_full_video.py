@@ -94,3 +94,41 @@ def test_missing_segments_are_reported_not_raised(tmp_path, monkeypatch):
 
     outcome = _run(session, tmp_path / "g", tmp_path, monkeypatch, cut=cut)
     assert outcome.video is None and "세그먼트" in outcome.error
+
+
+def _cut_range(session, folder, tmp_path, monkeypatch, rng, cut):
+    monkeypatch.setattr(fv, "cut_clip", cut)
+    monkeypatch.setattr(fv, "_free_bytes", lambda f: 10 * 2**30)
+    return fv.cut_full_video(
+        session, rng, START, START + timedelta(seconds=rng.last * 3), folder,
+        ffmpeg_path=Path("ffmpeg"), include_audio=True, tmp_dir=tmp_path,
+    )
+
+
+def test_missing_segments_after_the_recording_stopped_say_steam_stopped_recording(tmp_path, monkeypatch):
+    from lumia_briefing_room.pipeline.recording_stop import STOPPED_BEFORE_MESSAGE
+
+    session = _make_session(tmp_path)
+    (session.directory / "chunk-stream0-00099.m4s").unlink()
+
+    def cut(*a, **k):
+        raise ClipCutError("세그먼트를 찾을 수 없다: 200-300")
+
+    outcome = _cut_range(session, tmp_path / "g", tmp_path, monkeypatch, SegmentRange(200, 300), cut)
+    assert outcome.video is None
+    assert outcome.error == STOPPED_BEFORE_MESSAGE
+    assert outcome.recording_stopped == "before"
+
+
+def test_full_video_cut_short_by_a_stopped_recording_is_flagged(tmp_path, monkeypatch):
+    session = _make_session(tmp_path)
+    (session.directory / "chunk-stream0-00099.m4s").unlink()
+
+    def cut(sess, rng, out, **kw):
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(b"video")
+        return CutResult(segment_start=2, segment_end=6, duration_sec=15.0, source_incomplete=True)
+
+    outcome = _cut_range(session, tmp_path / "g", tmp_path, monkeypatch, SegmentRange(2, 60), cut)
+    assert outcome.video is not None and outcome.error is None
+    assert outcome.recording_stopped == "during"

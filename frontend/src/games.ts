@@ -65,6 +65,7 @@ export interface GameSummary {
   fullVideoSizeBytes: number | null
   durationSec: number | null
   fullVideoError: string | null
+  recordingStopped?: RecordingStopped
   fullVideoDeletedAt: string | null
   legacy: boolean
   canRebuildFullVideo?: boolean
@@ -87,6 +88,7 @@ export interface GameDetail {
   hasFullVideo: boolean
   fullVideo: { durationSec: number; sizeBytes: number | null } | null
   fullVideoError: string | null
+  recordingStopped?: RecordingStopped
   candidates: Candidate[]
   userCandidates: Candidate[]
   markers: Marker[]
@@ -185,7 +187,18 @@ export const MARKER_LABEL: Record<Marker['kind'], string> = {
 
 const COBALT_OUTCOMES = ['승리', '패배']
 
-export function gameHeadline(result: MatchResult | null): string {
+export type RecordingStopped = 'before' | 'during' | null
+
+/** 스팀 녹화가 오류로 멈춰 녹화가 없거나(before) 잘린(during) 게임에 붙이는 배지 문구. */
+export function recordingStopLabel(stopped: RecordingStopped | undefined): string | null {
+  if (stopped === 'before') return '스팀 녹화 오류로 녹화 없음'
+  if (stopped === 'during') return '스팀 녹화 오류로 일부만 녹화'
+  return null
+}
+
+export function gameHeadline(result: MatchResult | null, stopped?: RecordingStopped): string {
+  if (!result && stopped === 'before') return '녹화 없음'
+
   if (result?.outcome && COBALT_OUTCOMES.includes(result.outcome)) return result.outcome
   if (!result) return '결과 미확인'
   if (result.placement == null) return '순위 미확인'

@@ -177,7 +177,7 @@ export function GamePlayer({ gameKey, onBack, onChanged }: { gameKey: string; on
         <button type="button" className="rounded border border-zinc-600 px-3 py-1 text-sm hover:bg-zinc-700" onClick={onBack}>
           ← 게임 목록
         </button>
-        <h2 className="text-lg font-semibold">{gameHeadline(game.matchResult)}</h2>
+        <h2 className="text-lg font-semibold">{gameHeadline(game.matchResult, game.recordingStopped)}</h2>
         <span className="text-xs text-zinc-500">{game.gameKey}</span>
         <label className="ml-auto flex items-center gap-1 text-sm text-zinc-300">
           <input

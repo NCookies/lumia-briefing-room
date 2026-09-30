@@ -1,5 +1,5 @@
 import { cleanupReasonLabel, cleanupReasonTooltip, preserveLabel, type CleanupPreviewEntry } from '../cleanupPreview'
-import { gameHeadline, matchTypeLabel, type GameSummary } from '../games'
+import { gameHeadline, matchTypeLabel, recordingStopLabel, type GameSummary } from '../games'
 import { gameAssetUrl } from '../gamesApi'
 import { formatBytes } from '../retention'
 import { GameMenu, type GameMenuItem } from './GameMenu'
@@ -39,7 +39,7 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, menu }: Pr
           <div
             className={`text-xl font-bold ${g.matchResult?.placement === 1 || g.matchResult?.outcome === '승리' ? 'text-emerald-400' : 'text-zinc-200'}`}
           >
-            {gameHeadline(g.matchResult)}
+            {gameHeadline(g.matchResult, g.recordingStopped)}
           </div>
           <div className="text-sm font-semibold text-zinc-300">
             {g.gameMode === 'cobalt' ? '코발트' : matchTypeLabel(g.matchResult)}
@@ -90,7 +90,11 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, menu }: Pr
             {preserveLabel(due) && <span className="ml-1 text-rose-100/80">· {preserveLabel(due)}</span>}
           </span>
         )}
-        {g.legacy && !g.hasFullVideo ? (
+        {recordingStopLabel(g.recordingStopped) ? (
+          <span className="rounded bg-rose-600/25 px-1.5 text-xs text-rose-200" title={g.fullVideoError ?? undefined}>
+            {recordingStopLabel(g.recordingStopped)}
+          </span>
+        ) : g.legacy && !g.hasFullVideo ? (
           <span className="rounded bg-amber-500/20 px-1.5 text-xs text-amber-200" title={g.fullVideoError ?? undefined}>
             풀영상 없음(이전 버전)
           </span>

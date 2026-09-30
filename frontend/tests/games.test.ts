@@ -7,6 +7,7 @@ import {
   effectiveRange,
   formatClock,
   gameHeadline,
+  recordingStopLabel,
   matchTypeLabel,
   neighborCandidate,
   positionPct,
@@ -103,4 +104,15 @@ test('the match type shows as 랭크 or 일반 and stays hidden when unknown', (
 test('the users title wins over the detected one', () => {
   assert.equal(candidateTitle(c('a', 1, 5, { title: '1일차 낮 교전' })), '1일차 낮 교전')
   assert.equal(candidateTitle(c('a', 1, 5, { title: '1일차 낮 교전', user: { title: '내 이름' } })), '내 이름')
+})
+
+test('a game without a recording because steam recording stopped says so', () => {
+  assert.equal(gameHeadline(null, 'before'), '녹화 없음')
+  assert.equal(gameHeadline(null, 'during'), '결과 미확인')
+  assert.equal(gameHeadline({ placement: 3 }, 'before'), '#3')
+  assert.equal(gameHeadline(null), '결과 미확인')
+  assert.equal(recordingStopLabel('before'), '스팀 녹화 오류로 녹화 없음')
+  assert.equal(recordingStopLabel('during'), '스팀 녹화 오류로 일부만 녹화')
+  assert.equal(recordingStopLabel(null), null)
+  assert.equal(recordingStopLabel(undefined), null)
 })

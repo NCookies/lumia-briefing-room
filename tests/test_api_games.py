@@ -205,3 +205,23 @@ def test_portrait_files_left_in_the_folder_are_shown_even_if_game_json_lost_the_
     detail = client.get(f"/api/games/{KEY}").json()
     assert detail["portraits"]["me"] == "portrait_me.jpg"
     assert client.get(f"/api/games/{KEY}/asset/portrait_me.jpg").content == b"me"
+
+
+def test_a_game_recorded_before_the_steam_recording_stopped_is_flagged_with_the_cause(client):
+    from lumia_briefing_room.pipeline.recording_stop import STOPPED_BEFORE_MESSAGE
+
+    folder = client.tmp / "games" / KEY
+    game = json.loads((folder / "game.json").read_text(encoding="utf-8"))
+    game.update(fullVideo=None, fullVideoError="세그먼트를 찾을 수 없다: 680-1180", candidates=[], matchResult=None)
+    (folder / "game.json").write_text(json.dumps(game), encoding="utf-8")
+    (folder / "full.mp4").unlink()
+
+    (row,) = client.get("/api/games").json()["games"]
+    assert row["recordingStopped"] == "before" and row["fullVideoError"] == STOPPED_BEFORE_MESSAGE
+    detail = client.get(f"/api/games/{KEY}").json()
+    assert detail["recordingStopped"] == "before" and detail["fullVideoError"] == STOPPED_BEFORE_MESSAGE
+
+
+def test_a_normal_game_is_not_flagged(client):
+    (row,) = client.get("/api/games").json()["games"]
+    assert row["recordingStopped"] is None

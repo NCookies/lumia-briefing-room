@@ -371,7 +371,7 @@ export function GameViewer({
         <button type="button" className={BTN} onClick={onBack}>
           {backLabel}
         </button>
-        <h2 className="text-lg font-semibold">{gameHeadline(game.matchResult)}</h2>
+        <h2 className="text-lg font-semibold">{gameHeadline(game.matchResult, game.recordingStopped)}</h2>
         <span className="text-xs text-zinc-500">{game.source === 'vod' ? vodGameHeading(game) : game.gameKey}</span>
         {error && <span className="text-sm text-rose-300">{error}</span>}
         {notice && <span className="text-sm text-emerald-300">{notice}</span>}

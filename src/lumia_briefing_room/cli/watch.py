@@ -32,7 +32,7 @@ from lumia_briefing_room.pipeline.clip import ClipCutError
 from lumia_briefing_room.pipeline.ffmpeg_errors import describe_clip_error, is_disk_full_error
 from lumia_briefing_room.pipeline.nickname import learn_nickname
 from lumia_briefing_room.pipeline.orchestrator import process_match
-from lumia_briefing_room.pipeline.disk_alert import check_and_notify, report_full_video_failure
+from lumia_briefing_room.pipeline.disk_alert import check_and_notify, report_full_video_failure, report_recording_stopped
 from lumia_briefing_room.pipeline.playerlog import MatchBoundary
 from lumia_briefing_room.pipeline.watch_failures import WatchFailureTracker
 from lumia_briefing_room.pipeline.watcher import (
@@ -86,6 +86,7 @@ def make_processor(
                 k_templates=k_templates, a_templates=a_templates, hwaccel=hwaccel,
                 on_result=lambda r: learn_nickname(config_path, r.nickname),
                 on_full_video_error=report_full_video_failure,
+                on_recording_stopped=report_recording_stopped,
             )
         except ClipCutError as exc:
             log.warning("클립 생성 실패(세그먼트 없음): %s", exc)

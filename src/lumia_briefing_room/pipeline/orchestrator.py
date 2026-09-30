@@ -18,6 +18,7 @@ from lumia_briefing_room.pipeline.clip import ClipRange, copy_rate_for, cut_clip
 from lumia_briefing_room.detect.types import PortraitCrops
 from lumia_briefing_room.pipeline.filters import apply_filter
 from lumia_briefing_room.pipeline.full_video import FullVideoOutcome, cut_full_video
+from lumia_briefing_room.pipeline.recording_stop import STOPPED_DURING_MESSAGE
 from lumia_briefing_room.pipeline.game_store import (
     SCHEMA_VERSION,
     candidate_dict,
@@ -379,6 +380,7 @@ def _write_game_record(
             "saveMode": cfg.clip.save_mode,
             "fullVideo": video,
             "fullVideoError": full.error,
+            "recordingStopped": full.recording_stopped,
             "candidates": candidate_rows,
             "userCandidates": [],
             "markers": markers_dict(detection.markers, offset_sec=offset),
@@ -407,6 +409,7 @@ def process_match(
     on_progress: Callable[[float], None] | None = None,
     games_dir: Path | None = None,
     on_full_video_error: Callable[[str], None] | None = None,
+    on_recording_stopped: Callable[[str], None] | None = None,
     existing_clip_ids: Collection[str] | None = None,
 ) -> list[Path]:
     """SPEC §3 다이어그램 전체: 매치 하나를 검출부터 메타데이터 저장까지 처리한다.
@@ -456,7 +459,10 @@ def process_match(
         ffmpeg_path=ffmpeg_path, include_audio=cfg.clip.include_audio, tmp_dir=resolved.temp,
         max_bytes_per_sec=copy_rate,
     )
-    if full.error is not None and on_full_video_error is not None:
+    if full.recording_stopped is not None:
+        if on_recording_stopped is not None:
+            on_recording_stopped(full.error or STOPPED_DURING_MESSAGE)
+    elif full.error is not None and on_full_video_error is not None:
         on_full_video_error(full.error)
 
     if on_progress is not None:

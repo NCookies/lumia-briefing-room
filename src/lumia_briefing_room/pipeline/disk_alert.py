@@ -12,6 +12,7 @@ log = logging.getLogger(__name__)
 
 DISK_LOW = "disk_low"
 FULL_VIDEO_FAILED = "full_video_failed"
+RECORDING_STOPPED = "recording_stopped"
 
 
 def disk_status(cfg: Config) -> DiskStatus:
@@ -30,6 +31,10 @@ def check_and_notify(cfg: Config, center: NoticeCenter = notices) -> DiskStatus 
     else:
         center.clear(DISK_LOW)
     return status
+
+
+def report_recording_stopped(message: str, center: NoticeCenter = notices) -> None:
+    center.post(RECORDING_STOPPED, message, title="스팀 녹화가 멈췄습니다")
 
 
 def report_full_video_failure(message: str, center: NoticeCenter = notices) -> None:
