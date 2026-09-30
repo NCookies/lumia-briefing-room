@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useConfirm } from '../confirmContext'
 import type { DeleteMode } from '../deleteConfirm'
+import { onlyDueGames } from '../cleanupPreview'
 import { dayAnchorId, dayId, shortcutDays } from '../dayFold'
 import type { GameSummary } from '../games'
 import { getGames, setGamePinned } from '../gamesApi'
 import { formatBytes } from '../retention'
 import { useCleanupPreview } from '../useCleanupPreview'
+import { useStorageUsage } from '../useStorageUsage'
 import { useDayFold } from '../useDayFold'
 import {
   cancelAnalysis,
@@ -27,10 +29,12 @@ import { buildableGameCount, groupGamesByVod, vodGameTime, vodTotals } from '../
 import { probeProgress, type Vod } from '../vodGrouping'
 import { DayShortcutBar } from './DayShortcutBar'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
+import { DueOnlyToggle } from './DueOnlyToggle'
 import { GameDayHeader } from './GameDayHeader'
 import { GameRow } from './GameRow'
 import { GameViewer } from './GameViewer'
 import { LoadingBar } from './LoadingBar'
+import { StorageUsageBar } from './StorageUsageBar'
 import { VideoFormatHelp } from './VideoFormatHelp'
 import { VodSection } from './VodSection'
 
@@ -70,9 +74,16 @@ export function VodGameList({
   const [collapsedVods, setCollapsedVods] = useState<Set<string>>(new Set())
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null)
   const ask = useConfirm()
+  const [dueOnly, setDueOnly] = useState(false)
   const cleanup = useCleanupPreview(active)
+  const storage = useStorageUsage(active, games)
+  const shown = useMemo(() => onlyDueGames(games ?? [], cleanup, dueOnly), [games, cleanup, dueOnly])
+  const dueCount = useMemo(() => onlyDueGames(games ?? [], cleanup, true).length, [games, cleanup])
 
-  const groups = useMemo(() => groupGamesByVod(vods, games ?? []), [vods, games])
+  const groups = useMemo(() => {
+    const all = groupGamesByVod(vods, shown)
+    return dueOnly ? all.filter((g) => g.games.length > 0) : all
+  }, [vods, shown, dueOnly])
   const dateGroups = useMemo(() => groupVodsByDate(groups, 'desc'), [groups])
   const days = useMemo(() => dateGroups.map((d) => d.day), [dateGroups])
   const fold = useDayFold('vod', days)
@@ -253,13 +264,16 @@ export function VodGameList({
 
   const allGames = games ?? []
   const total = vodTotals(allGames)
-  const empty = vodsLoaded && games !== null && groups.length === 0
+  const empty = vodsLoaded && games !== null && groups.length === 0 && !dueOnly
 
   return (
     <div className="flex flex-1 flex-col gap-2 p-4">
       <div className="flex flex-wrap items-baseline gap-3 text-sm text-zinc-300">
-        <span>게임 {total.games}개</span>
-        <span className="text-xs text-zinc-500">풀영상 {formatBytes(total.bytes)}</span>
+        <span>게임 {dueOnly ? `${shown.length} / ${allGames.length}` : total.games}개</span>
+        <StorageUsageBar totals={storage} tabBytes={total.bytes} />
+        {!(storage && storage.autoCleanEnabled && storage.limitGb) && (
+          <span className="text-xs text-zinc-500">풀영상 {formatBytes(total.bytes)}</span>
+        )}
         {days.length > 0 && (
           <>
             <button
@@ -280,6 +294,7 @@ export function VodGameList({
             </button>
           </>
         )}
+        <DueOnlyToggle checked={dueOnly} count={dueCount} onChange={setDueOnly} />
         <VideoFormatHelp />
         <button
           type="button"
@@ -304,6 +319,8 @@ export function VodGameList({
       {error && <p className="text-sm text-rose-400">오류가 발생했습니다: {error}</p>}
       {actionError && <p className="text-sm text-rose-400">{actionError}</p>}
       {notice && <p className="text-sm text-emerald-400">{notice}</p>}
+
+      {dueOnly && groups.length === 0 && <p className="text-sm text-zinc-500">삭제 예정인 게임이 없습니다.</p>}
 
       {empty && (
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-center text-zinc-400">
