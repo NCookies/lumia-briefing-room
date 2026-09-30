@@ -5,6 +5,7 @@ from collections.abc import Iterable
 import numpy as np
 
 from lumia_briefing_room.detect.color import channel_stats, count, vivid_mask
+from lumia_briefing_room.detect.select_screen import read_select_screen
 from lumia_briefing_room.detect.spectator import read_spectating
 from lumia_briefing_room.detect.types import PortraitCrops
 from lumia_briefing_room.profiles.models import ResolutionProfile
@@ -60,6 +61,38 @@ def crops_look_like_portraits(crops: PortraitCrops) -> bool:
 
 
 GIVE_UP_AFTER_CONSECUTIVE_NON_NONE = 2
+SELECT_SCREEN_ROIS = ("select_timer", "select_title")
+
+
+def _portraits_if_filled(frame: np.ndarray, profile: ResolutionProfile) -> PortraitCrops | None:
+    """판정용 칸과 저장용 칸이 둘 다 초상화다워야 받는다.
+
+    실측(2026-09-30): 캐릭터 선택 화면에서는 팀원 칸이 회색 "EMPTY" 자리표시인데도 넓은 판정용
+    칸이 주변 색 때문에 통과했다 - 저장용 칸까지 보면 루트 선택 화면(세 장 다 채워짐)만 남는다.
+    """
+    if not crops_look_like_portraits(_detect_crops(frame, profile)):
+        return None
+    crops = crop_portraits(frame, profile)
+    return crops if crops_look_like_portraits(crops) else None
+
+
+def _find_on_select_screens(
+    frames: Iterable[tuple[float, np.ndarray]], profile: ResolutionProfile
+) -> PortraitCrops | None:
+    """캐릭터·루트 선택 화면 머리띠(`detect/select_screen.py`)가 보이는 프레임에서만 찾는다.
+
+    실측(2026-09-30, 치지직 1080p 다시보기): 방송 캐릭터 오버레이가 미니맵 아이콘 자리를 덮어
+    로딩·선택 화면이 전부 "관전"으로 읽혀, 관전 판정으로 포기하는 옛 방식은 선택 화면까지 가지
+    못했다. 머리띠는 상단 가운데·좌상단이라 오버레이에 덜 가리고, 선택 화면에서만 보므로 이전
+    경기의 로비·인게임 화면을 잘못 잡을 걱정이 없어 포기 규칙도 필요 없다.
+    """
+    for _, frame in frames:
+        if not read_select_screen(profile.crop(frame, "select_timer"), profile.crop(frame, "select_title")):
+            continue
+        found = _portraits_if_filled(frame, profile)
+        if found is not None:
+            return found
+    return None
 
 
 def find_portraits_in_frames(
@@ -80,7 +113,13 @@ def find_portraits_in_frames(
     그래서 `None` 이 아닌 판정이 **연속으로** `GIVE_UP_AFTER_CONSECUTIVE_NON_NONE` 번 나와야
     포기한다 - 낱개로 섞인 오판(관전 판정 자체가 가끔 틀리는 것도 실측으로 확인함)은 넘기고,
     진짜로 로비·인게임에 들어선 뒤(연속으로 찍힘)에는 더 볼 필요가 없어 계속 멈춘다.
+
+    프로필에 선택 화면 칸이 있으면(2026-09-30 이후 2560x1440·1920x1080) 위 관전 판정 대신
+    `_find_on_select_screens` 를 쓴다. 관전 판정 방식은 선택 화면 칸이 없는 프로필용으로 남긴다.
     """
+    if all(name in profile.rois for name in SELECT_SCREEN_ROIS):
+        return _find_on_select_screens(frames, profile)
+
     consecutive_non_none = 0
     for _, frame in frames:
         spectating = read_spectating(
@@ -92,6 +131,7 @@ def find_portraits_in_frames(
                 return None
             continue
         consecutive_non_none = 0
-        if crops_look_like_portraits(_detect_crops(frame, profile)):
-            return crop_portraits(frame, profile)
+        found = _portraits_if_filled(frame, profile)
+        if found is not None:
+            return found
     return None

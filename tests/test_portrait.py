@@ -1,3 +1,5 @@
+import dataclasses
+
 import numpy as np
 
 from lumia_briefing_room.detect.portrait import (
@@ -9,6 +11,9 @@ from lumia_briefing_room.detect.types import PortraitCrops
 from lumia_briefing_room.profiles.models import ResolutionProfile
 
 PROFILE = ResolutionProfile.for_resolution(2560, 1440)
+LEGACY_PROFILE = dataclasses.replace(
+    PROFILE, rois={k: v for k, v in PROFILE.rois.items() if not k.startswith("select_")}
+)
 VIVID = (250, 60, 40)  # 밝고 채도 높은 색 - 초상화 그림 흉내
 DIM = (20, 20, 20)
 
@@ -84,7 +89,7 @@ def test_find_portraits_in_frames_stops_at_the_first_frame_with_all_three_filled
         (6.0, _route_select_frame(me=winning_me_color)),  # 이제 세 칸 다 채워졌다
     ]
 
-    found = find_portraits_in_frames(frames, PROFILE)
+    found = find_portraits_in_frames(frames, LEGACY_PROFILE)
 
     assert found is not None
     assert tuple(found.me[0, 0]) == winning_me_color
@@ -99,7 +104,7 @@ def test_find_portraits_in_frames_gives_up_once_the_team_lobby_settles_in():
         (9.0, _route_select_frame()),
     ]
 
-    assert find_portraits_in_frames(frames, PROFILE) is None
+    assert find_portraits_in_frames(frames, LEGACY_PROFILE) is None
 
 
 def test_find_portraits_in_frames_gives_up_once_real_gameplay_settles_in():
@@ -112,7 +117,7 @@ def test_find_portraits_in_frames_gives_up_once_real_gameplay_settles_in():
         (9.0, _route_select_frame()),
     ]
 
-    assert find_portraits_in_frames(frames, PROFILE) is None
+    assert find_portraits_in_frames(frames, LEGACY_PROFILE) is None
 
 
 def test_find_portraits_in_frames_tolerates_a_single_stray_non_none_reading():
@@ -121,7 +126,7 @@ def test_find_portraits_in_frames_tolerates_a_single_stray_non_none_reading():
     `None` 이 아니면 포기하지 않고 계속 찾는다."""
     frames = [(0.0, _lobby_frame()), (3.0, _route_select_frame())]
 
-    found = find_portraits_in_frames(frames, PROFILE)
+    found = find_portraits_in_frames(frames, LEGACY_PROFILE)
 
     assert found is not None
 
@@ -129,4 +134,62 @@ def test_find_portraits_in_frames_tolerates_a_single_stray_non_none_reading():
 def test_find_portraits_in_frames_returns_none_when_nothing_matches():
     frames = [(0.0, _blank_frame()), (3.0, _blank_frame())]
 
+    assert find_portraits_in_frames(frames, LEGACY_PROFILE) is None
+
+
+def _with_select_header(frame: np.ndarray) -> np.ndarray:
+    """캐릭터·루트 선택 화면 머리띠 흉내: 시안색 남은 시간 + 어두운 바탕에 회색 제목 글자(`read_select_screen`)."""
+    _paint(frame, "select_timer", (50, 180, 220))
+    title = PROFILE.rois["select_title"]
+    frame[title.y0 : title.y1, title.x0 : title.x1] = (35, 35, 35)
+    stripe = max(1, round((title.y1 - title.y0) * 0.15))
+    frame[title.y0 : title.y0 + stripe, title.x0 : title.x1] = (180, 180, 180)
+    return frame
+
+
+def _select_route_frame(**kwargs) -> np.ndarray:
+    return _with_select_header(_route_select_frame(**kwargs))
+
+
+def test_select_mode_finds_portraits_on_the_route_select_screen():
+    frames = [(0.0, _blank_frame()), (3.0, _select_route_frame())]
+
+    assert find_portraits_in_frames(frames, PROFILE) is not None
+
+
+def test_select_mode_ignores_vivid_crops_outside_the_select_screen():
+    """선택 화면 머리띠가 없으면(인게임 HUD·이전 경기 화면) 세 칸이 초상화처럼 보여도 받지 않는다."""
+    frames = [(0.0, _route_select_frame()), (3.0, _blank_frame())]
+
     assert find_portraits_in_frames(frames, PROFILE) is None
+
+
+def test_select_mode_is_not_stopped_by_frames_read_as_spectating():
+    """실측(2026-09-30, 치지직 1080p 다시보기): 방송 캐릭터 오버레이가 미니맵 아이콘 자리를 덮어
+    로딩·선택 화면이 전부 "관전"으로 읽혔다 - 게임 시작에서 거꾸로 훑으면 로딩 화면 두 장에서
+    포기해 선택 화면까지 못 갔다. 선택 화면 판독이 있으면 관전 판정으로 포기하지 않는다."""
+    frames = [(0.0, _lobby_frame()), (3.0, _lobby_frame()), (6.0, _lobby_frame()), (9.0, _select_route_frame())]
+
+    assert find_portraits_in_frames(frames, PROFILE) is not None
+
+
+def test_empty_placeholder_cards_on_character_select_are_skipped():
+    """실측(2026-09-30): 캐릭터 선택 화면에서는 팀원 칸이 회색 "EMPTY" 자리표시인데도 넓은 판정용
+    칸이 주변 색 때문에 통과했다. 저장용 칸도 초상화다워야 받는다."""
+    character_select = _with_select_header(_blank_frame())
+    for base in ("portrait", "teammate1", "teammate2"):
+        _paint(character_select, base, VIVID)
+        _paint(character_select, f"{base}_display", DIM)
+    route_select = _select_route_frame(me=(250, 30, 200))
+    frames = [(0.0, character_select), (3.0, route_select)]
+
+    found = find_portraits_in_frames(frames, PROFILE)
+
+    assert found is not None
+    assert tuple(found.me[0, 0]) == (250, 30, 200)
+
+
+def test_1080p_profile_can_read_the_select_screen():
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+
+    assert {"select_timer", "select_title", "select_mode"} <= set(profile.rois)

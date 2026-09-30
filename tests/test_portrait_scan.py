@@ -18,10 +18,15 @@ def _paint(frame: np.ndarray, roi_name: str, color: tuple[int, int, int]) -> Non
 
 
 def _route_select_frame() -> np.ndarray:
+    """실제 루트 선택 화면처럼 선택 화면 머리띠(시안색 남은 시간 + 회색 제목)도 그린다."""
     frame = np.full((1440, 2560, 3), 20, dtype=np.uint8)
     for base in ("portrait", "teammate1", "teammate2"):
         _paint(frame, base, VIVID)
         _paint(frame, f"{base}_display", VIVID)
+    _paint(frame, "select_timer", (50, 180, 220))
+    title = PROFILE.rois["select_title"]
+    frame[title.y0 : title.y1, title.x0 : title.x1] = (35, 35, 35)
+    frame[title.y0 : title.y0 + max(1, round((title.y1 - title.y0) * 0.15)), title.x0 : title.x1] = (180, 180, 180)
     return frame
 
 
