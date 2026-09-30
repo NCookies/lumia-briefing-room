@@ -13,7 +13,7 @@ from lumia_briefing_room.detect.day import read_game_day
 from lumia_briefing_room.detect.ocr import OcrReader, TextReader
 from lumia_briefing_room.detect.phase import read_cobalt_phase
 from lumia_briefing_room.detect.region import load_region_templates
-from lumia_briefing_room.detect.result import ResultScreen, read_result_screen
+from lumia_briefing_room.detect.result import ResultScreen, merge_results, read_result_screen
 from lumia_briefing_room.profiles.models import ResolutionProfile
 from lumia_briefing_room.video.frames import extract_keyframe_frames
 from lumia_briefing_room.video.segments import SegmentRange, existing_segment_numbers
@@ -26,6 +26,8 @@ RESULT_TAIL_SEGMENTS = 8
 FORWARD_BATCH = 20
 FORWARD_MAX_BATCHES = 60
 FORWARD_MAX_OCR = 600
+MAX_VOTES = 5
+VOTE_PATIENCE = 3
 
 _reader: TextReader | None = None
 
@@ -50,6 +52,33 @@ def get_reader() -> TextReader:
 @dataclass(frozen=True)
 class EndScreens:
     result: ResultScreen | None
+    at: int | float | None = None
+
+
+class _Votes:
+    """결과 화면으로 읽힌 프레임을 모아 합친다. 결과 화면이 끝났거나(연속 `patience` 장 못 읽음) `max_votes` 장을 모으면 끝."""
+
+    def __init__(self, max_votes: int, patience: int) -> None:
+        self.max_votes, self.patience = max_votes, patience
+        self.reads: list[ResultScreen] = []
+        self.at: int | float | None = None
+        self._misses = 0
+
+    def add(self, key: int | float, result: ResultScreen | None) -> None:
+        if result is None:
+            self._misses += 1
+            return
+        if not self.reads:
+            self.at = key
+        self.reads.append(result)
+        self._misses = 0
+
+    @property
+    def done(self) -> bool:
+        return bool(self.reads) and (len(self.reads) >= self.max_votes or self._misses >= self.patience)
+
+    def outcome(self) -> EndScreens:
+        return EndScreens(merge_results(self.reads), self.at)
 
 
 def scan_for_result(
@@ -58,18 +87,19 @@ def scan_for_result(
     *,
     is_ingame: Callable[[np.ndarray], bool],
     max_frames: int = MAX_SCAN_FRAMES,
+    max_votes: int = MAX_VOTES,
+    patience: int = VOTE_PATIENCE,
 ) -> EndScreens:
     """경기 끝에서 거슬러 올라가며 결과 화면을 찾는다. 인게임 프레임은 OCR 없이 건너뛴다(OCR 이 프레임당 ~1초라서).
 
-    결과 화면을 찾으면 멈춘다.
+    첫 장에서 멈추지 않고 결과 화면이 이어지는 동안 몇 장을 더 읽어 항목별 다수결로 합친다(장마다 OCR 이 다른 곳을 틀린다).
     """
-    for _, frame in list(frames)[::-1][:max_frames]:
-        if is_ingame(frame):
-            continue
-        result = read(frame)
-        if result is not None:
-            return EndScreens(result)
-    return EndScreens(None)
+    votes = _Votes(max_votes, patience)
+    for key, frame in list(frames)[::-1][:max_frames]:
+        votes.add(key, None if is_ingame(frame) else read(frame))
+        if votes.done:
+            break
+    return votes.outcome()
 
 
 def scan_forward_for_result(
@@ -78,20 +108,25 @@ def scan_forward_for_result(
     *,
     is_ingame: Callable[[np.ndarray], bool],
     max_ocr: int = FORWARD_MAX_OCR,
+    max_votes: int = MAX_VOTES,
+    patience: int = VOTE_PATIENCE,
 ) -> EndScreens:
+    votes = _Votes(max_votes, patience)
     attempts = 0
     for batch in batches:
-        for _, frame in batch:
+        for key, frame in batch:
             if is_ingame(frame):
-                continue
-            result = read(frame)
-            if result is None:
-                attempts += 1
-                if attempts >= max_ocr:
-                    return EndScreens(None)
-                continue
-            return EndScreens(result)
-    return EndScreens(None)
+                votes.add(key, None)
+            else:
+                result = read(frame)
+                votes.add(key, result)
+                if result is None and not votes.reads:
+                    attempts += 1
+                    if attempts >= max_ocr:
+                        return EndScreens(None)
+            if votes.done:
+                return votes.outcome()
+    return votes.outcome()
 
 
 def scan_window(seg_range: SegmentRange) -> tuple[int, int]:

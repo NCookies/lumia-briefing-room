@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 
 import cv2
@@ -189,4 +190,38 @@ def read_result_screen(
         nickname=nickname,
         stats=parsed.stats,
         image=frame,
+    )
+
+
+def _majority(values: list):
+    """None 을 뺀 값 중 가장 많은 것. 동률이면 먼저 나온 쪽."""
+    known = [v for v in values if v is not None]
+    return Counter(known).most_common(1)[0][0] if known else None
+
+
+def _filled(result: ResultScreen) -> int:
+    fields = [result.placement, result.outcome, result.nickname, result.match_type != "unknown" or None]
+    return sum(f is not None for f in fields) + sum(v is not None for v in (result.stats or {}).values())
+
+
+def merge_results(results: list[ResultScreen]) -> ResultScreen | None:
+    """같은 결과 화면을 여러 장 읽은 값을 항목별 다수결로 합친다. OCR 이 장마다 다른 곳을 틀리기 때문이다.
+
+    못 읽은 값(None, unknown)은 표에 넣지 않는다. 결과표 이미지는 가장 많은 항목이 읽힌 장이다.
+    """
+    if not results:
+        return None
+    placement, total = _majority([(r.placement, r.total) for r in results if r.placement is not None]) or (None, None)
+    match_type = _majority([r.match_type for r in results if r.match_type != "unknown"]) or "unknown"
+    stat_keys = dict.fromkeys(k for r in results for k in (r.stats or {}))
+    stats = {k: _majority([(r.stats or {}).get(k) for r in results]) for k in stat_keys} if stat_keys else None
+    return ResultScreen(
+        placement=placement,
+        total=total,
+        match_type=match_type,
+        match_label=_majority([r.match_label for r in results if r.match_type == match_type and r.match_label]) or "",
+        outcome=_majority([r.outcome for r in results]),
+        nickname=_majority([r.nickname for r in results]),
+        stats=stats,
+        image=max(results, key=_filled).image,
     )

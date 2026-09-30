@@ -29,13 +29,32 @@ def make_read(calls):
     return read
 
 
-def test_scan_walks_backwards_from_the_last_frame_and_stops_at_first_hit():
+def test_scan_walks_backwards_and_keeps_reading_result_frames_until_the_screen_ends():
     calls = []
 
-    result = scan_for_result(frames(1, 9, 2, 3), make_read(calls), is_ingame=lambda f: False)
+    result = scan_for_result(frames(1, 9, 9, 9, 2, 3), make_read(calls), is_ingame=lambda f: False, patience=1)
 
-    assert result.result == RESULT
-    assert calls == [3, 2, 9]
+    assert result.result.placement == RESULT.placement
+    assert calls == [3, 2, 9, 9, 9, 1]
+
+
+def test_scan_stops_reading_after_max_votes():
+    calls = []
+
+    scan_for_result(frames(9, 9, 9, 9), make_read(calls), is_ingame=lambda f: False, max_votes=2)
+
+    assert calls == [9, 9]
+
+
+def test_scan_merges_what_each_frame_read():
+    frames_read = iter([
+        ResultScreen(placement=None, total=None, match_type="normal", match_label="일반", outcome="실험 종료", nickname="나"),
+        ResultScreen(placement=3, total=7, match_type="unknown", match_label="", outcome="실험 종료", nickname="나"),
+    ])
+
+    result = scan_for_result(frames(9, 9), lambda f: next(frames_read), is_ingame=lambda f: False)
+
+    assert (result.result.placement, result.result.match_type) == (3, "normal")
 
 
 def test_scan_skips_ingame_frames_without_running_ocr():
@@ -64,20 +83,36 @@ def batches(*groups):
     return iter([frames(*g) for g in groups])
 
 
-def test_scan_forward_reads_batches_lazily_and_stops_at_first_hit():
+def test_scan_forward_reads_lazily_and_stops_once_the_result_screen_has_ended():
     calls = []
     consumed = []
 
     def source():
-        for group in [(1, 1), (1, 9), (2, 2)]:
+        for group in [(1, 1), (1, 9), (9, 1), (1, 1), (2, 2)]:
             consumed.append(group)
             yield frames(*group)
 
-    result = scan_forward_for_result(source(), make_read(calls), is_ingame=lambda f: int(f[0, 0, 0]) == 1)
+    result = scan_forward_for_result(
+        source(), make_read(calls), is_ingame=lambda f: int(f[0, 0, 0]) == 1, patience=2
+    )
 
     assert result.result == RESULT
-    assert calls == [9]
-    assert consumed == [(1, 1), (1, 9)]
+    assert calls == [9, 9]
+    assert consumed == [(1, 1), (1, 9), (9, 1), (1, 1)]
+
+
+def test_scan_forward_reports_where_the_first_result_frame_was():
+    result = scan_forward_for_result(batches((1, 9), (9,)), make_read([]), is_ingame=lambda f: False)
+
+    assert result.at == 2
+
+
+def test_scan_forward_stops_after_max_votes():
+    calls = []
+
+    scan_forward_for_result(batches((9, 9, 9, 9)), make_read(calls), is_ingame=lambda f: False, max_votes=3)
+
+    assert calls == [9, 9, 9]
 
 
 def test_scan_forward_gives_up_after_max_ocr_attempts():

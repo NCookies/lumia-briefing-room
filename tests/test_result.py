@@ -227,3 +227,70 @@ def test_parse_panel_without_outcome_line_does_not_crash():
     parsed = parse_panel([line("4/7", 40), line("|내테스트닉", 372)])
     assert parsed.outcome is None and parsed.nickname_line.text == "|내테스트닉"
     assert parse_panel([line("TK", 10), line("|닉", 20)]) is None
+
+
+def screen(**kw):
+    base = dict(
+        placement=3, total=7, match_type="normal", match_label="일반", outcome="실험 종료", nickname="나",
+        stats={"tk": 13, "kills": 4, "deaths": 2, "assists": 5}, image=None,
+    )
+    base.update(kw)
+    return ResultScreen(**base)
+
+
+def test_merge_takes_the_majority_of_each_field_separately():
+    from lumia_briefing_room.detect.result import merge_results
+
+    merged = merge_results([
+        screen(placement=8, nickname="나X"),
+        screen(placement=3, match_type="unknown", match_label="", nickname="나"),
+        screen(placement=3, nickname="나"),
+        screen(placement=3, outcome=None, stats={"tk": 13, "kills": 4, "deaths": 9, "assists": 5}),
+    ])
+
+    assert (merged.placement, merged.total) == (3, 7)
+    assert (merged.match_type, merged.match_label) == ("normal", "일반")
+    assert merged.outcome == "실험 종료"
+    assert merged.nickname == "나"
+    assert merged.stats == {"tk": 13, "kills": 4, "deaths": 2, "assists": 5}
+
+
+def test_merge_ignores_unreadable_values_when_any_frame_read_them():
+    from lumia_briefing_room.detect.result import merge_results
+
+    merged = merge_results([
+        screen(placement=None, total=None, stats={"tk": None, "kills": 4, "deaths": None, "assists": None}),
+        screen(placement=1, total=7),
+    ])
+
+    assert merged.placement == 1
+    assert merged.stats["kills"] == 4 and merged.stats["tk"] == 13
+
+
+def test_merge_keeps_placement_empty_when_no_frame_read_it():
+    from lumia_briefing_room.detect.result import merge_results
+
+    merged = merge_results([screen(placement=None, total=None), screen(placement=None, total=None)])
+
+    assert merged.placement is None and merged.total is None
+
+
+def test_merge_uses_the_image_of_the_frame_with_most_fields_read():
+    from lumia_briefing_room.detect.result import merge_results
+
+    poor, rich = np.zeros((1, 1, 3), np.uint8), np.ones((1, 1, 3), np.uint8)
+
+    merged = merge_results([
+        screen(placement=None, match_type="unknown", match_label="", image=poor),
+        screen(image=rich),
+    ])
+
+    assert merged.image is rich
+
+
+def test_merge_of_one_screen_and_of_nothing():
+    from lumia_briefing_room.detect.result import merge_results
+
+    one = screen()
+    assert merge_results([one]) == one
+    assert merge_results([]) is None
