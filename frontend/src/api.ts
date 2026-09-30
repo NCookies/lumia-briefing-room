@@ -41,6 +41,7 @@ export async function patchClip(
   body: Partial<Pick<Clip, 'title' | 'pinned'>> & {
     userLabel?: UserLabel
     labelNote?: string | null
+    memo?: string | null
     matchResult?: { placement?: number; outcome?: string | null } | null
     matchResultSource?: 'manual' | null
   },

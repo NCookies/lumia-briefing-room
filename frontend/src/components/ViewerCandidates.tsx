@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { candidateTitle, effectiveRange, formatClock, isDismissed, isSaved, type Candidate } from '../games'
 import { archiveState } from '../archive'
 import { rangeModified } from '../playerBar'
+import { ClipMemoInput } from './ClipMemoInput'
 import { BookmarkFilledIcon, BookmarkIcon, EditIcon } from './ViewerIcons'
 
 interface Props {
@@ -19,6 +20,8 @@ interface Props {
   onArchive: (id: string, anchor: DOMRect) => void
   /** 보관한 클립에 고친 범위를 반영한다(다시 저장). */
   onResave: (id: string) => void
+  /** 보관한 클립의 메모(로컬 전용)를 저장한다. */
+  onMemo: (id: string, memo: string | null) => void
   onDismiss: (c: Candidate) => void
   onDelete: (id: string) => void
   onRename: (id: string, title: string) => void
@@ -28,6 +31,7 @@ interface Props {
 export function ViewerCandidates(p: Props) {
   const list = useRef<HTMLUListElement>(null)
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null)
+  const [memoOpen, setMemoOpen] = useState<string | null>(null)
 
   const commitRename = () => {
     if (!editing) return
@@ -145,6 +149,17 @@ export function ViewerCandidates(p: Props) {
                   </span>
                 ))}
                 <span className="ml-auto flex gap-1">
+                  {saved && (
+                    <button
+                      type="button"
+                      className={`rounded border px-2 py-0.5 hover:bg-zinc-600 ${c.user.savedMemo ? 'border-amber-500/60 text-amber-300' : 'border-zinc-600'}`}
+                      title="이 클립에 대한 나만의 메모(서버로 보내지 않음)"
+                      aria-expanded={memoOpen === c.id}
+                      onClick={() => setMemoOpen((open) => (open === c.id ? null : c.id))}
+                    >
+                      {c.user.savedMemo ? '메모 ●' : '메모'}
+                    </button>
+                  )}
                   {state === 'pending' && (
                     <button
                       type="button"
@@ -195,6 +210,9 @@ export function ViewerCandidates(p: Props) {
                   )}
                 </span>
               </div>
+              {saved && memoOpen === c.id && (
+                <ClipMemoInput clipId={c.id} value={c.user.savedMemo} rows={3} compact onSave={(memo) => p.onMemo(c.id, memo)} />
+              )}
             </li>
           )
         })}

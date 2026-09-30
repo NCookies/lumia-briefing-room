@@ -187,7 +187,7 @@ export function ClipArchive({ active, refreshTick, confirmDelete, onConfirmDelet
           <input
             type="search"
             aria-label="클립 검색"
-            placeholder="제목 검색"
+            placeholder="제목·메모 검색"
             className="w-48 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm outline-none focus:border-sky-500"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -259,6 +259,7 @@ export function ClipArchive({ active, refreshTick, confirmDelete, onConfirmDelet
                     </div>
                     <PortraitRow clip={c} />
                     <div className="truncate text-xs text-zinc-400" title={c.title}>{c.title}</div>
+                    {c.memo && <div className="truncate text-xs text-amber-300/80" title={c.memo}>📝 메모 있음</div>}
                   </>
                 )}
                 {c.sizeBytes ? <div className="text-xs text-zinc-600">{formatBytes(c.sizeBytes)}</div> : null}
@@ -322,6 +323,7 @@ export function ClipArchive({ active, refreshTick, confirmDelete, onConfirmDelet
           onIndexChange={(i) => setPlayingId(shown[i]?.id ?? null)}
           onLabel={(clip, label: UserLabel) => void run(() => patchClip(clip.id, { userLabel: label }))}
           onNote={(clip, note) => void run(() => patchClip(clip.id, { labelNote: note }))}
+          onMemo={(clip, memo) => void run(() => patchClip(clip.id, { memo }))}
           onExport={(clip) => setExportTarget(clip as LibraryClip)}
           onRename={(clip, title) => void run(() => patchClip(clip.id, { title }))}
           onTrim={async (clip, ranges) => {

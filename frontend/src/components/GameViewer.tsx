@@ -10,6 +10,7 @@ import {
   setGamePinned,
   unsaveCandidate,
 } from '../gamesApi'
+import { patchClip } from '../api'
 import { moveClipsToCategory } from '../categoriesApi'
 import { applyMark, candidateAtTime, newRangeAround, rangeModified, zoomBy, zoomView, type View } from '../playerBar'
 import { loadVolume, saveVolume, type VolumeState } from '../volume'
@@ -330,6 +331,10 @@ export function GameViewer({
       onToggleDismissed={setShowDismissed}
       onArchive={(id, anchor) => setArchiveTarget({ id, anchor })}
       onResave={resave}
+      onMemo={(id, memo) => {
+        const clipId = cands.find((c) => c.id === id)?.user.savedClipId
+        if (clipId) void run(() => patchClip(clipId, { memo }))
+      }}
       onDismiss={dismissOrDelete}
       onRename={(id, title) => void run(() => patchCandidate(gameKey, id, { title }))}
       onDelete={(id) => void run(() => deleteCandidate(gameKey, id))}

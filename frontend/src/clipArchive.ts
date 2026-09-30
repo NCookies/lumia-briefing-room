@@ -7,6 +7,7 @@ interface CardClip {
   matchStartUtc?: string
   gameMode?: string
   matchResult?: unknown
+  memo?: string | null
 }
 
 type Result = Parameters<typeof gameHeadline>[0]
@@ -22,7 +23,7 @@ export function cardHeadline(clip: CardClip): string {
 export function filterClips<T extends CardClip>(clips: T[], query: string): T[] {
   const q = query.trim().toLowerCase()
   if (!q) return clips
-  return clips.filter((c) => `${c.title}\n${c.fileName ?? ''}`.toLowerCase().includes(q))
+  return clips.filter((c) => `${c.title}\n${c.fileName ?? ''}\n${c.memo ?? ''}`.toLowerCase().includes(q))
 }
 
 export function sortedForCategory<T extends CardClip>(clips: T[]): T[] {

@@ -68,6 +68,7 @@ export interface Clip {
   region: string | null
   userLabel: UserLabel
   labelNote?: string | null
+  memo?: string | null
   labelSource?: 'user' | 'migrated' | null
   labelConflict?: boolean
   gameDay: number | null

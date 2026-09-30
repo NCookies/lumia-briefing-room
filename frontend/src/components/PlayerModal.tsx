@@ -8,6 +8,7 @@ import type { Clip, UserLabel } from '../types'
 import { loadVolume, saveVolume } from '../volume'
 import { useLabelingUi } from '../labelingContext'
 import { LabelButtons } from './LabelButtons'
+import { ClipMemoInput } from './ClipMemoInput'
 import { LabelNoteInput } from './LabelNoteInput'
 import { LabelingHelp } from './LabelingHelp'
 import { playerWidthCss, showEvidence } from '../playerLayout'
@@ -22,6 +23,7 @@ interface Props {
   onIndexChange: (index: number) => void
   onLabel: (clip: Clip, label: UserLabel) => void
   onNote: (clip: Clip, note: string | null) => void
+  onMemo?: (clip: Clip, memo: string | null) => void
   onDelete: (clip: Clip) => void
   onRename: (clip: Clip, title: string) => void
   onExport: (clip: Clip) => void
@@ -36,6 +38,7 @@ export function PlayerModal({
   onIndexChange,
   onLabel,
   onNote,
+  onMemo,
   onDelete,
   onRename,
   onExport,
@@ -229,6 +232,8 @@ export function PlayerModal({
             }}
           />
         )}
+
+        {onMemo && <ClipMemoInput clipId={clip.id} value={clip.memo} onSave={(memo) => onMemo(clip, memo)} />}
 
         {labeling && (
           <LabelNoteInput

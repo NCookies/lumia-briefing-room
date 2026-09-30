@@ -6,6 +6,7 @@ export interface CandidateUser {
   title?: string
   savedClipId?: string
   savedCategory?: string
+  savedMemo?: string
   savedStart?: number
   savedEnd?: number
 }
