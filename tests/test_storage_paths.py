@@ -18,20 +18,20 @@ def fake_home(tmp_path, monkeypatch):
 def test_root_splits_into_clip_and_full_video_folders(tmp_path):
     root = tmp_path / "store"
     r = resolve_paths(PathsConfig(root=root))
-    assert r.clips_steam == root / "클립" / "스팀 녹화"
-    assert r.clips_vod == root / "클립" / "영상 파일"
-    assert r.clips_root == root / "클립"
-    assert r.games_steam == root / "풀영상" / "스팀 녹화"
-    assert r.games_vod == root / "풀영상" / "영상 파일"
+    assert r.clips_steam == root / "clips" / "자동 보관"
+    assert r.clips_vod == root / "clips" / "자동 보관"
+    assert r.clips_root == root / "clips"
+    assert r.games_steam == root / "full_video" / "steam_replay"
+    assert r.games_vod == root / "full_video" / "vod"
     assert not uses_legacy_layout(PathsConfig(root=root))
 
 
 def test_full_video_location_override_moves_only_full_videos(tmp_path):
     root, big = tmp_path / "store", tmp_path / "hdd" / "full"
     r = resolve_paths(PathsConfig(root=root, full_videos=big))
-    assert r.games_steam == big / "스팀 녹화"
-    assert r.games_vod == big / "영상 파일"
-    assert r.clips_steam == root / "클립" / "스팀 녹화"
+    assert r.games_steam == big / "steam_replay"
+    assert r.games_vod == big / "vod"
+    assert r.clips_steam == root / "clips" / "자동 보관"
 
 
 def test_info_always_lives_in_app_data_regardless_of_root(tmp_path):
@@ -60,7 +60,7 @@ def test_new_layout_puts_big_temp_files_on_the_video_drive(tmp_path):
 def test_new_layout_full_video_staging_defaults_under_root_full_folder(tmp_path):
     root = tmp_path / "store"
     r = resolve_paths(PathsConfig(root=root))
-    assert r.staging_games == root / "풀영상" / ".staging"
+    assert r.staging_games == root / "full_video" / ".staging"
 
 
 def test_legacy_layout_keeps_existing_paths(tmp_path):
@@ -86,7 +86,7 @@ def test_legacy_layout_clips_root_lists_both_roots(tmp_path):
 
 def test_new_layout_has_single_clip_root(tmp_path):
     r = resolve_paths(PathsConfig(root=tmp_path / "s"))
-    assert r.clip_roots == (tmp_path / "s" / "클립",)
+    assert r.clip_roots == (tmp_path / "s" / "clips",)
 
 
 def test_legacy_layout_vod_staging_stays_next_to_vod_clips(tmp_path):

@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 
 from lumia_briefing_room.config import Config, resolve_paths, save_config, suggested_root, uses_legacy_layout
+from lumia_briefing_room.pipeline.folder_names import migrate_folder_names
 from lumia_briefing_room.pipeline.library_migrate import MigrationConflict, migrate_library
 from lumia_briefing_room.pipeline.notices import NoticeCenter, notices
 
@@ -29,6 +30,7 @@ def adopt_default_root(cfg: Config, config_path: Path | None) -> Config:
 def migrate_legacy_layout(cfg: Config, center: NoticeCenter = notices) -> int:
     """옮긴 파일 수. 새 구조(`paths.root`)는 옮길 것이 없다. 옮기지 못해도 앱은 켜져야 하므로 예외 대신 알림을 올린다."""
     if not uses_legacy_layout(cfg.paths):
+        migrate_folder_names(cfg.paths)
         return 0
     resolved = resolve_paths(cfg.paths)
     total = 0

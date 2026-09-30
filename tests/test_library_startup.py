@@ -63,3 +63,13 @@ def test_conflict_is_reported_as_a_notice_and_not_raised(tmp_path):
 
 def test_missing_clip_folders_are_fine(tmp_path):
     assert migrate_legacy_layout(_cfg(tmp_path), NoticeCenter()) == 0
+
+
+def test_new_layout_startup_renames_korean_folders(tmp_path):
+    root = tmp_path / "store"
+    (root / "클립" / "스팀 녹화").mkdir(parents=True)
+    (root / "클립" / "스팀 녹화" / "a.mp4").write_bytes(b"V")
+    (root / "풀영상" / "스팀 녹화" / "k").mkdir(parents=True)
+    cfg = Config(paths=PathsConfig(root=root, temp=tmp_path / "tmp"))
+    assert migrate_legacy_layout(cfg, NoticeCenter()) == 0
+    assert (root / "clips" / "자동 보관" / "a.mp4").exists() and (root / "full_video" / "steam_replay" / "k").is_dir()

@@ -95,10 +95,12 @@ def _default_userprofile() -> Path:
     return Path(os.environ.get("USERPROFILE", str(Path.home())))
 
 
-CLIPS_FOLDER = "클립"
-FULL_VIDEOS_FOLDER = "풀영상"
-STEAM_FOLDER = "스팀 녹화"
-VOD_FOLDER = "영상 파일"
+CLIPS_FOLDER = "clips"
+FULL_VIDEOS_FOLDER = "full_video"
+STEAM_FOLDER = "steam_replay"
+VOD_FOLDER = "vod"
+ARCHIVE_FOLDER = "보관함"
+AUTO_ARCHIVE_FOLDER = "자동 보관"
 STAGING_FOLDER = ".staging"
 
 
@@ -136,7 +138,7 @@ def resolve_paths(cfg: PathsConfig) -> ResolvedPaths:
     if cfg.root is not None:
         root = cfg.root
         full = cfg.full_videos or (root / FULL_VIDEOS_FOLDER)
-        clips_steam, clips_vod = root / CLIPS_FOLDER / STEAM_FOLDER, root / CLIPS_FOLDER / VOD_FOLDER
+        clips_steam = clips_vod = root / CLIPS_FOLDER / AUTO_ARCHIVE_FOLDER
         proxy_cache = root / ".cache" / "proxy"
         return ResolvedPaths(
             clips=clips_steam,

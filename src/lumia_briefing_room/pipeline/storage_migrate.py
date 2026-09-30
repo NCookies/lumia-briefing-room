@@ -13,7 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from lumia_briefing_room.config import PathsConfig, ResolvedPaths
+from lumia_briefing_room.config import ARCHIVE_FOLDER, FULL_VIDEOS_FOLDER, PathsConfig, ResolvedPaths
 from lumia_briefing_room.pipeline.clip_files import move_file, walk_videos
 from lumia_briefing_room.pipeline.game_files import valid_key
 from lumia_briefing_room.pipeline.game_store import GAME_JSON
@@ -69,12 +69,21 @@ def plan_storage_move(old: ResolvedPaths, new: ResolvedPaths) -> StoragePlan:
     def add_tree(src_base: Path, dst_base: Path, files, *, with_dirs: bool = False) -> None:
         if src_base.resolve() == dst_base.resolve():
             return
-        if _is_inside(dst_base, src_base):
+        in_place = with_dirs and dst_base.parent.resolve() == src_base.resolve()
+        if _is_inside(dst_base, src_base) and not in_place:
             raise StorageMoveError("새 폴더는 기존 폴더의 안쪽일 수 없습니다")
-        old_bases.append(src_base)
+        skip = [dst_base, src_base / ARCHIVE_FOLDER] if in_place else []
+
+        def kept(path: Path) -> bool:
+            return not any(path == s or s in path.parents for s in skip)
+
+        if in_place:
+            old_bases.extend(d for d in sorted(src_base.iterdir()) if d.is_dir() and not d.name.startswith(".") and kept(d))
+        else:
+            old_bases.append(src_base)
         if with_dirs:
-            dirs.extend((d, dst_base / d.relative_to(src_base)) for d in _subdirs(src_base))
-        pairs.extend((f, dst_base / f.relative_to(src_base)) for f in files)
+            dirs.extend((d, dst_base / d.relative_to(src_base)) for d in _subdirs(src_base) if kept(d))
+        pairs.extend((f, dst_base / f.relative_to(src_base)) for f in files if kept(f))
 
     for src_base, dst_base in _video_bases(old, new):
         add_tree(src_base, dst_base, walk_videos([src_base]), with_dirs=True)
@@ -104,7 +113,7 @@ def plan_storage_move(old: ResolvedPaths, new: ResolvedPaths) -> StoragePlan:
         return StoragePlan(pairs=[], total_bytes=0, old_bases=[], dirs=[])
     old_bases.extend(old.games_dirs)
     if len(old.clip_roots) == 1:
-        if old.games_steam.parent.name == "풀영상":
+        if old.games_steam.parent.name == FULL_VIDEOS_FOLDER:
             old_bases.append(old.games_steam.parent)
         if old.proxy_cache.parent.name == ".cache":
             old_bases.append(old.proxy_cache.parent)

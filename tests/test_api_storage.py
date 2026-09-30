@@ -81,8 +81,8 @@ def test_migrate_moves_videos_switches_config_and_keeps_clips_visible(tmp_path):
     assert status["doneBytes"] == status["totalBytes"] > 0
     paths = load_config(config_path).paths
     assert paths.root == store and paths.clips is None and paths.vod_clips is None and paths.games is None
-    assert (store / "클립" / "스팀 녹화" / "a.mp4").read_bytes() == b"VIDEO"
-    assert (store / "풀영상" / "스팀 녹화" / KEY / "full.mp4").exists()
+    assert (store / "clips" / "자동 보관" / "a.mp4").read_bytes() == b"VIDEO"
+    assert (store / "full_video" / "steam_replay" / KEY / "full.mp4").exists()
     assert [c["id"] for c in client.get("/api/clips").json()] == ["a"]
     assert client.get("/api/clips/a/video").content == b"VIDEO"
     assert client.get("/api/games").json()["games"][0]["hasFullVideo"] is True
@@ -93,14 +93,14 @@ def test_migrate_with_a_separate_full_video_folder(tmp_path):
     client, config_path = make_legacy(tmp_path)
     _, status = run_move(client, {"root": str(tmp_path / "store"), "fullVideos": str(tmp_path / "hdd")})
     assert status["state"] == "done"
-    assert (tmp_path / "hdd" / "스팀 녹화" / KEY / "full.mp4").exists()
+    assert (tmp_path / "hdd" / "steam_replay" / KEY / "full.mp4").exists()
     assert load_config(config_path).paths.full_videos == tmp_path / "hdd"
     assert client.get("/api/storage").json()["fullVideos"] == str(tmp_path / "hdd")
 
 
 def test_conflict_is_refused_and_config_is_unchanged(tmp_path):
     client, config_path = make_legacy(tmp_path)
-    clash = tmp_path / "store" / "클립" / "스팀 녹화" / "a.mp4"
+    clash = tmp_path / "store" / "clips" / "자동 보관" / "a.mp4"
     clash.parent.mkdir(parents=True)
     clash.write_bytes(b"other")
 
@@ -139,11 +139,11 @@ def test_undo_restores_files_and_config(tmp_path):
 def test_moving_an_already_new_layout_to_another_root(tmp_path):
     client, config_path = make_legacy(tmp_path)
     run_move(client, {"root": str(tmp_path / "A")})
-    (tmp_path / "A" / "클립" / "아야").mkdir()
-    (tmp_path / "A" / "클립" / "스팀 녹화" / "a.mp4").rename(tmp_path / "A" / "클립" / "아야" / "a.mp4")
+    (tmp_path / "A" / "clips" / "아야").mkdir()
+    (tmp_path / "A" / "clips" / "자동 보관" / "a.mp4").rename(tmp_path / "A" / "clips" / "아야" / "a.mp4")
 
     _, status = run_move(client, {"root": str(tmp_path / "B")})
 
     assert status["state"] == "done"
-    assert (tmp_path / "B" / "클립" / "아야" / "a.mp4").read_bytes() == b"VIDEO"
+    assert (tmp_path / "B" / "clips" / "아야" / "a.mp4").read_bytes() == b"VIDEO"
     assert client.get("/api/clips/a/video").content == b"VIDEO"
