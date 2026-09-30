@@ -35,6 +35,7 @@ from lumia_briefing_room.api.onboarding import register_onboarding_routes
 from lumia_briefing_room.api.app_info_routes import register_app_info_routes
 from lumia_briefing_room.api.telemetry_routes import register_telemetry_routes
 from lumia_briefing_room.api.update_routes import register_update_routes
+from lumia_briefing_room.api.library_routes import register_library_routes
 from lumia_briefing_room.api.storage_routes import register_storage_routes
 from lumia_briefing_room.api.vods import register_vod_routes
 from lumia_briefing_room.api.filters import ClipQuery, filter_clip_summaries, sort_clip_summaries
@@ -801,6 +802,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     register_vod_routes(app, lock=lock, current_config=current_config, put_config=put_config)
     register_onboarding_routes(app, current_config=current_config, put_config=put_config)
     register_disk_routes(app, current_config=current_config)
+    register_library_routes(app, lock=lock, current_config=current_config, put_config=put_config, serialize=_serialize)
     register_storage_routes(app, lock=lock, current_config=current_config, put_config=put_config)
     register_game_routes(app, lock=lock, current_config=current_config)
     register_telemetry_routes(app)

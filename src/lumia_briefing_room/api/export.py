@@ -10,7 +10,7 @@ import shutil
 import string
 from pathlib import Path
 
-_INVALID_CHARS = re.compile(r'[<>:"/\|?*\x00-\x1f]')
+_INVALID_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
 def list_roots() -> list[str]:

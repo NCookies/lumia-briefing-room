@@ -81,6 +81,7 @@
 | 클립 | `GET /api/clips`(`source`=steam 기본/vod/other/all - `other`·`all` 은 앱이 만들지 않은 영상 포함, `vodId`, 태그·모드·라벨·`minPvpScore`·`q`…), `GET·PATCH·DELETE /api/clips/{id}`, `…/video`(**Range 필수** — 탐색바), `…/thumbnail`, `…/result-image`, `…/character-portrait/{me\|teammate1\|teammate2}`, `…/trim`, `…/split`, `…/export`, `…/proxy` |
 | 게임 | `GET /api/games/records`, `DELETE /api/games/records/{id}`, `…/result-image`, `POST /api/games/reprocess`, `GET /api/games/reprocess/{key}`, 풀영상 게임 API 는 [pipeline.md §11](pipeline.md) (`GET /api/games?source=steam\|vod\|all`, 기본 steam) |
 | 영상 파일 | `GET /api/vods`, `PATCH·DELETE /api/vods/{vid}`, `POST·GET /api/vods/{vid}/analyze`(`resume`/`rebuild`/`force`/`deleteSource`), `…/analyze/cancel`, `POST /api/vods/{vid}/full-videos`(이미 분석한 옛 영상의 풀영상 만들기), `DELETE /api/vods/{vid}/clips`, `DELETE /api/vods/{vid}/games/{i}`, `…/games/{i}/result-image` |
+| 클립 정리 | `GET /api/library?path=`, `POST /api/library/folders`, `PATCH /api/library/rename`, `POST /api/library/move`·`delete`·`reveal`·`export` |
 | 저장 위치 | `GET /api/storage`, `POST·GET /api/storage/migrate`, `POST /api/storage/undo` |
 | 정리 | `POST /api/cleanup`, `GET /api/cleanup/preview`, `GET·POST /api/clips-dir/move`, `GET /api/legacy-trash`, `POST /api/legacy-trash/migrate` |
 | 작업 | `GET /api/activity`, `GET /api/backfill`, `GET /api/backfill/preview`, `POST /api/backfill/start·cancel`, `GET /api/watch/failures`, `POST /api/watch/failures/{key}/retry` |
@@ -121,3 +122,13 @@
 - 영상 묶음 머리 기능은 그대로: 분석 시작·취소·진행률(`풀영상 만들기` 단계 추가), 날짜·이름 고치기, 다시 분석, 전체 삭제(확인 문구가 게임 풀영상까지 지운다고 알린다), 목록에서 삭제.
 - **필터 바는 없다** - 스팀 녹화 탭이 새 화면에서 필터 바를 없애고 도구 줄(게임 수·풀영상 용량·날짜 모두 펼치기/접기·바로가기)만 둔 기준을 따른다. 도구 줄에 새로고침·영상 형식 도움말. 날짜는 최신순, 한 날짜 안은 영상 이름순, 영상 안은 게임 번호순.
 - 옛 영상: 원본·캐시가 남았으면 영상 머리에 `풀영상 만들기 (N)`(확인 창에 최대 용량). 원본이 지워졌으면 게임 행이 `풀영상 없음(이전 버전)` 이고 열면 저장된 클립으로 본다(`LegacyGamePanel`, 클립은 후보 기록에서).
+
+## 클립 정리 API (F7, `api/library_routes.py`·`pipeline/library_fs.py`)
+
+클립 폴더를 **실제 폴더 구조 그대로** 다룬다 - 앱은 분류하지 않고 폴더를 만들고 이름을 바꾸고 옮기고 지우는 것을 돕기만 한다(탐색기에서 직접 하는 것도 정상 사용).
+
+- 경로는 전부 클립 폴더 기준 상대 경로(`/` 구분)다. `..`·절대 경로·드라이브(`:`)·역슬래시·`.` 으로 시작하는 이름(앱 작업·캐시 폴더)·클립 폴더 밖을 가리키는 심볼릭 링크는 400. 옛 경로 모드는 클립 폴더가 둘이라 가상 최상위(`스팀 녹화`·`영상 파일`) 아래로 보이고, 가상 최상위에는 폴더를 만들거나 옮기거나 지울 수 없다. 클립 폴더 자체도 지우거나 옮길 수 없다.
+- `GET /api/library?path=`: 그 폴더의 하위 폴더(`clipCount` = 안쪽 영상 수)와 **그 폴더 바로 아래** 영상의 클립(`relPath`·`fileName` 덧붙임. 정보가 있는 클립 + 앱이 만들지 않은 영상), 경로 조각(`crumbs`). 탭을 열 때·새로고침할 때마다 다시 읽는다.
+- `POST /folders {path,name}`(같은 이름 409), `PATCH /rename {path,name}`(영상은 확장자를 유지), `POST /move {items,dest}`(하나라도 같은 이름이 있으면 409 로 아무것도 안 옮김, 폴더를 자기 안으로는 불가, 다른 드라이브는 복사 뒤 원본 삭제), `POST /delete {items}`(설정한 삭제 방식. 클립은 기존 삭제와 같이 라벨 보관·게임 기록을 남기고 정보·썸네일·재생용 변환 영상까지 지운다. **복사본이 더 있는 클립은 영상만 지우고 정보는 남긴다**. 폴더는 안의 클립을 처리한 뒤 폴더째 지운다), `POST /reveal {path}`(Windows 탐색기), `POST /export {items,dir}`(선택한 항목의 영상을 복사, 고른 폴더를 `paths.exportDefault` 로 기억).
+- 이름을 바꾸거나 옮겨도 정보(제목·태그·라벨·게임)는 영상 안 태그·지문으로 이어진다([pipeline.md §8](pipeline.md)).
+
