@@ -27,6 +27,7 @@
     "ultimate_r": [1100, 1298, 1160, 1358],
     "result_panel": [300, 450, 1000, 1080],
     "result_chip": [335, 625, 600, 675],
+    "result_rank": [340, 502, 425, 614],
     "result_character": [1470, 420, 1600, 830],
     "scoreboard_panel": [40, 100, 520, 700],
     "scoreboard_names": [800, 200, 1300, 1260],

@@ -3,11 +3,15 @@ from __future__ import annotations
 import re
 from collections import Counter
 from dataclasses import dataclass, field
+from functools import lru_cache
+from pathlib import Path
 
 import cv2
 import numpy as np
 
 from lumia_briefing_room.detect.ocr import TextLine, TextReader
+from lumia_briefing_room.detect.rank import read_rank_digit
+from lumia_briefing_room.detect.region import load_region_templates
 from lumia_briefing_room.profiles.models import ResolutionProfile
 from lumia_briefing_room.video.frames import crop_roi
 
@@ -21,6 +25,7 @@ MIN_OUTCOME_HANGUL = 2
 MIN_OUTCOME_SCORE = 0.8
 MIN_STAT_SCORE = 0.6
 MIN_STATS_WITHOUT_PLACEMENT = 3
+SURVIVOR_OUTCOME = "최종생존"
 STAT_COLUMN_TOLERANCE = 60
 STAT_ROW_MAX_GAP = 90
 STAT_LABELS = {"TK": "tk", "K": "kills", "D": "deaths", "A": "assists"}
@@ -168,6 +173,30 @@ def _match_type(chip_text: str) -> str:
     return "rank" if "랭크" in chip_text else "normal"
 
 
+@lru_cache(maxsize=4)
+def _load_rank_templates(path: Path) -> dict:
+    return load_region_templates(path)
+
+
+def _rank_from_template(frame: np.ndarray, profile: ResolutionProfile) -> int | None:
+    if "result_rank" not in profile.rois or profile.rank_templates is None:
+        return None
+    return read_rank_digit(profile.crop(frame, "result_rank"), _load_rank_templates(profile.rank_templates))
+
+
+def _resolve_placement(
+    parsed: PanelParse, frame: np.ndarray, profile: ResolutionProfile
+) -> tuple[int | None, int | None]:
+    """순위: 숫자 본보기(OCR 이 못 읽는 숫자가 있다) → OCR `N/M` → 결과 문구 `최종 생존` 이면 1위 순으로 정한다."""
+    placement, total = parsed.placement, parsed.total
+    digit = _rank_from_template(frame, profile)
+    if digit is not None and (total is None or digit <= total):
+        placement = digit
+    if placement is None and parsed.outcome and parsed.outcome.replace(" ", "") == SURVIVOR_OUTCOME:
+        placement = 1
+    return placement, total
+
+
 def read_result_screen(
     frame: np.ndarray,
     profile: ResolutionProfile,
@@ -181,9 +210,11 @@ def read_result_screen(
     chip_text = read_chip(crop_roi(frame, profile.rois["result_chip"]), reader)
     nickname = read_nickname(panel, parsed.nickname_line, reader) if parsed.nickname_line else None
 
+    placement, total = _resolve_placement(parsed, frame, profile)
+
     return ResultScreen(
-        placement=parsed.placement,
-        total=parsed.total,
+        placement=placement,
+        total=total,
         match_type=_match_type(chip_text),
         match_label=chip_text,
         outcome=parsed.outcome,

@@ -294,3 +294,50 @@ def test_merge_of_one_screen_and_of_nothing():
     one = screen()
     assert merge_results([one]) == one
     assert merge_results([]) is None
+
+
+def test_rank_digit_template_fills_in_a_placement_ocr_could_not_read(monkeypatch):
+    from lumia_briefing_room.detect import result as result_module
+
+    monkeypatch.setattr(result_module, "_rank_from_template", lambda frame, profile: 3)
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+
+    result = read_result_screen(blank_frame(profile), profile, FakeReader(UNREADABLE_RANK_PANEL, [line("일반", 5)]))
+
+    assert result.placement == 3 and result.total is None
+
+
+def test_rank_digit_template_wins_over_a_conflicting_ocr_read(monkeypatch):
+    from lumia_briefing_room.detect import result as result_module
+
+    monkeypatch.setattr(result_module, "_rank_from_template", lambda frame, profile: 1)
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+
+    result = read_result_screen(blank_frame(profile), profile, FakeReader(PANEL, [line("일반", 5)]))
+
+    assert (result.placement, result.total) == (1, 7)
+
+
+def test_final_survivor_outcome_means_first_place_when_no_digit_was_read(monkeypatch):
+    from lumia_briefing_room.detect import result as result_module
+
+    monkeypatch.setattr(result_module, "_rank_from_template", lambda frame, profile: None)
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    panel = [ln if ln.text != "실험 종료" else line("최종 생존", 225, 0.99) for ln in UNREADABLE_RANK_PANEL]
+
+    result = read_result_screen(blank_frame(profile), profile, FakeReader(panel, [line("일반", 5)]))
+
+    assert result.placement == 1
+    other = read_result_screen(blank_frame(profile), profile, FakeReader(UNREADABLE_RANK_PANEL, [line("일반", 5)]))
+    assert other.placement is None
+
+
+def test_a_placement_that_exceeds_the_total_is_dropped_in_favor_of_nothing(monkeypatch):
+    from lumia_briefing_room.detect import result as result_module
+
+    monkeypatch.setattr(result_module, "_rank_from_template", lambda frame, profile: 8)
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+
+    result = read_result_screen(blank_frame(profile), profile, FakeReader(PANEL, [line("일반", 5)]))
+
+    assert result.placement == 4

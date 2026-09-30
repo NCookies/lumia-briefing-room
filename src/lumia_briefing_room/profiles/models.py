@@ -91,6 +91,10 @@ def _phase_templates_path(width: int, height: int) -> Path | None:
     return _template_path("phase", "코발트 페이즈 본보기", width, height)
 
 
+def _rank_templates_path(width: int, height: int) -> Path | None:
+    return _template_path("rank", "결과 화면 순위 숫자 본보기", width, height)
+
+
 def _cobalt_outcome_templates_path(width: int, height: int) -> Path | None:
     return _template_path("cobalt_outcome", "코발트 승패 본보기", width, height)
 
@@ -106,6 +110,7 @@ class ResolutionProfile:
     day_templates: Path | None = None
     phase_templates: Path | None = None
     cobalt_outcome_templates: Path | None = None
+    rank_templates: Path | None = None
     reference_rois: dict[str, Roi] | None = None
 
     @classmethod
@@ -130,6 +135,7 @@ class ResolutionProfile:
             templates=_templates_path(ref_w, ref_h),
             region_templates=_region_templates_path(ref_w, ref_h),
             day_templates=_day_templates_path(ref_w, ref_h),
+            rank_templates=_rank_templates_path(ref_w, ref_h),
             # 코발트는 기준 해상도(2560x1440) 녹화가 없어 정규화하지 않는다 — 이 프로필
             # 자신의 해상도로 본보기를 찾는다(plan.md §10-1).
             phase_templates=_phase_templates_path(width, height),
