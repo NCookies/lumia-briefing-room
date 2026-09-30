@@ -181,3 +181,43 @@ def test_chip_falls_back_to_binarized_when_plain_upscale_reads_nothing():
     result = read_result_screen(blank_frame(profile), profile, reader)
 
     assert (result.match_type, result.match_label) == ("rank", "랭크 대전")
+
+
+UNREADABLE_RANK_PANEL = [
+    line("L/E", 41, 0.81),
+    line("실험 종료", 225, 0.99),
+    line("|내테스트닉", 372),
+    line("TK", 426, x=84),
+    line("K", 427, x=207),
+    line("D", 430, x=323),
+    line("A", 426, x=438),
+    line("13", 456, x=86),
+    line("4", 457, x=208),
+    line("2", 458, x=322),
+    line("5", 457, x=437),
+]
+
+
+def test_parse_panel_keeps_rest_when_placement_is_unreadable():
+    parsed = parse_panel(UNREADABLE_RANK_PANEL)
+
+    assert (parsed.placement, parsed.total) == (None, None)
+    assert parsed.outcome == "실험 종료"
+    assert parsed.nickname_line.text == "|내테스트닉"
+    assert parsed.stats == {"tk": 13, "kills": 4, "deaths": 2, "assists": 5}
+
+
+def test_parse_panel_without_placement_needs_nickname_and_stats():
+    assert parse_panel([line("실험 종료", 225), line("|내테스트닉", 372)]) is None
+    assert parse_panel([line("실험 종료", 225), line("TK", 426), line("13", 456)]) is None
+
+
+def test_read_result_screen_saves_result_without_placement():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    reader = FakeReader(UNREADABLE_RANK_PANEL, [line("일반", 5)])
+
+    result = read_result_screen(blank_frame(profile), profile, reader)
+
+    assert result.placement is None and result.total is None
+    assert (result.match_type, result.outcome, result.nickname) == ("normal", "실험 종료", "내테스트닉")
+    assert result.stats["tk"] == 13

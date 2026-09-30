@@ -19,6 +19,7 @@ _HANGUL = re.compile(r"[가-힣]")
 MIN_OUTCOME_HANGUL = 2
 MIN_OUTCOME_SCORE = 0.8
 MIN_STAT_SCORE = 0.6
+MIN_STATS_WITHOUT_PLACEMENT = 3
 STAT_COLUMN_TOLERANCE = 60
 STAT_ROW_MAX_GAP = 90
 STAT_LABELS = {"TK": "tk", "K": "kills", "D": "deaths", "A": "assists"}
@@ -29,8 +30,8 @@ LANGS = ("korean", "ch")
 class ResultScreen:
     """SPEC §2.13: 경기 종료 결과 화면(`4/7 실험 종료`)에서 읽은 값."""
 
-    placement: int
-    total: int
+    placement: int | None
+    total: int | None
     match_type: str
     match_label: str
     outcome: str | None
@@ -41,8 +42,8 @@ class ResultScreen:
 
 @dataclass(frozen=True)
 class PanelParse:
-    placement: int
-    total: int
+    placement: int | None
+    total: int | None
     outcome: str | None
     nickname_line: TextLine | None
     stats: dict | None = None
@@ -84,11 +85,31 @@ def parse_stats(lines: list[TextLine]) -> dict:
     return stats
 
 
+def _parse_after(placement: int | None, total: int | None, rest: list[TextLine], ordered: list[TextLine]) -> PanelParse:
+    nickname_line = next((l for l in rest if _BAR_PREFIX.match(l.text)), None)
+    above = rest[: rest.index(nickname_line)] if nickname_line else rest
+    candidates = [l for l in above if _is_outcome(l)]
+    outcome_line = candidates[-1] if nickname_line else (candidates[0] if candidates else None)
+    return PanelParse(
+        placement, total, outcome_line.text.strip() if outcome_line else None, nickname_line, parse_stats(ordered)
+    )
+
+
+def _parse_without_placement(ordered: list[TextLine]) -> PanelParse | None:
+    """순위(`N/M`)가 안 읽힌 결과 화면. 닉네임 줄과 스탯이 함께 읽힐 때만 결과 화면으로 본다(순위 없이 넓게 받으면 오탐이 는다)."""
+    parsed = _parse_after(None, None, ordered, ordered)
+    read_stats = sum(v is not None for v in (parsed.stats or {}).values())
+    if parsed.nickname_line is None or read_stats < MIN_STATS_WITHOUT_PLACEMENT:
+        return None
+    return parsed
+
+
 def parse_panel(lines: list[TextLine]) -> PanelParse | None:
     """결과 화면 좌측 패널의 OCR 줄들에서 순위·결과 문구·닉네임 줄을 골라낸다.
 
     글자 위치가 아니라 순서로 찾는다: 순위(`N/M`) 뒤 막대(`|`)로 시작하는 줄이 닉네임이고, 그 바로 위 한글 줄이 결과 문구다.
     모드 칩(`랭크 대전`)이 패널 OCR 에 읽히는 프레임이 있어 문구는 닉네임에 가장 가까운 줄로 잡는다.
+    순위가 안 읽히면(글꼴의 일부 숫자를 OCR 이 못 읽는다) 순위만 비우고 나머지를 돌려준다.
     """
     ordered = sorted(lines, key=lambda l: (l.y, l.x))
     for i, ln in enumerate(ordered):
@@ -97,17 +118,9 @@ def parse_panel(lines: list[TextLine]) -> PanelParse | None:
             continue
         placement, total = int(m.group(1)), int(m.group(2))
         if not 1 <= placement <= total:
-            return None
-
-        rest = ordered[i + 1 :]
-        nickname_line = next((l for l in rest if _BAR_PREFIX.match(l.text)), None)
-        above = rest[: rest.index(nickname_line)] if nickname_line else rest
-        candidates = [l for l in above if _is_outcome(l)]
-        outcome_line = candidates[-1] if nickname_line else (candidates[0] if candidates else None)
-        return PanelParse(
-            placement, total, outcome_line.text.strip() if outcome_line else None, nickname_line, parse_stats(ordered)
-        )
-    return None
+            break
+        return _parse_after(placement, total, ordered[i + 1 :], ordered)
+    return _parse_without_placement(ordered)
 
 
 def _binarize_dark_on_light(rgb: np.ndarray, threshold: int = CHIP_THRESHOLD) -> np.ndarray:
