@@ -4,6 +4,7 @@ import { AdminPanel } from './components/AdminPanel'
 import { BackfillDialog } from './components/BackfillDialog'
 import { ClipBrowser, type ClipSource } from './components/ClipBrowser'
 import { FirstRunScreen } from './components/FirstRunScreen'
+import { GameList } from './components/GameList'
 import { SettingsModal } from './components/SettingsModal'
 import { UpdateBanner } from './components/UpdateBanner'
 import { UpdateBadge } from './components/UpdateBadge'
@@ -26,14 +27,15 @@ const TABS: { id: ClipSource; label: string }[] = [
   { id: 'steam', label: '스팀 녹화' },
   { id: 'vod', label: '영상 파일' },
 ]
+const GAMES_TAB = { id: 'games', label: '게임(풀영상)' } as const
 const ADMIN_TAB = { id: 'admin', label: '관리자' } as const
-type Tab = ClipSource | typeof ADMIN_TAB.id
+type Tab = ClipSource | typeof GAMES_TAB.id | typeof ADMIN_TAB.id
 const TAB_KEY = 'lumia.tab'
 
 function loadTab(): Tab {
   try {
     const saved = localStorage.getItem(TAB_KEY)
-    return saved === 'vod' || saved === 'admin' ? saved : 'steam'
+    return saved === 'vod' || saved === 'admin' || saved === 'games' ? saved : 'steam'
   } catch {
     return 'steam'
   }
@@ -45,7 +47,7 @@ export default function App() {
   const isDev = showTuningUi(appInfo)
   const [savedTab, setTab] = useState<Tab>(loadTab)
   const tab: Tab = savedTab === 'admin' && !isDev ? 'steam' : savedTab
-  const navTabs: { id: Tab; label: string }[] = isDev ? [...TABS, ADMIN_TAB] : TABS
+  const navTabs: { id: Tab; label: string }[] = isDev ? [...TABS, GAMES_TAB, ADMIN_TAB] : [...TABS, GAMES_TAB]
   const [showSettings, setShowSettings] = useState(false)
   const [settingsTab, setSettingsTab] = useState<'general' | 'vod' | 'about'>('general')
   const [browserKey, setBrowserKey] = useState(0)
@@ -198,6 +200,10 @@ export default function App() {
           <AdminPanel active={tab === 'admin'} />
         </div>
       )}
+
+      <div className={tab === 'games' ? 'flex flex-1 flex-col' : 'hidden'}>
+        <GameList key={browserKey} active={tab === 'games'} refreshTick={refreshTick} />
+      </div>
 
       {TABS.map((t) => (
         <div key={`${t.id}-${browserKey}`} className={tab === t.id ? 'flex flex-1 flex-col' : 'hidden'}>
