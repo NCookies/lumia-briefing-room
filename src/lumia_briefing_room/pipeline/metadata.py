@@ -121,6 +121,7 @@ def build_metadata(
     my_character_portrait_path: str | None = None,
     teammate_portrait_paths: list[str] | None = None,
     match_result_source: str | None = None,
+    clip_uid: str | None = None,
 ) -> ClipMetadata:
     day_night = interval.day_night
     phase = phase_index(game_day, day_night) if game_day is not None and day_night is not None else None
@@ -171,7 +172,7 @@ def build_metadata(
         detector_confidence=interval.confidence,
         match_result=match_result_dict(match_result, result_image_path),
         match_end_utc=_isoformat_z(match_end_utc) if match_end_utc else None,
-        clip_uid=new_clip_uid(),
+        clip_uid=clip_uid or new_clip_uid(),
         my_character_portrait_path=my_character_portrait_path,
         teammate_portrait_paths=teammate_portrait_paths or [],
         match_result_source=match_result_source,

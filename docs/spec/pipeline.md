@@ -115,6 +115,7 @@ Player.log 폴링 ─ 경기 경계(GAME→LOBBY) ─▶ 녹화 세션 결정(�
 
 - 여러 사용자의 라벨을 서버에서 합칠 전역 키. 새 클립은 `uuid4().hex`(하이픈 없음), 분할 조각은 `<부모>-<번호>`(조각의 조각 `…-1-3`, 기존 조각 최댓값 다음 번호). 계보가 값에 들어 있어 원본 필드를 따로 두지 않는다. 파일 이름은 바꾸지 않는다.
 - 앱 시작 시 백그라운드로 스팀·VOD 클립과 라벨 보관소 사본에 없는 것만 채운다(임시 파일 → `os.replace`, 서버와 같은 락). `GET /api/clips` 도 안전망으로 채운다.
+- **영상 안에도 넣는다**(`pipeline/mp4_tags.py`): 새 클립을 자를 때 `ffmpeg -c copy -metadata comment=lumia:clipUid=<ID>` 로 mp4 표준 `comment` 태그에 쓴다(스팀 컷·영상 클립 컷·풀영상에서 저장·교체 저장은 기존 ID 유지·분할 조각은 조각 자기 ID). `-movflags use_metadata_tags` 없이 들어가고 자르기(`-map 0 -c copy`)·복사·이름 바꾸기 뒤에도 남는다. 사용자 정의 키(`-metadata lumia_clip_uid=…`)는 그 옵션 없이는 조용히 버려지고 켜면 `major_brand` 가 중복되므로 쓰지 않는다. 읽기는 ffprobe(70ms)가 아니라 파이썬으로 mp4 상위 박스를 훑어 `moov/udta/meta/ilst/©cmt` 만 읽는다(1ms, 경로·크기·수정 시각으로 메모리 캐시). 옛 클립 mp4 는 다시 쓰지 않는다.
 - **서버 전송에는 아직 쓰지 않는다**(서버 계약이 `clipUid`·`legacyClipId` 를 받기 전) — [plan.md](../plan.md).
 
 ## 9. 삭제·보관·자동 정리

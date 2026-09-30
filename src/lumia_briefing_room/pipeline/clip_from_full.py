@@ -17,6 +17,7 @@ from lumia_briefing_room.pipeline.clip import make_thumbnail
 from lumia_briefing_room.pipeline.clip_assets import stored_asset_path
 from lumia_briefing_room.pipeline.clip_files import find_video
 from lumia_briefing_room.pipeline.clip_uid import new_clip_uid
+from lumia_briefing_room.pipeline.mp4_tags import uid_metadata_args
 from lumia_briefing_room.pipeline.game_candidates import effective_range, effective_title
 from lumia_briefing_room.pipeline.game_store import FULL_VIDEO
 from lumia_briefing_room.detect.pvp import PvpScore
@@ -54,12 +55,12 @@ def _run_ffmpeg(cmd: list[str]) -> None:
     run_hidden(cmd, check=True, capture_output=True)
 
 
-def cut_from_full(full: Path, out: Path, start: float, end: float, *, ffmpeg_path: Path) -> None:
+def cut_from_full(full: Path, out: Path, start: float, end: float, *, ffmpeg_path: Path, clip_uid: str | None = None) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
         str(ffmpeg_path), "-hide_banner", "-v", "error", "-y",
         "-ss", f"{start:.3f}", "-i", str(full), "-t", f"{end - start:.3f}",
-        "-map", "0", "-c", "copy", str(out),
+        "-map", "0", "-c", "copy", *(uid_metadata_args(clip_uid) if clip_uid else []), str(out),
     ]
     _run_ffmpeg(cmd)
 
@@ -154,15 +155,18 @@ def save_candidate_clip(
     thumbnails_root = thumbnails_root or (clips_dir / ".thumbs")
     clip_id = replace_clip_id or _unique_clip_id(clips_dir, cand["id"], roots)
     clip_path = (find_video(clips_dir, clip_id, roots) if replace_clip_id else None) or video_root / f"{clip_id}.mp4"
+    json_path = clips_dir / f"{clip_id}.json"
+    old = _read_json(json_path) if replace_clip_id else {}
+    uid = old.get("clipUid") or new_clip_uid()
     if replace_clip_id:
         staged = clip_path.with_name(f"{clip_id}.replace.mp4")
         try:
-            cut_from_full(full, staged, start, end, ffmpeg_path=ffmpeg_path)
+            cut_from_full(full, staged, start, end, ffmpeg_path=ffmpeg_path, clip_uid=uid)
             os.replace(staged, clip_path)
         finally:
             staged.unlink(missing_ok=True)
     else:
-        cut_from_full(full, clip_path, start, end, ffmpeg_path=ffmpeg_path)
+        cut_from_full(full, clip_path, start, end, ffmpeg_path=ffmpeg_path, clip_uid=uid)
 
     thumb_rel = None
     if cfg.encode.thumbnail.enabled:
@@ -181,12 +185,12 @@ def save_candidate_clip(
     combat_start = offset + float(cand.get("combatStart", start))
     combat_end = offset + float(cand.get("combatEnd", end))
 
-    json_path = clips_dir / f"{clip_id}.json"
     if game.get("source") == "vod":
         vod_meta = _vod_clip_metadata(
             game, cand, start=start, end=end, offset=offset, thumb_rel=thumb_rel, result=result,
             me_portrait=me_portrait, mates=mates,
         )
+        vod_meta["clipUid"] = uid
         return _finish(json_path, json.dumps(vod_meta, ensure_ascii=False, indent=2), replace_clip_id, clip_id)
 
     meta = ClipMetadata(
@@ -235,12 +239,11 @@ def save_candidate_clip(
         detector_confidence=float(cand.get("detectorConfidence") or 0.0),
         match_result=result,
         match_end_utc=game.get("matchEndUtc"),
-        clip_uid=new_clip_uid(),
+        clip_uid=uid,
         my_character_portrait_path=me_portrait,
         teammate_portrait_paths=mates,
         match_result_source=None,
     )
-    old = _read_json(json_path) if replace_clip_id else {}
     write_metadata(meta, json_path)
     return _merge_kept(json_path, old, clip_id)
 

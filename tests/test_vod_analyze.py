@@ -101,7 +101,11 @@ def test_analyze_makes_clips_metadata_and_index(vod_file, tmp_path):
     assert meta["vodGameIndex"] == 1
     assert "kill" in meta["tags"] and meta["gameDay"] == 2
     assert meta["myCharacter"] is None and meta["matchResult"]["placement"] == 1
-    assert (resolve_paths(cfg.paths).clips_vod / f"{metas[0].stem}.mp4").exists()
+    clip_video = resolve_paths(cfg.paths).clips_vod / f"{metas[0].stem}.mp4"
+    assert clip_video.exists()
+    from lumia_briefing_room.pipeline.mp4_tags import read_clip_uid
+
+    assert read_clip_uid(clip_video) == meta["clipUid"], "정보의 clipUid 가 영상 안에도 들어 있다"
     assert (root / ".thumbs" / f"{metas[0].stem}.jpg").exists()
     assert load_index(root, vod_id(vod_file))["clips"] == [m.stem for m in metas]
 

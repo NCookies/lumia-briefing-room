@@ -174,3 +174,23 @@ def test_a_clip_id_used_by_a_moved_video_is_not_reused(tmp_path, fake_ffmpeg):
         video_dir=tmp_path / "clips", video_roots=[tmp_path / "clips"],
     )
     assert clip_id == f"{cand['id']}-r2"
+
+
+def test_the_clip_uid_in_the_json_is_written_into_the_video_too(tmp_path, fake_ffmpeg):
+    folder, game, cand = _game(tmp_path)
+    clip_id = _save(tmp_path, game, cand, folder)
+    uid = json.loads((tmp_path / "clips" / f"{clip_id}.json").read_text(encoding="utf-8"))["clipUid"]
+    cmd = fake_ffmpeg[-1]
+    assert cmd[cmd.index("-metadata") + 1] == f"comment=lumia:clipUid={uid}"
+
+
+def test_recutting_a_saved_clip_keeps_the_same_uid_in_the_video(tmp_path, fake_ffmpeg):
+    folder, game, cand = _game(tmp_path)
+    clip_id = _save(tmp_path, game, cand, folder)
+    uid = json.loads((tmp_path / "clips" / f"{clip_id}.json").read_text(encoding="utf-8"))["clipUid"]
+    cand["user"] = {"start": 90.0, "end": 150.0}
+    cfg = Config(paths=PathsConfig(clips=tmp_path / "clips"))
+    cff.save_candidate_clip(game, cand, game_folder=folder, clips_dir=tmp_path / "clips", cfg=cfg,
+                            ffmpeg_path=Path("ffmpeg"), replace_clip_id=clip_id)
+    cmd = fake_ffmpeg[-1]
+    assert cmd[cmd.index("-metadata") + 1] == f"comment=lumia:clipUid={uid}"

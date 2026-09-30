@@ -8,6 +8,7 @@ from lumia_briefing_room.detect.result import ResultScreen
 from lumia_briefing_room.detect.types import CombatInterval
 from lumia_briefing_room.pipeline.clip import ClipRange
 from lumia_briefing_room.pipeline.clip_uid import new_clip_uid
+from lumia_briefing_room.pipeline.mp4_tags import uid_metadata_args
 from lumia_briefing_room.pipeline.metadata import (
     match_result_dict,
     phase_index,
@@ -33,6 +34,7 @@ def cut_vod_clip(
     *,
     ffmpeg_path: Path,
     include_audio: bool = True,
+    clip_uid: str | None = None,
 ) -> VodCutResult:
     """다시보기 영상에서 구간을 재인코딩 없이 잘라낸다. 시작은 그 앞 키프레임(1초 간격)에 붙는다."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -44,7 +46,7 @@ def cut_vod_clip(
     ]
     if include_audio:
         cmd += ["-map", "0:a:0?"]
-    cmd += ["-c", "copy", "-avoid_negative_ts", "make_zero", str(out_path)]
+    cmd += ["-c", "copy", "-avoid_negative_ts", "make_zero", *(uid_metadata_args(clip_uid) if clip_uid else []), str(out_path)]
     run_hidden(cmd, check=True, capture_output=True)
 
     ffprobe_path = find_ffprobe(ffmpeg_path)
@@ -77,13 +79,14 @@ def build_vod_metadata(
     my_character_portrait_path: str | None = None,
     teammate_portrait_paths: list[str] | None = None,
     match_result_source: str | None = None,
+    clip_uid: str | None = None,
 ) -> dict:
     """스팀 클립 메타데이터와 같은 필드 이름을 쓰되, 세션 필드 대신 다시보기 위치 필드를 채운다(SPEC §2.14)."""
     game_day = interval.game_day
     day_night = interval.day_night
     phase = phase_index(game_day, day_night) if game_day is not None and day_night is not None else None
     return {
-        "clipUid": new_clip_uid(),
+        "clipUid": clip_uid or new_clip_uid(),
         "title": title,
         "source": "vod",
         "vodId": vod_id,

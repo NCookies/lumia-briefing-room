@@ -73,7 +73,8 @@ def test_trim_rewrites_the_video_in_place(env, monkeypatch):
 def test_split_creates_pieces_next_to_the_original_video(env, monkeypatch):
     video = add_clip(env, "a")
     monkeypatch.setattr(delete_helper, "_send2trash", lambda p: Path(p).unlink())
-    monkeypatch.setattr(trim_module, "run_hidden", lambda cmd, **kw: Path(cmd[-1]).write_bytes(b"piece"))
+    cmds = []
+    monkeypatch.setattr(trim_module, "run_hidden", lambda cmd, **kw: (cmds.append(cmd), Path(cmd[-1]).write_bytes(b"piece")))
     monkeypatch.setattr(app_module, "discover_ffmpeg", lambda: Path("ffmpeg"))
     body = env.post("/api/clips/a/split", json={"ranges": [{"start": 0, "end": 5}, {"start": 8, "end": 15}]})
     assert body.status_code == 200
@@ -81,3 +82,6 @@ def test_split_creates_pieces_next_to_the_original_video(env, monkeypatch):
     assert sorted(p.name for p in env.library.glob("*.json")) == ["a-p1.json", "a-p2.json"]
     assert not video.exists()
     assert {c["id"] for c in env.get("/api/clips").json()} == {"a-p1", "a-p2"}
+    for cmd, piece in zip(cmds, ("a-p1", "a-p2")):
+        uid = json.loads((env.library / f"{piece}.json").read_text(encoding="utf-8"))["clipUid"]
+        assert cmd[cmd.index("-metadata") + 1] == f"comment=lumia:clipUid={uid}", "조각은 부모가 아니라 자기 ID 를 영상에 쓴다"

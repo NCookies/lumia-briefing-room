@@ -201,3 +201,16 @@ def test_audio_status_full_partial_none():
     assert audio_status([10, 11, 12], [11, 12]) == "partial"
     assert audio_status([10, 11, 12], [10, 11]) == "partial"
     assert audio_status([10, 11, 12], []) == "none"
+
+
+@requires_ffmpeg
+def test_cut_clip_writes_the_clip_uid_into_the_video(tmp_path, make_synthetic_session):
+    from lumia_briefing_room.pipeline.mp4_tags import read_clip_uid
+
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    session = RecordingSession.load(make_synthetic_session(
+        tmp_path, width=64, height=48, fps=10, segment_frames=10, num_segments=10, start_utc=start,
+    ))
+    out_path = tmp_path / "clip.mp4"
+    cut_clip(session, ClipRange(1.0, 5.0, "combat"), out_path, ffmpeg_path=FFMPEG_PATH, clip_uid="abc123")
+    assert read_clip_uid(out_path) == "abc123"

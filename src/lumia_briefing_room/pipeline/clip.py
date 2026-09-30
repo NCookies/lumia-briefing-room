@@ -8,6 +8,7 @@ from lumia_briefing_room.detect.types import CombatInterval
 from lumia_briefing_room.video.frames import write_merged_segment_file
 from lumia_briefing_room.video.segments import segment_time_range
 from lumia_briefing_room.video.session import RecordingSession
+from lumia_briefing_room.pipeline.mp4_tags import uid_metadata_args
 from lumia_briefing_room.procs import run_hidden
 
 
@@ -107,6 +108,7 @@ def cut_clip(
     stream_audio: int = 1,
     include_audio: bool = True,
     tmp_dir: Path | None = None,
+    clip_uid: str | None = None,
 ) -> CutResult:
     """SPEC §3 `[필요한 세그먼트만 복사 -> 병합 -> ffmpeg -c copy 컷]`.
 
@@ -143,7 +145,7 @@ def cut_clip(
                 map_args += ["-map", "1:a:0"]
 
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        cmd += map_args + ["-c", "copy", str(out_path)]
+        cmd += map_args + ["-c", "copy", *(uid_metadata_args(clip_uid) if clip_uid else []), str(out_path)]
         run_hidden(cmd, check=True, capture_output=True)
 
     gaps = seg_range.gaps(used_video)

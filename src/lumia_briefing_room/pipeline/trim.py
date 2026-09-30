@@ -22,6 +22,7 @@ from lumia_briefing_room.pipeline.clip_uid import (
     write_json_atomic,
 )
 from lumia_briefing_room.pipeline.delete_helper import delete_clip
+from lumia_briefing_room.pipeline.mp4_tags import uid_metadata_args
 from lumia_briefing_room.procs import run_hidden
 
 MIN_LENGTH_SEC = 1.0
@@ -131,7 +132,7 @@ def split_clip(
             cmd = [
                 str(ffmpeg_path), "-hide_banner", "-v", "error", "-y",
                 "-ss", f"{start:.3f}", "-to", f"{end:.3f}", "-i", str(src_mp4),
-                "-map", "0", "-c", "copy", str(piece_mp4),
+                "-map", "0", "-c", "copy", *uid_metadata_args(piece_uid), str(piece_mp4),
             ]
             run_hidden(cmd, check=True, capture_output=True)
 

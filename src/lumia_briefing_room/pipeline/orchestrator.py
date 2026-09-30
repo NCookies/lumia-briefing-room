@@ -13,6 +13,7 @@ from lumia_briefing_room.detect.match import detect_match
 from lumia_briefing_room.detect.pvp import score_interval
 from lumia_briefing_room.detect.result import ResultScreen
 from lumia_briefing_room.detect.types import CombatInterval, MatchDetection
+from lumia_briefing_room.pipeline.clip_uid import new_clip_uid
 from lumia_briefing_room.pipeline.clip import ClipRange, cut_clip, make_thumbnail, resolve_clip_range
 from lumia_briefing_room.detect.types import PortraitCrops
 from lumia_briefing_room.pipeline.filters import apply_filter
@@ -482,10 +483,11 @@ def process_match(
     try:
         for n, cand in enumerate(to_save, start=1):
             clip_path = video_root / f"{cand.clip_id}.mp4"
+            clip_uid = new_clip_uid()
             cut_result = cut_clip(
                 session, cand.plan.range, clip_path,
                 ffmpeg_path=ffmpeg_path, include_audio=cfg.clip.include_audio,
-                tmp_dir=resolved.temp,
+                tmp_dir=resolved.temp, clip_uid=clip_uid,
             )
 
             thumbnail_rel: str | None = None
@@ -517,6 +519,7 @@ def process_match(
                 match_result=result,
                 result_image_path=result_image_path,
                 match_end_utc=match_end,
+                clip_uid=clip_uid,
                 my_character_portrait_path=portrait_paths["me"],
                 teammate_portrait_paths=[
                     p for p in (portrait_paths["teammate1"], portrait_paths["teammate2"]) if p

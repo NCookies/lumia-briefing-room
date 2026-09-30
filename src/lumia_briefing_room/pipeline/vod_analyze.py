@@ -27,6 +27,7 @@ from lumia_briefing_room.detect.types import FrameState, PortraitCrops
 from lumia_briefing_room.pipeline.clip import ClipRange, make_thumbnail
 from lumia_briefing_room.pipeline.clip_assets import stored_asset_path
 from lumia_briefing_room.pipeline.clip_files import commit_staged_clips, find_video
+from lumia_briefing_room.pipeline.clip_uid import new_clip_uid
 from lumia_briefing_room.pipeline.ffmpeg_errors import describe_clip_error, is_disk_full_error
 from lumia_briefing_room.pipeline.filters import apply_filter
 from lumia_briefing_room.pipeline.game_store import GAME_JSON, is_certain, plans_to_save, vod_game_key
@@ -542,8 +543,10 @@ def _make_clips(
                 report("cut", progress_fraction(i + 1), f"게임 {span.index} 클립 {len(game_clip_ids) + 1}",
                        games=len(games), clips=len(clip_ids))
                 clips_done += 1
+                clip_uid = new_clip_uid()
                 cut = cut_vod_clip(
-                    video_path, rng, clip_path, ffmpeg_path=ffmpeg_path, include_audio=cfg.clip.include_audio
+                    video_path, rng, clip_path, ffmpeg_path=ffmpeg_path, include_audio=cfg.clip.include_audio,
+                    clip_uid=clip_uid,
                 )
                 thumb_rel = None
                 if cfg.encode.thumbnail.enabled:
@@ -569,6 +572,7 @@ def _make_clips(
                     teammate_portrait_paths=[
                         p for p in (portrait_paths["teammate1"], portrait_paths["teammate2"]) if p
                     ],
+                    clip_uid=clip_uid,
                 )
                 clip_path.with_suffix(".json").write_text(
                     json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
