@@ -52,6 +52,8 @@ class PathsConfig:
     steam_recording: Path | None = None
     vod_clips: Path | None = None
     games: Path | None = None
+    root: Path | None = None
+    full_videos: Path | None = None
     min_free_gb: float = 20.0
 
 
@@ -64,6 +66,19 @@ class ResolvedPaths:
     export_default: Path
     vod_clips: Path
     games: Path
+    clips_steam: Path
+    clips_vod: Path
+    clips_root: Path
+    clip_roots: tuple[Path, ...]
+    games_steam: Path
+    games_vod: Path
+    library_steam: Path
+    library_vod: Path
+    staging_clips: Path
+    staging_games: Path
+    staging_library_steam: Path
+    staging_library_vod: Path
+    proxy_cache: Path
 
 
 def _default_local_appdata() -> Path:
@@ -78,17 +93,85 @@ def _default_userprofile() -> Path:
     return Path(os.environ.get("USERPROFILE", str(Path.home())))
 
 
+CLIPS_FOLDER = "클립"
+FULL_VIDEOS_FOLDER = "풀영상"
+STEAM_FOLDER = "스팀 녹화"
+VOD_FOLDER = "영상 파일"
+STAGING_FOLDER = ".staging"
+
+
+def uses_legacy_layout(cfg: PathsConfig) -> bool:
+    """`paths.root` 가 없으면 옛 경로(clips·vodClips·games)를 그대로 인정한다."""
+    return cfg.root is None
+
+
+def _default_storage_root() -> Path:
+    return _default_userprofile() / "Videos" / paths.app_folder_name()
+
+
+def suggested_root(cfg: PathsConfig) -> Path | None:
+    """첫 실행에서 저장 폴더로 권하는 기본값. 옛 경로를 이미 쓰는 사용자(설정 키 또는 옛 기본 폴더)에겐 None."""
+    if cfg.root is not None or cfg.clips or cfg.vod_clips or cfg.games:
+        return None
+    if (_default_storage_root() / "clips").exists():
+        return None
+    return _default_storage_root()
+
+
 def resolve_paths(cfg: PathsConfig) -> ResolvedPaths:
-    """SPEC §7.1: 비워두면 기본 위치, thumbnails/proxies/trash 는 clips 하위."""
-    clips = cfg.clips or (_default_userprofile() / "Videos" / paths.app_folder_name() / "clips")
+    """SPEC §7.1: 비워두면 기본 위치. 정보(json·썸네일 등)는 항상 앱 데이터 폴더, 영상만 저장 폴더(plan-fullvideo §3.10)."""
+    library = _default_local_appdata() / paths.app_folder_name() / "library"
+    temp = cfg.temp or (_default_local_appdata() / "Temp" / paths.app_folder_name())
+    export_default = cfg.export_default or (_default_userprofile() / "Videos")
+    common = dict(
+        temp=temp,
+        export_default=export_default,
+        library_steam=library / "steam",
+        library_vod=library / "vod",
+        staging_library_steam=library / "steam" / STAGING_FOLDER,
+        staging_library_vod=library / "vod" / STAGING_FOLDER,
+    )
+    if cfg.root is not None:
+        root = cfg.root
+        full = cfg.full_videos or (root / FULL_VIDEOS_FOLDER)
+        clips_steam, clips_vod = root / CLIPS_FOLDER / STEAM_FOLDER, root / CLIPS_FOLDER / VOD_FOLDER
+        proxy_cache = root / ".cache" / "proxy"
+        return ResolvedPaths(
+            clips=clips_steam,
+            thumbnails=library / "steam" / ".thumbs",
+            proxies=proxy_cache,
+            vod_clips=clips_vod,
+            games=full / STEAM_FOLDER,
+            clips_steam=clips_steam,
+            clips_vod=clips_vod,
+            clips_root=root / CLIPS_FOLDER,
+            clip_roots=(root / CLIPS_FOLDER,),
+            games_steam=full / STEAM_FOLDER,
+            games_vod=full / VOD_FOLDER,
+            staging_clips=root / STAGING_FOLDER,
+            staging_games=full / STAGING_FOLDER,
+            proxy_cache=proxy_cache,
+            **common,
+        )
+    clips = cfg.clips or (_default_storage_root() / "clips")
+    vod_clips = cfg.vod_clips or (_default_storage_root() / "vod")
+    games = cfg.games or (clips.parent / "games")
     return ResolvedPaths(
-        temp=cfg.temp or (_default_local_appdata() / "Temp" / paths.app_folder_name()),
         clips=clips,
         thumbnails=cfg.thumbnails or (clips / ".thumbs"),
         proxies=cfg.proxies or (clips / ".proxy"),
-        export_default=cfg.export_default or (_default_userprofile() / "Videos"),
-        vod_clips=cfg.vod_clips or (_default_userprofile() / "Videos" / paths.app_folder_name() / "vod"),
-        games=cfg.games or (clips.parent / "games"),
+        vod_clips=vod_clips,
+        games=games,
+        clips_steam=clips,
+        clips_vod=vod_clips,
+        clips_root=clips,
+        clip_roots=(clips, vod_clips),
+        games_steam=games,
+        games_vod=games,
+        staging_clips=clips / STAGING_FOLDER,
+        staging_games=games / STAGING_FOLDER,
+        proxy_cache=clips / ".proxy",
+        **common,
     )
 
 

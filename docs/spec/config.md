@@ -9,6 +9,8 @@
 | 키 | 기본값 | 설명 |
 |---|---|---|
 | `paths.clips` | `%USERPROFILE%\Videos\LumiaBriefingRoom\clips` | 스팀 클립. 썸네일 `.thumbs`, 프록시 `.proxy`, 라벨 보관소 `.labels`, 게임 기록 `.games` 가 그 아래 |
+| `paths.root` | `null` | 저장 폴더 하나. 있으면 `클립\{스팀 녹화,영상 파일}`·`풀영상\{스팀 녹화,영상 파일}` 로 나눠 쓴다(`config.resolve_paths`). 미사용 — 해석 함수만 있고 아직 호출하는 코드가 옛 경로(`clips`·`vodClips`·`games`)를 읽는다 |
+| `paths.fullVideos` | `null` | 풀영상 위치만 덮어쓰기(`root` 가 있을 때). 미사용(위와 같음) |
 | `paths.games` | `<clips 의 상위>\games` | 게임별 풀영상·게임 기록(`games\<경기키>ull.mp4`, `game.json`) |
 | `paths.vodClips` | `…\LumiaBriefingRoom\vod` | 영상 파일 클립(스팀과 섞지 않는다). `.thumbs`·`.vods` |
 | `paths.temp` | `%LOCALAPPDATA%\Temp\LumiaBriefingRoom` | 구출 복사·병합 중간물·처리 이력. 클립 폴더와 드라이브가 다르면 최종 이동이 복사가 된다 |
