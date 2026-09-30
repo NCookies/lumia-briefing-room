@@ -21,6 +21,7 @@ from lumia_briefing_room.pipeline.delete_helper import delete_clip
 from lumia_briefing_room.pipeline.game_records import clear_records, record_game, records_dir_for
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for, archive_if_labeled
 from lumia_briefing_room.pipeline.proxy import remove_orphan_proxies
+from lumia_briefing_room.pipeline.game_cleanup import run_game_cleanup
 from lumia_briefing_room.pipeline.retention import select_for_auto_clean
 
 log = logging.getLogger(__name__)
@@ -126,13 +127,13 @@ def run_cleanup(clips_dir: Path, cfg: RetentionConfig, *, now: datetime | None =
     return plan
 
 
-def make_cleanup_runner(config_path: Path | None) -> Callable[[], CleanupPlan]:
-    """설정 파일을 실행 때마다 다시 읽는다 — 사용자가 옵션에서 바꾼 값이 재시작 없이 반영된다."""
+def make_cleanup_runner(config_path: Path | None) -> Callable[[], object]:
+    """설정 파일을 실행 때마다 다시 읽는다 — 사용자가 옵션에서 바꾼 값이 재시작 없이 반영된다. 자동 정리 대상은 풀영상이다."""
 
-    def run() -> CleanupPlan:
+    def run():
         cfg = load_config(config_path)
         resolved = resolve_paths(cfg.paths)
-        return run_cleanup(resolved.clips, cfg.retention)
+        return run_game_cleanup(resolved.games, cfg.retention)
 
     return run
 

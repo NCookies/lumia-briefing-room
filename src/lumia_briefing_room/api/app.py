@@ -50,7 +50,8 @@ from lumia_briefing_room.pipeline.game_records import (
 )
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for
 from lumia_briefing_room.pipeline.label_note import normalize_label_note
-from lumia_briefing_room.pipeline.cleanup import plan_cleanup, remove_orphan_result_images, run_cleanup
+from lumia_briefing_room.pipeline.cleanup import remove_orphan_result_images
+from lumia_briefing_room.pipeline.game_cleanup import game_cleanup_preview, plan_game_cleanup, run_game_cleanup
 from lumia_briefing_room.pipeline.cleanup_registry import registry as cleanup_preview_registry
 from lumia_briefing_room.pipeline.clip_assets import (
     resolve_character_portrait,
@@ -612,8 +613,8 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         cfg = current_config()
         resolved = resolve_paths(cfg.paths)
         dry_run = bool(body.get("dryRun"))
-        step = plan_cleanup if dry_run else run_cleanup
-        plan = step(resolved.clips, cfg.retention)
+        step = plan_game_cleanup if dry_run else run_game_cleanup
+        plan = step(resolved.games, cfg.retention)
         return {
             "toDelete": len(plan.to_delete),
             "bytesToFree": plan.bytes_to_free,
@@ -644,7 +645,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
 
     @app.get("/api/cleanup/preview")
     def get_cleanup_preview():
-        """다음 자동 정리 때 지워질 클립의 이유·예정 시각. (plan-ui.md §0 "자동 정리 삭제 예정 표시")
+        """다음 자동 정리 때 풀영상이 지워질 게임(경기 키)의 이유·예정 시각. (plan-ui.md §0 "자동 정리 삭제 예정 표시")
 
         화면이 매번 요청할 때 dry-run 을 새로 돌리지 않고, cleanup_preview_registry 가
         클립 변경 시점마다 미리 계산해 둔 결과를 그대로 읽기만 한다.
@@ -752,7 +753,9 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     register_update_routes(app)
     register_backfill_routes(app, current_config=current_config)
 
-    cleanup_preview_registry.configure(lambda: (resolve_paths(current_config().paths).clips, current_config().retention))
+    cleanup_preview_registry.configure(
+        lambda: (resolve_paths(current_config().paths).games, current_config().retention), game_cleanup_preview
+    )
     cleanup_preview_registry.recompute_now()
     return app
 

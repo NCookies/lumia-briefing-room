@@ -72,15 +72,15 @@
 | `encode.thumbnail.enabled` / `encode.thumbnail.offsetRatio` / `encode.thumbnail.width` | `true` / 0.35 / 480 | |
 | `encode.reencode` | `false` | 미사용 |
 
-## 보관·자동 정리 `retention.*` (스팀 클립만)
+## 보관·자동 정리 `retention.*` (스팀 게임의 풀영상만)
 
 | 키 | 기본값 | 설명 |
 |---|---|---|
-| `retention.autoCleanEnabled` | `false` | |
-| `retention.maxAgeDays` / `retention.maxTotalGb` / `retention.maxCount` | `null` | 기준별, `null` = 미적용 |
+| `retention.autoCleanEnabled` | `true` | 대상은 풀영상. 저장한 클립은 대상이 아니다 |
+| `retention.maxAgeDays` / `retention.maxTotalGb` / `retention.maxCount` | `null` / `40` / `null` | 기준별, `null` = 미적용 |
 | `retention.deleteMode` | `permanent` | 자동 정리 전용(`recycle`/`permanent`) |
-| `retention.protectPinned` | `true` | |
-| `retention.protectTags` | `[]` | 기본은 고정만 보호(2026-09-25 변경, 기존 설정은 유지) |
+| `retention.protectPinned` | `true` | `game.json` 의 `pinned` |
+| `retention.protectTags` | `[]` | 후보 태그 중 하나라도 있으면 그 게임의 풀영상을 보호. 기본은 고정만 보호 |
 | `retention.keepGameRecords` | `true` | 클립이 다 지워진 경기 요약·결과표를 `.games` 에 남김 |
 
 ## 내보내기 `export.*` — 전부 미사용 (지금 저장은 mp4 만 복사)

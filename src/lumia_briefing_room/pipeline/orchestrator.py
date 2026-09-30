@@ -504,6 +504,5 @@ def process_match(
 
     if on_progress is not None:
         on_progress(1.0)
-    if written:
-        cleanup_preview_registry.notify_clips_changed()
+    cleanup_preview_registry.notify_clips_changed()
     return written

@@ -446,10 +446,24 @@ def _enable_cleanup(client, **retention):
     client.put("/api/config", json={"retention": {"autoCleanEnabled": True, **retention}})
 
 
+def _write_game(client, key, *, start, size=100, pinned=False):
+    import json
+
+    games = client.app.state.clips_dir_for_test.parent / "games"
+    folder = games / key
+    folder.mkdir(parents=True)
+    (folder / "full.mp4").write_bytes(b"x" * size)
+    (folder / "game.json").write_text(
+        json.dumps({"gameKey": key, "matchStartUtc": start, "pinned": pinned, "candidates": [],
+                    "fullVideo": {"path": "full.mp4", "sizeBytes": size}}),
+        encoding="utf-8",
+    )
+    return folder
+
+
 def test_cleanup_preview_counts_without_touching_files(client):
-    clips = client.app.state.clips_dir_for_test
-    _write_clip(clips, "old", matchStartUtc="2020-01-01T00:00:00Z")
-    _write_clip(clips, "new", matchStartUtc="2999-01-01T00:00:00Z")
+    old = _write_game(client, "old", start="2020-01-01T00:00:00Z")
+    _write_game(client, "new", start="2999-01-01T00:00:00Z")
     _enable_cleanup(client, maxAgeDays=30)
 
     resp = client.post("/api/cleanup", json={"dryRun": True})
@@ -457,37 +471,38 @@ def test_cleanup_preview_counts_without_touching_files(client):
     assert resp.status_code == 200
     body = resp.json()
     assert body["toDelete"] == 1 and body["applied"] is False
-    assert (clips / "old.json").exists()
+    assert (old / "full.mp4").exists()
 
 
-def test_cleanup_run_deletes_old_clips(client):
+def test_cleanup_run_deletes_old_full_videos_but_keeps_the_game_record_and_clips(client):
     clips = client.app.state.clips_dir_for_test
-    _write_clip(clips, "old", matchStartUtc="2020-01-01T00:00:00Z")
+    _write_clip(clips, "clip", matchStartUtc="2020-01-01T00:00:00Z")
+    old = _write_game(client, "old", start="2020-01-01T00:00:00Z")
     _enable_cleanup(client, maxAgeDays=30, deleteMode="permanent")
 
     body = client.post("/api/cleanup", json={}).json()
 
     assert body["toDelete"] == 1 and body["applied"] is True
-    assert not (clips / "old.json").exists()
+    assert not (old / "full.mp4").exists()
+    assert (old / "game.json").exists()
+    assert (clips / "clip.json").exists()
 
 
 def test_cleanup_does_nothing_when_disabled(client):
-    clips = client.app.state.clips_dir_for_test
-    _write_clip(clips, "old", matchStartUtc="2020-01-01T00:00:00Z")
-    client.put("/api/config", json={"retention": {"maxAgeDays": 30}})
+    old = _write_game(client, "old", start="2020-01-01T00:00:00Z")
+    client.put("/api/config", json={"retention": {"autoCleanEnabled": False, "maxAgeDays": 30}})
 
     body = client.post("/api/cleanup", json={}).json()
 
     assert body["toDelete"] == 0
-    assert (clips / "old.json").exists()
+    assert (old / "full.mp4").exists()
 
 
-def test_cleanup_preview_endpoint_returns_reason_and_due_date(client):
+def test_cleanup_preview_endpoint_returns_reason_and_due_date_per_game(client):
     from lumia_briefing_room.pipeline.cleanup_registry import registry as cleanup_preview_registry
 
-    clips = client.app.state.clips_dir_for_test
-    _write_clip(clips, "old", matchStartUtc="2020-01-01T00:00:00Z")
-    _write_clip(clips, "new", matchStartUtc="2999-01-01T00:00:00Z")
+    _write_game(client, "old", start="2020-01-01T00:00:00Z")
+    _write_game(client, "new", start="2999-01-01T00:00:00Z")
     _enable_cleanup(client, maxAgeDays=30)
     cleanup_preview_registry.recompute_now()  # 디바운스를 기다리지 않고 바로 계산
 
@@ -500,16 +515,11 @@ def test_cleanup_preview_endpoint_returns_reason_and_due_date(client):
     assert body["old"]["dueAt"] is not None
 
 
-def test_cleanup_preview_endpoint_recomputes_after_pin_removes_a_clip(client):
+def test_cleanup_preview_skips_pinned_games(client):
     from lumia_briefing_room.pipeline.cleanup_registry import registry as cleanup_preview_registry
 
-    clips = client.app.state.clips_dir_for_test
-    _write_clip(clips, "old", matchStartUtc="2020-01-01T00:00:00Z")
+    _write_game(client, "old", start="2020-01-01T00:00:00Z", pinned=True)
     _enable_cleanup(client, maxAgeDays=30)
-    cleanup_preview_registry.recompute_now()
-    assert set(client.get("/api/cleanup/preview").json()) == {"old"}
-
-    client.patch("/api/clips/old", json={"pinned": True})
     cleanup_preview_registry.recompute_now()
 
     assert client.get("/api/cleanup/preview").json() == {}

@@ -123,8 +123,8 @@ Player.log 폴링 ─ 경기 경계(GAME→LOBBY) ─▶ 녹화 세션 결정(�
 - 옛 버전의 `clips/.trash` 는 첫 실행에 `pipeline/legacy_trash.py` 가 복구/Windows 휴지통/나중에 로 묻는다(비면 더 안 묻는다).
 - **라벨 보관소**: 지우기 직전(방식 무관) `userLabel` 이 있는 클립은 경로 필드를 뺀 메타 사본을 `clips/.labels/<id>.json` 에 남긴다. 평가·전송의 자료다. `scan_clips` 는 하위 폴더를 안 보므로 목록에 안 뜬다.
 - **게임 기록**(`pipeline/game_records.py`, `retention.keepGameRecords` 기본 켬): 클립이 다 지워져도 경기 요약(순위·모드·TK/K/A·결과표 이미지)을 `clips/.games/<경기키>.json` 에 남겨 "클립 삭제됨" 게임 행으로 보인다. 결과표를 못 읽은 경기는 요약하지 않는다. 기록만 지우려면 `DELETE /api/games/records/{id}`.
-- **자동 정리**(`pipeline/cleanup.py`, 스팀 클립만): 1시간마다 설정을 다시 읽어 나이(`matchStartUtc` 기준 — mtime 은 라벨링 때마다 바뀐다)·총 용량·개수 한도를 오래된 것부터 적용. 고정·보호 태그 제외. 방식 기본은 **영구 삭제**(디스크 확보가 목적). `POST /api/cleanup {dryRun}` 로 미리보기·즉시 실행.
-- **삭제 예정 미리 계산**(`pipeline/cleanup_registry.py`): 클립 생성·삭제·고정·설정 변경·정리 실행·앱 시작 때 `notify_clips_changed()` → 1.5초 디바운스로 실제 정리와 **같은 함수**로 재계산해 메모리에 캐시, `GET /api/cleanup/preview` 는 읽기만. 나이 기준은 예정 시각을 저장해 화면이 남은 일수를 계산한다.
+- **자동 정리**(`pipeline/game_cleanup.py`, 스팀 게임): 1시간마다 설정을 다시 읽어 **풀영상(`games/<경기키>/full.mp4`)** 에 나이(`matchStartUtc` 기준)·총 용량·개수 한도를 오래된 것부터 적용한다(선정 규칙은 `retention.select_for_auto_clean` 공용). **저장한 클립은 대상이 아니다.** 풀영상만 지우고 `game.json`(후보·마커·결과)과 결과·초상화 이미지는 남기며 `fullVideo:null`·`fullVideoDeletedAt` 을 기록한다. 고정(`game.json` 의 `pinned`)·보호 태그(후보 태그 합집합)는 제외. 방식 기본은 **영구 삭제**. 기본값은 자동 정리 **켬 + 총 용량 40GB**(새 설치만 — 저장된 설정은 그대로). `POST /api/cleanup {dryRun}` 로 미리보기·즉시 실행. 옛 클립 정리 함수(`cleanup.py::run_cleanup` 등)는 F5 까지 코드에 남아 있으나 아무도 부르지 않는다.
+- **삭제 예정 미리 계산**(`pipeline/cleanup_registry.py`): 게임 기록 생성·정리 실행·설정 변경·앱 시작 때 `notify_clips_changed()` → 1.5초 디바운스로 실제 정리와 **같은 함수**로 재계산해 메모리에 캐시, `GET /api/cleanup/preview` 는 읽기만 한다. **키는 경기 키**(`YYYYMMDD_HHMMSS`)이고 나이 기준은 예정 시각을 같이 준다. 옛 클립 카드의 "삭제 예정" 배지는 이 키와 맞지 않아 더 뜨지 않는다(새 게임 목록이 대신한다, F4).
 - **클립 폴더 이동**(`pipeline/move_clips.py`, `POST /api/clips-dir/move`, 202 + 진행률): mp4·json·썸네일·`.proxy`·`.games`·`.labels` 를 옮긴 뒤 설정을 바꾼다. 같은 이름 파일이 있거나 폴더가 겹치면 409 로 아무것도 안 옮긴다.
 
 ## 10. 트레이 앱 (`cli/app.py`)

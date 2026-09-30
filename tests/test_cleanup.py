@@ -38,7 +38,7 @@ def names(paths):
 def test_disabled_cleanup_plans_nothing(tmp_path):
     write_clip(tmp_path / "clips", "old", days_ago=400)
 
-    plan = plan_cleanup(tmp_path / "clips", RetentionConfig(max_age_days=1), now=NOW)
+    plan = plan_cleanup(tmp_path / "clips", RetentionConfig(auto_clean_enabled=False, max_age_days=1), now=NOW)
 
     assert plan.to_delete == []
 
@@ -171,25 +171,30 @@ def test_cleanup_loop_survives_a_failing_run():
 
 
 def test_make_cleanup_runner_reads_the_current_config_file_each_time(tmp_path):
+    import json
+
     from lumia_briefing_room.config import Config, PathsConfig, save_config
     from lumia_briefing_room.pipeline.cleanup import make_cleanup_runner
 
     clips = tmp_path / "clips"
-    write_clip(clips, "old", days_ago=400)
+    game = tmp_path / "games" / "20200101_000000"
+    game.mkdir(parents=True)
+    (game / "full.mp4").write_bytes(b"x" * 100)
+    (game / "game.json").write_text(json.dumps({"matchStartUtc": "2020-01-01T00:00:00Z", "candidates": []}), encoding="utf-8")
     config_path = tmp_path / "config.json"
-    save_config(Config(paths=PathsConfig(clips=clips)), config_path)
+    off = RetentionConfig(auto_clean_enabled=False, max_age_days=30)
+    save_config(Config(paths=PathsConfig(clips=clips), retention=off), config_path)
     runner = make_cleanup_runner(config_path)
 
     assert runner().to_delete == []
 
-    save_config(
-        Config(paths=PathsConfig(clips=clips), retention=RetentionConfig(auto_clean_enabled=True, max_age_days=30)),
-        config_path,
-    )
+    on = RetentionConfig(auto_clean_enabled=True, max_age_days=30)
+    save_config(Config(paths=PathsConfig(clips=clips), retention=on), config_path)
     plan = runner()
 
-    assert names(plan.to_delete) == ["old"]
-    assert not (clips / "old.json").exists()
+    assert names(plan.to_delete) == ["20200101_000000"]
+    assert not (game / "full.mp4").exists()
+    assert (game / "game.json").exists()
 
 
 def test_cleanup_preview_tags_age_reason_with_due_date(tmp_path):

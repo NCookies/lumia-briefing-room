@@ -167,9 +167,9 @@ class EncodeConfig:
 @dataclass
 class RetentionConfig:
     delete_mode: str = "permanent"
-    auto_clean_enabled: bool = False
+    auto_clean_enabled: bool = True
     max_age_days: int | None = None
-    max_total_gb: float | None = None
+    max_total_gb: float | None = 40.0
     max_count: int | None = None
     protect_pinned: bool = True
     protect_tags: list[str] = field(default_factory=list)

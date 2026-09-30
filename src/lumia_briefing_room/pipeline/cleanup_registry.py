@@ -26,15 +26,17 @@ class CleanupPreviewRegistry:
         self._preview: dict[str, dict] = {}
         self._timer: threading.Timer | None = None
         self._source: Callable[[], tuple] | None = None
+        self._preview_fn: Callable[..., dict[str, dict]] | None = None
 
-    def configure(self, source: Callable[[], tuple]) -> None:
-        """(clips_dir, retention_cfg) 를 매번 새로 구해오는 함수를 등록한다.
+    def configure(self, source: Callable[[], tuple], preview_fn: Callable[..., dict[str, dict]] | None = None) -> None:
+        """(폴더, retention_cfg) 를 매번 새로 구해오는 함수를 등록한다. `preview_fn` 을 안 주면 클립 정리 미리보기를 쓴다.
 
         설정 파일을 그때그때 다시 읽는 함수를 넘기면, 사용자가 옵션을 바꿔도 재시작
         없이 다음 계산부터 반영된다(pipeline/cleanup.py::make_cleanup_runner 와 같은 방식).
         """
         with self._lock:
             self._source = source
+            self._preview_fn = preview_fn
 
     def notify_clips_changed(self) -> None:
         """클립이 바뀔 때마다 부른다. 디바운스 창 안에 여러 번 와도 마지막 한 번만 계산한다."""
@@ -57,12 +59,14 @@ class CleanupPreviewRegistry:
     def _recompute(self) -> None:
         with self._lock:
             source = self._source
+            preview_fn = self._preview_fn
         if source is None:
             return
-        clips_dir, cfg = source()
-        from lumia_briefing_room.pipeline.cleanup import cleanup_preview
+        folder, cfg = source()
+        if preview_fn is None:
+            from lumia_briefing_room.pipeline.cleanup import cleanup_preview as preview_fn
 
-        preview = cleanup_preview(clips_dir, cfg)
+        preview = preview_fn(folder, cfg)
         with self._lock:
             self._preview = preview
 
