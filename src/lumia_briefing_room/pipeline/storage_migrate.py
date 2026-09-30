@@ -27,7 +27,8 @@ class StorageMoveError(Exception):
 class StoragePlan:
     pairs: list[tuple[Path, Path]]
     total_bytes: int
-    old_bases: list[tuple[Path, bool]]  # (옛 폴더, 비어도 폴더 자체는 남길지)
+    old_bases: list[Path]  # 다 옮긴 뒤 비었으면 치울 옛 폴더
+    dirs: list[tuple[Path, Path]]  # 영상 자리의 하위 폴더(사용자가 만든 빈 폴더 포함) 옛 → 새
 
 
 def previous_paths(paths: PathsConfig) -> dict:
@@ -52,23 +53,34 @@ def _video_bases(old: ResolvedPaths, new: ResolvedPaths) -> list[tuple[Path, Pat
     return [(old.clips_steam, new.clips_steam), (old.clips_vod, new.clips_vod)]
 
 
+def _subdirs(base: Path) -> list[Path]:
+    found: list[Path] = []
+    for current, names, _ in os.walk(base):
+        names[:] = sorted(n for n in names if not n.startswith("."))
+        found.extend(Path(current) / n for n in names)
+    return found
+
+
 def plan_storage_move(old: ResolvedPaths, new: ResolvedPaths) -> StoragePlan:
     pairs: list[tuple[Path, Path]] = []
-    old_bases: list[tuple[Path, bool]] = []
+    old_bases: list[Path] = []
+    dirs: list[tuple[Path, Path]] = []
 
-    def add_tree(src_base: Path, dst_base: Path, files, keep_base: bool = True) -> None:
+    def add_tree(src_base: Path, dst_base: Path, files, *, with_dirs: bool = False) -> None:
         if src_base.resolve() == dst_base.resolve():
             return
         if _is_inside(dst_base, src_base):
             raise StorageMoveError("새 폴더는 기존 폴더의 안쪽일 수 없습니다")
-        old_bases.append((src_base, keep_base))
+        old_bases.append(src_base)
+        if with_dirs:
+            dirs.extend((d, dst_base / d.relative_to(src_base)) for d in _subdirs(src_base))
         pairs.extend((f, dst_base / f.relative_to(src_base)) for f in files)
 
     for src_base, dst_base in _video_bases(old, new):
-        add_tree(src_base, dst_base, walk_videos([src_base]))
+        add_tree(src_base, dst_base, walk_videos([src_base]), with_dirs=True)
 
     if old.proxy_cache.resolve() != new.proxy_cache.resolve() and old.proxy_cache.is_dir():
-        add_tree(old.proxy_cache, new.proxy_cache, sorted(p for p in old.proxy_cache.glob("*.mp4") if p.is_file()), keep_base=False)
+        add_tree(old.proxy_cache, new.proxy_cache, sorted(p for p in old.proxy_cache.glob("*.mp4") if p.is_file()))
 
     for games_dir in old.games_dirs:
         try:
@@ -82,13 +94,24 @@ def plan_storage_move(old: ResolvedPaths, new: ResolvedPaths) -> StoragePlan:
             if _is_inside(target_base / folder.name, folder):
                 raise StorageMoveError("새 폴더는 기존 폴더의 안쪽일 수 없습니다")
             files = sorted((p for p in folder.rglob("*") if p.is_file()), key=lambda p: (p.name == GAME_JSON, str(p)))
-            old_bases.append((folder, False))
+            old_bases.append(folder)
             pairs.extend((f, target_base / folder.name / f.relative_to(folder)) for f in files)
 
     clashes = [dst for _, dst in pairs if dst.exists()]
     if clashes:
         raise StorageMoveError(f"새 위치에 같은 이름의 파일이 이미 있습니다: {', '.join(p.name for p in clashes[:3])}")
-    return StoragePlan(pairs=pairs, total_bytes=sum(src.stat().st_size for src, _ in pairs), old_bases=old_bases)
+    if not pairs and not dirs:
+        return StoragePlan(pairs=[], total_bytes=0, old_bases=[], dirs=[])
+    old_bases.extend(old.games_dirs)
+    if len(old.clip_roots) == 1:
+        if old.games_steam.parent.name == "풀영상":
+            old_bases.append(old.games_steam.parent)
+        if old.proxy_cache.parent.name == ".cache":
+            old_bases.append(old.proxy_cache.parent)
+    old_bases.extend([old.staging_clips, old.staging_games])
+    return StoragePlan(
+        pairs=pairs, total_bytes=sum(src.stat().st_size for src, _ in pairs), old_bases=old_bases, dirs=dirs
+    )
 
 
 def _append(ledger: Path, entry: dict) -> None:
@@ -123,6 +146,10 @@ def execute_storage_move(
     done = 0
     if progress is not None:
         progress(0, plan.total_bytes)
+    for src_dir, dst_dir in plan.dirs:
+        if not dst_dir.is_dir():
+            dst_dir.mkdir(parents=True, exist_ok=True)
+            _append(ledger, {"dirsrc": str(src_dir), "dirdst": str(dst_dir)})
     for src, dst in plan.pairs:
         size = src.stat().st_size
         move_file(src, dst, overwrite=False)
@@ -130,8 +157,8 @@ def execute_storage_move(
         done += size
         if progress is not None:
             progress(done, plan.total_bytes)
-    for base, keep in plan.old_bases:
-        _remove_empty_dirs(base, keep_base=keep)
+    for base in plan.old_bases:
+        _remove_empty_dirs(base, keep_base=False)
     return len(plan.pairs)
 
 
@@ -147,5 +174,9 @@ def undo_storage_move(ledger: Path) -> dict | None:
         raise StorageMoveError(f"원래 자리에 같은 이름의 파일이 생겼습니다: {', '.join(p.name for p in blocked[:3])}")
     for dst, src in todo:
         move_file(dst, src, overwrite=False)
+    for entry in reversed(lines):
+        if "dirsrc" in entry:
+            Path(entry["dirsrc"]).mkdir(parents=True, exist_ok=True)
+            _remove_empty_dirs(Path(entry["dirdst"]), keep_base=False)
     ledger.unlink()
     return previous

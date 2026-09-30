@@ -183,3 +183,52 @@ def test_undo_refuses_when_an_original_spot_was_reused(tmp_path):
 
 def test_undo_without_a_ledger_returns_none(tmp_path):
     assert undo_storage_move(tmp_path / "none.jsonl") is None
+
+
+def test_empty_user_subfolders_move_with_the_videos(tmp_path):
+    cfg = legacy(tmp_path)
+    (tmp_path / "old" / "clips" / "비어 있는 폴더" / "안쪽").mkdir(parents=True)
+    p = plan(tmp_path, cfg)
+    execute_storage_move(p, tmp_path / "local" / "l.jsonl", previous=previous_paths(cfg))
+    assert (tmp_path / "store" / "클립" / "스팀 녹화" / "비어 있는 폴더" / "안쪽").is_dir()
+    assert (tmp_path / "store" / "클립" / "스팀 녹화" / "sub").is_dir()
+    assert not (tmp_path / "old" / "clips" / "비어 있는 폴더").exists()
+
+
+def test_emptied_legacy_folders_are_removed_but_a_folder_with_user_files_stays(tmp_path):
+    cfg = legacy(tmp_path)
+    execute_storage_move(plan(tmp_path, cfg), tmp_path / "local" / "l.jsonl", previous=previous_paths(cfg))
+    old = tmp_path / "old"
+    assert not (old / "vod").exists() and not (old / "games").exists(), "비게 된 옛 폴더는 치운다(숨김 작업 폴더 포함)"
+    assert (old / "clips" / "notes.txt").exists(), "사용자 파일이 남은 폴더는 그대로 둔다"
+    assert not (old / "clips" / ".proxy").exists()
+
+
+def test_moving_between_roots_removes_the_old_structure_but_keeps_the_root_folder(tmp_path):
+    a, b = tmp_path / "A", tmp_path / "B"
+    cfg = PathsConfig(root=a)
+    (a / "클립" / "아야").mkdir(parents=True)
+    (a / "클립" / "빈 폴더").mkdir()
+    (a / "클립" / "아야" / "x.mp4").write_bytes(b"X")
+    (a / "풀영상" / "스팀 녹화" / STEAM_KEY).mkdir(parents=True)
+    (a / "풀영상" / "스팀 녹화" / STEAM_KEY / "game.json").write_text("{}", encoding="utf-8")
+    (a / ".cache" / "proxy").mkdir(parents=True)
+    (a / ".staging").mkdir()
+    (a / "메모.txt").write_text("내 파일", encoding="utf-8")
+    execute_storage_move(
+        plan_storage_move(resolve_paths(cfg), resolve_paths(PathsConfig(root=b))), tmp_path / "local" / "l.jsonl",
+        previous=previous_paths(cfg),
+    )
+    assert (b / "클립" / "빈 폴더").is_dir() and (b / "클립" / "아야" / "x.mp4").exists()
+    assert a.is_dir() and (a / "메모.txt").exists()
+    assert not any(p.name in ("클립", "풀영상", ".cache", ".staging") for p in a.iterdir())
+
+
+def test_undo_brings_back_empty_folders_too(tmp_path):
+    cfg = legacy(tmp_path)
+    (tmp_path / "old" / "clips" / "비어 있는 폴더").mkdir()
+    ledger = tmp_path / "local" / "l.jsonl"
+    execute_storage_move(plan(tmp_path, cfg), ledger, previous=previous_paths(cfg))
+    undo_storage_move(ledger)
+    assert (tmp_path / "old" / "clips" / "비어 있는 폴더").is_dir()
+    assert not (tmp_path / "store" / "클립" / "스팀 녹화" / "비어 있는 폴더").exists()
