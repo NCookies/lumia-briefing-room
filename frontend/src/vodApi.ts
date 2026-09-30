@@ -5,8 +5,9 @@ const BASE = '/api'
 
 export interface AnalysisJob {
   id: string
+  kind?: 'analyze' | 'fullVideos'
   state: 'idle' | 'running' | 'done' | 'error' | 'cancelled'
-  phase?: 'decode' | 'games' | 'cut' | 'done'
+  phase?: 'decode' | 'games' | 'full' | 'cut' | 'done'
   fraction?: number
   games?: number
   clips?: number
@@ -50,6 +51,11 @@ export async function startAnalysis(
   options: { force?: boolean; rebuild?: boolean; deleteSource?: boolean } = {},
 ): Promise<void> {
   await jsonOrThrow(await send(`${BASE}/vods/${id}/analyze`, 'POST', options), '분석 시작')
+}
+
+/** 이미 분석한 옛 영상의 게임을 풀영상으로 만든다(원본과 판독 캐시가 남아 있어야 한다). 진행률은 getAnalysis 로 읽는다. */
+export async function startFullVideos(id: string): Promise<void> {
+  await jsonOrThrow(await send(`${BASE}/vods/${id}/full-videos`, 'POST'), '풀영상 만들기')
 }
 
 export async function getAnalysis(id: string): Promise<AnalysisJob> {

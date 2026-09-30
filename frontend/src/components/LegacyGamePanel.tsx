@@ -3,7 +3,7 @@ import { listClips, thumbnailUrl } from '../api'
 import { formatClock, type GameDetail } from '../games'
 import { getRebuildStatus, startRebuildFullVideo } from '../gamesApi'
 import { clipsOfGame, rebuildStatusText, type RebuildStatus } from '../legacyGame'
-import type { Clip } from '../types'
+import { clipsOfVodGame, type SavedClipRef } from '../vodGames'
 import { loadVolume, saveVolume } from '../volume'
 import { ClipVideo } from './ClipVideo'
 
@@ -11,16 +11,22 @@ const POLL_MS = 1500
 
 /** 이전 버전에서 분석해 풀영상이 없는 게임: 안내 + 예전 방식으로 저장된 클립 목록·재생. 원본이 남았으면 풀영상 만들기. */
 export function LegacyGamePanel({ game, onRebuilt }: { game: GameDetail; onRebuilt: () => void }) {
-  const [clips, setClips] = useState<Clip[] | null>(null)
+  const [clips, setClips] = useState<SavedClipRef[] | null>(null)
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [rebuild, setRebuild] = useState<RebuildStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
   const volume = useRef(loadVolume())
 
   useEffect(() => {
+    if (game.source === 'vod') {
+      const mine = clipsOfVodGame(game)
+      setClips(mine)
+      setPlayingId((id) => id ?? mine[0]?.id ?? null)
+      return
+    }
     listClips()
       .then((all) => {
-        const mine = clipsOfGame(all, game)
+        const mine: SavedClipRef[] = clipsOfGame(all, game).map((c) => ({ id: c.id, title: c.title, durationSec: c.durationSec }))
         setClips(mine)
         setPlayingId((id) => id ?? mine[0]?.id ?? null)
       })

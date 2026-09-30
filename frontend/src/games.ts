@@ -44,6 +44,12 @@ export interface MatchResult {
 
 export interface GameSummary {
   key: string
+  source?: 'steam' | 'vod'
+  vodId?: string | null
+  gameIndex?: number | null
+  streamer?: string | null
+  vodStartSec?: number | null
+  vodEndSec?: number | null
   matchStartUtc: string | null
   matchEndUtc: string | null
   gameMode: string | null
@@ -65,6 +71,10 @@ export interface GameSummary {
 
 export interface GameDetail {
   gameKey: string
+  source?: 'steam' | 'vod'
+  vodId?: string | null
+  vodGameIndex?: number | null
+  streamer?: string | null
   matchStartUtc: string | null
   sessionDir?: string | null
   legacy?: boolean

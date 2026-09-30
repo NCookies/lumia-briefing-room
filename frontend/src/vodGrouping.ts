@@ -35,6 +35,7 @@ export interface Vod {
   clipCount: number
   clipBytes: number
   probing: boolean
+  canBuildFullVideos?: boolean
 }
 
 export interface VodClipLike {

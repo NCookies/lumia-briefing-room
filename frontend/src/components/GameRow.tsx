@@ -1,0 +1,119 @@
+import { cleanupReasonLabel, cleanupReasonTooltip, type CleanupPreviewEntry } from '../cleanupPreview'
+import { gameHeadline, matchTypeLabel, type GameSummary } from '../games'
+import { gameAssetUrl } from '../gamesApi'
+import { formatBytes } from '../retention'
+
+export interface RowTime {
+  main: string
+  sub?: string
+}
+
+function barColor(g: GameSummary): string {
+  const p = g.matchResult?.placement
+  if (p === 1 || g.matchResult?.outcome === '승리') return 'bg-emerald-500'
+  if (p != null && p <= 3) return 'bg-sky-500'
+  return 'bg-zinc-500'
+}
+
+interface Props {
+  game: GameSummary
+  time: RowTime
+  due?: CleanupPreviewEntry
+  onOpen: () => void
+  onPin: () => void
+}
+
+/** 게임 목록의 게임 한 줄. 스팀 녹화 탭과 영상 파일 탭이 같이 쓴다(시간 칸만 다르다). */
+export function GameRow({ game: g, time, due, onOpen, onPin }: Props) {
+  return (
+    <li
+      className="flex cursor-pointer items-stretch overflow-hidden rounded border border-zinc-700 bg-zinc-800/60 hover:border-zinc-500 hover:bg-zinc-800"
+      onClick={onOpen}
+    >
+      <div className={`w-1.5 shrink-0 ${barColor(g)}`} />
+      <div className="flex flex-1 flex-wrap items-center gap-x-8 gap-y-2 px-4 py-3">
+        <div className="w-20">
+          <div
+            className={`text-xl font-bold ${g.matchResult?.placement === 1 || g.matchResult?.outcome === '승리' ? 'text-emerald-400' : 'text-zinc-200'}`}
+          >
+            {gameHeadline(g.matchResult)}
+          </div>
+          <div className="text-sm font-semibold text-zinc-300">
+            {g.gameMode === 'cobalt' ? '코발트' : matchTypeLabel(g.matchResult)}
+          </div>
+        </div>
+        <div className="w-32 text-sm">
+          <div className="text-zinc-200">{time.main}</div>
+          <div className="text-xs text-zinc-500">{time.sub ?? ''}</div>
+        </div>
+        <div className="w-28">
+          {g.matchResult?.kills != null && (
+            <>
+              <div className="text-base font-bold text-zinc-100">
+                {g.matchResult.tk ?? '-'} / {g.matchResult.kills} / {g.matchResult.assists ?? '-'}
+              </div>
+              <div className="text-xs text-zinc-500">TK / K / A</div>
+            </>
+          )}
+        </div>
+        <div className="flex min-w-[7.5rem] items-center gap-1">
+          {(['me', 'teammate1', 'teammate2'] as const).map((slot) =>
+            g.portraits[slot] ? (
+              <img
+                key={slot}
+                className="h-10 w-10 rounded-full object-cover"
+                src={gameAssetUrl(g.key, g.portraits[slot]!)}
+                alt=""
+              />
+            ) : null,
+          )}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center justify-end gap-3 py-3 pr-4">
+        {g.unsavedEditCount > 0 && (
+          <span
+            className="rounded bg-red-600 px-2 py-0.5 text-xs font-semibold text-white"
+            title="범위를 고쳤지만 아직 클립에 반영하지 않은 후보입니다. 열어서 저장하세요."
+          >
+            편집 {g.unsavedEditCount}개 저장 안 됨
+          </span>
+        )}
+        {g.pinned && <span className="rounded bg-sky-600/30 px-1.5 text-xs text-sky-200">고정</span>}
+        {due && g.hasFullVideo && (
+          <span className="rounded bg-rose-600/30 px-1.5 text-xs text-rose-200" title={cleanupReasonTooltip(due)}>
+            {cleanupReasonLabel(due)}
+          </span>
+        )}
+        {g.legacy && !g.hasFullVideo ? (
+          <span className="rounded bg-amber-500/20 px-1.5 text-xs text-amber-200" title={g.fullVideoError ?? undefined}>
+            풀영상 없음(이전 버전)
+          </span>
+        ) : (
+          g.fullVideoError && <span className="text-xs text-amber-300">{g.fullVideoError}</span>
+        )}
+        <span className="text-xs text-zinc-300">저장한 클립 {g.savedClipCount}개</span>
+        <span className="text-xs text-zinc-500">
+          {g.legacy && !g.hasFullVideo
+            ? ''
+            : g.hasFullVideo
+              ? `풀영상 ${g.fullVideoSizeBytes != null ? formatBytes(g.fullVideoSizeBytes) : ''}`
+              : g.fullVideoDeletedAt
+                ? '풀영상 삭제됨'
+                : '풀영상 없음'}
+        </span>
+        <span className="flex gap-2">
+          <button
+            type="button"
+            className="rounded border border-zinc-600 px-2 py-1 text-xs hover:bg-zinc-700"
+            onClick={(e) => {
+              e.stopPropagation()
+              onPin()
+            }}
+          >
+            {g.pinned ? '고정 해제' : '고정'}
+          </button>
+        </span>
+      </div>
+    </li>
+  )
+}

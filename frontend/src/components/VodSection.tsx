@@ -22,12 +22,15 @@ interface Props {
   onEditDate: (date: string) => void
   onDeleteClips: () => void
   onDeleteVod: () => void
+  buildableCount?: number
+  onBuildFullVideos?: () => void
   children: ReactNode
 }
 
 const PHASE_LABELS: Record<string, string> = {
   decode: '화면 판독',
   games: '게임 정리',
+  full: '풀영상 만들기',
   cut: '클립 만들기',
   done: '완료',
 }
@@ -250,9 +253,12 @@ export function VodSection({
   onEditDate,
   onDeleteClips,
   onDeleteVod,
+  buildableCount = 0,
+  onBuildFullVideos,
   children,
 }: Props) {
   const running = vod?.status === 'analyzing'
+  const buildingFullVideos = running && job?.kind === 'fullVideos'
   const percent = running ? Math.round((job?.fraction ?? 0) * 100) : vod ? analysisPercent(vod) : 0
   const resolution = vod?.width && vod.height ? `${vod.height}p` : ''
   const canStart = vod !== null && vod.exists && !analysisBusy
@@ -291,7 +297,11 @@ export function VodSection({
 
         {vod && (
           <span className={`rounded px-2 py-0.5 text-xs ${STATUS_STYLES[vod.status]}`}>
-            {vod.status === 'error' && vod.errorKind === 'disk_full' ? '저장 공간 부족으로 중단됨' : vodStatusLabel(vod.status)}
+            {vod.status === 'error' && vod.errorKind === 'disk_full'
+              ? '저장 공간 부족으로 중단됨'
+              : buildingFullVideos
+                ? '풀영상 만드는 중'
+                : vodStatusLabel(vod.status)}
             {vod.status !== 'done' && vod.status !== 'new' && percent > 0 ? ` ${percent}%` : ''}
           </span>
         )}
@@ -306,7 +316,7 @@ export function VodSection({
         <div className="flex items-center gap-3 text-xs">
           {running ? (
             <button type="button" className="text-amber-300 hover:underline" onClick={onCancel}>
-              분석 취소
+              {buildingFullVideos ? '취소' : '분석 취소'}
             </button>
           ) : vod && vod.status === 'done' ? (
             <ReanalyzeMenu disabled={!canStart} blockedReason={blockedReason} onAnalyze={onAnalyze} />
@@ -321,6 +331,21 @@ export function VodSection({
               {vod.status === 'new' ? '분석 시작' : '이어서 분석'}
             </button>
           ) : null}
+          {!running && onBuildFullVideos && buildableCount > 0 && vod?.canBuildFullVideos && (
+            <button
+              type="button"
+              className="rounded border border-sky-500/60 px-3 py-1 text-sky-300 hover:bg-sky-500/20 disabled:opacity-50"
+              disabled={analysisBusy}
+              title={
+                analysisBusy
+                  ? '다른 영상 작업이 끝나면 시작할 수 있습니다'
+                  : '이전 버전에서 분석한 게임의 풀영상을 원본에서 잘라 만듭니다. 저장된 클립은 그대로 둡니다'
+              }
+              onClick={onBuildFullVideos}
+            >
+              풀영상 만들기 ({buildableCount})
+            </button>
+          )}
           {clipCount > 0 && (
             <button type="button" className="text-zinc-400 hover:text-rose-400" onClick={onDeleteClips}>
               전체 삭제

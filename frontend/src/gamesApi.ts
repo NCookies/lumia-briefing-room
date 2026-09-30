@@ -16,8 +16,8 @@ async function jsonOrThrow<T>(res: Response, action: string): Promise<T> {
   return res.json()
 }
 
-export async function getGames(): Promise<GameSummary[]> {
-  return (await jsonOrThrow<{ games: GameSummary[] }>(await fetch(BASE), '게임 목록 불러오기')).games
+export async function getGames(source: 'steam' | 'vod' = 'steam'): Promise<GameSummary[]> {
+  return (await jsonOrThrow<{ games: GameSummary[] }>(await fetch(`${BASE}?source=${source}`), '게임 목록 불러오기')).games
 }
 
 export async function getGame(key: string): Promise<GameDetail> {

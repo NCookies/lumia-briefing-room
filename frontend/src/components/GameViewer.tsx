@@ -12,6 +12,7 @@ import {
 import { applyMark, candidateAtTime, newRangeAround, rangeModified, zoomBy, zoomView, type View } from '../playerBar'
 import { loadVolume, saveVolume, type VolumeState } from '../volume'
 import { isLegacyWithoutVideo } from '../legacyGame'
+import { vodGameHeading } from '../vodGames'
 import { LegacyGamePanel } from './LegacyGamePanel'
 import { ViewerBar, ViewerScroll } from './ViewerBar'
 import { ExitFullscreenIcon, FullscreenIcon, MuteIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon, VolumeIcon, ZoomInIcon, ZoomOutIcon } from './ViewerIcons'
@@ -24,7 +25,17 @@ type Undo = { kind: 'range'; id: string; prev: [number, number] } | { kind: 'add
 
 const BTN = 'rounded border border-zinc-600 px-2 py-1 text-sm hover:bg-zinc-700 disabled:opacity-40'
 
-export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; onBack: () => void; onChanged: () => void }) {
+export function GameViewer({
+  gameKey,
+  onBack,
+  onChanged,
+  backLabel = '← 게임 목록',
+}: {
+  gameKey: string
+  onBack: () => void
+  onChanged: () => void
+  backLabel?: string
+}) {
   const [game, setGame] = useState<GameDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -298,10 +309,10 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
     <div className="flex flex-1 flex-col gap-2 p-4">
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" className={BTN} onClick={onBack}>
-          ← 게임 목록
+          {backLabel}
         </button>
         <h2 className="text-lg font-semibold">{gameHeadline(game.matchResult)}</h2>
-        <span className="text-xs text-zinc-500">{game.gameKey}</span>
+        <span className="text-xs text-zinc-500">{game.source === 'vod' ? vodGameHeading(game) : game.gameKey}</span>
         {error && <span className="text-sm text-rose-300">{error}</span>}
         {notice && <span className="text-sm text-emerald-300">{notice}</span>}
         <label className="ml-auto flex items-center gap-1 text-sm text-zinc-300">
