@@ -145,3 +145,16 @@ def test_find_ffprobe_order_sibling_then_bundle_then_path(tmp_path, monkeypatch)
     assert find_ffprobe(other / "ffmpeg.exe") == bundled
     bundled.unlink()
     assert str(find_ffprobe(other / "ffmpeg.exe")).endswith("ffprobe.exe")
+
+
+@requires_ffmpeg
+def test_fps_option_decodes_every_frame_at_that_density_with_original_times(vod_file):
+    source = VodFileSource(
+        vod_file, ffmpeg_path=FFMPEG_PATH, ffprobe_path=FFPROBE_PATH, start_sec=2.0, end_sec=6.0, fps=2
+    )
+
+    times = [t for t, _ in source.frames()]
+
+    assert 7 <= len(times) <= 9
+    assert times[0] == pytest.approx(2.0, abs=0.6)
+    assert all(b - a == pytest.approx(0.5, abs=0.05) for a, b in zip(times, times[1:]))

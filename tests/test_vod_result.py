@@ -101,3 +101,72 @@ def test_ingame_frames_are_not_read():
     scan_game_end(factory, SPAN, None, read=counting_read, is_ingame=is_ingame)
 
     assert calls == []
+
+
+class DenseSource(FakeSource):
+    def frames(self):
+        try:
+            for t in sorted(self.frames_by_t):
+                if self.start <= t <= self.end:
+                    self.yielded += 1
+                    yield t, self.frames_by_t[t]
+        finally:
+            self.closed = True
+
+
+def make_dense(frames_by_t):
+    made = []
+
+    def factory(start, end):
+        src = DenseSource(start, end, frames_by_t)
+        made.append((start, end, src))
+        return src
+
+    return factory, made
+
+
+def test_dense_pass_rereads_around_the_keyframe_hit_and_uses_its_merged_result():
+    sparse = {100.0 + i: frame(200 if i == 0 else 0) for i in range(0, 60)}
+    sparse[108.0] = frame(100)
+    dense = {t: frame(101) for t in [107.0, 108.0, 109.0]}
+    factory, _ = make(sparse)
+    dense_factory, dense_made = make_dense(dense)
+
+    def read_by_value(f):
+        v = int(f[0, 0, 0])
+        return result(9) if v == 100 else result(3) if v == 101 else None
+
+    found = scan_game_end(factory, SPAN, None, read=read_by_value, is_ingame=is_ingame, dense_factory=dense_factory)
+
+    assert found.placement == 3
+    assert dense_made[0][:2] == (105.0, 120.0)
+
+
+def test_dense_pass_scans_the_first_seconds_after_the_game_when_keyframes_found_nothing():
+    factory, _ = make({100.0 + i: frame(0) for i in range(0, 60)})
+    dense_factory, dense_made = make_dense({102.0: frame(100), 102.5: frame(100)})
+
+    found = scan_game_end(factory, SPAN, None, read=read, is_ingame=is_ingame, dense_factory=dense_factory)
+
+    assert found is not None
+    assert dense_made[0][:2] == (100.0, 130.0)
+
+
+def test_dense_pass_never_looks_past_the_next_game_start():
+    factory, _ = make({})
+    dense_factory, dense_made = make_dense({})
+
+    scan_game_end(factory, SPAN, 110.0, read=read, is_ingame=is_ingame, dense_factory=dense_factory)
+
+    assert dense_made[0][:2] == (100.0, 110.0)
+
+
+def test_keyframe_result_is_kept_when_the_dense_pass_reads_nothing():
+    sparse = {100.0 + i: frame(0) for i in range(0, 60)}
+    sparse[108.0] = frame(100)
+    factory, _ = make(sparse)
+    dense_factory, _ = make_dense({})
+
+    found = scan_game_end(factory, SPAN, None, read=read, is_ingame=is_ingame, dense_factory=dense_factory)
+
+    assert found is not None and found.placement == 1

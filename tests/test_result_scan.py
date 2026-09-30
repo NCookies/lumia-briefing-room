@@ -32,7 +32,7 @@ def make_read(calls):
 def test_scan_walks_backwards_and_keeps_reading_result_frames_until_the_screen_ends():
     calls = []
 
-    result = scan_for_result(frames(1, 9, 9, 9, 2, 3), make_read(calls), is_ingame=lambda f: False, patience=1)
+    result = scan_for_result(frames(1, 9, 9, 9, 2, 3), make_read(calls), is_ingame=lambda f: False, patience=1, max_votes=5)
 
     assert result.result.placement == RESULT.placement
     assert calls == [3, 2, 9, 9, 9, 1]

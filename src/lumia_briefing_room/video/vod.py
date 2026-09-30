@@ -74,7 +74,7 @@ def probe_video(path: Path, *, ffprobe_path: Path) -> VideoInfo:
 
 
 class VodFileSource:
-    """영상 파일 하나(다시보기). 키프레임만 디코딩해 (원본 시각 초, 프레임) 으로 내준다.
+    """영상 파일 하나(다시보기). 기본은 키프레임만, `fps` 를 주면 그 밀도로 전부 디코딩해 (원본 시각 초, 프레임) 으로 내준다.
 
     시각은 ffmpeg showinfo 가 찍는 키프레임 pts 그대로라 `ffmpeg -ss` 로 그 자리를 다시 자를 수 있다.
     프레임은 한 장씩 읽으므로 몇 시간짜리 영상도 메모리가 한 장 분량이다.
@@ -89,6 +89,7 @@ class VodFileSource:
         start_sec: float = 0.0,
         end_sec: float | None = None,
         hwaccel: str | None = None,
+        fps: float | None = None,
     ) -> None:
         self.path = Path(path)
         self.info = probe_video(self.path, ffprobe_path=ffprobe_path)
@@ -98,6 +99,7 @@ class VodFileSource:
         self._start_sec = start_sec
         self._end_sec = end_sec
         self._hwaccel = hwaccel
+        self._fps = fps
 
     def gaps(self) -> list[tuple[float, float]]:
         return []
@@ -106,13 +108,16 @@ class VodFileSource:
         cmd = [str(self._ffmpeg_path), "-hide_banner", "-nostats", "-loglevel", "info"]
         if self._hwaccel:
             cmd += ["-hwaccel", self._hwaccel]
-        cmd += ["-skip_frame", "nokey", "-copyts"]
+        if self._fps is None:
+            cmd += ["-skip_frame", "nokey"]
+        cmd += ["-copyts"]
         if self._start_sec > 0:
             cmd += ["-ss", f"{self._start_sec:.3f}"]
         if self._end_sec is not None:
             cmd += ["-to", f"{self._end_sec:.3f}"]
         cmd += [
-            "-i", str(self.path), "-vf", "showinfo", "-fps_mode", "passthrough",
+            "-i", str(self.path), "-vf", f"fps={self._fps:g},showinfo" if self._fps else "showinfo",
+            "-fps_mode", "passthrough",
             "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1",
         ]
         return cmd
