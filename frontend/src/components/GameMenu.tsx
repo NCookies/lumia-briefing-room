@@ -8,7 +8,7 @@ export interface GameMenuItem {
   onSelect: () => void
 }
 
-const MENU_WIDTH = 208
+const MENU_WIDTH = 240
 
 /** 게임 행 오른쪽 `⋯` 메뉴. 행이 `overflow-hidden` 이라 메뉴는 화면 기준(`fixed`)으로 띄운다. */
 export function GameMenu({ items }: { items: GameMenuItem[] }) {
@@ -65,7 +65,7 @@ export function GameMenu({ items }: { items: GameMenuItem[] }) {
                   role="menuitem"
                   disabled={item.disabled}
                   title={item.title}
-                  className={`block w-full px-3 py-2 text-left text-sm hover:bg-zinc-700 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent ${
+                  className={`block w-full whitespace-nowrap px-3 py-2 text-left text-sm hover:bg-zinc-700 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent ${
                     item.danger ? 'text-rose-300' : 'text-zinc-200'
                   }`}
                   onClick={(e) => {

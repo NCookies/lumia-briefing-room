@@ -11,25 +11,24 @@ const game = (extra: Partial<DeletableGame> = {}): DeletableGame => ({
   ...extra,
 })
 
-test('메뉴 네 항목 - 풀영상·클립이 있으면 모두 켜진다', () => {
+test('메뉴 세 항목 - 풀영상만·클립만·게임 전체(풀영상과 클립 전체는 게임 전체 삭제에 포함돼 따로 없다)', () => {
   const items = deleteMenuItems(game())
   assert.deepEqual(items.map((i) => [i.target, i.label, i.disabled]), [
     ['fullVideo', '풀영상만 삭제', false],
     ['clips', '클립만 전체 삭제', false],
-    ['both', '풀영상과 클립 전체 삭제', false],
-    ['all', '게임 전체 삭제 (목록에서도 지움)', false],
+    ['all', '게임 전체 삭제', false],
   ])
 })
 
 test('풀영상이 없으면 풀영상만 삭제는 꺼지고, 클립이 없으면 클립만 삭제가 꺼진다', () => {
   const noVideo = deleteMenuItems(game({ hasFullVideo: false }))
   assert.equal(noVideo[0].disabled, true)
-  assert.equal(noVideo[2].disabled, false)
+  assert.equal(noVideo[2].disabled, false, '게임 전체 삭제는 늘 켜져 있다')
   const noClips = deleteMenuItems(game({ savedClipCount: 0 }))
   assert.equal(noClips[1].disabled, true)
   assert.equal(noClips[2].disabled, false)
   const nothing = deleteMenuItems(game({ hasFullVideo: false, savedClipCount: 0 }))
-  assert.deepEqual(nothing.map((i) => i.disabled), [true, true, true, false], '지울 게 없어도 게임 기록까지 지우는 항목은 켜져 있다')
+  assert.deepEqual(nothing.map((i) => i.disabled), [true, true, false], '지울 게 없어도 게임 기록까지 지우는 항목은 켜져 있다')
 })
 
 test('게임 전체 삭제 경고는 기록까지 지워진다고 알리고 고정한 게임은 한 줄 더', () => {

@@ -246,12 +246,12 @@ export function GameViewer({
     const cand = cands.find((c) => c.id === id)
     const result = await ask({
       message: `"${cand ? candidateTitle(cand) : '이'}" 클립을 삭제합니다.
-클립 영상 파일이 지워지고 이 후보는 목록에 그대로 남습니다.`,
+클립 영상 파일과 이 구간(후보)이 목록에서 모두 사라지며 되돌릴 수 없습니다.`,
       confirmLabel: '삭제',
       danger: true,
     })
     if (!result.ok) return
-    void run(() => unsaveCandidate(gameKey, id), '클립을 삭제했습니다 — 후보는 목록에 남아 있습니다')
+    void run(() => unsaveCandidate(gameKey, id), '클립과 그 구간을 삭제했습니다')
   }
 
   const zoomStep = (factor: number) => {

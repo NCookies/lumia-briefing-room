@@ -60,6 +60,7 @@ export function ClipArchive({ active, refreshTick, confirmDelete, onConfirmDelet
         .then((list) => {
           setEnabled(list.enabled)
           setCategories(list.categories)
+          setError(null)
           setCurrent((now) => (now && list.categories.some((c) => c.name === now) ? now : (list.categories[0]?.name ?? null)))
         })
         .catch((e: Error) => setError(e.message)),
@@ -71,6 +72,7 @@ export function ClipArchive({ active, refreshTick, confirmDelete, onConfirmDelet
     getLibrary(current)
       .then((listing) => {
         setClips(listing.clips)
+        setError(null)
         setSelected((prev) => new Set([...prev].filter((k) => listing.clips.some((c) => c.relPath === k))))
       })
       .catch((e: Error) => setError(e.message))

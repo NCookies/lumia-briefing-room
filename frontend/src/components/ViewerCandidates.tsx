@@ -187,7 +187,7 @@ export function ViewerCandidates(p: Props) {
                       type="button"
                       disabled={p.busy}
                       className="rounded border border-rose-500/50 px-2 py-0.5 text-rose-300 hover:bg-rose-500/20 disabled:opacity-40"
-                      title="이 후보로 만든 클립 영상을 삭제합니다(후보는 목록에 남습니다)"
+                      title="이 후보로 만든 클립 영상과 이 구간을 삭제합니다(되돌릴 수 없습니다)"
                       onClick={() => p.onDeleteClip(c.id)}
                     >
                       클립 삭제

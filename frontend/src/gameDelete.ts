@@ -20,8 +20,7 @@ export function deleteMenuItems(game: DeletableGame): DeleteMenuItem[] {
   return [
     { target: 'fullVideo', label: '풀영상만 삭제', disabled: !game.hasFullVideo },
     { target: 'clips', label: '클립만 전체 삭제', disabled: !hasClips },
-    { target: 'both', label: '풀영상과 클립 전체 삭제', disabled: !game.hasFullVideo && !hasClips },
-    { target: 'all', label: '게임 전체 삭제 (목록에서도 지움)', disabled: false },
+    { target: 'all', label: '게임 전체 삭제', disabled: false },
   ]
 }
 
