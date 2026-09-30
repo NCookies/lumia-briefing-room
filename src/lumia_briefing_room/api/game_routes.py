@@ -18,12 +18,19 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from lumia_briefing_room import activity
+from lumia_briefing_room.api.clips import find_clip
 from lumia_briefing_room.config import Config, discover_ffmpeg, resolve_paths
 from lumia_briefing_room.pipeline import game_candidates as gcand
 from lumia_briefing_room.pipeline.clip_from_full import FullVideoMissing
 from lumia_briefing_room.pipeline.game_clip_save import save_and_mark
 from lumia_briefing_room.pipeline.cleanup_registry import registry as cleanup_preview_registry
+from lumia_briefing_room.pipeline.cleanup import remove_orphan_result_images
+from lumia_briefing_room.pipeline.delete_helper import delete_clip
 from lumia_briefing_room.pipeline.ffmpeg_errors import describe_clip_error
+from lumia_briefing_room.pipeline.game_cleanup import delete_full_video
+from lumia_briefing_room.pipeline.game_records import records_dir_for
+from lumia_briefing_room.pipeline.label_archive import archive_dir_for
+from lumia_briefing_room.pipeline.proxy import proxy_file
 from lumia_briefing_room.pipeline.game_files import GameNotFound, game_dir, has_full_video, list_games, load_game, update_game
 from lumia_briefing_room.pipeline.game_store import FULL_VIDEO
 from lumia_briefing_room.pipeline.legacy_games import migrate_legacy_games
@@ -44,6 +51,10 @@ class CandidateCreate(BaseModel):
     start: float
     end: float
     title: str | None = None
+
+
+class GameDelete(BaseModel):
+    target: str  # fullVideo | clips | both
 
 
 class BatchSave(BaseModel):
@@ -380,3 +391,78 @@ def register_game_routes(
                 except HTTPException as exc:
                     failed.append({"candidateId": cand["id"], "error": exc.detail})
         return {"saved": saved, "failed": failed}
+
+    def _remove_saved_clip(game: dict, clip_id: str) -> bool:
+        """클립 탭 삭제와 같은 처리(라벨 보관·게임 기록 유지). 영상을 못 찾으면(이미 다른 데서 지움) 지운 것으로 세지 않는다."""
+        cfg = current_config()
+        resolved = resolve_paths(cfg.paths)
+        library = clips_dir_for(game)
+        clip = find_clip(library, clip_id, resolved.clip_roots)
+        if clip is None:
+            return False
+        proxy = proxy_file(resolved.proxy_cache, clip_id)
+        keep_records = cfg.retention.keep_game_records and library == resolved.library_steam
+        found_video = clip.video.exists()
+        delete_clip(
+            clip.meta_path, mode=cfg.ui.delete_mode, archive_dir=archive_dir_for(library),
+            records_dir=records_dir_for(library) if keep_records else None,
+            proxy=proxy if proxy.exists() else None, video=clip.video,
+        )
+        remove_orphan_result_images(library)
+        return found_video
+
+    def _clear_saved_marks(key: str, *, only: str | None = None, dismiss: bool = False) -> None:
+        def change(data: dict) -> None:
+            for cand in gcand.all_candidates(data):
+                user = cand.get("user") or {}
+                if only is not None and cand.get("id") != only or not user.get("savedClipId"):
+                    continue
+                for field in ("savedClipId", "savedStart", "savedEnd"):
+                    user.pop(field, None)
+                if dismiss:
+                    user["dismissed"] = True
+                cand["user"] = user
+
+        update_game(games_dir(key), key, change)
+
+    @app.post("/api/games/{key}/delete")
+    def delete_game_files(key: str, body: GameDelete):
+        """풀영상·저장한 클립을 지운다. 게임 기록(결과·후보)은 남는다. 휴지통/영구는 `ui.deleteMode`."""
+        if body.target not in ("fullVideo", "clips", "both"):
+            raise HTTPException(400, "target 은 fullVideo, clips, both 중 하나여야 합니다")
+        game = load_or_404(key)
+        folder = game_dir(games_dir(key), key)
+        video = folder / FULL_VIDEO
+        with lock:
+            freed = video.stat().st_size if video.is_file() else 0
+            if body.target == "fullVideo" and not video.is_file():
+                raise HTTPException(409, "지울 풀영상이 없습니다")
+            deleted_clips = 0
+            if body.target in ("clips", "both"):
+                for cand in gcand.all_candidates(game):
+                    clip_id = (cand.get("user") or {}).get("savedClipId")
+                    if clip_id and _remove_saved_clip(game, clip_id):
+                        deleted_clips += 1
+                _clear_saved_marks(key)
+            deleted_full = False
+            if body.target in ("fullVideo", "both") and video.is_file():
+                delete_full_video(folder, mode=current_config().ui.delete_mode)
+                deleted_full = True
+        cleanup_preview_registry.notify_clips_changed()
+        return {"deletedFullVideo": deleted_full, "deletedClips": deleted_clips, "freedBytes": freed if deleted_full else 0}
+
+    @app.post("/api/games/{key}/candidates/{candidate_id}/unsave")
+    def unsave_candidate(key: str, candidate_id: str):
+        """보관 해제: 클립 영상을 지우고 그 후보는 무시 처리한다(무시한 후보 보기에서 되살려 다시 보관할 수 있다)."""
+        game = load_or_404(key)
+        cand = gcand.find_candidate(game, candidate_id)
+        if cand is None:
+            raise HTTPException(404, "후보를 찾을 수 없습니다")
+        clip_id = (cand.get("user") or {}).get("savedClipId")
+        if not clip_id:
+            raise HTTPException(409, "보관한 클립이 아닙니다")
+        with lock:
+            _remove_saved_clip(game, clip_id)
+            _clear_saved_marks(key, only=candidate_id, dismiss=True)
+        cleanup_preview_registry.notify_clips_changed()
+        return gcand.find_candidate(load_or_404(key), candidate_id)

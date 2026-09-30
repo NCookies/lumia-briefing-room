@@ -185,6 +185,8 @@ result.jpg / portrait_{me,teammate1,teammate2}.jpg   클립 쪽 썸네일 폴더
 | `DELETE /api/games/{key}/candidates/{id}` | 직접 추가한 구간만 삭제(자동 후보는 "무시") |
 | `POST /api/games/{key}/candidates/{id}/save` | 후보(조정한 범위)를 풀영상에서 `-c copy` 로 잘라 클립 저장 → `{clipId}`. 이미 저장했고 범위가 저장 당시와 같으면 다시 자르지 않고 기존 ID, **범위를 고쳤으면 같은 클립(파일·ID·제목·라벨·고정·`clipUid` 유지)을 새 범위로 다시 잘라 교체**. 풀영상이 없으면 409 |
 | `POST /api/games/{key}/save` | 일괄 저장 `{mode: all\|certain\|ids, ids}` → `{saved[], failed[]}` (무시·저장된 후보 제외) |
+| `POST /api/games/{key}/candidates/{id}/unsave` | 보관 해제: 클립 영상을 `clipUid`/`savedClipId` 로 찾아 지우고(클립 탭 삭제와 같은 처리 - 라벨 보관·게임 기록 유지, 휴지통/영구는 `ui.deleteMode`) `savedClipId`·`savedStart`·`savedEnd` 를 지우며 그 후보를 **무시(`dismissed`) 처리**한다. 보관한 후보가 아니면 409 |
+| `POST /api/games/{key}/delete` | `{target: fullVideo\|clips\|both}` → `{deletedFullVideo, deletedClips, freedBytes}`. `fullVideo` 는 풀영상만(`delete_full_video` - 행은 "풀영상 삭제됨", 없으면 409), `clips` 는 저장한 클립 전부(영상이 이미 없으면 지운 것으로 세지 않고 표시만 지운다), `both` 는 둘 다. 게임 기록(결과·후보)은 항상 남는다. 고정한 게임이어도 서버는 막지 않는다(경고는 화면이 한다) |
 
 - 클립 저장(`pipeline/clip_from_full.py`): 시작은 키프레임 격자 때문에 앞으로 최대 3초 당겨진다. 클립 메타데이터는 기존 클립과 같은 형식이라(세션 기준 오프셋 포함) 기존 화면·API 가 그대로 읽는다. 결과·초상화는 클립이 읽는 `.thumbs` 로 복사. 저장 후 `user.savedClipId` 와 저장에 쓴 범위 `user.savedStart/savedEnd` 를 남긴다(기록이 없는 옛 클립은 검출 범위로 만든 것으로 본다). 교체는 임시 파일에 잘라 `os.replace` 로 바꾼다.
 - 실측(스팀 녹화 63초 풀영상 → 21초 구간 `-c copy`): HEVC + AAC 가 그대로 나오고 길이 21.02초.
