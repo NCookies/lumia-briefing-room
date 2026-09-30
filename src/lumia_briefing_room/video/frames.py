@@ -188,3 +188,44 @@ def extract_keyframe_frames(
             ffmpeg_path=ffmpeg_path,
             hwaccel=hwaccel,
         )
+
+
+def extract_tail_frames(
+    path: Path,
+    *,
+    tail_sec: float | None,
+    fps: float,
+    ffmpeg_path: Path,
+    ffprobe_path: Path,
+    hwaccel: str | None = None,
+) -> Iterator[tuple[int, np.ndarray]]:
+    """영상 파일의 마지막 `tail_sec` 초를 초당 `fps` 장으로 디코딩해 (순번, 프레임) 으로 한 장씩 내준다.
+
+    결과 화면은 2~3초만 떠 있을 수 있어 키프레임(3초 격자)으로는 놓친다. 풀영상은 게임마다 있으므로 끝부분을 촘촘히 읽는다.
+    영상이 tail_sec 보다 짧으면 처음부터 읽는다. `tail_sec=None` 이면 끝을 찾지 않고 전부 읽는다(세그먼트를 이어 붙인 조각 파일은
+    시각이 세션 기준 절대값이라 끝에서 거꾸로 찾는 `-sseof` 가 빗나간다 - 실측). 소비자가 중간에 닫으면 ffmpeg 도 바로 끝낸다.
+    """
+    from lumia_briefing_room.video.vod import probe_video
+
+    info = probe_video(path, ffprobe_path=ffprobe_path)
+    cmd = [str(ffmpeg_path), "-hide_banner", "-v", "error"]
+    if hwaccel:
+        cmd += ["-hwaccel", hwaccel]
+    if tail_sec is not None:
+        cmd += ["-sseof", f"-{tail_sec:g}"]
+    cmd += ["-i", str(path), "-vf", f"fps={fps:g}", "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"]
+    proc = popen_hidden(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    frame_bytes = info.width * info.height * 3
+    try:
+        n = 0
+        while True:
+            data = proc.stdout.read(frame_bytes)
+            if len(data) < frame_bytes:
+                break
+            yield n, np.frombuffer(data, dtype=np.uint8).reshape(info.height, info.width, 3)
+            n += 1
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+        proc.stdout.close()
+        proc.wait()

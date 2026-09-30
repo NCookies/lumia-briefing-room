@@ -36,11 +36,13 @@ from lumia_briefing_room.pipeline.portrait_scan import (
     save_portrait_image,
 )
 from lumia_briefing_room.pipeline.result_scan import (
+    RESULT_TAIL_SEGMENTS,
     find_result_after,
     find_result_screen,
     result_image_name,
     save_result_image,
 )
+from lumia_briefing_room.pipeline.result_tail import find_result_in_segments, find_result_in_video
 from lumia_briefing_room.video.segments import segment_number_at, segment_time_range
 from lumia_briefing_room.video.session import RecordingSession
 
@@ -184,14 +186,37 @@ def _resolve_clip_paths(cfg: Config, clips_dir: Path | None) -> tuple[Path, Path
     return clips_root, thumbnails_root
 
 
+def _read_result_tail(
+    session, seg_range, ffmpeg_path: Path, hwaccel: str | None, *,
+    search_from: datetime | None, full_video: Path | None, tmp_dir: Path | None,
+) -> ResultScreen | None:
+    """게임 끝부분을 2fps 로 읽는다(풀영상이 있으면 그 끝, 없으면 끝 세그먼트). 실패해도 키프레임 훑기로 넘어간다."""
+    try:
+        if full_video is not None:
+            return find_result_in_video(full_video, ffmpeg_path=ffmpeg_path, hwaccel=hwaccel)
+        if tmp_dir is not None:
+            last = seg_range.last if search_from is not None else seg_range.last + RESULT_TAIL_SEGMENTS
+            return find_result_in_segments(session, last, ffmpeg_path=ffmpeg_path, tmp_dir=tmp_dir, hwaccel=hwaccel)
+    except Exception:
+        log.exception("게임 끝부분 2fps 판독 실패 - 키프레임 훑기로 넘어간다")
+    return None
+
+
 def _read_result(
-    session, seg_range, ffmpeg_path: Path, hwaccel: str | None, *, search_from: datetime | None = None
+    session, seg_range, ffmpeg_path: Path, hwaccel: str | None, *, search_from: datetime | None = None,
+    full_video: Path | None = None, tmp_dir: Path | None = None,
 ) -> ResultScreen | None:
     """결과 화면 판독은 부가 정보라 실패해도 클립 생성을 막지 않는다.
 
+    먼저 게임 끝부분을 초당 2장으로 읽는다(결과 화면이 2~3초만 떠도 잡힌다). 못 찾으면 키프레임(3초 격자) 훑기로 넘어간다.
     로그 기반 경기는 끝이 로비 복귀 시각이라 구간 끝에서 거슬러 오른다. 화면으로 찾은 경기(과거 녹화 복구)는 끝을 '마지막 인게임
     프레임'으로 알 뿐이라 `search_from`(그 시각) 뒤에서 앞으로 훑는다 — 구간 끝(다음 경기 시작 전)까지만 본다.
     """
+    tail = _read_result_tail(
+        session, seg_range, ffmpeg_path, hwaccel, search_from=search_from, full_video=full_video, tmp_dir=tmp_dir
+    )
+    if tail is not None:
+        return tail
     try:
         if search_from is not None:
             return find_result_after(
@@ -427,7 +452,10 @@ def process_match(
         on_progress(DETECTION_PROGRESS_FRACTION)
 
     plans = _plan_clips(filtered, cfg.clip, game_mode=game_mode)
-    result = _read_result(session, seg_range, ffmpeg_path, hwaccel, search_from=result_search_from)
+    result = _read_result(
+        session, seg_range, ffmpeg_path, hwaccel, search_from=result_search_from,
+        full_video=full.video.path if full.video is not None else None, tmp_dir=resolved.temp,
+    )
     if result is not None and on_result is not None:
         on_result(result)
     result_image_path = _save_result_image(result, thumbnails_root / result_image_name(match_start), clips_root)

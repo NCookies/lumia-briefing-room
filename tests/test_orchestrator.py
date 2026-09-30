@@ -351,6 +351,51 @@ def test_read_result_scans_forward_from_the_game_end_for_screen_based_windows(mo
     assert calls == [("after", 101, 131)]
 
 
+def test_read_result_reads_the_full_video_tail_first_and_skips_the_keyframe_scan(monkeypatch):
+    from lumia_briefing_room.pipeline import orchestrator as orch
+    from lumia_briefing_room.video.segments import SegmentRange
+
+    calls = []
+    monkeypatch.setattr(orch, "find_result_in_video", lambda path, **kw: calls.append(("video", path)) or "T")
+    monkeypatch.setattr(orch, "find_result_screen", lambda *a, **kw: calls.append("keyframes") or "R")
+
+    got = orch._read_result("session", SegmentRange(10, 50), Path("ffmpeg"), None, full_video=Path("full.mp4"))
+
+    assert got == "T"
+    assert calls == [("video", Path("full.mp4"))]
+
+
+def test_read_result_falls_back_to_keyframes_when_the_tail_finds_nothing_or_fails(monkeypatch):
+    from lumia_briefing_room.pipeline import orchestrator as orch
+    from lumia_briefing_room.video.segments import SegmentRange
+
+    monkeypatch.setattr(orch, "find_result_screen", lambda *a, **kw: "R")
+    monkeypatch.setattr(orch, "find_result_in_video", lambda *a, **kw: None)
+    assert orch._read_result("s", SegmentRange(10, 50), Path("ffmpeg"), None, full_video=Path("f.mp4")) == "R"
+
+    def boom(*a, **kw):
+        raise RuntimeError("ffmpeg 실패")
+
+    monkeypatch.setattr(orch, "find_result_in_video", boom)
+    assert orch._read_result("s", SegmentRange(10, 50), Path("ffmpeg"), None, full_video=Path("f.mp4")) == "R"
+
+
+def test_read_result_without_full_video_reads_the_last_segments_past_the_logged_end(monkeypatch):
+    from lumia_briefing_room.pipeline import orchestrator as orch
+    from lumia_briefing_room.pipeline.result_scan import RESULT_TAIL_SEGMENTS
+    from lumia_briefing_room.video.segments import SegmentRange
+
+    calls = []
+    monkeypatch.setattr(
+        orch, "find_result_in_segments", lambda session, last, **kw: calls.append(last) or "T"
+    )
+
+    got = orch._read_result("s", SegmentRange(10, 50), Path("ffmpeg"), None, tmp_dir=Path("tmp"))
+
+    assert got == "T"
+    assert calls == [50 + RESULT_TAIL_SEGMENTS]
+
+
 def test_read_result_failure_is_swallowed_in_both_modes(monkeypatch):
     from datetime import datetime, timezone
 
