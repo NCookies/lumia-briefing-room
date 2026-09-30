@@ -3,6 +3,7 @@ import { showTuningUi, useAppInfo, versionLabel } from './appInfo'
 import { AdminPanel } from './components/AdminPanel'
 import { BackfillDialog } from './components/BackfillDialog'
 import type { ClipSource } from './components/ClipBrowser'
+import { ClipLibrary } from './components/ClipLibrary'
 import { FirstRunScreen } from './components/FirstRunScreen'
 import { GameList } from './components/GameList'
 import { SettingsModal } from './components/SettingsModal'
@@ -24,18 +25,19 @@ import { getLegacyTrashCount } from './legacyTrashApi'
 import { browserCanPlayHevc } from './playback'
 import { reportClientCapabilities } from './telemetryApi'
 
-const TABS: { id: ClipSource; label: string }[] = [
+const ADMIN_TAB = { id: 'admin', label: '관리자' } as const
+type Tab = ClipSource | 'library' | typeof ADMIN_TAB.id
+const TABS: { id: Tab; label: string }[] = [
   { id: 'steam', label: '스팀 녹화' },
   { id: 'vod', label: '영상 파일' },
+  { id: 'library', label: '클립' },
 ]
-const ADMIN_TAB = { id: 'admin', label: '관리자' } as const
-type Tab = ClipSource | typeof ADMIN_TAB.id
 const TAB_KEY = 'lumia.tab'
 
 function loadTab(): Tab {
   try {
     const saved = localStorage.getItem(TAB_KEY)
-    return saved === 'vod' || saved === 'admin' ? saved : 'steam'
+    return saved === 'vod' || saved === 'library' || saved === 'admin' ? saved : 'steam'
   } catch {
     return 'steam'
   }
@@ -213,6 +215,18 @@ export default function App() {
             setSettingsTab('vod')
             setShowSettings(true)
           }}
+        />
+      </div>
+
+      <div className={tab === 'library' ? 'flex flex-1 flex-col' : 'hidden'}>
+        <ClipLibrary
+          key={`library-${browserKey}`}
+          active={tab === 'library'}
+          refreshTick={refreshTick}
+          confirmDelete={confirmDelete}
+          onConfirmDeleteChange={changeConfirmDelete}
+          deleteMode={deleteMode}
+          onDeleteModeChange={changeDeleteMode}
         />
       </div>
 
