@@ -1,0 +1,412 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useConfirm } from '../confirmContext'
+import type { DeleteMode } from '../deleteConfirm'
+import { dayAnchorId, dayId, shortcutDays } from '../dayFold'
+import type { GameSummary } from '../games'
+import { getGames, setGamePinned } from '../gamesApi'
+import { formatBytes } from '../retention'
+import { useCleanupPreview } from '../useCleanupPreview'
+import { useDayFold } from '../useDayFold'
+import {
+  cancelAnalysis,
+  deleteVod,
+  deleteVodClips,
+  getAnalysis,
+  getDeleteSourceAfter,
+  listVods,
+  setDeleteSourceAfter,
+  setStreamer,
+  setVideoDate,
+  startAnalysis,
+  startFullVideos,
+  type AnalysisJob,
+} from '../vodApi'
+import { groupVodsByDate } from '../vodDates'
+import { resolvedDeleteSource } from '../vodDeleteSource'
+import { buildableGameCount, groupGamesByVod, vodGameTime, vodTotals } from '../vodGames'
+import { probeProgress, type Vod } from '../vodGrouping'
+import { DayShortcutBar } from './DayShortcutBar'
+import { DeleteConfirmDialog } from './DeleteConfirmDialog'
+import { GameDayHeader } from './GameDayHeader'
+import { GameRow } from './GameRow'
+import { GameViewer } from './GameViewer'
+import { LoadingBar } from './LoadingBar'
+import { VideoFormatHelp } from './VideoFormatHelp'
+import { VodSection } from './VodSection'
+
+interface DeleteRequest {
+  label: string
+  run: (mode: DeleteMode) => Promise<unknown>
+}
+
+interface Props {
+  active: boolean
+  refreshTick: number
+  confirmDelete: boolean
+  onConfirmDeleteChange: (value: boolean) => void
+  deleteMode: DeleteMode
+  onDeleteModeChange: (value: DeleteMode) => void
+  onAddVodSources: () => void
+}
+
+/** 영상 파일 탭: 날짜 머리줄 > 영상 묶음(분석·이름·날짜 조작 그대로) > 게임 행(스팀 녹화 탭과 같은 모양) → 게임을 누르면 풀영상 화면. */
+export function VodGameList({
+  active,
+  refreshTick,
+  confirmDelete,
+  onConfirmDeleteChange,
+  deleteMode,
+  onDeleteModeChange,
+  onAddVodSources,
+}: Props) {
+  const [vods, setVods] = useState<Vod[]>([])
+  const [vodsLoaded, setVodsLoaded] = useState(false)
+  const [games, setGames] = useState<GameSummary[] | null>(null)
+  const [job, setJob] = useState<AnalysisJob | null>(null)
+  const [open, setOpen] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [collapsedVods, setCollapsedVods] = useState<Set<string>>(new Set())
+  const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null)
+  const ask = useConfirm()
+  const cleanup = useCleanupPreview(active)
+
+  const groups = useMemo(() => groupGamesByVod(vods, games ?? []), [vods, games])
+  const dateGroups = useMemo(() => groupVodsByDate(groups, 'desc'), [groups])
+  const days = useMemo(() => dateGroups.map((d) => d.day), [dateGroups])
+  const fold = useDayFold('vod', days)
+
+  const reloadGames = useCallback(() => {
+    getGames('vod')
+      .then(setGames)
+      .catch((e: Error) => setError(e.message))
+  }, [])
+
+  const reloadVods = useCallback(() => {
+    listVods()
+      .then(setVods)
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setVodsLoaded(true))
+  }, [])
+
+  const reload = useCallback(() => {
+    setError(null)
+    reloadVods()
+    reloadGames()
+  }, [reloadVods, reloadGames])
+
+  useEffect(() => {
+    if (active) reload()
+  }, [active, reload])
+
+  const handledTick = useRef(refreshTick)
+  useEffect(() => {
+    if (handledTick.current === refreshTick) return
+    handledTick.current = refreshTick
+    if (active) reload()
+  }, [refreshTick, active, reload])
+
+  const runningVodId = vods.find((v) => v.status === 'analyzing')?.id ?? null
+  const probe = probeProgress(vods)
+
+  useEffect(() => {
+    if (!active || !probe.active) return
+    const timer = setInterval(() => {
+      listVods()
+        .then(setVods)
+        .catch(() => {})
+    }, 2000)
+    return () => clearInterval(timer)
+  }, [active, probe.active])
+
+  useEffect(() => {
+    if (!active || runningVodId === null) return
+    const timer = setInterval(async () => {
+      try {
+        const status = await getAnalysis(runningVodId)
+        setJob(status)
+        setVods(await listVods())
+        if (status.state === 'running') return
+        if (status.state === 'error') setActionError(status.message ?? '작업에 실패했습니다')
+        if (status.state === 'done') setNotice(status.kind === 'fullVideos' ? '풀영상을 만들었습니다.' : '분석을 마쳤습니다.')
+        reloadGames()
+      } catch (e) {
+        setActionError((e as Error).message)
+      }
+    }, 2000)
+    return () => clearInterval(timer)
+  }, [active, runningVodId, reloadGames])
+
+  const runAndReload = async (action: () => Promise<unknown>) => {
+    setActionError(null)
+    try {
+      await action()
+    } catch (e) {
+      setActionError((e as Error).message)
+    } finally {
+      reload()
+    }
+  }
+
+  const requestDelete = (label: string, run: (mode: DeleteMode) => Promise<unknown>) => {
+    if (!confirmDelete) {
+      void runAndReload(() => run(deleteMode))
+      return
+    }
+    setDeleteRequest({ label, run })
+  }
+
+  const handleDeleteConfirm = async ({ mode, skipNext }: { mode: DeleteMode; skipNext: boolean }) => {
+    const request = deleteRequest
+    setDeleteRequest(null)
+    if (skipNext) onConfirmDeleteChange(false)
+    if (mode !== deleteMode) onDeleteModeChange(mode)
+    if (request) await runAndReload(() => request.run(mode))
+  }
+
+  const handleAnalyze = async (vod: Vod, options: { force?: boolean; rebuild?: boolean }) => {
+    const message = options.force
+      ? `"${vod.name}" 영상을 처음부터 다시 분석합니다.\n게임마다 풀영상을 새로 만들고, 클립 자동 저장 설정이면 기존 클립도 새로 만듭니다(라벨은 그대로 옮겨집니다). 실패하면 기존 결과는 그대로 남습니다.\n영상 길이에 따라 수십 분이 걸릴 수 있습니다. 계속하시겠습니까?`
+      : options.rebuild
+        ? `"${vod.name}" 영상의 게임 풀영상과 클립을 저장된 분석 결과로 다시 만듭니다.\n성공하면 기존 풀영상을 새로 바꾸고, 클립 자동 저장 설정이면 기존 클립도 새로 만듭니다. 계속하시겠습니까?`
+        : `"${vod.name}" 영상을 분석합니다.\n게임마다 풀영상(캐릭터 선택 ~ 결과 화면)이 저장되어 디스크를 게임 구간만큼 씁니다. 영상 길이에 따라 수십 분이 걸릴 수 있으며, 도중에 취소해도 다음에 이어서 할 수 있습니다. 계속하시겠습니까?`
+    const result = await ask({
+      message,
+      confirmLabel: options.force ? '다시 분석' : options.rebuild ? '다시 만들기' : '분석 시작',
+    })
+    if (!result.ok) return
+
+    let deleteSource = resolvedDeleteSource(await getDeleteSourceAfter())
+    if (deleteSource === null) {
+      const choice = await ask({
+        message: '게임 풀영상 저장이 끝나면 원본 영상 파일을 삭제할까요?',
+        confirmLabel: '삭제',
+        cancelLabel: '삭제 안 함',
+        allowSkip: true,
+        danger: true,
+      })
+      deleteSource = choice.ok
+      if (choice.skipNext) await setDeleteSourceAfter(choice.ok ? 'always' : 'never')
+    }
+
+    setActionError(null)
+    setNotice(null)
+    try {
+      await startAnalysis(vod.id, { ...options, deleteSource })
+      reloadVods()
+    } catch (e) {
+      setActionError((e as Error).message)
+    }
+  }
+
+  const handleBuildFullVideos = async (vod: Vod, count: number) => {
+    const size = vod.sizeBytes ? `디스크를 최대 ${formatBytes(vod.sizeBytes)}(원본 크기) 안에서 새로 씁니다.` : ''
+    const result = await ask({
+      message: `"${vod.name}" 에서 이전 버전에 분석한 게임 ${count}개의 풀영상을 원본에서 잘라 만듭니다.\n원본 영상은 그대로 두고, 저장해 둔 클립은 다시 만들지 않습니다. ${size}\n게임마다 결과 화면·초상화를 다시 찾아 몇 분 걸립니다(게임 하나에 30초~1분). 계속하시겠습니까?`,
+      confirmLabel: '풀영상 만들기',
+    })
+    if (!result.ok) return
+    setActionError(null)
+    setNotice(null)
+    try {
+      await startFullVideos(vod.id)
+      reloadVods()
+    } catch (e) {
+      setActionError((e as Error).message)
+    }
+  }
+
+  const handleCancel = (vod: Vod) =>
+    cancelAnalysis(vod.id)
+      .then(reloadVods)
+      .catch((e: Error) => setActionError(e.message))
+
+  const handleRenameStreamer = (vod: Vod, name: string) =>
+    setStreamer(vod.id, name)
+      .then(reloadVods)
+      .catch((e: Error) => setActionError(e.message))
+
+  const handleEditVideoDate = (vod: Vod, date: string) =>
+    setVideoDate(vod.id, date)
+      .then(reloadVods)
+      .catch((e: Error) => setActionError(e.message))
+
+  const handleDeleteAll = (vod: Vod, name: string, gameCount: number, clipCount: number) =>
+    requestDelete(
+      `"${name}" 영상의 게임 ${gameCount}개(풀영상)와 클립 ${clipCount}개를 모두 삭제합니다. 영상 파일은 지우지 않습니다.`,
+      () => deleteVodClips(vod.id),
+    )
+
+  const handleRemoveVod = async (id: string, name: string) => {
+    const result = await ask({
+      message: `"${name}" 을(를) 영상 목록에서 삭제합니다. 남은 게임 풀영상·클립과 판독 기록도 함께 지워집니다(원본 영상은 지우지 않으며, 아직 있으면 다음에 새 영상으로 다시 나타납니다). 되돌릴 수 없습니다. 계속하시겠습니까?`,
+      confirmLabel: '목록에서 삭제',
+      danger: true,
+    })
+    if (result.ok) await runAndReload(() => deleteVod(id))
+  }
+
+  if (open) {
+    return <GameViewer gameKey={open} backLabel="← 영상 목록" onBack={() => setOpen(null)} onChanged={reloadGames} />
+  }
+
+  const allGames = games ?? []
+  const total = vodTotals(allGames)
+  const empty = vodsLoaded && games !== null && groups.length === 0
+
+  return (
+    <div className="flex flex-1 flex-col gap-2 p-4">
+      <div className="flex flex-wrap items-baseline gap-3 text-sm text-zinc-300">
+        <span>게임 {total.games}개</span>
+        <span className="text-xs text-zinc-500">풀영상 {formatBytes(total.bytes)}</span>
+        {days.length > 0 && (
+          <>
+            <button
+              type="button"
+              className="rounded border border-zinc-600 px-2 py-0.5 text-xs hover:bg-zinc-700 disabled:opacity-40"
+              disabled={fold.collapsed.size === 0}
+              onClick={fold.expandAll}
+            >
+              날짜 모두 펼치기
+            </button>
+            <button
+              type="button"
+              className="rounded border border-zinc-600 px-2 py-0.5 text-xs hover:bg-zinc-700 disabled:opacity-40"
+              disabled={fold.allCollapsed}
+              onClick={fold.collapseAll}
+            >
+              날짜 모두 접기
+            </button>
+          </>
+        )}
+        <VideoFormatHelp />
+        <button
+          type="button"
+          className="ml-auto rounded border border-zinc-600 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
+          title="영상 파일 목록과 분석 결과를 다시 읽습니다"
+          onClick={reload}
+        >
+          새로고침
+        </button>
+      </div>
+
+      {(!vodsLoaded || games === null) && !error && <LoadingBar label="영상 파일 목록을 불러오는 중입니다…" />}
+      {vodsLoaded && probe.active && (
+        <div className="rounded border border-zinc-700 bg-zinc-800/60 p-3">
+          <LoadingBar
+            label={`영상 정보를 읽는 중입니다 (${probe.done}/${probe.total})`}
+            detail="용량이 큰 영상은 길이를 읽는 데 1분 넘게 걸릴 수 있습니다. 그동안에도 다른 화면은 쓸 수 있고, 끝나면 목록이 자동으로 채워집니다."
+            percent={probe.percent}
+          />
+        </div>
+      )}
+      {error && <p className="text-sm text-rose-400">오류가 발생했습니다: {error}</p>}
+      {actionError && <p className="text-sm text-rose-400">{actionError}</p>}
+      {notice && <p className="text-sm text-emerald-400">{notice}</p>}
+
+      {empty && (
+        <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-center text-zinc-400">
+          <p className="text-base text-zinc-300">분석할 영상 파일이 없습니다. 영상 파일이나 폴더를 추가해 주세요</p>
+          <button
+            type="button"
+            className="rounded border border-sky-500/60 px-4 py-1.5 text-sm text-sky-300 hover:bg-sky-500/20"
+            onClick={onAddVodSources}
+          >
+            영상 경로 추가
+          </button>
+          <span className="flex items-center gap-1.5 text-xs text-zinc-500">
+            어떤 영상을 넣을 수 있나요?
+            <VideoFormatHelp centered />
+          </span>
+        </div>
+      )}
+
+      <DayShortcutBar shortcuts={shortcutDays(days, 'vod')} onGo={fold.go} />
+      <div className="flex flex-col gap-3">
+        {dateGroups.map((dateGroup) => (
+          <section key={dateGroup.day ?? 'unknown'} id={dayAnchorId('vod', dateGroup.day)} className="flex flex-col gap-3 [&+&]:mt-5">
+            <GameDayHeader
+              day={dateGroup.day}
+              videoCount={dateGroup.vods.length}
+              gameCount={dateGroup.vods.reduce((n, vg) => n + vg.games.length, 0)}
+              clipCount={dateGroup.vods.reduce((n, vg) => n + vodTotals(vg.games).clips, 0)}
+              clipBytes={dateGroup.vods.reduce((n, vg) => n + vodTotals(vg.games).bytes, 0)}
+              bytesLabel="풀영상 "
+              collapsed={fold.collapsed.has(dayId(dateGroup.day))}
+              onToggle={() => fold.toggle(dateGroup.day)}
+            />
+            {!fold.collapsed.has(dayId(dateGroup.day)) &&
+              dateGroup.vods.map((vg) => {
+                const totals = vodTotals(vg.games)
+                const buildable = buildableGameCount(vg.games)
+                const vod = vg.vod
+                return (
+                  <VodSection
+                    key={vg.vodId}
+                    name={vg.name}
+                    vod={vod}
+                    job={job?.id === vg.vodId ? job : null}
+                    expanded={!collapsedVods.has(vg.vodId)}
+                    gameCount={totals.games}
+                    clipCount={totals.clips}
+                    visibleGameCount={vg.games.length}
+                    clipBytes={totals.bytes}
+                    bytesLabel="풀영상 "
+                    deletable={vg.games.length > 0 || (vod?.clipCount ?? 0) > 0}
+                    emptyHint={
+                      vod?.status === 'done'
+                        ? '이 영상에서 찾은 게임이 없습니다'
+                        : '아직 게임이 없습니다. 분석을 시작하면 게임별로 풀영상이 만들어집니다.'
+                    }
+                    analysisBusy={runningVodId !== null}
+                    buildableCount={buildable}
+                    onBuildFullVideos={() => vod && handleBuildFullVideos(vod, buildable)}
+                    onToggle={() =>
+                      setCollapsedVods((prev) => {
+                        const next = new Set(prev)
+                        if (!next.delete(vg.vodId)) next.add(vg.vodId)
+                        return next
+                      })
+                    }
+                    onAnalyze={(options) => vod && handleAnalyze(vod, options)}
+                    onCancel={() => vod && handleCancel(vod)}
+                    onRenameStreamer={(name) => vod && handleRenameStreamer(vod, name)}
+                    onEditDate={(date) => vod && handleEditVideoDate(vod, date)}
+                    onDeleteClips={() => vod && handleDeleteAll(vod, vg.name, totals.games, totals.clips)}
+                    onDeleteVod={() => handleRemoveVod(vg.vodId, vg.name)}
+                  >
+                    <ul className="flex flex-col gap-2">
+                      {vg.games.map((g) => (
+                        <GameRow
+                          key={g.key}
+                          game={g}
+                          time={vodGameTime(g)}
+                          due={cleanup[g.key]}
+                          onOpen={() => setOpen(g.key)}
+                          onPin={() =>
+                            void setGamePinned(g.key, !g.pinned)
+                              .then(reloadGames)
+                              .catch((err: Error) => setActionError(err.message))
+                          }
+                        />
+                      ))}
+                    </ul>
+                  </VodSection>
+                )
+              })}
+          </section>
+        ))}
+      </div>
+
+      {deleteRequest && (
+        <DeleteConfirmDialog
+          label={deleteRequest.label}
+          deleteMode={deleteMode}
+          onCancel={() => setDeleteRequest(null)}
+          onConfirm={handleDeleteConfirm}
+        />
+      )}
+    </div>
+  )
+}

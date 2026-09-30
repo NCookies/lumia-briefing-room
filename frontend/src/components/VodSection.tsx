@@ -24,6 +24,9 @@ interface Props {
   onDeleteVod: () => void
   buildableCount?: number
   onBuildFullVideos?: () => void
+  deletable?: boolean
+  bytesLabel?: string
+  emptyHint?: string
   children: ReactNode
 }
 
@@ -255,6 +258,9 @@ export function VodSection({
   onDeleteVod,
   buildableCount = 0,
   onBuildFullVideos,
+  deletable,
+  bytesLabel = '',
+  emptyHint,
   children,
 }: Props) {
   const running = vod?.status === 'analyzing'
@@ -310,7 +316,10 @@ export function VodSection({
           <div>
             게임 {gameCount}개 · 클립 {clipCount}개
           </div>
-          <div className="text-xs text-zinc-500">{formatBytes(clipBytes)}</div>
+          <div className="text-xs text-zinc-500">
+            {bytesLabel}
+            {formatBytes(clipBytes)}
+          </div>
         </div>
 
         <div className="flex items-center gap-3 text-xs">
@@ -346,7 +355,7 @@ export function VodSection({
               풀영상 만들기 ({buildableCount})
             </button>
           )}
-          {clipCount > 0 && (
+          {(deletable ?? clipCount > 0) && (
             <button type="button" className="text-zinc-400 hover:text-rose-400" onClick={onDeleteClips}>
               전체 삭제
             </button>
@@ -387,7 +396,8 @@ export function VodSection({
         <div className="flex flex-col gap-3 border-t border-zinc-700 p-3">
           {visibleGameCount === 0 && (
             <p className="px-1 text-center text-sm text-zinc-500">
-              {vod?.status === 'done' ? '조건에 맞는 게임이 없습니다' : '아직 클립이 없습니다. 분석을 시작하면 게임별로 만들어집니다.'}
+              {emptyHint ??
+                (vod?.status === 'done' ? '조건에 맞는 게임이 없습니다' : '아직 클립이 없습니다. 분석을 시작하면 게임별로 만들어집니다.')}
             </p>
           )}
           {children}
