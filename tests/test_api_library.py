@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from lumia_briefing_room.api import library_routes, unknown_clips
+from lumia_briefing_room.api import clip_index, library_routes, unknown_clips
 from lumia_briefing_room.api.app import create_app
 from lumia_briefing_room.config import Config, PathsConfig, resolve_paths
 from lumia_briefing_room.pipeline import delete_helper
@@ -30,7 +30,7 @@ def make_client(tmp_path, monkeypatch, *, new_layout: bool):
     cfg = Config(paths=paths)
     resolved = resolve_paths(cfg.paths)
     monkeypatch.setattr(unknown_clips, "probe_duration", lambda path, ffmpeg: 10.0)
-    monkeypatch.setattr(library_routes, "discover_ffmpeg", lambda: None)
+    monkeypatch.setattr(clip_index, "discover_ffmpeg", lambda: None)
     monkeypatch.setattr(delete_helper, "_send2trash", _fake_trash)
     client = TestClient(create_app(cfg, config_path=tmp_path / "config.json"))
     client.resolved = resolved

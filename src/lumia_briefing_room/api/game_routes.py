@@ -19,6 +19,8 @@ from pydantic import BaseModel
 
 from lumia_briefing_room import activity
 from lumia_briefing_room.api.clips import find_clip
+from lumia_briefing_room.pipeline import categories as cats
+from lumia_briefing_room.pipeline.library_fs import LibraryError
 from lumia_briefing_room.config import Config, discover_ffmpeg, resolve_paths
 from lumia_briefing_room.pipeline import game_candidates as gcand
 from lumia_briefing_room.pipeline.clip_from_full import FullVideoMissing
@@ -57,9 +59,14 @@ class GameDelete(BaseModel):
     target: str  # fullVideo | clips | both
 
 
+class SaveOptions(BaseModel):
+    category: str | None = None
+
+
 class BatchSave(BaseModel):
     mode: str = "all"  # all | certain | ids
     ids: list[str] | None = None
+    category: str | None = None
 
 
 def _summary(game: dict, games_dir: Path, *, can_rebuild_full: bool = False) -> dict:
@@ -196,7 +203,22 @@ def register_game_routes(
             )
         else:
             can = can_rebuild(game, games_dir(key), resolve_recording_root(current_config().paths.steam_recording))
+        self_saved_category(game)
         return {**game, "hasFullVideo": has_full_video(games_dir(key), key), "canRebuildFullVideo": can}
+
+    def category_of_clip(game: dict, clip_id: str) -> str | None:
+        cfg = current_config()
+        if not cats.enabled(cfg):
+            return None
+        clip = find_clip(clips_dir_for(game), clip_id, resolve_paths(cfg.paths).clip_roots)
+        return cats.category_of(cfg, clip.video) if clip is not None else None
+
+    def self_saved_category(game: dict) -> None:
+        """보관한 후보마다 지금 어느 카테고리에 있는지 `user.savedCategory` 로 붙인다(저장하지 않는 계산 값)."""
+        for cand in gcand.all_candidates(game):
+            user = cand.get("user") or {}
+            if user.get("savedClipId") and (name := category_of_clip(game, user["savedClipId"])):
+                cand["user"] = {**user, "savedCategory": name}
 
     rebuild_jobs: dict[str, dict] = {}
 
@@ -345,14 +367,16 @@ def register_game_routes(
             raise HTTPException(404, "직접 추가한 구간만 지울 수 있습니다(자동 후보는 '무시'를 쓰세요)")
         return {"id": candidate_id, "deleted": True}
 
-    def _save_one(key: str, candidate_id: str, ffmpeg: Path) -> str:
+    def _save_one(key: str, candidate_id: str, ffmpeg: Path, category: str | None = None) -> str:
         cfg = current_config()
         game = load_game(games_dir(key), key)
         cand = gcand.find_candidate(game, candidate_id)
         if cand is None:
             raise HTTPException(404, "후보를 찾을 수 없습니다")
         try:
-            clip_id = save_and_mark(games_dir(key), key, game, cand, cfg=cfg, ffmpeg_path=ffmpeg)
+            clip_id = save_and_mark(games_dir(key), key, game, cand, cfg=cfg, ffmpeg_path=ffmpeg, manual=True, category=category)
+        except LibraryError as exc:
+            raise HTTPException(exc.status, str(exc))
         except FullVideoMissing:
             raise HTTPException(409, "풀영상이 없어 클립을 저장할 수 없습니다")
         except ValueError as exc:
@@ -369,10 +393,11 @@ def register_game_routes(
         return ffmpeg
 
     @app.post("/api/games/{key}/candidates/{candidate_id}/save")
-    def save_candidate(key: str, candidate_id: str):
-        load_or_404(key)
+    def save_candidate(key: str, candidate_id: str, body: SaveOptions | None = None):
+        game = load_or_404(key)
         with lock:
-            return {"clipId": _save_one(key, candidate_id, _ffmpeg())}
+            clip_id = _save_one(key, candidate_id, _ffmpeg(), body.category if body else None)
+            return {"clipId": clip_id, "category": category_of_clip(game, clip_id)}
 
     @app.post("/api/games/{key}/save")
     def save_batch(key: str, body: BatchSave):
@@ -387,7 +412,7 @@ def register_game_routes(
         with lock:
             for cand in targets:
                 try:
-                    saved.append({"candidateId": cand["id"], "clipId": _save_one(key, cand["id"], ffmpeg)})
+                    saved.append({"candidateId": cand["id"], "clipId": _save_one(key, cand["id"], ffmpeg, body.category)})
                 except HTTPException as exc:
                     failed.append({"candidateId": cand["id"], "error": exc.detail})
         return {"saved": saved, "failed": failed}

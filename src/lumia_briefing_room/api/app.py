@@ -30,6 +30,7 @@ from lumia_briefing_room.api.export import (
 from lumia_briefing_room.api.admin_routes import register_admin_routes
 from lumia_briefing_room.api.backfill_routes import register_backfill_routes
 from lumia_briefing_room.api.disk_routes import register_disk_routes
+from lumia_briefing_room.api.category_routes import register_category_routes
 from lumia_briefing_room.api.game_routes import register_game_routes
 from lumia_briefing_room.api.onboarding import register_onboarding_routes
 from lumia_briefing_room.api.app_info_routes import register_app_info_routes
@@ -805,6 +806,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     register_library_routes(app, lock=lock, current_config=current_config, put_config=put_config, serialize=_serialize)
     register_storage_routes(app, lock=lock, current_config=current_config, put_config=put_config)
     register_game_routes(app, lock=lock, current_config=current_config)
+    register_category_routes(app, lock=lock, current_config=current_config)
     register_telemetry_routes(app)
     register_app_info_routes(app)
     register_admin_routes(app, current_config=current_config)

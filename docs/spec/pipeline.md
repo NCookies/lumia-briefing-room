@@ -176,16 +176,19 @@ result.jpg / portrait_{me,teammate1,teammate2}.jpg   클립 쪽 썸네일 폴더
 | 경로 | 동작 |
 |---|---|
 | `GET /api/games` | 최신순 요약(옛 스팀 게임은 `canRebuildFullVideo` 도): 결과, 초상화 파일명, `hasFullVideo`, 풀영상 크기·길이, 후보 수(무시 제외)·확실한 후보 수·저장한 클립 수·저장 안 된 범위 수정 수(`unsavedEditCount`), `pinned` |
-| `GET /api/games/{key}` | `game.json` 전체 + `hasFullVideo` |
+| `GET /api/games/{key}` | `game.json` 전체 + `hasFullVideo`(+ 보관한 후보마다 계산 값 `user.savedCategory`) |
 | `GET /api/games/{key}/video` | 풀영상 스트리밍(Range 지원, `FileResponse`). 없으면 404 |
 | `GET /api/games/{key}/asset/{name}` | `result.jpg`, `portrait_{me,teammate1,teammate2}.jpg` 만 |
 | `PATCH /api/games/{key}` | `{pinned}` (자동 정리에서 제외) |
 | `PATCH /api/games/{key}/candidates/{id}` | 사용자 수정 → `candidates[].user`: `start`/`end`(영상 안, 1초 이상), `dismissed`, `label`(`combat`/`hunt`/null), `title`(클립 이름, 100자 이하, 빈 값 = 검출 이름으로 복귀; 이미 저장한 후보면 클립 json 의 title 도 바로 바꾼다 — 다시 자르지 않음). 자동 검출 값은 그대로 |
 | `POST /api/games/{key}/candidates` | 직접 추가한 구간(`userCandidates`, ID `<키>_uN`) |
 | `DELETE /api/games/{key}/candidates/{id}` | 직접 추가한 구간만 삭제(자동 후보는 "무시") |
-| `POST /api/games/{key}/candidates/{id}/save` | 후보(조정한 범위)를 풀영상에서 `-c copy` 로 잘라 클립 저장 → `{clipId}`. 이미 저장했고 범위가 저장 당시와 같으면 다시 자르지 않고 기존 ID, **범위를 고쳤으면 같은 클립(파일·ID·제목·라벨·고정·`clipUid` 유지)을 새 범위로 다시 잘라 교체**. 풀영상이 없으면 409 |
-| `POST /api/games/{key}/save` | 일괄 저장 `{mode: all\|certain\|ids, ids}` → `{saved[], failed[]}` (무시·저장된 후보 제외) |
+| `POST /api/games/{key}/candidates/{id}/save` | 후보(조정한 범위)를 풀영상에서 `-c copy` 로 잘라 클립 저장(직접 보관) → `{clipId, category}`. 본문 `{category}` 로 카테고리를 고르고(없으면 `보관함`, 없는 이름이면 만든다) 옛 경로 모드는 카테고리 없이 `category: null`. 이미 저장했고 범위가 저장 당시와 같으면 다시 자르지 않고 기존 ID, **범위를 고쳤으면 같은 클립(파일·ID·제목·라벨·고정·`clipUid` 유지)을 새 범위로 다시 잘라 교체**. 풀영상이 없으면 409 |
+| `POST /api/games/{key}/save` | 일괄 저장 `{mode: all\|certain\|ids, ids, category}` → `{saved[], failed[]}` (무시·저장된 후보 제외) |
 | `POST /api/games/{key}/candidates/{id}/unsave` | 보관 해제: 클립 영상을 `clipUid`/`savedClipId` 로 찾아 지우고(클립 탭 삭제와 같은 처리 - 라벨 보관·게임 기록 유지, 휴지통/영구는 `ui.deleteMode`) `savedClipId`·`savedStart`·`savedEnd` 를 지우며 그 후보를 **무시(`dismissed`) 처리**한다. 보관한 후보가 아니면 409 |
+| `GET /api/categories` | 클립 카테고리(= `clips\` 바로 아래 폴더) 목록 `{enabled, categories[{name, auto, default, clipCount, thumbnailClipId}]}`. `보관함`이 맨 앞, 사용자 카테고리(이름순), `자동 보관`(`auto`)이 맨 뒤이며 앞뒤 두 칸은 폴더가 없어도 항상 있다. `thumbnailClipId` 는 그 카테고리에서 가장 최근에 만든 클립(썸네일은 `GET /api/clips/{id}/thumbnail`). 옛 경로 모드는 `enabled:false` |
+| `POST /api/categories` | `{name}` 카테고리(폴더) 만들기 → 201. 이름 규칙은 클립 정리 탭 폴더와 같고(`.` 시작·경로 문자 400), 이미 있으면(기본 두 칸 포함) 409 |
+| `POST /api/categories/move` | `{clipIds[], category}` 클립 영상을 그 카테고리로 옮긴다(없으면 만듦, 같은 이름이 있으면 ` (2)` 를 붙여 둘 다 둔다) → `{moved, category}`. 정보·라벨은 영상 태그·지문으로 이어져 그대로다 |
 | `POST /api/games/{key}/delete` | `{target: fullVideo\|clips\|both}` → `{deletedFullVideo, deletedClips, freedBytes}`. `fullVideo` 는 풀영상만(`delete_full_video` - 행은 "풀영상 삭제됨", 없으면 409), `clips` 는 저장한 클립 전부(영상이 이미 없으면 지운 것으로 세지 않고 표시만 지운다), `both` 는 둘 다. 게임 기록(결과·후보)은 항상 남는다. 고정한 게임이어도 서버는 막지 않는다(경고는 화면이 한다) |
 
 - 클립 저장(`pipeline/clip_from_full.py`): 시작은 키프레임 격자 때문에 앞으로 최대 3초 당겨진다. 클립 메타데이터는 기존 클립과 같은 형식이라(세션 기준 오프셋 포함) 기존 화면·API 가 그대로 읽는다. 결과·초상화는 클립이 읽는 `.thumbs` 로 복사. 저장 후 `user.savedClipId` 와 저장에 쓴 범위 `user.savedStart/savedEnd` 를 남긴다(기록이 없는 옛 클립은 검출 범위로 만든 것으로 본다). 교체는 임시 파일에 잘라 `os.replace` 로 바꾼다.

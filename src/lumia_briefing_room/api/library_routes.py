@@ -14,12 +14,11 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 
-from lumia_briefing_room.api.clips import ClipSummary, scan_clips
+from lumia_briefing_room.api.clip_index import norm as _norm, summaries_by_video as _summaries_by_video
+from lumia_briefing_room.api.clips import ClipSummary
 from lumia_briefing_room.api.export import export_video
-from lumia_briefing_room.api.unknown_clips import summary_of as summary_of_unknown
-from lumia_briefing_room.config import Config, discover_ffmpeg, resolve_paths, uses_legacy_layout
+from lumia_briefing_room.config import Config, resolve_paths, uses_legacy_layout
 from lumia_briefing_room.pipeline.cleanup_registry import registry as cleanup_preview_registry
-from lumia_briefing_room.pipeline.clip_files import unknown_videos
 from lumia_briefing_room.pipeline.delete_helper import PERMANENT, delete_clip, permanently_delete, send_to_recycle_bin
 from lumia_briefing_room.pipeline.game_records import records_dir_for
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for
@@ -34,10 +33,6 @@ def _roots(cfg: Config) -> LibraryRoots:
     return LibraryRoots([("클립", resolved.clips_root)], single=True)
 
 
-def _norm(path: Path) -> str:
-    return os.path.normcase(str(path))
-
-
 def register_library_routes(
     app: FastAPI,
     *,
@@ -49,18 +44,7 @@ def register_library_routes(
     def roots() -> LibraryRoots:
         return _roots(current_config())
 
-    def summaries_by_video(cfg: Config) -> dict[str, ClipSummary]:
-        """영상 경로 → 클립(정보가 있는 것 + 앱이 만들지 않은 것)."""
-        resolved = resolve_paths(cfg.paths)
-        libraries = (resolved.library_steam, resolved.library_vod)
-        found: dict[str, ClipSummary] = {}
-        for library in libraries:
-            for clip in scan_clips(library, resolved.clip_roots):
-                found[_norm(clip.video)] = clip
-        ffmpeg = discover_ffmpeg()
-        for unknown in unknown_videos(libraries, resolved.clip_roots):
-            found[_norm(unknown.path)] = summary_of_unknown(unknown, resolved.library_steam, ffmpeg)
-        return found
+    summaries_by_video = _summaries_by_video
 
     def guarded(fn):
         @functools.wraps(fn)
