@@ -101,3 +101,27 @@ class RecordingSession:
             segment_duration_sec=segment_duration_sec,
             buffer_minutes=buffer_minutes,
         )
+
+
+RECORDING_ACTIVE_WINDOW_SEC = 60.0
+
+
+def recording_in_progress(recording_root: Path, *, window_sec: float = RECORDING_ACTIVE_WINDOW_SEC) -> bool:
+    """스팀이 지금 녹화 중인지: 세션 폴더 중 하나라도 최근에 바뀌었으면(3초마다 조각이 생기고 링버퍼가 옛 조각을 지운다) 녹화 중이다.
+
+    session.mpd 의 type="dynamic" 은 스팀이 비정상 종료되면 그대로 남을 수 있어 폴더 수정 시각을 본다.
+    """
+    try:
+        entries = list(Path(recording_root).iterdir())
+    except OSError:
+        return False
+    threshold = datetime.now().timestamp() - window_sec
+    for entry in entries:
+        if not _FOLDER_PATTERN.match(entry.name):
+            continue
+        try:
+            if entry.is_dir() and entry.stat().st_mtime >= threshold:
+                return True
+        except OSError:
+            continue
+    return False

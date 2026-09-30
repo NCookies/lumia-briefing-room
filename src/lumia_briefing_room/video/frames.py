@@ -10,6 +10,7 @@ import numpy as np
 
 from lumia_briefing_room.profiles.models import Roi
 from lumia_briefing_room.video.session import RecordingSession
+from lumia_briefing_room.video.throttle import Throttle
 from lumia_briefing_room.procs import popen_hidden
 
 
@@ -139,7 +140,12 @@ def largest_contiguous_run(items: list[tuple[int, Path]]) -> list[tuple[int, Pat
 
 
 def write_merged_segment_file(
-    session: RecordingSession, stream: int, segment_numbers: list[int], out_path: Path
+    session: RecordingSession,
+    stream: int,
+    segment_numbers: list[int],
+    out_path: Path,
+    *,
+    throttle: Throttle | None = None,
 ) -> list[int]:
     """존재하는 세그먼트 중 가장 긴 연속 구간만 이어붙여 유효한 fMP4 파일을 만든다.
 
@@ -155,8 +161,13 @@ def write_merged_segment_file(
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "wb") as out:
         out.write(init_bytes)
+        if throttle is not None:
+            throttle.consume(len(init_bytes))
         for _, chunk_path in run:
-            out.write(chunk_path.read_bytes())
+            data = chunk_path.read_bytes()
+            out.write(data)
+            if throttle is not None:
+                throttle.consume(len(data))
     return [n for n, _ in run]
 
 

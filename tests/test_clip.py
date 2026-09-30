@@ -214,3 +214,30 @@ def test_cut_clip_writes_the_clip_uid_into_the_video(tmp_path, make_synthetic_se
     out_path = tmp_path / "clip.mp4"
     cut_clip(session, ClipRange(1.0, 5.0, "combat"), out_path, ffmpeg_path=FFMPEG_PATH, clip_uid="abc123")
     assert read_clip_uid(out_path) == "abc123"
+
+
+@requires_ffmpeg
+def test_cut_clip_with_a_rate_limit_on_the_recording_disk_moves_the_result_through_temp(
+    tmp_path, make_synthetic_session, monkeypatch
+):
+    import lumia_briefing_room.pipeline.clip as clip_mod
+
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    session_dir = make_synthetic_session(
+        tmp_path, width=64, height=48, fps=10, segment_frames=10, num_segments=10,
+        start_utc=start,
+    )
+    session = RecordingSession.load(session_dir)
+    monkeypatch.setattr(clip_mod, "same_disk", lambda a, b: True)
+    out_path = tmp_path / "games" / "k" / "full.mp4"
+    work = tmp_path / "work"
+    work.mkdir()
+
+    result = cut_clip(
+        session, ClipRange(1.0, 5.0, "combat"), out_path, ffmpeg_path=FFMPEG_PATH,
+        tmp_dir=work, max_bytes_per_sec=1e12,
+    )
+
+    assert out_path.stat().st_size > 0
+    assert result.segment_start <= result.segment_end
+    assert list(work.iterdir()) == []

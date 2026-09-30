@@ -71,6 +71,7 @@ def cut_full_video(
     ffmpeg_path: Path,
     include_audio: bool,
     tmp_dir: Path,
+    max_bytes_per_sec: float | None = None,
 ) -> FullVideoOutcome:
     """게임 전체 세그먼트를 `-c copy` 로 한 파일에 만든다. 실패해도 예외를 올리지 않는다 - 후보 기록과 클립 저장은 계속돼야 한다."""
     needed = estimate_source_bytes(session, seg_range)
@@ -93,7 +94,8 @@ def cut_full_video(
     )
     try:
         cut = cut_clip(
-            session, clip_range, tmp_out, ffmpeg_path=ffmpeg_path, include_audio=include_audio, tmp_dir=tmp_dir
+            session, clip_range, tmp_out, ffmpeg_path=ffmpeg_path, include_audio=include_audio, tmp_dir=tmp_dir,
+            max_bytes_per_sec=max_bytes_per_sec,
         )
         os.replace(tmp_out, final)
     except (ClipCutError, OSError, subprocess.CalledProcessError) as exc:

@@ -4,12 +4,18 @@ from datetime import timedelta
 from pathlib import Path
 
 from lumia_briefing_room.config import ClipConfig
+from lumia_briefing_room.disk_identity import same_disk
 from lumia_briefing_room.detect.types import CombatInterval
 from lumia_briefing_room.video.frames import write_merged_segment_file
 from lumia_briefing_room.video.segments import segment_time_range
-from lumia_briefing_room.video.session import RecordingSession
+from lumia_briefing_room.video.session import RecordingSession, recording_in_progress
+from lumia_briefing_room.video.throttle import Throttle, copy_throttled
 from lumia_briefing_room.pipeline.mp4_tags import uid_metadata_args
 from lumia_briefing_room.procs import run_hidden
+
+# 스팀이 녹화 중일 때 녹화 드라이브를 읽고 쓰는 속도 상한. 녹화 자체는 초당 3MB 남짓이라, 나머지 시간을 스팀 쓰기에 비워 둔다.
+# 무제한으로 몰아서 복사하면 스팀이 프레임을 버리다 녹화를 오류로 끝냈다(2026-10-01 실사용, 풀영상 2.8GB 컷 중).
+LIVE_RECORDING_BYTES_PER_SEC = 32 * 1024 * 1024
 
 
 class ClipCutError(Exception):
@@ -98,6 +104,13 @@ def audio_status(video_run: list[int], audio_run: list[int]) -> str:
     return "full" if covers else "partial"
 
 
+def copy_rate_for(session: RecordingSession) -> float | None:
+    """스팀이 녹화 중이면 복사 속도 상한, 아니면 None(제한 없음)."""
+    if recording_in_progress(session.directory.parent):
+        return LIVE_RECORDING_BYTES_PER_SEC
+    return None
+
+
 def cut_clip(
     session: RecordingSession,
     clip_range: ClipRange,
@@ -109,12 +122,16 @@ def cut_clip(
     include_audio: bool = True,
     tmp_dir: Path | None = None,
     clip_uid: str | None = None,
+    max_bytes_per_sec: float | None = None,
 ) -> CutResult:
     """SPEC §3 `[필요한 세그먼트만 복사 -> 병합 -> ffmpeg -c copy 컷]`.
 
     research §2.4: init + 연속 세그먼트를 이어붙이면 그대로 유효한 fMP4 다.
     gap 이 있으면 가장 긴 연속 구간만 쓰고 source_incomplete=True 로 표시한다
     (SPEC §7.2.1 부분 소실).
+
+    `max_bytes_per_sec` 를 주면 녹화 폴더에서 읽는 속도를 제한하고, 결과를 녹화와 같은 디스크에 쓸 때는 임시 폴더에 만든 뒤
+    같은 속도로 옮긴다(ffmpeg 가 직접 쓰면 속도를 제한할 수 없다).
     """
     seg_range = segment_time_range(
         session,
@@ -122,11 +139,13 @@ def cut_clip(
         session.start_utc + timedelta(seconds=clip_range.end),
     )
     numbers = seg_range.numbers()
+    throttle = Throttle(max_bytes_per_sec) if max_bytes_per_sec else None
+    move_slowly = throttle is not None and same_disk(_existing_parent(out_path), session.directory)
 
     with tempfile.TemporaryDirectory(dir=tmp_dir, prefix="lumia_cut_") as td:
         td_path = Path(td)
         video_path = td_path / "video.mp4"
-        used_video = write_merged_segment_file(session, stream_video, numbers, video_path)
+        used_video = write_merged_segment_file(session, stream_video, numbers, video_path, throttle=throttle)
         if not used_video:
             raise ClipCutError(
                 f"세그먼트를 찾을 수 없다: {seg_range.first}-{seg_range.last}"
@@ -138,15 +157,18 @@ def cut_clip(
         used_audio: list[int] = []
         if include_audio:
             audio_path = td_path / "audio.mp4"
-            used_audio = write_merged_segment_file(session, stream_audio, numbers, audio_path)
+            used_audio = write_merged_segment_file(session, stream_audio, numbers, audio_path, throttle=throttle)
             if used_audio:
                 cmd += audio_input_args(used_video, used_audio, session.segment_duration_sec)
                 cmd += ["-i", str(audio_path)]
                 map_args += ["-map", "1:a:0"]
 
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        cmd += map_args + ["-c", "copy", *(uid_metadata_args(clip_uid) if clip_uid else []), str(out_path)]
+        target = td_path / f"out{out_path.suffix}" if move_slowly else out_path
+        cmd += map_args + ["-c", "copy", *(uid_metadata_args(clip_uid) if clip_uid else []), str(target)]
         run_hidden(cmd, check=True, capture_output=True)
+        if move_slowly:
+            copy_throttled(target, out_path, throttle)
 
     gaps = seg_range.gaps(used_video)
     source_incomplete = bool(gaps)
@@ -158,6 +180,13 @@ def cut_clip(
         source_incomplete=source_incomplete,
         audio_status=audio_status(used_video, used_audio),
     )
+
+
+def _existing_parent(path: Path) -> Path:
+    probe = path.parent
+    while not probe.exists() and probe.parent != probe:
+        probe = probe.parent
+    return probe
 
 
 def make_thumbnail(

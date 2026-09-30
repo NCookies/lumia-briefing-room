@@ -14,7 +14,7 @@ from lumia_briefing_room.detect.pvp import score_interval
 from lumia_briefing_room.detect.result import ResultScreen
 from lumia_briefing_room.detect.types import CombatInterval, MatchDetection
 from lumia_briefing_room.pipeline.clip_uid import new_clip_uid
-from lumia_briefing_room.pipeline.clip import ClipRange, cut_clip, make_thumbnail, resolve_clip_range
+from lumia_briefing_room.pipeline.clip import ClipRange, copy_rate_for, cut_clip, make_thumbnail, resolve_clip_range
 from lumia_briefing_room.detect.types import PortraitCrops
 from lumia_briefing_room.pipeline.filters import apply_filter
 from lumia_briefing_room.pipeline.full_video import FullVideoOutcome, cut_full_video
@@ -446,10 +446,15 @@ def process_match(
     video_root.mkdir(parents=True, exist_ok=True)
     resolved.temp.mkdir(parents=True, exist_ok=True)
 
+    copy_rate = copy_rate_for(session)
+    if copy_rate is not None:
+        log.info("스팀이 녹화 중이라 녹화 폴더 복사 속도를 초당 %dMB 로 제한한다", copy_rate // 2**20)
+
     # 링버퍼가 원본을 지우기 전에 끝나야 하므로 풀영상 컷이 클립 컷보다 먼저다. 실패해도 나머지는 계속한다.
     full = cut_full_video(
         session, seg_range, match_start, match_end, game_folder,
         ffmpeg_path=ffmpeg_path, include_audio=cfg.clip.include_audio, tmp_dir=resolved.temp,
+        max_bytes_per_sec=copy_rate,
     )
     if full.error is not None and on_full_video_error is not None:
         on_full_video_error(full.error)
@@ -487,7 +492,7 @@ def process_match(
             cut_result = cut_clip(
                 session, cand.plan.range, clip_path,
                 ffmpeg_path=ffmpeg_path, include_audio=cfg.clip.include_audio,
-                tmp_dir=resolved.temp, clip_uid=clip_uid,
+                tmp_dir=resolved.temp, clip_uid=clip_uid, max_bytes_per_sec=copy_rate,
             )
 
             thumbnail_rel: str | None = None
