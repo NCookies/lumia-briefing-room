@@ -321,6 +321,7 @@ def _write_game_record(
                 "sizeBytes": full.video.size_bytes,
                 "durationSec": full.video.cut.duration_sec,
                 "offsetSec": full.video.offset_sec,
+                "segmentDurationSec": session.segment_duration_sec,
                 "segmentStart": full.video.cut.segment_start,
                 "segmentEnd": full.video.cut.segment_end,
                 "sourceIncomplete": full.video.cut.source_incomplete,
