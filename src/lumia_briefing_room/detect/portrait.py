@@ -52,6 +52,26 @@ def _looks_like_portrait(rgb: np.ndarray) -> bool:
     return (count(mask) / mask.size * 100) >= PORTRAIT_VIVID_PCT_MIN
 
 
+PORTRAIT_TEXTURE_STD_MIN = 40.0
+
+
+def _has_artwork_texture(rgb: np.ndarray) -> bool:
+    """채도가 낮은 그림(흰 머리 캐릭터 등)도 채워진 칸으로 보는 기준: 밝기의 표준편차.
+
+    실측(2026-10-01, 2560x1440): 채워진 카드 65~100, 회색 "EMPTY" 자리표시 19~24. 색 기준(채도 높은 픽셀 10%)은 흰 머리 카드가
+    5.5% 라 놓쳤고, 자리표시(4.4~6.1%)와는 색으로 가를 수도 없었다.
+    """
+    return float(rgb.mean(axis=2).std()) >= PORTRAIT_TEXTURE_STD_MIN
+
+
+def _looks_filled(rgb: np.ndarray) -> bool:
+    return _looks_like_portrait(rgb) or _has_artwork_texture(rgb)
+
+
+def crops_look_filled(crops: PortraitCrops) -> bool:
+    return _looks_filled(crops.me) and _looks_filled(crops.teammate1) and _looks_filled(crops.teammate2)
+
+
 def crops_look_like_portraits(crops: PortraitCrops) -> bool:
     return (
         _looks_like_portrait(crops.me)
@@ -64,16 +84,17 @@ GIVE_UP_AFTER_CONSECUTIVE_NON_NONE = 2
 SELECT_SCREEN_ROIS = ("select_timer", "select_title")
 
 
-def _portraits_if_filled(frame: np.ndarray, profile: ResolutionProfile) -> PortraitCrops | None:
+def _portraits_if_filled(frame: np.ndarray, profile: ResolutionProfile, *, texture: bool = False) -> PortraitCrops | None:
     """판정용 칸과 저장용 칸이 둘 다 초상화다워야 받는다.
 
     실측(2026-09-30): 캐릭터 선택 화면에서는 팀원 칸이 회색 "EMPTY" 자리표시인데도 넓은 판정용
     칸이 주변 색 때문에 통과했다 - 저장용 칸까지 보면 루트 선택 화면(세 장 다 채워짐)만 남는다.
     """
-    if not crops_look_like_portraits(_detect_crops(frame, profile)):
+    check = crops_look_filled if texture else crops_look_like_portraits
+    if not check(_detect_crops(frame, profile)):
         return None
     crops = crop_portraits(frame, profile)
-    return crops if crops_look_like_portraits(crops) else None
+    return crops if check(crops) else None
 
 
 def _find_on_select_screens(
@@ -89,7 +110,7 @@ def _find_on_select_screens(
     for _, frame in frames:
         if not read_select_screen(profile.crop(frame, "select_timer"), profile.crop(frame, "select_title")):
             continue
-        found = _portraits_if_filled(frame, profile)
+        found = _portraits_if_filled(frame, profile, texture=True)
         if found is not None:
             return found
     return None

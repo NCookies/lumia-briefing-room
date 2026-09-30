@@ -193,3 +193,51 @@ def test_1080p_profile_can_read_the_select_screen():
     profile = ResolutionProfile.for_resolution(1920, 1080)
 
     assert {"select_timer", "select_title", "select_mode"} <= set(profile.rois)
+
+
+def _paint_pale_artwork(frame: np.ndarray, roi_name: str) -> None:
+    """흰 머리 캐릭터처럼 채도가 거의 없지만 그림의 결(밝고 어두운 줄무늬)이 있는 칸 흉내."""
+    roi = PROFILE.rois[roi_name]
+    region = frame[roi.y0 : roi.y1, roi.x0 : roi.x1]
+    region[:] = (235, 235, 240)
+    region[::6] = (40, 40, 45)
+
+
+def _paint_empty_placeholder(frame: np.ndarray, roi_name: str) -> None:
+    """캐릭터 선택 화면의 회색 "EMPTY" 자리표시: 밋밋한 회색에 약한 잡음(실측 밝기 표준편차 약 20)."""
+    roi = PROFILE.rois[roi_name]
+    rng = np.random.default_rng(1)
+    noise = rng.normal(0, 20, (roi.y1 - roi.y0, roi.x1 - roi.x0, 1))
+    frame[roi.y0 : roi.y1, roi.x0 : roi.x1] = np.clip(70 + noise, 0, 255).astype(np.uint8)
+
+
+def test_a_pale_portrait_with_little_saturation_is_still_found_on_the_route_select_screen():
+    """실측(2026-10-01, 20260928_163711): 흰 머리 팀원 카드는 채도 높은 픽셀이 5.5% 뿐이라 색 기준(10%)에 걸려
+    선택 화면이 66초나 보이는데도 초상화를 못 찾았다. 그림의 결(밝기 표준편차)로도 채워진 칸으로 본다."""
+    frame = _select_route_frame()
+    for name in ("teammate1", "teammate1_display"):
+        _paint_pale_artwork(frame, name)
+
+    found = find_portraits_in_frames([(0.0, frame)], PROFILE)
+
+    assert found is not None
+
+
+def test_empty_placeholders_with_a_little_noise_are_still_not_portraits():
+    frame = _with_select_header(_blank_frame())
+    for base in ("portrait", "teammate1", "teammate2"):
+        _paint(frame, base, VIVID)
+        _paint_empty_placeholder(frame, f"{base}_display")
+
+    assert find_portraits_in_frames([(0.0, frame)], PROFILE) is None
+
+
+def test_the_texture_rule_only_applies_on_the_select_screen_path():
+    """관전 판정 방식(선택 화면 칸이 없는 프로필)에서는 글자·아이콘에 오탐할 수 있어 색 기준만 쓴다."""
+    frame = _route_select_frame()
+    for name in ("teammate1", "teammate1_display"):
+        _paint(frame, name, DIM)
+        _paint_pale_artwork(frame, name)
+
+    assert find_portraits_in_frames([(0.0, frame)], LEGACY_PROFILE) is None
+
