@@ -87,6 +87,7 @@ test('the headline shows the placement as #N, win/loss for cobalt, or says the r
   assert.equal(gameHeadline({ placement: 2, outcome: '승리' }), '승리')
   assert.equal(gameHeadline({ outcome: '패배' }), '패배')
   assert.equal(gameHeadline({ placement: 3, outcome: '탈출' }), '#3')
+  assert.equal(gameHeadline({ placement: null, matchType: 'normal' }), '순위 미확인')
   assert.equal(gameHeadline(null), '결과 미확인')
 })
 

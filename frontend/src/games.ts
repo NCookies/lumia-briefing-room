@@ -167,7 +167,8 @@ const COBALT_OUTCOMES = ['승리', '패배']
 
 export function gameHeadline(result: MatchResult | null): string {
   if (result?.outcome && COBALT_OUTCOMES.includes(result.outcome)) return result.outcome
-  if (!result || result.placement == null) return '결과 미확인'
+  if (!result) return '결과 미확인'
+  if (result.placement == null) return '순위 미확인'
   return `#${result.placement}`
 }
 

@@ -11,8 +11,8 @@ export type UserLabel = 'pvp' | 'pve' | null
 export interface MatchResult {
   matchType: 'rank' | 'normal' | 'unknown'
   matchLabel: string
-  placement: number
-  total: number
+  placement: number | null
+  total: number | null
   outcome: string | null
   nickname: string | null
   imagePath?: string | null

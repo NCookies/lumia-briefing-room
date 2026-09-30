@@ -90,6 +90,11 @@ test('formatMatchResult omits the game type when it could not be read', () => {
   assert.equal(formatMatchResult(result({ matchType: 'unknown', placement: 2 })), '2위')
 })
 
+test('formatMatchResult drops the placement when it could not be read', () => {
+  assert.equal(formatMatchResult(result({ matchType: 'normal', placement: null })), '일반')
+  assert.equal(formatMatchResult(result({ matchType: 'unknown', placement: null })), null)
+})
+
 test('formatMatchResult shows an escape outcome but no character name(초상화로 대체, plan-ui.md §0)', () => {
   assert.equal(formatMatchResult(result({ placement: 3, outcome: '탈출 성공' })), '랭크 · 3위 · 탈출 성공')
 })

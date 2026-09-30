@@ -31,14 +31,14 @@ function formatStart(iso: string): string {
   return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-function barColor(placement: number | undefined): string {
+function barColor(placement: number | null | undefined): string {
   if (placement === 1) return 'bg-emerald-500'
-  if (placement !== undefined && placement <= 3) return 'bg-sky-500'
+  if (placement != null && placement <= 3) return 'bg-sky-500'
   return 'bg-zinc-500'
 }
 
 interface MatchResultFormProps {
-  placement: number | undefined
+  placement: number | null | undefined
   outcome: string | null | undefined
   locked?: boolean
   onSave: (values: { placement: number; outcome: string }) => void
@@ -173,7 +173,7 @@ export function GameSection({
                   ) : (
                     <>
                       <div className={`text-xl font-bold ${result.placement === 1 ? 'text-emerald-400' : 'text-zinc-200'}`}>
-                        #{result.placement}
+                        {result.placement == null ? '순위 미확인' : `#${result.placement}`}
                         {matchResultLocked && (
                           <span className="ml-1 align-middle text-xs text-amber-400" title="수동으로 고정한 값입니다">
                             🔒

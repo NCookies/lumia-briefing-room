@@ -104,10 +104,10 @@ export function formatMatchResult(result: MatchResult | null | undefined): strin
   if (result.outcome && (COBALT_OUTCOMES as readonly string[]).includes(result.outcome)) {
     return result.outcome
   }
-  const parts = [`${result.placement}위`]
+  const parts = result.placement == null ? [] : [`${result.placement}위`]
   if (result.matchType !== 'unknown') parts.unshift(result.matchType === 'rank' ? '랭크' : '일반')
   if (result.outcome?.includes('탈출')) parts.push(result.outcome)
-  return parts.join(' · ')
+  return parts.length ? parts.join(' · ') : null
 }
 
 export function formatKda(result: MatchResult | null | undefined): string | null {
