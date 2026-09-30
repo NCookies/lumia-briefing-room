@@ -6,6 +6,8 @@ export interface CandidateUser {
   title?: string
   savedClipId?: string
   savedCategory?: string
+  /** 자동 보관이 아닌 카테고리에 있는 클립일 때만 true(계산 값). 자동 보관의 클립은 파일은 있어도 보관된 것이 아니다. */
+  archived?: boolean
   savedMemo?: string
   savedStart?: number
   savedEnd?: number

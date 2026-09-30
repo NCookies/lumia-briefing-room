@@ -12,7 +12,7 @@ test('가이드는 풀영상·교전 후보·클립·폴더 구조·입력 소�
 test('보관과 저장을 구분해 쓴다 - 옛 문구를 쓰지 않는다', () => {
   assert.match(all, /보관/)
   assert.match(all, /다시 저장/)
-  assert.doesNotMatch(all, /클립으로 저장|자동 저장|직접 저장|저장한 클립/)
+  assert.doesNotMatch(all, /클립으로 저장|자동 저장|직접 저장|저장한 클립|보관 해제/)
 })
 
 test('폴더 그림은 새 영어 폴더 이름과 한글 카테고리 이름을 쓴다', () => {

@@ -10,14 +10,13 @@ interface Props {
   current: string | null
   archived: boolean
   onPick: (category: string | undefined) => void
-  onUnarchive?: () => void
   createLabel?: string
   onClose: () => void
   title?: string
 }
 
 /** 유튜브 "저장 위치"처럼 카테고리(= `clips\` 아래 폴더)를 골라 보관한다. 이미 보관한 후보면 카테고리 바꾸기·보관 해제. */
-export function ArchivePopup({ anchor, current, archived, onPick, onUnarchive, onClose, title = '보관 위치', createLabel }: Props) {
+export function ArchivePopup({ anchor, current, archived, onPick, onClose, title = '보관 위치', createLabel }: Props) {
   const [categories, setCategories] = useState<Category[] | null>(null)
   const [enabled, setEnabled] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -128,16 +127,6 @@ export function ArchivePopup({ anchor, current, archived, onPick, onUnarchive, o
               </button>
             )}
           </div>
-        )}
-        {archived && onUnarchive && (
-          <button
-            type="button"
-            className="border-t border-zinc-700 px-3 py-2 text-left text-rose-300 hover:bg-zinc-700"
-            title="클립 영상을 지우고 이 후보를 보관 전 상태로 되돌립니다(후보는 목록에 남습니다)"
-            onClick={onUnarchive}
-          >
-            보관 해제
-          </button>
         )}
       </div>
     </div>

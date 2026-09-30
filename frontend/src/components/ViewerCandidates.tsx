@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { candidateTitle, effectiveRange, formatClock, isDismissed, isSaved, type Candidate } from '../games'
-import { archiveState } from '../archive'
+import { rowState } from '../archive'
 import { rangeModified } from '../playerBar'
 import { ClipMemoInput } from './ClipMemoInput'
 import { BookmarkFilledIcon, BookmarkIcon, EditIcon } from './ViewerIcons'
@@ -20,6 +20,8 @@ interface Props {
   onArchive: (id: string, anchor: DOMRect) => void
   /** 보관한 클립에 고친 범위를 반영한다(다시 저장). */
   onResave: (id: string) => void
+  /** 이 후보로 만든 클립 파일을 지운다(보관됨 여부와 상관없이). 후보는 목록에 남는다. */
+  onDeleteClip: (id: string) => void
   /** 보관한 클립의 메모(로컬 전용)를 저장한다. */
   onMemo: (id: string, memo: string | null) => void
   onDismiss: (c: Candidate) => void
@@ -81,7 +83,7 @@ export function ViewerCandidates(p: Props) {
           const saved = isSaved(c)
           const dismissed = isDismissed(c)
           const modified = rangeModified(c, p.duration)
-          const state = archiveState(saved, modified)
+          const state = rowState(saved, c.user.archived === true, modified)
           const selected = p.selectedId === c.id
           return (
             <li
@@ -154,7 +156,7 @@ export function ViewerCandidates(p: Props) {
                       {c.user.savedMemo ? '메모 ●' : '메모'}
                     </button>
                   )}
-                  {state === 'pending' && (
+                  {state.resave && (
                     <button
                       type="button"
                       disabled={p.busy || !p.canSave}
@@ -167,27 +169,39 @@ export function ViewerCandidates(p: Props) {
                   )}
                   <button
                     type="button"
-                    disabled={p.busy || (state === 'none' && (!p.canSave || dismissed))}
-                    aria-pressed={state !== 'none'}
+                    disabled={p.busy || (!saved && (!p.canSave || dismissed))}
+                    aria-pressed={state.bookmark === 'archived'}
                     className={`flex items-center gap-1 rounded px-2 py-0.5 disabled:opacity-40 ${
-                      state === 'none'
+                      state.bookmark === 'none'
                         ? 'bg-sky-600 text-zinc-100 hover:bg-sky-500'
                         : 'bg-emerald-600/30 text-emerald-200 hover:bg-emerald-600/40'
                     }`}
-                    title={state === 'none' ? '클립으로 만들어 카테고리에 보관합니다' : `보관됨(${c.user.savedCategory ?? '카테고리 없음'}) — 카테고리 바꾸기·보관 해제`}
+                    title={state.bookmark === 'none' ? (saved ? '카테고리를 골라 보관합니다(클립을 그 카테고리로 옮깁니다)' : '클립으로 만들어 카테고리에 보관합니다') : `보관됨(${c.user.savedCategory ?? '카테고리 없음'}) — 눌러서 카테고리 바꾸기`}
                     onClick={(e) => p.onArchive(c.id, e.currentTarget.getBoundingClientRect())}
                   >
-                    {state === 'none' ? <BookmarkIcon /> : <BookmarkFilledIcon />}
-                    {state === 'none' ? '보관' : '보관됨'}
+                    {state.bookmark === 'none' ? <BookmarkIcon /> : <BookmarkFilledIcon />}
+                    {state.bookmark === 'none' ? '보관' : '보관됨'}
                   </button>
+                  {state.deletable && (
+                    <button
+                      type="button"
+                      disabled={p.busy}
+                      className="rounded border border-rose-500/50 px-2 py-0.5 text-rose-300 hover:bg-rose-500/20 disabled:opacity-40"
+                      title="이 후보로 만든 클립 영상을 삭제합니다(후보는 목록에 남습니다)"
+                      onClick={() => p.onDeleteClip(c.id)}
+                    >
+                      클립 삭제
+                    </button>
+                  )}
                   {c.id.includes('_u') ? (
                     <button
                       type="button"
                       disabled={p.busy}
                       className="rounded border border-zinc-600 px-2 py-0.5 hover:bg-zinc-600"
+                      title="직접 추가한 구간을 지웁니다"
                       onClick={() => p.onDelete(c.id)}
                     >
-                      삭제
+                      구간 삭제
                     </button>
                   ) : (
                     !saved && (

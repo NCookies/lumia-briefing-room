@@ -11,6 +11,7 @@ import {
   unsaveCandidate,
 } from '../gamesApi'
 import { patchClip } from '../api'
+import { useConfirm } from '../confirmContext'
 import { moveClipsToCategory } from '../categoriesApi'
 import { applyMark, candidateAtTime, newRangeAround, rangeModified, zoomBy, zoomView, type View } from '../playerBar'
 import { loadVolume, saveVolume, type VolumeState } from '../volume'
@@ -58,6 +59,7 @@ export function GameViewer({
   const [vol, setVol] = useState<VolumeState>(loadVolume)
   const [fullscreen, setFullscreen] = useState(false)
   const [showDismissed, setShowDismissed] = useState(false)
+  const ask = useConfirm()
   const [archiveTarget, setArchiveTarget] = useState<{ id: string; anchor: DOMRect } | null>(null)
   const video = useRef<HTMLVideoElement>(null)
   const shell = useRef<HTMLDivElement>(null)
@@ -240,10 +242,16 @@ export function GameViewer({
     if (clipId) void run(() => moveClipsToCategory([clipId], category), `"${category}"로 옮겼습니다`)
   }
 
-  const unarchive = (id: string) => {
-    setArchiveTarget(null)
-    setSelected((sel) => (sel === id ? null : sel))
-    void run(() => unsaveCandidate(gameKey, id), '보관을 해제했습니다 — 클립 영상은 지웠고 후보는 그대로 남아 있습니다')
+  const deleteClip = async (id: string) => {
+    const cand = cands.find((c) => c.id === id)
+    const result = await ask({
+      message: `"${cand ? candidateTitle(cand) : '이'}" 클립을 삭제합니다.
+클립 영상 파일이 지워지고 이 후보는 목록에 그대로 남습니다.`,
+      confirmLabel: '삭제',
+      danger: true,
+    })
+    if (!result.ok) return
+    void run(() => unsaveCandidate(gameKey, id), '클립을 삭제했습니다 — 후보는 목록에 남아 있습니다')
   }
 
   const zoomStep = (factor: number) => {
@@ -340,6 +348,7 @@ export function GameViewer({
       onToggleDismissed={setShowDismissed}
       onArchive={(id, anchor) => setArchiveTarget({ id, anchor })}
       onResave={resave}
+      onDeleteClip={(id) => void deleteClip(id)}
       onMemo={(id, memo) => {
         const clipId = cands.find((c) => c.id === id)?.user.savedClipId
         if (clipId) void run(() => patchClip(clipId, { memo }))
@@ -488,14 +497,13 @@ export function GameViewer({
         {archiveTarget &&
           (() => {
             const cand = cands.find((c) => c.id === archiveTarget.id)
-            const archived = cand ? isSaved(cand) : false
+            const hasClip = cand ? isSaved(cand) : false
             return (
               <ArchivePopup
                 anchor={archiveTarget.anchor}
                 current={cand?.user.savedCategory ?? null}
-                archived={archived}
-                onPick={(category) => (archived && category ? moveArchived(archiveTarget.id, category) : archive(archiveTarget.id, category))}
-                onUnarchive={() => unarchive(archiveTarget.id)}
+                archived={cand?.user.archived === true}
+                onPick={(category) => (hasClip && category ? moveArchived(archiveTarget.id, category) : archive(archiveTarget.id, category))}
                 onClose={() => setArchiveTarget(null)}
               />
             )

@@ -111,7 +111,7 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, menu }: Pr
             {rebuild.label}
           </button>
         )}
-        <span className="text-xs text-zinc-300">보관한 클립 {g.savedClipCount}개</span>
+        <span className="text-xs text-zinc-300">클립 {g.savedClipCount}개</span>
         <span className="text-xs text-zinc-500">
           {g.legacy && !g.hasFullVideo
             ? ''
