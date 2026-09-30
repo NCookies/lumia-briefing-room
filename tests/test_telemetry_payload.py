@@ -161,3 +161,9 @@ def test_hash_key_is_32_hex():
 def test_normalize_label_value():
     assert normalize_label_value("pvp") == "combat" and normalize_label_value("pve") == "other"
     assert normalize_label_value(None) is None
+
+
+def test_local_clip_memo_is_never_sent():
+    label = build(steam_meta(memo="이 교전은 팀원이 늦게 와서 아쉬웠다 someone_secret"))
+    assert "memo" not in label
+    assert "someone_secret" not in json.dumps(label, ensure_ascii=False)

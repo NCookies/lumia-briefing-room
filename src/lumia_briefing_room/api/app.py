@@ -56,7 +56,7 @@ from lumia_briefing_room.pipeline.game_records import (
     records_dir_for,
 )
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for
-from lumia_briefing_room.pipeline.label_note import normalize_label_note
+from lumia_briefing_room.pipeline.label_note import normalize_label_note, normalize_memo
 from lumia_briefing_room.pipeline.cleanup import remove_orphan_result_images
 from lumia_briefing_room.pipeline.preserve_before_delete import make_preserver
 from lumia_briefing_room.pipeline.game_cleanup import game_cleanup_preview, plan_game_cleanup, run_game_cleanup
@@ -261,6 +261,12 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
                 meta["labelNote"] = normalize_label_note(body["labelNote"])
             except ValueError as e:
                 raise HTTPException(400, str(e))
+        if "memo" in body:
+            try:
+                memo = normalize_memo(body["memo"])
+            except ValueError as e:
+                raise HTTPException(400, str(e))
+            meta["memo"] = memo
         if "userLabel" in body:
             meta["labelSource"] = "user" if body["userLabel"] is not None else None
             meta["labelConflict"] = False

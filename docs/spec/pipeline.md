@@ -93,7 +93,7 @@ Player.log 폴링 ─ 경기 경계(GAME→LOBBY) ─▶ 녹화 세션 결정(�
   "matchResult": {"matchType": "rank", "matchLabel": "랭크", "placement": 4, "total": 7, "outcome": "실험 종료",
                   "nickname": "…", "tk": 13, "kills": 3, "deaths": 1, "assists": 6, "imagePath": ".thumbs/…_result.jpg"},
   "matchResultSource": null,
-  "userLabel": null, "labelNote": null, "labeledAt": null, "labelConflict": false,
+  "userLabel": null, "labelNote": null, "labeledAt": null, "labelConflict": false, "memo": null,
   "trimmed": false, "originalDurationSec": null, "splitFrom": null
 }
 ```
@@ -185,6 +185,7 @@ result.jpg / portrait_{me,teammate1,teammate2}.jpg   클립 쪽 썸네일 폴더
 | `DELETE /api/games/{key}/candidates/{id}` | 직접 추가한 구간만 삭제(자동 후보는 "무시") |
 | `POST /api/games/{key}/candidates/{id}/save` | 후보(조정한 범위)를 풀영상에서 `-c copy` 로 잘라 클립 저장(직접 보관) → `{clipId, category}`. 본문 `{category}` 로 카테고리를 고르고(없으면 `보관함`, 없는 이름이면 만든다) 옛 경로 모드는 카테고리 없이 `category: null`. 이미 저장했고 범위가 저장 당시와 같으면 다시 자르지 않고 기존 ID, **범위를 고쳤으면 같은 클립(파일·ID·제목·라벨·고정·`clipUid` 유지)을 새 범위로 다시 잘라 교체**. 풀영상이 없으면 409 |
 | `POST /api/games/{key}/save` | 일괄 저장 `{mode: all\|certain\|ids, ids, category}` → `{saved[], failed[]}` (무시·저장된 후보 제외) |
+| `PATCH /api/clips/{id}` `{memo}` | **클립 메모**(`memo`, `normalize_memo` - 최대 5,000자, 줄바꿈 유지, 빈 값 = 지움, 문자열이 아니면 400): 좋았던·아쉬웠던 점을 적는 개인 메모. 라벨 메모(`labelNote`, 500자, 전송 대상)와 **별개 필드**이며 서버로 보내지 않는다(`contract/app-metadata-fields.json` `excluded`, `test_local_clip_memo_is_never_sent`). 라벨을 해제해도 지워지지 않고, 범위를 고쳐 다시 저장(`_KEPT_ON_REPLACE`)해도 유지된다. 정보 파일(library)에 있어 영상을 옮기거나 이름을 바꿔도 `clipUid` 로 이어진다. 게임 상세는 보관한 후보마다 계산 값 `user.savedMemo` 를 붙인다 |
 | `POST /api/games/{key}/candidates/{id}/unsave` | 보관 해제: 클립 영상을 `clipUid`/`savedClipId` 로 찾아 지우고(클립 탭 삭제와 같은 처리 - 라벨 보관·게임 기록 유지, 휴지통/영구는 `ui.deleteMode`) `savedClipId`·`savedStart`·`savedEnd` 를 지우며 그 후보를 **무시(`dismissed`) 처리**한다. 보관한 후보가 아니면 409 |
 | `GET /api/categories` | 클립 카테고리(= `clips\` 바로 아래 폴더) 목록 `{enabled, categories[{name, auto, default, clipCount, thumbnailClipId}]}`. `보관함`이 맨 앞, 사용자 카테고리(이름순), `자동 보관`(`auto`)이 맨 뒤이며 앞뒤 두 칸은 폴더가 없어도 항상 있다. `thumbnailClipId` 는 그 카테고리에서 가장 최근에 만든 클립(썸네일은 `GET /api/clips/{id}/thumbnail`). 옛 경로 모드는 `enabled:false` |
 | `POST /api/categories` | `{name}` 카테고리(폴더) 만들기 → 201. 이름 규칙은 클립 정리 탭 폴더와 같고(`.` 시작·경로 문자 400), 이미 있으면(기본 두 칸 포함) 409 |

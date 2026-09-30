@@ -28,7 +28,7 @@ from lumia_briefing_room.pipeline.vod_clips import build_vod_metadata
 from lumia_briefing_room.procs import run_hidden
 
 PORTRAIT_SLOTS = ("me", "teammate1", "teammate2")
-_KEPT_ON_REPLACE = ("title", "userLabel", "labelSource", "labelConflict", "pinned", "deletedAt", "clipUid")
+_KEPT_ON_REPLACE = ("title", "userLabel", "labelSource", "labelConflict", "pinned", "deletedAt", "clipUid", "memo")
 
 
 def _read_json(path: Path) -> dict:

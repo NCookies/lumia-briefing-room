@@ -214,11 +214,23 @@ def register_game_routes(
         return cats.category_of(cfg, clip.video) if clip is not None else None
 
     def self_saved_category(game: dict) -> None:
-        """보관한 후보마다 지금 어느 카테고리에 있는지 `user.savedCategory` 로 붙인다(저장하지 않는 계산 값)."""
+        """보관한 후보마다 지금 어느 카테고리에 있는지(`user.savedCategory`)와 클립 메모(`user.savedMemo`)를 붙인다(저장하지 않는 계산 값)."""
+        cfg = current_config()
+        roots = resolve_paths(cfg.paths).clip_roots
         for cand in gcand.all_candidates(game):
             user = cand.get("user") or {}
-            if user.get("savedClipId") and (name := category_of_clip(game, user["savedClipId"])):
-                cand["user"] = {**user, "savedCategory": name}
+            if not user.get("savedClipId"):
+                continue
+            clip = find_clip(clips_dir_for(game), user["savedClipId"], roots)
+            if clip is None:
+                continue
+            extra: dict = {}
+            if cats.enabled(cfg) and (name := cats.category_of(cfg, clip.video)):
+                extra["savedCategory"] = name
+            if isinstance(clip.meta.get("memo"), str) and clip.meta["memo"]:
+                extra["savedMemo"] = clip.meta["memo"]
+            if extra:
+                cand["user"] = {**user, **extra}
 
     rebuild_jobs: dict[str, dict] = {}
 

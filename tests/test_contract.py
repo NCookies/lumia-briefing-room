@@ -51,7 +51,7 @@ def _camel_names() -> list[str]:
 
 
 # 앱 메타데이터의 dataclass 필드가 아니지만 클라이언트가 만들어 붙이는 값(labelNote 는 API 가 추가로 쓰고, source 는 VOD 클립에만 있고, clipId 는 파일 이름)
-CLIENT_ADDED = {"labelNote", "labeledAt", "source", "clipId"}
+CLIENT_ADDED = {"labelNote", "labeledAt", "source", "clipId", "memo"}
 
 
 def _classified() -> set[str]:

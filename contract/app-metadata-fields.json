@@ -58,7 +58,8 @@
     "matchResult": "닉네임·이미지 경로 포함",
     "myCharacterPortraitPath": "경로 원문(이미지, 로컬 전용 — plan-ui.md §0 캐릭터 초상화)",
     "teammatePortraitPaths": "경로 원문(이미지, 로컬 전용 — plan-ui.md §0 캐릭터 초상화)",
-    "matchResultSource": "화면 상태(수동 보정 잠금 여부 — plan-ui.md §0 판독값 수동 보정)"
+    "matchResultSource": "화면 상태(수동 보정 잠금 여부 — plan-ui.md §0 판독값 수동 보정)",
+    "memo": "개인 메모(로컬 전용 — 서버로 보내지 않는다, plan-fullvideo.md §3.13). 라벨 메모 labelNote 와 별개 필드"
   },
   "appMissing": {
     "pvpSignalValues": "신호별 수치는 앱이 아직 저장하지 않음(D10 에서 추가)"
