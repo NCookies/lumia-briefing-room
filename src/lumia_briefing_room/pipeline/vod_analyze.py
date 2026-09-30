@@ -571,7 +571,7 @@ def _make_clips(
                 game_clip_ids.append(clip_id)
                 clip_ids.append(clip_id)
 
-            result_file, portrait_files = save_game_assets(folder, result, portraits)
+            result_file, portrait_files = save_game_assets(folder, result, portraits, game_mode=det.detection.game_mode)
             data = vod_game_dict(
                 source=source, span=span, game_mode=det.detection.game_mode, detection=det.detection,
                 candidates=candidates, saved_ids=saved_ids, full_start=full_start, full_end=full_end,

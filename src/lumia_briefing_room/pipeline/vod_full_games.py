@@ -222,9 +222,11 @@ def vod_game_dict(
 
 
 def save_game_assets(
-    folder: Path, result: ResultScreen | None, portraits: PortraitCrops | None
+    folder: Path, result: ResultScreen | None, portraits: PortraitCrops | None, *, game_mode: str = "battle_royale"
 ) -> tuple[str | None, dict[str, str | None]]:
-    """결과표 이미지(`result.jpg`)와 초상화(`portrait_<칸>.jpg`)를 게임 폴더에 쓰고 파일 이름을 돌려준다. 못 쓴 것은 None."""
+    """결과표 이미지(`result.jpg`)와 초상화(`portrait_<칸>.jpg`)를 게임 폴더에 쓰고 파일 이름을 돌려준다. 못 쓴 것은 None.
+
+    코발트는 선택 화면 UI 가 달라 초상화를 지원하지 않는다(detection.md §9) - 판독기가 엉뚱한 자리를 잘라 오므로 저장하지 않는다."""
     result_file = None
     if result is not None and result.image is not None:
         try:
@@ -233,7 +235,7 @@ def save_game_assets(
         except OSError:
             log.exception("결과 화면 이미지 저장 실패")
     names: dict[str, str | None] = {slot: None for slot in PORTRAIT_SLOTS}
-    if portraits is not None:
+    if portraits is not None and game_mode != "cobalt":
         for slot in PORTRAIT_SLOTS:
             try:
                 save_portrait_image(getattr(portraits, slot), folder / f"portrait_{slot}.jpg")

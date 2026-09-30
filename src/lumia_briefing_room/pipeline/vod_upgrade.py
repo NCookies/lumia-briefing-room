@@ -208,7 +208,7 @@ def upgrade_vod_games(
             vod, g["index"], duration=duration,
         )
         saved = _link_old_clips(candidates, _old_clip_spans(root, g), full_start)
-        result_file, portrait_files = save_game_assets(folder, result, portraits)
+        result_file, portrait_files = save_game_assets(folder, result, portraits, game_mode=det.detection.game_mode)
         data = vod_game_dict(
             source=source, span=span, game_mode=det.detection.game_mode, detection=det.detection,
             candidates=candidates, saved_ids=saved, full_start=full_start, full_end=full_end, full=full.video,
@@ -217,7 +217,7 @@ def upgrade_vod_games(
         )
         if result is None:
             _keep_old_result(data, folder, root, g)
-        old_portraits = _old_portraits(folder)
+        old_portraits = _old_portraits(folder) if det.detection.game_mode != "cobalt" else {}
         data["portraits"] = {slot: name or old_portraits.get(slot) for slot, name in data["portraits"].items()}
         write_vod_game(folder, _keep_pinned(folder, data))
         g.update(gameKey=key, fullVideo=True, fullStartSec=full_start, fullEndSec=full_end)

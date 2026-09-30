@@ -238,3 +238,17 @@ def test_game_assets_are_written_into_the_game_folder(tmp_path):
 def test_game_assets_are_none_without_a_result_or_portraits(tmp_path):
     result_file, names = vfg.save_game_assets(tmp_path / "g", None, None)
     assert result_file is None and names == {"me": None, "teammate1": None, "teammate2": None}
+
+
+def test_cobalt_games_get_no_portraits(tmp_path):
+    import numpy as np
+
+    from lumia_briefing_room.detect.types import PortraitCrops
+
+    image = np.zeros((20, 40, 3), dtype=np.uint8)
+    crops = PortraitCrops(me=image, teammate1=image, teammate2=image)
+
+    _, names = vfg.save_game_assets(tmp_path / "g", None, crops, game_mode="cobalt")
+
+    assert names == {"me": None, "teammate1": None, "teammate2": None}
+    assert not (tmp_path / "g" / "portrait_me.jpg").exists()
