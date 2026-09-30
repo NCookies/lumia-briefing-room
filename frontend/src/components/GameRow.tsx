@@ -79,7 +79,9 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild }: Props) {
             편집 {g.unsavedEditCount}개 저장 안 됨
           </span>
         )}
-        {g.pinned && <span className="rounded bg-sky-600/30 px-1.5 text-xs text-sky-200">고정</span>}
+        {g.pinned && <span className="rounded bg-sky-600/30 px-1.5 text-xs text-sky-200" title="자동 정리에서 제외됩니다">
+            고정
+          </span>}
         {due && g.hasFullVideo && (
           <span className="rounded bg-rose-600/30 px-1.5 text-xs text-rose-200" title={cleanupReasonTooltip(due)}>
             {cleanupReasonLabel(due)}
@@ -121,6 +123,7 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild }: Props) {
           <button
             type="button"
             className="rounded border border-zinc-600 px-2 py-1 text-xs hover:bg-zinc-700"
+            title={g.pinned ? undefined : '자동 정리에서 제외됩니다'}
             onClick={(e) => {
               e.stopPropagation()
               onPin()

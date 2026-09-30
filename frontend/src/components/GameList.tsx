@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { dayAnchorId, dayId, shortcutDays } from '../dayFold'
+import { dayAnchorId, dayId } from '../dayFold'
 import { groupByDay } from '../gameDays'
 import type { GameSummary } from '../games'
 import { getGames, setGamePinned } from '../gamesApi'
@@ -10,7 +10,6 @@ import { useCleanupPreview } from '../useCleanupPreview'
 import { useStorageUsage } from '../useStorageUsage'
 import { useDayFold } from '../useDayFold'
 import { useRebuildFullVideo } from '../useRebuildFullVideo'
-import { DayShortcutBar } from './DayShortcutBar'
 import { DueOnlyToggle } from './DueOnlyToggle'
 import { GameDayHeader } from './GameDayHeader'
 import { GameRow } from './GameRow'
@@ -83,7 +82,7 @@ export function GameList({ active, refreshTick, onBackfill, backfillLabel }: Pro
               disabled={fold.collapsed.size === 0}
               onClick={fold.expandAll}
             >
-              모두 펼치기
+              날짜 모두 펼치기
             </button>
             <button
               type="button"
@@ -91,7 +90,7 @@ export function GameList({ active, refreshTick, onBackfill, backfillLabel }: Pro
               disabled={fold.allCollapsed}
               onClick={fold.collapseAll}
             >
-              모두 접기
+              날짜 모두 접기
             </button>
           </>
         )}
@@ -111,7 +110,6 @@ export function GameList({ active, refreshTick, onBackfill, backfillLabel }: Pro
           아직 저장된 게임이 없습니다. 게임을 한 판 마치면 전체 영상과 교전 후보가 여기에 쌓입니다.
         </p>
       )}
-      <DayShortcutBar shortcuts={shortcutDays(dayList, 'steam')} onGo={fold.go} />
       {dayGroups.map((dayGroup) => (
         <section
           key={dayGroup.day ?? 'unknown'}

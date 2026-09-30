@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useConfirm } from '../confirmContext'
 import type { DeleteMode } from '../deleteConfirm'
 import { onlyDueGames } from '../cleanupPreview'
-import { dayAnchorId, dayId, shortcutDays } from '../dayFold'
+import { dayAnchorId, dayId } from '../dayFold'
 import type { GameSummary } from '../games'
 import { getGames, setGamePinned } from '../gamesApi'
 import { formatBytes } from '../retention'
@@ -27,7 +27,6 @@ import { groupVodsByDate } from '../vodDates'
 import { resolvedDeleteSource } from '../vodDeleteSource'
 import { buildableGameCount, groupGamesByVod, vodGameTime, vodTotals } from '../vodGames'
 import { probeProgress, type Vod } from '../vodGrouping'
-import { DayShortcutBar } from './DayShortcutBar'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { DueOnlyToggle } from './DueOnlyToggle'
 import { GameDayHeader } from './GameDayHeader'
@@ -339,7 +338,6 @@ export function VodGameList({
         </div>
       )}
 
-      <DayShortcutBar shortcuts={shortcutDays(days, 'vod')} onGo={fold.go} />
       <div className="flex flex-col gap-3">
         {dateGroups.map((dateGroup) => (
           <section key={dateGroup.day ?? 'unknown'} id={dayAnchorId('vod', dateGroup.day)} className="flex flex-col gap-3 [&+&]:mt-5">
