@@ -1,0 +1,65 @@
+import type { Candidate, CandidateUser, GameDetail, GameSummary } from './games'
+
+const BASE = '/api/games'
+
+async function jsonOrThrow<T>(res: Response, action: string): Promise<T> {
+  if (!res.ok) {
+    let detail = ''
+    try {
+      detail = (await res.json()).detail ?? ''
+    } catch {
+      // 본문이 JSON 이 아니어도 상태 코드로 알린다
+    }
+    throw new Error(detail || `${action}에 실패했습니다 (${res.status})`)
+  }
+  return res.json()
+}
+
+export async function getGames(): Promise<GameSummary[]> {
+  return (await jsonOrThrow<{ games: GameSummary[] }>(await fetch(BASE), '게임 목록 불러오기')).games
+}
+
+export async function getGame(key: string): Promise<GameDetail> {
+  return jsonOrThrow(await fetch(`${BASE}/${key}`), '게임 불러오기')
+}
+
+export const gameVideoUrl = (key: string) => `${BASE}/${key}/video`
+export const gameAssetUrl = (key: string, name: string) => `${BASE}/${key}/asset/${name}`
+
+const send = (method: string, url: string, body?: unknown) =>
+  fetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+
+export async function setGamePinned(key: string, pinned: boolean): Promise<GameSummary> {
+  return jsonOrThrow(await send('PATCH', `${BASE}/${key}`, { pinned }), '고정')
+}
+
+export type CandidatePatch = Partial<Pick<CandidateUser, 'start' | 'end' | 'dismissed'>> & { label?: 'combat' | 'hunt' | null }
+
+export async function patchCandidate(key: string, id: string, patch: CandidatePatch): Promise<Candidate> {
+  return jsonOrThrow(await send('PATCH', `${BASE}/${key}/candidates/${id}`, patch), '후보 수정')
+}
+
+export async function addCandidate(key: string, start: number, end: number, title?: string): Promise<Candidate> {
+  return jsonOrThrow(await send('POST', `${BASE}/${key}/candidates`, { start, end, title }), '구간 추가')
+}
+
+export async function deleteCandidate(key: string, id: string): Promise<void> {
+  await jsonOrThrow(await send('DELETE', `${BASE}/${key}/candidates/${id}`), '구간 삭제')
+}
+
+export async function saveCandidate(key: string, id: string): Promise<string> {
+  return (await jsonOrThrow<{ clipId: string }>(await send('POST', `${BASE}/${key}/candidates/${id}/save`), '클립 저장')).clipId
+}
+
+export interface BatchResult {
+  saved: { candidateId: string; clipId: string }[]
+  failed: { candidateId: string; error: string }[]
+}
+
+export async function saveBatch(key: string, mode: 'all' | 'certain' | 'ids', ids?: string[]): Promise<BatchResult> {
+  return jsonOrThrow(await send('POST', `${BASE}/${key}/save`, { mode, ids }), '일괄 저장')
+}
