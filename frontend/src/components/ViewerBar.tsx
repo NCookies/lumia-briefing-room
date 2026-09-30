@@ -138,16 +138,20 @@ export function ViewerBar({ duration, view, time, cands, selectedId, markers, ov
               {active && s >= view[0] && (
                 <span
                   data-testid="handle-start"
-                  className="absolute -top-1 -bottom-1 -left-2 w-2 cursor-ew-resize rounded-l-sm border border-white bg-yellow-400"
+                  className="absolute -top-1 -bottom-1 -left-2 w-2 cursor-ew-resize"
                   onPointerDown={(ev) => startHandle(ev, 'start', c)}
-                />
+                >
+                  <span className="absolute inset-y-0 right-0 w-0.5 bg-white" />
+                </span>
               )}
               {active && e <= view[1] && (
                 <span
                   data-testid="handle-end"
-                  className="absolute -top-1 -bottom-1 -right-2 w-2 cursor-ew-resize rounded-r-sm border border-white bg-yellow-400"
+                  className="absolute -top-1 -bottom-1 -right-2 w-2 cursor-ew-resize"
                   onPointerDown={(ev) => startHandle(ev, 'end', c)}
-                />
+                >
+                  <span className="absolute inset-y-0 left-0 w-0.5 bg-white" />
+                </span>
               )}
             </div>
           )
