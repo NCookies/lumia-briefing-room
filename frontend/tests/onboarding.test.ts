@@ -32,6 +32,7 @@ const info: FirstRunInfo = {
   recording: { ...base, session },
   clipsDir: 'C:/clips',
   ffmpegFound: true,
+  disk: { available: true, freeGb: 30, belowRecommended: true, low: false, recommendedGb: [50, 100] },
 }
 
 test('the past-recording analysis is offered on a first run when the recording folder and ffmpeg are there', () => {
@@ -43,4 +44,23 @@ test('the past-recording analysis is not offered without a recognised recording,
   assert.equal(canOfferFirstBackfill({ ...info, recording: { ...base, root: null, exists: false, session } }), false)
   assert.equal(canOfferFirstBackfill({ ...info, ffmpegFound: false }), false)
   assert.equal(canOfferFirstBackfill({ ...info, pendingItems: ['update', 'labels'] }), false)
+})
+
+import { canStartFirstRun, diskFreeText, diskTone } from '../src/onboarding.ts'
+
+test('the disk warning turns on below the recommended free space and off above it', () => {
+  assert.equal(diskTone(info.disk), 'warn')
+  assert.equal(diskTone({ available: true, freeGb: 80, belowRecommended: false, recommendedGb: [50, 100] }), 'ok')
+  assert.equal(diskTone({ available: false, recommendedGb: [50, 100] }), 'unknown')
+})
+
+test('the free space text shows the number or says it could not be read', () => {
+  assert.equal(diskFreeText(info.disk), '지금 저장 폴더가 있는 드라이브의 여유 공간: 30GB')
+  assert.match(diskFreeText({ available: false, recommendedGb: [50, 100] }), /확인하지 못했습니다/)
+})
+
+test('a first run with the setup step cannot start before the disk notice is acknowledged', () => {
+  assert.equal(canStartFirstRun(['setup', 'update'], false), false)
+  assert.equal(canStartFirstRun(['setup', 'update'], true), true)
+  assert.equal(canStartFirstRun(['update'], false), true)
 })

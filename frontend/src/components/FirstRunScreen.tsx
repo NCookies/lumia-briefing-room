@@ -2,6 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   RECORDING_STATE_TEXT,
   canOfferFirstBackfill,
+  canStartFirstRun,
+  diskFreeText,
+  diskTone,
   RESOLUTION_TONE,
   SOURCE_TEXT,
   recordingState,
@@ -74,6 +77,7 @@ export function FirstRunScreen({ onDone }: { onDone: (backfillStarted: boolean) 
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState<'recording' | 'clips' | null>(null)
   const [analyzePast, setAnalyzePast] = useState(true)
+  const [diskAcknowledged, setDiskAcknowledged] = useState(false)
 
   const load = useCallback(() => {
     getFirstRun()
@@ -215,6 +219,33 @@ export function FirstRunScreen({ onDone }: { onDone: (backfillStarted: boolean) 
           )}
         </section>
 
+        <section className="flex flex-col gap-2" data-testid="disk-notice">
+          <h3 className="text-base font-medium">저장 공간</h3>
+          <div
+            className={`rounded border-2 px-4 py-3 ${
+              diskTone(info.disk) === 'warn'
+                ? 'border-rose-500 bg-rose-500/10 text-rose-100'
+                : 'border-amber-500/70 bg-amber-500/10 text-amber-100'
+            }`}
+          >
+            <p className="text-lg font-semibold">
+              게임 하나에 2~5GB 가 저장됩니다. {info.disk.recommendedGb[0]}~{info.disk.recommendedGb[1]}GB 여유 공간을
+              확보하고 사용하세요.
+            </p>
+            <p className={`mt-2 text-sm ${diskTone(info.disk) === 'warn' ? 'font-semibold text-rose-300' : ''}`}>
+              {diskFreeText(info.disk)}
+              {diskTone(info.disk) === 'warn' && ` (권장 ${info.disk.recommendedGb[0]}GB 미만)`}
+            </p>
+            <p className="mt-1 text-xs text-zinc-400">
+              게임 전체 영상을 저장하기 때문입니다. 오래된 영상은 옵션의 자동 정리 한도(기본 40GB)로 지울 수 있습니다.
+            </p>
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 rounded border border-zinc-600 bg-zinc-900/60 p-3 text-sm">
+            <input type="checkbox" checked={diskAcknowledged} onChange={(e) => setDiskAcknowledged(e.target.checked)} />
+            <b>확인했습니다</b>
+          </label>
+        </section>
+
         <section className="flex flex-col gap-2">
           <h3 className="text-base font-medium">2. 녹화 해상도</h3>
           {resolution && info.recording.session ? (
@@ -274,7 +305,8 @@ export function FirstRunScreen({ onDone }: { onDone: (backfillStarted: boolean) 
         <div className="flex justify-end">
           <button
             type="button"
-            className="rounded bg-sky-600 px-6 py-2 text-sm font-medium hover:bg-sky-500"
+            className="rounded bg-sky-600 px-6 py-2 text-sm font-medium hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!canStartFirstRun(info.pendingItems, diskAcknowledged)}
             onClick={finish}
           >
             시작하기

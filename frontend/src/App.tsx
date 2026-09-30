@@ -8,6 +8,7 @@ import { SettingsModal } from './components/SettingsModal'
 import { UpdateBanner } from './components/UpdateBanner'
 import { UpdateBadge } from './components/UpdateBadge'
 import { ActivityBar } from './components/ActivityBar'
+import { NoticeBanner } from './components/NoticeBanner'
 import { WatchFailureBanner } from './components/WatchFailureBanner'
 import { activityLabels } from './activity'
 import { useActivity } from './useActivity'
@@ -188,6 +189,7 @@ export default function App() {
         labels={activityLabels(tasks, backfillRunning ? `과거 녹화 분석 중 ${progressPercent(backfill)}%` : null)}
       />
       <WatchFailureBanner />
+      <NoticeBanner />
 
       <UpdateBanner />
 

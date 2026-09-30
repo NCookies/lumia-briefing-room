@@ -8,6 +8,16 @@ export interface RecordingReport {
   resolution: { kind: ResolutionKind; message: string; width: number; height: number } | null
 }
 
+export interface DiskReport {
+  available: boolean
+  path?: string
+  freeGb?: number
+  low?: boolean
+  belowRecommended?: boolean
+  message?: string | null
+  recommendedGb: [number, number]
+}
+
 export interface FirstRunInfo {
   needed: boolean
   pendingItems: string[]
@@ -16,6 +26,7 @@ export interface FirstRunInfo {
   recording: RecordingReport
   clipsDir: string
   ffmpegFound: boolean
+  disk: DiskReport
 }
 
 export type RecordingState = 'ok' | 'no-root' | 'missing-folder' | 'no-session'
@@ -48,4 +59,21 @@ export const SOURCE_TEXT: Record<'config' | 'auto', string> = {
 
 export function canOfferFirstBackfill(info: FirstRunInfo): boolean {
   return info.pendingItems.includes('setup') && info.ffmpegFound && recordingState(info.recording) === 'ok'
+}
+
+export type DiskTone = 'ok' | 'warn' | 'unknown'
+
+export function diskTone(disk: DiskReport): DiskTone {
+  if (!disk.available) return 'unknown'
+  return disk.belowRecommended ? 'warn' : 'ok'
+}
+
+export function diskFreeText(disk: DiskReport): string {
+  if (!disk.available || disk.freeGb === undefined) return '저장 폴더의 여유 공간을 확인하지 못했습니다.'
+  return `지금 저장 폴더가 있는 드라이브의 여유 공간: ${disk.freeGb}GB`
+}
+
+/** 첫 실행에서 저장 공간 안내를 확인해야 시작할 수 있다(설정 단계가 있을 때만). */
+export function canStartFirstRun(pendingItems: string[], diskAcknowledged: boolean): boolean {
+  return !pendingItems.includes('setup') || diskAcknowledged
 }
