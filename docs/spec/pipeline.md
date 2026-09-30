@@ -176,7 +176,7 @@ result.jpg / portrait_{me,teammate1,teammate2}.jpg   클립 쪽 썸네일 폴더
 | 경로 | 동작 |
 |---|---|
 | `GET /api/games` | 최신순 요약(옛 스팀 게임은 `canRebuildFullVideo` 도): 결과, 초상화 파일명, `hasFullVideo`, 풀영상 크기·길이, 후보 수(무시 제외)·확실한 후보 수·보관한 클립 수(`savedClipCount`)·보관한 클립 중 범위를 고치고 아직 저장(반영)하지 않은 수(`unsavedEditCount` - 보관하지 않은 후보의 수정은 바로 기억되므로 세지 않는다), `pinned` |
-| `GET /api/games/{key}` | `game.json` 전체 + `hasFullVideo`(+ 보관한 후보마다 계산 값 `user.savedCategory`) |
+| `GET /api/games/{key}` | `game.json` 전체 + `hasFullVideo`(+ 클립이 있는 후보마다 계산 값 `user.savedCategory`·**`user.archived`**(자동 보관이 아닌 카테고리에 있을 때만 true - `자동 보관` 의 클립은 파일은 있어도 어디에도 속하지 않은 것으로 본다, 옛 경로 모드는 클립이 있으면 true)·`user.savedMemo`) |
 | `GET /api/games/{key}/video` | 풀영상 스트리밍(Range 지원, `FileResponse`). 없으면 404 |
 | `GET /api/games/{key}/asset/{name}` | `result.jpg`, `portrait_{me,teammate1,teammate2}.jpg` 만 |
 | `PATCH /api/games/{key}` | `{pinned}` (자동 정리에서 제외) |

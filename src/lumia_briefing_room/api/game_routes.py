@@ -22,7 +22,7 @@ from lumia_briefing_room import activity
 from lumia_briefing_room.api.clips import find_clip
 from lumia_briefing_room.pipeline import categories as cats
 from lumia_briefing_room.pipeline.library_fs import LibraryError
-from lumia_briefing_room.config import Config, discover_ffmpeg, resolve_paths
+from lumia_briefing_room.config import AUTO_ARCHIVE_FOLDER, Config, discover_ffmpeg, resolve_paths
 from lumia_briefing_room.pipeline import game_candidates as gcand
 from lumia_briefing_room.pipeline.clip_from_full import FullVideoMissing
 from lumia_briefing_room.pipeline.game_clip_save import save_and_mark
@@ -215,7 +215,9 @@ def register_game_routes(
         return cats.category_of(cfg, clip.video) if clip is not None else None
 
     def self_saved_category(game: dict) -> None:
-        """보관한 후보마다 지금 어느 카테고리에 있는지(`user.savedCategory`)와 클립 메모(`user.savedMemo`)를 붙인다(저장하지 않는 계산 값)."""
+        """클립이 있는 후보마다 지금 어느 카테고리에 있는지(`user.savedCategory`), **보관됨 여부(`user.archived`)**, 클립 메모(`user.savedMemo`)를 붙인다(저장하지 않는 계산 값).
+
+        보관됨 = 자동 보관이 아닌 카테고리에 있는 클립. `자동 보관` 의 클립은 클립 파일은 있어도 어디에도 속하지 않은 것으로 본다(옛 경로 모드는 카테고리가 없어 클립이 있으면 보관됨)."""
         cfg = current_config()
         roots = resolve_paths(cfg.paths).clip_roots
         for cand in gcand.all_candidates(game):
@@ -226,8 +228,10 @@ def register_game_routes(
             if clip is None:
                 continue
             extra: dict = {}
-            if cats.enabled(cfg) and (name := cats.category_of(cfg, clip.video)):
+            name = cats.category_of(cfg, clip.video) if cats.enabled(cfg) else None
+            if name:
                 extra["savedCategory"] = name
+            extra["archived"] = not cats.enabled(cfg) or (name is not None and name != AUTO_ARCHIVE_FOLDER)
             if isinstance(clip.meta.get("memo"), str) and clip.meta["memo"]:
                 extra["savedMemo"] = clip.meta["memo"]
             if extra:

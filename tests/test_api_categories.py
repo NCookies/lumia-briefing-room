@@ -164,3 +164,37 @@ def test_legacy_layout_has_no_categories_and_saves_where_it_always_did(tmp_path,
     resp = save(client, "01", category="아야")
     assert resp.status_code == 200 and resp.json()["category"] is None
     assert (tmp_path / "clips" / f"{KEY}_01.mp4").exists()
+
+
+def _user(client, cid):
+    cands = {c["id"]: c for c in client.get(f"/api/games/{KEY}").json()["candidates"]}
+    return cands[f"{KEY}_{cid}"]["user"]
+
+
+def test_a_clip_in_the_auto_folder_is_not_archived_but_one_in_any_other_category_is(client):
+    save(client, "01")
+    save(client, "02", category="아야")
+    save(client, "03", category="자동 보관")
+    assert _user(client, "01")["archived"] is True
+    assert _user(client, "02")["archived"] is True
+    user = _user(client, "03")
+    assert user["archived"] is False and user["savedCategory"] == "자동 보관", "클립은 있지만 어디에도 속하지 않은 것으로 본다"
+
+
+def test_moving_an_auto_clip_into_a_category_archives_it_and_moving_back_unarchives_it(client):
+    save(client, "01", category="자동 보관")
+    client.post("/api/categories/move", json={"clipIds": [f"{KEY}_01"], "category": "보관함"})
+    assert _user(client, "01")["archived"] is True
+    client.post("/api/categories/move", json={"clipIds": [f"{KEY}_01"], "category": "자동 보관"})
+    assert _user(client, "01")["archived"] is False
+
+
+def test_unsaved_candidates_have_no_archive_flag(client):
+    assert "archived" not in _user(client, "01")
+
+
+def test_legacy_layout_saved_clips_count_as_archived(tmp_path, monkeypatch):
+    paths = PathsConfig(clips=tmp_path / "clips", vod_clips=tmp_path / "vod", games=tmp_path / "games", temp=tmp_path / "tmp")
+    client = make_client(tmp_path, monkeypatch, paths)
+    save(client, "01")
+    assert _user(client, "01")["archived"] is True
