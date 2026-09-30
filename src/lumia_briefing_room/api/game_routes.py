@@ -64,6 +64,15 @@ def _summary(game: dict, games_dir: Path) -> dict:
     }
 
 
+def _range_changed(cand: dict, used: tuple[float, float], duration: float) -> bool:
+    """저장 당시 범위와 지금 범위가 다른가. 저장 범위 기록이 없는 옛 클립은 검출 범위로 만들어졌다고 본다."""
+    user = cand.get("user") or {}
+    base = (float(user["savedStart"]), float(user["savedEnd"])) if "savedStart" in user and "savedEnd" in user else (
+        max(0.0, float(cand["start"])), min(duration, float(cand["end"]))
+    )
+    return abs(base[0] - used[0]) > 0.001 or abs(base[1] - used[1]) > 0.001
+
+
 def register_game_routes(
     app: FastAPI, *, lock, current_config: Callable[[], Config]
 ) -> None:
@@ -181,12 +190,15 @@ def register_game_routes(
         cand = gcand.find_candidate(game, candidate_id)
         if cand is None:
             raise HTTPException(404, "후보를 찾을 수 없습니다")
-        existing = (cand.get("user") or {}).get("savedClipId")
-        if existing:
+        user = cand.get("user") or {}
+        existing = user.get("savedClipId")
+        used = gcand.effective_range(cand, duration_of(game))
+        if existing and not _range_changed(cand, used, duration_of(game)):
             return existing
         try:
             clip_id = save_candidate_clip(
-                game, cand, game_folder=game_dir(games_dir(), key), clips_dir=clips_dir(), cfg=cfg, ffmpeg_path=ffmpeg
+                game, cand, game_folder=game_dir(games_dir(), key), clips_dir=clips_dir(), cfg=cfg, ffmpeg_path=ffmpeg,
+                replace_clip_id=existing,
             )
         except FullVideoMissing:
             raise HTTPException(409, "풀영상이 없어 클립을 저장할 수 없습니다")
@@ -197,7 +209,12 @@ def register_game_routes(
 
         def mark(data: dict) -> None:
             target = gcand.find_candidate(data, candidate_id)
-            target["user"] = {**(target.get("user") or {}), "savedClipId": clip_id}
+            target["user"] = {
+                **(target.get("user") or {}),
+                "savedClipId": clip_id,
+                "savedStart": round(used[0], 3),
+                "savedEnd": round(used[1], 3),
+            }
 
         update_game(games_dir(), key, mark)
         cleanup_preview_registry.notify_clips_changed()

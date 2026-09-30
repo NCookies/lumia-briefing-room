@@ -123,3 +123,36 @@ def test_batch_save_modes(client):
 def test_saving_without_a_full_video_is_a_conflict(client):
     (client.tmp / "games" / KEY / "full.mp4").unlink()
     assert client.post(f"/api/games/{KEY}/candidates/{KEY}_01/save").status_code == 409
+
+
+def test_resaving_after_a_range_change_replaces_the_clip_and_unchanged_resave_does_nothing(client):
+    url = f"/api/games/{KEY}/candidates/{KEY}_01"
+    client.post(f"{url}/save")
+    saved = client.get(f"/api/games/{KEY}").json()["candidates"][0]["user"]
+    assert saved["savedStart"] == 100.0 and saved["savedEnd"] == 140.0
+
+    client.post(f"{url}/save")
+    assert len(client.cuts) == 1
+
+    assert client.patch(url, json={"start": 90.0, "end": 150.0}).status_code == 200
+    assert client.post(f"{url}/save").json()["clipId"] == f"{KEY}_01"
+    assert len(client.cuts) == 2
+    cmd = client.cuts[-1]
+    assert cmd[cmd.index("-ss") + 1] == "90.000" and cmd[cmd.index("-t") + 1] == "60.000"
+    user = client.get(f"/api/games/{KEY}").json()["candidates"][0]["user"]
+    assert user["savedStart"] == 90.0 and user["savedEnd"] == 150.0 and user["savedClipId"] == f"{KEY}_01"
+    assert len([c for c in client.get("/api/clips").json() if c["id"].startswith(KEY)]) == 1
+
+
+def test_a_clip_saved_before_range_records_existed_counts_the_detected_range_as_saved(client):
+    url = f"/api/games/{KEY}/candidates/{KEY}_01"
+    client.post(f"{url}/save")
+    path = client.tmp / "games" / KEY / "game.json"
+    game = json.loads(path.read_text(encoding="utf-8"))
+    game["candidates"][0]["user"] = {"savedClipId": f"{KEY}_01"}
+    path.write_text(json.dumps(game), encoding="utf-8")
+    client.post(f"{url}/save")
+    assert len(client.cuts) == 1
+    client.patch(url, json={"start": 95.0})
+    client.post(f"{url}/save")
+    assert len(client.cuts) == 2

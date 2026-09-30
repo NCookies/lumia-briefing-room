@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import json
+import os
 import shutil
 from pathlib import Path
 
@@ -19,6 +21,14 @@ from lumia_briefing_room.pipeline.metadata import ClipMetadata, phase_index, rev
 from lumia_briefing_room.procs import run_hidden
 
 PORTRAIT_SLOTS = ("me", "teammate1", "teammate2")
+_KEPT_ON_REPLACE = ("title", "userLabel", "labelSource", "labelConflict", "pinned", "deletedAt", "clipUid")
+
+
+def _read_json(path: Path) -> dict:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
 
 
 class FullVideoMissing(Exception):
@@ -86,8 +96,10 @@ def save_candidate_clip(
     cfg: Config,
     ffmpeg_path: Path,
     thumbnails_root: Path | None = None,
+    replace_clip_id: str | None = None,
 ) -> str:
-    """후보 하나를 클립으로 저장하고 클립 ID 를 돌려준다."""
+    """후보 하나를 클립으로 저장하고 클립 ID 를 돌려준다. `replace_clip_id` 가 있으면 그 클립을 새 범위로 교체한다
+    (같은 파일 이름·클립 ID·제목·라벨·고정 상태 유지)."""
     video = game.get("fullVideo")
     full = game_folder / FULL_VIDEO
     if not video or not full.is_file():
@@ -98,9 +110,17 @@ def save_candidate_clip(
         raise ValueError("구간이 올바르지 않습니다")
 
     thumbnails_root = thumbnails_root or cfg.paths.thumbnails or (clips_dir / ".thumbs")
-    clip_id = _unique_clip_id(clips_dir, cand["id"])
+    clip_id = replace_clip_id or _unique_clip_id(clips_dir, cand["id"])
     clip_path = clips_dir / f"{clip_id}.mp4"
-    cut_from_full(full, clip_path, start, end, ffmpeg_path=ffmpeg_path)
+    if replace_clip_id:
+        staged = clips_dir / f"{clip_id}.replace.mp4"
+        try:
+            cut_from_full(full, staged, start, end, ffmpeg_path=ffmpeg_path)
+            os.replace(staged, clip_path)
+        finally:
+            staged.unlink(missing_ok=True)
+    else:
+        cut_from_full(full, clip_path, start, end, ffmpeg_path=ffmpeg_path)
 
     thumb_rel = None
     if cfg.encode.thumbnail.enabled:
@@ -170,5 +190,11 @@ def save_candidate_clip(
         teammate_portrait_paths=mates,
         match_result_source=None,
     )
-    write_metadata(meta, clip_path.with_suffix(".json"))
+    json_path = clip_path.with_suffix(".json")
+    old = _read_json(json_path) if replace_clip_id else {}
+    write_metadata(meta, json_path)
+    if old:
+        kept = {k: old[k] for k in _KEPT_ON_REPLACE if k in old}
+        merged = {**json.loads(json_path.read_text(encoding="utf-8")), **kept}
+        json_path.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
     return clip_id

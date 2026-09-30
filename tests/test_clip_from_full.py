@@ -106,3 +106,29 @@ def test_missing_full_video_raises(tmp_path, fake_ffmpeg):
     folder, game, cand = _game(tmp_path, with_video=False)
     with pytest.raises(cff.FullVideoMissing):
         _save(tmp_path, game, cand, folder)
+
+
+def test_replacing_a_saved_clip_recuts_the_same_file_and_keeps_its_identity(tmp_path, fake_ffmpeg):
+    folder, game, cand = _game(tmp_path)
+    clip_id = _save(tmp_path, game, cand, folder)
+    json_path = tmp_path / "clips" / f"{clip_id}.json"
+    meta = json.loads(json_path.read_text(encoding="utf-8"))
+    meta.update({"title": "내가 바꾼 제목", "userLabel": "combat", "pinned": True})
+    json_path.write_text(json.dumps(meta), encoding="utf-8")
+    uid = meta["clipUid"]
+
+    cand["user"] = {"start": 90.0, "end": 150.0}
+    cfg = Config(paths=PathsConfig(clips=tmp_path / "clips"))
+    same = cff.save_candidate_clip(
+        game, cand, game_folder=folder, clips_dir=tmp_path / "clips", cfg=cfg, ffmpeg_path=Path("ffmpeg"), replace_clip_id=clip_id
+    )
+
+    assert same == clip_id
+    assert not list((tmp_path / "clips").glob("*-r2*"))
+    cmd = fake_ffmpeg[-1]
+    assert cmd[cmd.index("-ss") + 1] == "90.000" and cmd[cmd.index("-t") + 1] == "60.000"
+    assert (tmp_path / "clips" / f"{clip_id}.mp4").read_bytes() == b"clip"
+    new_meta = json.loads(json_path.read_text(encoding="utf-8"))
+    assert new_meta["durationSec"] == 60.0 and new_meta["videoOffsetSec"] == 390.0
+    assert new_meta["title"] == "내가 바꾼 제목" and new_meta["userLabel"] == "combat" and new_meta["pinned"] is True
+    assert new_meta["clipUid"] == uid
