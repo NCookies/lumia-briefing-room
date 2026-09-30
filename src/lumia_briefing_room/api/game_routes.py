@@ -7,7 +7,9 @@
 from __future__ import annotations
 
 import json
+import logging
 import subprocess
+import threading
 from collections.abc import Callable
 from pathlib import Path
 
@@ -22,6 +24,9 @@ from lumia_briefing_room.pipeline.cleanup_registry import registry as cleanup_pr
 from lumia_briefing_room.pipeline.ffmpeg_errors import describe_clip_error
 from lumia_briefing_room.pipeline.game_files import GameNotFound, game_dir, has_full_video, list_games, load_game, update_game
 from lumia_briefing_room.pipeline.game_store import FULL_VIDEO
+from lumia_briefing_room.pipeline.legacy_games import migrate_legacy_games
+
+log = logging.getLogger(__name__)
 
 _ASSETS = {"result.jpg", "portrait_me.jpg", "portrait_teammate1.jpg", "portrait_teammate2.jpg"}
 
@@ -58,6 +63,7 @@ def _summary(game: dict, games_dir: Path) -> dict:
         "fullVideoSizeBytes": video.get("sizeBytes"),
         "durationSec": video.get("durationSec"),
         "fullVideoError": game.get("fullVideoError"),
+        "legacy": bool(game.get("legacy")),
         "fullVideoDeletedAt": game.get("fullVideoDeletedAt"),
         "candidateCount": len(active),
         "certainCount": sum(1 for c in active if c.get("certain")),
@@ -69,11 +75,30 @@ def _summary(game: dict, games_dir: Path) -> dict:
 def register_game_routes(
     app: FastAPI, *, lock, current_config: Callable[[], Config]
 ) -> None:
+    migrate_lock = threading.Lock()
+
     def games_dir() -> Path:
         return resolve_paths(current_config().paths).games
 
     def clips_dir() -> Path:
         return resolve_paths(current_config().paths).clips
+
+    migrated: set[tuple[Path, Path]] = set()
+
+    def migrate_once() -> None:
+        """앱을 켠 뒤 처음 목록을 볼 때(경로를 바꾸면 그 경로에서 다시 한 번) 이전 버전 클립을 게임 기록으로 옮긴다.
+
+        시작 시 자동보다 목록 요청 때가 안전하다: 경로를 옵션에서 바꾼 뒤에도 따라가고, 서버가 뜨는 동안 파일을 건드리지 않는다.
+        """
+        pair = (clips_dir(), games_dir())
+        with migrate_lock:
+            if pair in migrated:
+                return
+            migrated.add(pair)
+            try:
+                migrate_legacy_games(*pair)
+            except Exception:
+                log.exception("이전 버전 게임 통합 실패")
 
     def load_or_404(key: str) -> dict:
         try:
@@ -87,6 +112,7 @@ def register_game_routes(
 
     @app.get("/api/games")
     def get_games():
+        migrate_once()
         root = games_dir()
         return {"games": [_summary(g, root) for g in list_games(root)]}
 

@@ -152,6 +152,15 @@ result.jpg / portrait_{me,teammate1,teammate2}.jpg   클립 쪽 썸네일 폴더
 - 스테이징(다시 분석·백필)으로 클립만 옮기는 경우에도 `games/` 는 스테이징을 거치지 않고 바로 쓴다(같은 경기키를 덮어쓴다).
 - 실측(2026-09-30, 스팀 녹화 24분 게임): 검출 + 풀영상 컷 + 클립 12개 전체 81초, 풀영상 4.02GB.
 
+### 이전 버전 게임 통합 (`pipeline/legacy_games.py`)
+
+풀영상 전환 전에 만든 클립(`clips/*.json`)과 게임 기록(`clips/.games/*.json`)을 `games/<경기키>/game.json` 으로 옮긴다. 경기키는 `matchStartUtc` 로 만든다.
+
+- **언제**: 앱을 켠 뒤 `GET /api/games` 를 처음 부를 때(클립·게임 폴더 경로 조합마다 한 번). 시작 시 자동보다 옵션에서 경로를 바꾼 뒤에도 따라가고, 서버가 뜨는 동안 파일을 건드리지 않아서 이쪽이 안전하다. 몇 번 돌려도 같다.
+- 한 게임(`sessionDir`+`matchStartUtc`)의 클립들 → 후보(저장됨, `user.savedClipId` = 클립 ID, 태그·점수·제목 그대로). 후보 시각은 세션 기준 오프셋에서 게임 시작을 뺀 값(풀영상이 없어 표시용). 결과·초상화·결과표 이미지는 게임 폴더로 복사한다(`result.jpg`, `portrait_*.jpg`).
+- `legacy: true`, `fullVideo: null`, `fullVideoError` = "이전 버전에서 분석한 게임이라 풀영상이 없습니다". 자동 정리는 풀영상이 없는 폴더를 건너뛰므로 지워지지 않는다.
+- 이미 `game.json` 이 있는 경기, `full.mp4` 만 있는(자르는 중일 수 있는) 폴더는 건드리지 않는다. 옛 파일은 지우지 않는다. 클립이 모두 지워지고 게임 기록만 남은 경기는 후보 없는 게임이 된다.
+
 ### 게임 API (`api/game_routes.py`, F4 백엔드)
 
 기존 클립 API 는 그대로 두고 새 경로만 둔다. `{key}` 는 경기 키(`YYYYMMDD_HHMMSS`, 형식이 아니면 404).
