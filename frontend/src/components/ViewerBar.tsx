@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { MARKER_LABEL, dragRange, effectiveRange, formatClock, isDismissed, type Candidate, type DragKind, type Marker } from '../games'
-import { barPct, candidateAtTime, tickStep, timeFromBar, type View } from '../playerBar'
+import { barPct, candidateAtTime, panView, tickStep, timeFromBar, type View } from '../playerBar'
 
 const MARKER_COLOR: Record<string, string> = {
   kill: 'bg-emerald-400',
@@ -185,6 +185,59 @@ export function ViewerBar({ duration, view, time, cands, selectedId, markers, ov
           {hovered && ` · ${hovered.title}`}
         </span>
       )}
+    </div>
+  )
+}
+
+/** 확대했을 때 보이는 범위를 좌우로 옮기는 스크롤 띠. 전체 보기일 때는 그리지 않는다. */
+export function ViewerScroll({ duration, view, onPan }: { duration: number; view: View; onPan: (next: View) => void }) {
+  const strip = useRef<HTMLDivElement>(null)
+  const [grab, setGrab] = useState<{ originX: number; originView: View } | null>(null)
+
+  useEffect(() => {
+    if (!grab) return
+    const move = (e: PointerEvent) => {
+      const width = strip.current?.getBoundingClientRect().width ?? 0
+      if (width > 0) onPan(panView(grab.originView, ((e.clientX - grab.originX) / width) * duration, duration))
+    }
+    const up = () => setGrab(null)
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grab, duration])
+
+  const span = view[1] - view[0]
+  if (duration <= 0 || span >= duration) return null
+
+  const jumpTo = (e: React.PointerEvent) => {
+    const rect = strip.current?.getBoundingClientRect()
+    if (!rect || rect.width <= 0) return
+    const center = ((e.clientX - rect.left) / rect.width) * duration
+    onPan(panView(view, center - span / 2 - view[0], duration))
+  }
+
+  return (
+    <div
+      ref={strip}
+      data-testid="viewer-scroll"
+      className="relative h-3 cursor-pointer touch-none rounded bg-zinc-700"
+      onPointerDown={jumpTo}
+      onWheel={(e) => onPan(panView(view, (e.deltaY / 100) * (span / 5), duration))}
+    >
+      <div
+        data-testid="viewer-scroll-thumb"
+        className="absolute inset-y-0 cursor-grab rounded bg-zinc-400 hover:bg-zinc-300"
+        style={{ left: `${(view[0] / duration) * 100}%`, width: `${(span / duration) * 100}%` }}
+        onPointerDown={(e) => {
+          e.stopPropagation()
+          e.preventDefault()
+          setGrab({ originX: e.clientX, originView: view })
+        }}
+      />
     </div>
   )
 }

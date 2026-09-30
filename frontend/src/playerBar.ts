@@ -24,6 +24,13 @@ export function zoomView(range: [number, number], duration: number): View {
   return [Math.max(0, range[0] - ZOOM_PAD_SEC), Math.min(duration, range[1] + ZOOM_PAD_SEC)]
 }
 
+/** 확대한 범위를 좌우로 옮긴다. 폭은 그대로, 영상 밖으로는 나가지 않는다. */
+export function panView(view: View, deltaSec: number, duration: number): View {
+  const span = view[1] - view[0]
+  const start = Math.min(Math.max(0, view[0] + deltaSec), Math.max(0, duration - span))
+  return [start, start + span]
+}
+
 /** 그 시각이 든 후보(무시한 후보 제외). 겹치면 더 짧은 구간이 이긴다. */
 export function candidateAtTime(cands: Candidate[], t: number, duration: number): Candidate | null {
   let best: { c: Candidate; length: number } | null = null

@@ -8,6 +8,7 @@ import {
   candidateAtTime,
   candidateAtBar,
   newRangeAround,
+  panView,
   timeFromBar,
   tickStep,
   zoomView,
@@ -104,4 +105,10 @@ test('tick spacing grows with the visible span and keeps the count small', () =>
   assert.equal(tickStep(1500), 300)
   assert.equal(tickStep(5400), 600)
   for (const span of [30, 90, 400, 1500, 3000, 7200]) assert.ok(span / tickStep(span) <= 12)
+})
+
+test('panning a zoomed view keeps its width and stops at the video edges', () => {
+  assert.deepEqual(panView([100, 160], 20, 600), [120, 180])
+  assert.deepEqual(panView([100, 160], -500, 600), [0, 60])
+  assert.deepEqual(panView([100, 160], 900, 600), [540, 600])
 })

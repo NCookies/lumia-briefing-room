@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { effectiveRange, formatClock, gameHeadline, isDismissed, neighborCandidate, visibleCandidates, type Candidate, type GameDetail } from '../games'
+import { effectiveRange, formatClock, gameHeadline, isDismissed, isSaved, neighborCandidate, visibleCandidates, type Candidate, type GameDetail } from '../games'
 import {
   addCandidate,
   deleteCandidate,
@@ -12,7 +12,8 @@ import {
 } from '../gamesApi'
 import { applyMark, candidateAtTime, newRangeAround, zoomView, type View } from '../playerBar'
 import { loadVolume, saveVolume, type VolumeState } from '../volume'
-import { ViewerBar } from './ViewerBar'
+import { ViewerBar, ViewerScroll } from './ViewerBar'
+import { ExitFullscreenIcon, FullscreenIcon, MuteIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon, VolumeIcon } from './ViewerIcons'
 import { ViewerCandidates } from './ViewerCandidates'
 
 const SEEK_STEP_SEC = 5
@@ -33,7 +34,7 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
   const [videoError, setVideoError] = useState(false)
   const [time, setTime] = useState(0)
   const [playing, setPlaying] = useState(false)
-  const [zoomed, setZoomed] = useState(false)
+  const [zoomWindow, setZoomWindow] = useState<View | null>(null)
   const [undo, setUndo] = useState<Undo[]>([])
   const [overrides, setOverrides] = useState<Record<string, [number, number]>>({})
   const [vol, setVol] = useState<VolumeState>(loadVolume)
@@ -57,7 +58,7 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
   const cands = useMemo(() => (game ? visibleCandidates(game, showDismissed) : []), [game, showDismissed])
   const selectedCand = cands.find((c) => c.id === selected) ?? null
   const rangeOf = (c: Candidate): [number, number] => overrides[c.id] ?? effectiveRange(c, duration)
-  const view: View = zoomed && selectedCand ? zoomView(effectiveRange(selectedCand, duration), duration) : [0, duration]
+  const view: View = zoomWindow ?? [0, duration]
   const currentId = candidateAtTime(cands, time, duration)?.id ?? null
 
   const seek = (t: number) => {
@@ -135,8 +136,11 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
     }).finally(() => clearOverride(id))
   }
 
-  const commitRange = (id: string, next: [number, number], prev: [number, number]) =>
+  const commitRange = (id: string, next: [number, number], prev: [number, number]) => {
+    const saved = cands.find((c) => c.id === id)
     setRange(id, next, () => setUndo((u) => [...u, { kind: 'range', id, prev }]))
+    setNotice(saved && isSaved(saved) ? '범위를 기록했습니다 — 이미 저장한 클립은 그대로입니다' : '범위를 기록했습니다 — 클립은 "저장"을 눌러야 만들어집니다')
+  }
 
   const mark = (kind: 'start' | 'end') => {
     if (!selectedCand || busy) return
@@ -169,6 +173,7 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
   const select = (c: Candidate) => {
     setSelected(c.id)
     seek(rangeOf(c)[0])
+    if (zoomWindow) setZoomWindow(zoomView(rangeOf(c), duration))
   }
 
   const jump = (direction: 'prev' | 'next') => {
@@ -309,9 +314,9 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
               </p>
             )}
 
-            <div className="flex flex-wrap items-center gap-1">
+            <div className="flex flex-wrap items-center gap-1 text-white">
               <button type="button" className={BTN} title="재생/일시정지 (Space)" onClick={togglePlay}>
-                {playing ? '⏸' : '▶'}
+                {playing ? <PauseIcon /> : <PlayIcon />}
               </button>
               <button type="button" className={BTN} title="10초 뒤로" onClick={() => seek(time - SKIP_SEC)}>
                 ↺10
@@ -319,18 +324,18 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
               <button type="button" className={BTN} title="10초 앞으로" onClick={() => seek(time + SKIP_SEC)}>
                 10↻
               </button>
-              <button type="button" className={BTN} title="이전 후보 (P)" onClick={() => jump('prev')}>
-                ⏮ 후보
+              <button type="button" className={`${BTN} flex items-center gap-1`} title="이전 클립 (P)" onClick={() => jump('prev')}>
+                <PrevIcon /> 이전 클립
               </button>
-              <button type="button" className={BTN} title="다음 후보 (N)" onClick={() => jump('next')}>
-                후보 ⏭
+              <button type="button" className={`${BTN} flex items-center gap-1`} title="다음 클립 (N)" onClick={() => jump('next')}>
+                다음 클립 <NextIcon />
               </button>
               <span className="ml-2 text-sm tabular-nums text-zinc-300">
                 {formatClock(time)} / {formatClock(duration)}
               </span>
               <span className="ml-auto flex items-center gap-1">
                 <button type="button" className={BTN} title="음소거" onClick={() => setVol({ ...vol, muted: !vol.muted })}>
-                  {vol.muted || vol.volume === 0 ? '🔇' : '🔊'}
+                  {vol.muted || vol.volume === 0 ? <MuteIcon /> : <VolumeIcon />}
                 </button>
                 <input
                   type="range"
@@ -343,7 +348,7 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
                   onChange={(e) => setVol({ volume: Number(e.target.value), muted: false })}
                 />
                 <button type="button" className={BTN} title="전체화면" onClick={toggleFullscreen}>
-                  {fullscreen ? '⤡' : '⛶'}
+                  {fullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
                 </button>
               </span>
             </div>
@@ -360,32 +365,27 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
               onSelect={setSelected}
               onRangeCommit={commitRange}
             />
+            <ViewerScroll duration={duration} view={view} onPan={setZoomWindow} />
 
             <div className="flex flex-wrap items-center gap-1 pt-1">
-              <button type="button" disabled={!selectedCand || busy} className={BTN} title="선택한 구간의 시작을 현재 위치로 (I)" onClick={() => mark('start')}>
-                시작점=현재 (I)
-              </button>
-              <button type="button" disabled={!selectedCand || busy} className={BTN} title="선택한 구간의 끝을 현재 위치로 (O)" onClick={() => mark('end')}>
-                끝점=현재 (O)
-              </button>
               <button type="button" disabled={undo.length === 0 || busy} className={BTN} onClick={undoLast}>
                 되돌리기
               </button>
               <button
                 type="button"
-                disabled={!selectedCand}
+                disabled={!selectedCand && !zoomWindow}
                 className={BTN}
                 title="선택한 구간 앞뒤 30초를 막대 전체로 확대"
-                onClick={() => setZoomed((z) => !z)}
+                onClick={() => setZoomWindow(zoomWindow || !selectedCand ? null : zoomView(rangeOf(selectedCand), duration))}
               >
-                {zoomed ? '전체 보기' : '확대'}
+                {zoomWindow ? '전체 보기' : '확대'}
               </button>
               <button type="button" disabled={busy} className="rounded border border-yellow-600/60 px-2 py-1 text-sm hover:bg-zinc-700 disabled:opacity-40" onClick={addHere}>
                 + 여기서 구간 추가
               </button>
               <span className="ml-2 truncate text-xs text-zinc-500">
                 {selectedCand
-                  ? `선택: ${selectedCand.title} — 노란 손잡이를 끌거나 I/O 로 범위 조정`
+                  ? `선택: ${selectedCand.title} — 양 끝 손잡이를 끌어 범위를 바꾸면 바로 기록됩니다`
                   : '막대에서 노란 구간을 누르면 선택됩니다. 초록 킬 · 파랑 어시 · 빨강 사망 · 주황 팀원 사망'}
               </span>
             </div>
