@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { effectiveRange, formatClock, isDismissed, isSaved, type Candidate } from '../games'
+import { rangeModified } from '../playerBar'
 
 interface Props {
   cands: Candidate[]
@@ -59,17 +60,25 @@ export function ViewerCandidates(p: Props) {
           const [s, e] = effectiveRange(c, p.duration)
           const saved = isSaved(c)
           const dismissed = isDismissed(c)
+          const modified = rangeModified(c, p.duration)
           const selected = p.selectedId === c.id
           return (
             <li
               key={c.id}
               data-cand={c.id}
               className={`flex flex-col gap-1 rounded border px-2 py-1.5 text-xs ${
-                selected ? 'border-white bg-zinc-700' : p.currentId === c.id ? 'border-yellow-400/70 bg-yellow-400/10' : 'border-zinc-700'
+                selected ? 'border-white bg-zinc-700' : p.currentId === c.id ? 'border-yellow-400/70 bg-yellow-400/10' : modified ? 'border-orange-400/70' : 'border-zinc-700'
               } ${dismissed ? 'opacity-50' : ''}`}
             >
               <div className="flex items-center gap-2">
-                <input type="checkbox" disabled={saved || dismissed} checked={p.checked.has(c.id)} onChange={() => p.onToggleChecked(c.id)} />
+                {!saved && !dismissed && (
+                  <input
+                    type="checkbox"
+                    title="위의 '선택한 N개' 일괄 저장에 포함"
+                    checked={p.checked.has(c.id)}
+                    onChange={() => p.onToggleChecked(c.id)}
+                  />
+                )}
                 <button type="button" className="min-w-0 flex-1 truncate text-left text-sm hover:underline" title={c.title} onClick={() => p.onSelect(c)}>
                   {c.title}
                 </button>
@@ -78,6 +87,9 @@ export function ViewerCandidates(p: Props) {
                 <span>
                   {formatClock(s)}~{formatClock(e)} ({Math.round(e - s)}초)
                 </span>
+                {modified && (
+                  <span className="rounded bg-orange-500/25 px-1.5 text-orange-300">{saved ? '수정됨 · 저장 전' : '수정됨'}</span>
+                )}
                 {c.certain && <span className="rounded bg-yellow-500/20 px-1.5 text-yellow-300">확실</span>}
                 {c.tags.map((t) => (
                   <span key={t} className="rounded bg-zinc-700 px-1.5 text-zinc-300">
@@ -85,7 +97,7 @@ export function ViewerCandidates(p: Props) {
                   </span>
                 ))}
                 <span className="ml-auto flex gap-1">
-                  {saved ? (
+                  {saved && !modified ? (
                     <span className="rounded bg-emerald-600/30 px-2 py-0.5 text-emerald-200">저장됨</span>
                   ) : (
                     <button
@@ -94,7 +106,7 @@ export function ViewerCandidates(p: Props) {
                       className="rounded bg-sky-600 px-2 py-0.5 text-zinc-100 hover:bg-sky-500 disabled:opacity-40"
                       onClick={() => p.onSave(c.id)}
                     >
-                      저장
+                      {saved ? '다시 저장' : '저장'}
                     </button>
                   )}
                   {c.id.includes('_u') ? (
@@ -102,14 +114,17 @@ export function ViewerCandidates(p: Props) {
                       삭제
                     </button>
                   ) : (
-                    <button
-                      type="button"
-                      disabled={p.busy || saved}
-                      className="rounded border border-zinc-600 px-2 py-0.5 hover:bg-zinc-600 disabled:opacity-40"
-                      onClick={() => p.onDismiss(c)}
-                    >
-                      {dismissed ? '되살리기' : '무시'}
-                    </button>
+                    !saved && (
+                      <button
+                        type="button"
+                        disabled={p.busy}
+                        className="rounded border border-zinc-600 px-2 py-0.5 hover:bg-zinc-600"
+                        title="이 후보를 목록에서 숨긴다(무시한 후보 보기로 다시 볼 수 있다)"
+                        onClick={() => p.onDismiss(c)}
+                      >
+                        {dismissed ? '되살리기' : '무시'}
+                      </button>
+                    )
                   )}
                 </span>
               </div>

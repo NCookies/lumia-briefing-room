@@ -9,6 +9,8 @@ import {
   candidateAtBar,
   newRangeAround,
   panView,
+  rangeModified,
+  zoomBy,
   timeFromBar,
   tickStep,
   zoomView,
@@ -111,4 +113,27 @@ test('panning a zoomed view keeps its width and stops at the video edges', () =>
   assert.deepEqual(panView([100, 160], 20, 600), [120, 180])
   assert.deepEqual(panView([100, 160], -500, 600), [0, 60])
   assert.deepEqual(panView([100, 160], 900, 600), [540, 600])
+})
+
+test('zooming in halves the visible span around the center and zooming out doubles it', () => {
+  assert.deepEqual(zoomBy([0, 1200], 0.5, 300, 1200), [150, 750])
+  assert.deepEqual(zoomBy([100, 200], 0.5, 150, 1200), [125, 175])
+  assert.deepEqual(zoomBy([100, 200], 2, 150, 1200), [50, 250])
+})
+
+test('zoom keeps at least ten seconds, stays inside the video and returns null when fully zoomed out', () => {
+  assert.deepEqual(zoomBy([100, 120], 0.25, 110, 1200), [105, 115])
+  assert.deepEqual(zoomBy([0, 100], 2, 10, 1200), [0, 200])
+  assert.deepEqual(zoomBy([1100, 1200], 2, 1190, 1200), [1000, 1200])
+  assert.equal(zoomBy([100, 700], 2, 400, 1200), null)
+})
+
+test('a candidate counts as modified when its range differs from what was saved (or detected, if never saved)', () => {
+  const base = c('a', 10, 40)
+  assert.equal(rangeModified(base, 600), false)
+  assert.equal(rangeModified(c('a', 10, 40, { user: { start: 12 } }), 600), true)
+  assert.equal(rangeModified(c('a', 10, 40, { user: { start: 10, end: 40 } }), 600), false)
+  const saved = c('a', 10, 40, { user: { start: 5, end: 50, savedClipId: 'a', savedStart: 5, savedEnd: 50 } })
+  assert.equal(rangeModified(saved, 600), false)
+  assert.equal(rangeModified({ ...saved, user: { ...saved.user, end: 60 } }, 600), true)
 })

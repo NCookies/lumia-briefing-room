@@ -4,6 +4,8 @@ export interface CandidateUser {
   dismissed?: boolean
   label?: 'combat' | 'hunt'
   savedClipId?: string
+  savedStart?: number
+  savedEnd?: number
 }
 
 export interface Candidate {

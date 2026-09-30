@@ -166,10 +166,10 @@ result.jpg / portrait_{me,teammate1,teammate2}.jpg   클립 쪽 썸네일 폴더
 | `PATCH /api/games/{key}/candidates/{id}` | 사용자 수정 → `candidates[].user`: `start`/`end`(영상 안, 1초 이상), `dismissed`, `label`(`combat`/`hunt`/null). 자동 검출 값은 그대로 |
 | `POST /api/games/{key}/candidates` | 직접 추가한 구간(`userCandidates`, ID `<키>_uN`) |
 | `DELETE /api/games/{key}/candidates/{id}` | 직접 추가한 구간만 삭제(자동 후보는 "무시") |
-| `POST /api/games/{key}/candidates/{id}/save` | 후보(조정한 범위)를 풀영상에서 `-c copy` 로 잘라 클립 저장 → `{clipId}`. 이미 저장했으면 다시 자르지 않고 기존 ID. 풀영상이 없으면 409 |
+| `POST /api/games/{key}/candidates/{id}/save` | 후보(조정한 범위)를 풀영상에서 `-c copy` 로 잘라 클립 저장 → `{clipId}`. 이미 저장했고 범위가 저장 당시와 같으면 다시 자르지 않고 기존 ID, **범위를 고쳤으면 같은 클립(파일·ID·제목·라벨·고정·`clipUid` 유지)을 새 범위로 다시 잘라 교체**. 풀영상이 없으면 409 |
 | `POST /api/games/{key}/save` | 일괄 저장 `{mode: all\|certain\|ids, ids}` → `{saved[], failed[]}` (무시·저장된 후보 제외) |
 
-- 클립 저장(`pipeline/clip_from_full.py`): 시작은 키프레임 격자 때문에 앞으로 최대 3초 당겨진다. 클립 메타데이터는 기존 클립과 같은 형식이라(세션 기준 오프셋 포함) 기존 화면·API 가 그대로 읽는다. 결과·초상화는 클립이 읽는 `.thumbs` 로 복사. 저장 후 `user.savedClipId` 를 남긴다.
+- 클립 저장(`pipeline/clip_from_full.py`): 시작은 키프레임 격자 때문에 앞으로 최대 3초 당겨진다. 클립 메타데이터는 기존 클립과 같은 형식이라(세션 기준 오프셋 포함) 기존 화면·API 가 그대로 읽는다. 결과·초상화는 클립이 읽는 `.thumbs` 로 복사. 저장 후 `user.savedClipId` 와 저장에 쓴 범위 `user.savedStart/savedEnd` 를 남긴다(기록이 없는 옛 클립은 검출 범위로 만든 것으로 본다). 교체는 임시 파일에 잘라 `os.replace` 로 바꾼다.
 - 실측(스팀 녹화 63초 풀영상 → 21초 구간 `-c copy`): HEVC + AAC 가 그대로 나오고 길이 21.02초.
 
 ## 12. 저장 공간 알림 (`pipeline/disk_space.py`, `disk_alert.py`, `notices.py`, `api/disk_routes.py`)

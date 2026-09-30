@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { MARKER_LABEL, dragRange, effectiveRange, formatClock, isDismissed, type Candidate, type DragKind, type Marker } from '../games'
-import { barPct, candidateAtTime, panView, tickStep, timeFromBar, type View } from '../playerBar'
+import { barPct, candidateAtTime, panView, rangeModified, tickStep, timeFromBar, type View } from '../playerBar'
 
 const MARKER_COLOR: Record<string, string> = {
   kill: 'bg-emerald-400',
@@ -125,13 +125,20 @@ export function ViewerBar({ duration, view, time, cands, selectedId, markers, ov
           if (e < view[0] || s > view[1]) return null
           const active = selectedId === c.id
           const dismissed = isDismissed(c)
+          const modified = rangeModified({ ...c, user: { ...c.user, start: s, end: e } }, duration)
           const left = barPct(s, view)
           return (
             <div
               key={c.id}
               data-testid={`bar-cand-${c.id}`}
               className={`absolute inset-y-0 border-x-2 border-dashed ${
-                dismissed ? 'border-zinc-400 bg-zinc-500/30' : c.certain ? 'border-yellow-300 bg-yellow-400/70' : 'border-yellow-300 bg-yellow-300/30'
+                dismissed
+                  ? 'border-zinc-400 bg-zinc-500/30'
+                  : modified
+                    ? 'border-orange-400 bg-orange-500/60'
+                    : c.certain
+                      ? 'border-yellow-300 bg-yellow-400/70'
+                      : 'border-yellow-300 bg-yellow-300/30'
               } ${active ? 'border-y border-y-white' : ''}`}
               style={{ left: `${left}%`, width: `${Math.max(0.3, barPct(e, view) - left)}%` }}
             >

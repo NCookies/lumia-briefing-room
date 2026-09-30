@@ -10,10 +10,10 @@ import {
   saveCandidate,
   setGamePinned,
 } from '../gamesApi'
-import { applyMark, candidateAtTime, newRangeAround, zoomView, type View } from '../playerBar'
+import { applyMark, candidateAtTime, newRangeAround, rangeModified, zoomBy, zoomView, type View } from '../playerBar'
 import { loadVolume, saveVolume, type VolumeState } from '../volume'
 import { ViewerBar, ViewerScroll } from './ViewerBar'
-import { ExitFullscreenIcon, FullscreenIcon, MuteIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon, VolumeIcon } from './ViewerIcons'
+import { ExitFullscreenIcon, FullscreenIcon, MuteIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon, VolumeIcon, ZoomInIcon, ZoomOutIcon } from './ViewerIcons'
 import { ViewerCandidates } from './ViewerCandidates'
 
 const SEEK_STEP_SEC = 5
@@ -139,7 +139,11 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
   const commitRange = (id: string, next: [number, number], prev: [number, number]) => {
     const saved = cands.find((c) => c.id === id)
     setRange(id, next, () => setUndo((u) => [...u, { kind: 'range', id, prev }]))
-    setNotice(saved && isSaved(saved) ? '범위를 기록했습니다 — 이미 저장한 클립은 그대로입니다' : '범위를 기록했습니다 — 클립은 "저장"을 눌러야 만들어집니다')
+    setNotice(
+      saved && isSaved(saved)
+        ? '범위를 수정했습니다 — 이미 저장한 클립은 "다시 저장"을 눌러야 새 범위로 바뀝니다'
+        : '범위를 수정했습니다 — 클립은 "저장"을 눌러야 만들어집니다',
+    )
   }
 
   const mark = (kind: 'start' | 'end') => {
@@ -187,7 +191,16 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
     else void run(() => patchCandidate(gameKey, c.id, { dismissed: !isDismissed(c) }))
   }
 
-  const saveOne = (id: string) => void run(() => saveCandidate(gameKey, id), '클립으로 저장했습니다')
+  const saveOne = (id: string) => {
+    const replaced = cands.some((c) => c.id === id && isSaved(c))
+    void run(() => saveCandidate(gameKey, id), replaced ? '클립을 새 범위로 교체했습니다' : '클립으로 저장했습니다')
+  }
+
+  const zoomStep = (factor: number) => {
+    const base: View = zoomWindow ?? [0, duration]
+    const center = time >= base[0] && time <= base[1] ? time : (base[0] + base[1]) / 2
+    setZoomWindow(zoomBy(base, factor, center, duration))
+  }
 
   const batch = (mode: 'all' | 'certain' | 'ids') =>
     void run(async () => {
@@ -209,7 +222,13 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
   const handleKey = (e: KeyboardEvent) => {
     const target = e.target as HTMLElement | null
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return
-    if (e.ctrlKey || e.metaKey || e.altKey || !game?.hasFullVideo) return
+    if (!game?.hasFullVideo) return
+    if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && !e.shiftKey) {
+      e.preventDefault()
+      undoLast()
+      return
+    }
+    if (e.ctrlKey || e.metaKey || e.altKey) return
     const key = e.key.length === 1 ? e.key.toLowerCase() : e.key
     const actions: Record<string, () => void> = {
       ' ': togglePlay,
@@ -217,7 +236,12 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
       ArrowRight: () => seek(time + SEEK_STEP_SEC),
       n: () => jump('next'),
       p: () => jump('prev'),
-      s: () => selectedCand && !busy && !isDismissed(selectedCand) && saveOne(selectedCand.id),
+      s: () =>
+        selectedCand &&
+        !busy &&
+        !isDismissed(selectedCand) &&
+        (!isSaved(selectedCand) || rangeModified({ ...selectedCand, user: { ...selectedCand.user, start: rangeOf(selectedCand)[0], end: rangeOf(selectedCand)[1] } }, duration)) &&
+        saveOne(selectedCand.id),
       d: () => selectedCand && !busy && dismissOrDelete(selectedCand),
       i: () => mark('start'),
       o: () => mark('end'),
@@ -368,7 +392,7 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
             <ViewerScroll duration={duration} view={view} onPan={setZoomWindow} />
 
             <div className="flex flex-wrap items-center gap-1 pt-1">
-              <button type="button" disabled={undo.length === 0 || busy} className={BTN} onClick={undoLast}>
+              <button type="button" disabled={undo.length === 0 || busy} className={BTN} title="되돌리기 (Ctrl+Z)" onClick={undoLast}>
                 되돌리기
               </button>
               <button
@@ -378,7 +402,13 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
                 title="선택한 구간 앞뒤 30초를 막대 전체로 확대"
                 onClick={() => setZoomWindow(zoomWindow || !selectedCand ? null : zoomView(rangeOf(selectedCand), duration))}
               >
-                {zoomWindow ? '전체 보기' : '확대'}
+                {zoomWindow ? '전체 보기' : '구간 확대'}
+              </button>
+              <button type="button" className={`${BTN} flex items-center`} title="배율 확대" onClick={() => zoomStep(0.5)}>
+                <ZoomInIcon />
+              </button>
+              <button type="button" disabled={!zoomWindow} className={`${BTN} flex items-center`} title="배율 축소" onClick={() => zoomStep(2)}>
+                <ZoomOutIcon />
               </button>
               <button type="button" disabled={busy} className="rounded border border-yellow-600/60 px-2 py-1 text-sm hover:bg-zinc-700 disabled:opacity-40" onClick={addHere}>
                 + 여기서 구간 추가

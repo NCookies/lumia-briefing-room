@@ -1,4 +1,4 @@
-import { MIN_RANGE_SEC, effectiveRange, isDismissed, type Candidate } from './games.ts'
+import { MIN_RANGE_SEC, effectiveRange, isDismissed, isSaved, type Candidate } from './games.ts'
 
 export type View = [number, number]
 
@@ -6,6 +6,7 @@ const ZOOM_PAD_SEC = 30
 const NEW_RANGE_PAD_SEC = 10
 const TICK_STEPS = [5, 10, 30, 60, 120, 300, 600, 1800]
 const MAX_TICKS = 10
+const MIN_VIEW_SEC = 10
 
 export function barPct(t: number, view: View): number {
   const span = view[1] - view[0]
@@ -68,4 +69,24 @@ export function newRangeAround(now: number, duration: number): [number, number] 
 
 export function tickStep(span: number): number {
   return TICK_STEPS.find((s) => span / s <= MAX_TICKS) ?? TICK_STEPS[TICK_STEPS.length - 1]
+}
+
+/** 돋보기 +/-: 보이는 범위를 factor 배로 바꾼다(중심 유지). 전체가 다 보이게 되면 null(전체 보기). */
+export function zoomBy(view: View, factor: number, center: number, duration: number): View | null {
+  const span = Math.min(duration, Math.max(MIN_VIEW_SEC, (view[1] - view[0]) * factor))
+  if (span >= duration * 0.999) return null
+  const ratio = (center - view[0]) / (view[1] - view[0])
+  const start = Math.min(Math.max(0, center - ratio * span), duration - span)
+  return [start, start + span]
+}
+
+/** 저장한 뒤(또는 저장한 적 없으면 검출된 값에서) 범위를 고쳤는가. */
+export function rangeModified(c: Candidate, duration: number): boolean {
+  const [s, e] = effectiveRange(c, duration)
+  const u = c.user
+  const [bs, be] =
+    isSaved(c) && u.savedStart !== undefined && u.savedEnd !== undefined
+      ? [u.savedStart, u.savedEnd]
+      : [Math.max(0, c.start), Math.min(duration, c.end)]
+  return Math.abs(s - bs) > 0.001 || Math.abs(e - be) > 0.001
 }
