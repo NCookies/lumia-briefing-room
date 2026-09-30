@@ -185,3 +185,17 @@ def test_legacy_game_without_video_is_ignored_by_auto_clean(tmp_path):
     plan = plan_game_cleanup(games, RetentionConfig(auto_clean_enabled=True, max_total_gb=0.000001))
 
     assert plan.to_delete == [] and (games / KEY / "game.json").exists()
+
+
+def test_existing_clip_ids_of_a_legacy_game_near_the_window_start(tmp_path):
+    clips, games = _setup(tmp_path)
+    lg.migrate_legacy_games(clips, games)
+    from datetime import datetime, timedelta, timezone
+
+    start = datetime(2026, 9, 28, 16, 0, 25, 975000, tzinfo=timezone.utc)
+
+    assert lg.existing_clip_ids(games, clips, start + timedelta(seconds=30)) == {f"{KEY}_01", f"{KEY}_02"}
+    assert lg.existing_clip_ids(games, clips, start + timedelta(minutes=30)) is None
+    (clips / f"{KEY}_02.json").unlink()
+    assert lg.existing_clip_ids(games, clips, start) == {f"{KEY}_01"}
+

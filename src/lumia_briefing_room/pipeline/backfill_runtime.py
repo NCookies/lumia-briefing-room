@@ -132,7 +132,9 @@ def make_process_window(
     a_templates: dict | None,
     hwaccel: str | None,
     config_path: Path | None,
+    existing_clip_ids: Callable[[GameWindow], set[str] | None] | None = None,
 ) -> Callable[[Path, GameWindow, Path, threading.Event | None, Callable[[float], None] | None], list[Path]]:
+    """`existing_clip_ids` 는 이전 버전이 이 구간의 게임에 이미 저장해 둔 클립 ID 를 돌려준다(그 클립은 다시 만들지 않고, 이전 버전 게임이 아니면 None)."""
     staged = staging_config(cfg)
 
     def process(
@@ -148,6 +150,7 @@ def make_process_window(
                 clips_dir=staging, cancel=cancel, result_search_from=window.hud_end_utc,
                 on_result=lambda r: learn_nickname(config_path, r.nickname),
                 on_progress=on_progress,
+                existing_clip_ids=existing_clip_ids(window) if existing_clip_ids is not None else None,
             )
         except DetectionCancelled as exc:
             raise GameCancelled() from exc

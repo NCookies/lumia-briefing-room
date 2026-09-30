@@ -28,6 +28,7 @@ from lumia_briefing_room.pipeline.backfill_progress import (
     estimate_game_count,
     overall_fraction,
 )
+from lumia_briefing_room.pipeline.game_files import has_full_video, list_games
 from lumia_briefing_room.pipeline.session_scan import GameWindow, ScanCancelled, window_key
 
 log = logging.getLogger("lumia_briefing_room.backfill")
@@ -92,21 +93,40 @@ def _parse_utc(text: object) -> datetime | None:
     return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
 
 
-def collect_known_starts(clips_dir: Path) -> list[datetime]:
-    """이미 클립이 있거나(휴지통 포함) 게임 기록이 남은 경기의 시작 시각. 같은 경기를 두 번 만들지 않는 기준이다."""
+def _starts_in(folder: Path) -> list[datetime]:
     starts = []
-    for folder in (clips_dir, clips_dir / ".trash", clips_dir / ".games"):
-        if not folder.is_dir():
+    if not folder.is_dir():
+        return starts
+    for path in folder.glob("*.json"):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
             continue
-        for path in folder.glob("*.json"):
-            try:
-                data = json.loads(path.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                continue
-            start = _parse_utc(data.get("matchStartUtc")) if isinstance(data, dict) else None
-            if start is not None:
-                starts.append(start)
+        start = _parse_utc(data.get("matchStartUtc")) if isinstance(data, dict) else None
+        if start is not None:
+            starts.append(start)
     return starts
+
+
+def collect_known_starts(clips_dir: Path, games_dir: Path | None = None) -> list[datetime]:
+    """이미 처리한 경기의 시작 시각. 같은 경기를 두 번 만들지 않는 기준이다.
+
+    `games_dir` 를 주면 **풀영상이 있는(또는 자동 정리로 지운) 게임만** 처리된 것으로 본다. 풀영상이 없는 게임(이전 버전에서 클립만
+    만든 게임, 풀영상 저장에 실패한 게임)은 원본이 남아 있으면 풀영상을 새로 만든다. 클립·휴지통·게임 기록에만 있고 게임 기록
+    (`game.json`)이 없는 경기(휴지통에 버린 게임 등)는 처리된 것으로 본다. 안 주면 예전 방식(클립·휴지통·게임 기록이 있으면 처리됨).
+    """
+    clip_side = [s for folder in (clips_dir, clips_dir / ".trash", clips_dir / ".games") for s in _starts_in(folder)]
+    if games_dir is None:
+        return clip_side
+    done, tracked = [], []
+    for game in list_games(games_dir):
+        start = _parse_utc(game.get("matchStartUtc"))
+        if start is None:
+            continue
+        tracked.append(start)
+        if game.get("fullVideoDeletedAt") or has_full_video(games_dir, game.get("gameKey") or ""):
+            done.append(start)
+    return done + [s for s in clip_side if s not in tracked]
 
 
 def overlaps_known(window: GameWindow, known_starts: list[datetime]) -> bool:

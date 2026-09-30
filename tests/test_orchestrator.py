@@ -568,3 +568,25 @@ def test_when_the_full_video_fails_only_certain_candidates_become_clips_and_the_
     assert game["fullVideo"] is None and "저장 공간이 부족" in game["fullVideoError"]
     assert len(game["candidates"]) == 2
     assert game["candidates"][0]["user"] and not game["candidates"][1]["user"]
+
+
+def test_existing_clip_ids_are_marked_saved_and_no_new_clip_is_cut(tmp_path, monkeypatch):
+    from lumia_briefing_room.pipeline import orchestrator as orch
+
+    intervals = [ci(10.0, 20.0, {"kill"}), ci(200.0, 210.0, {"death"})]
+    cuts = _patch_pipeline(monkeypatch, orch, intervals=intervals)
+    written, game = _run_process(orch, tmp_path, existing_clip_ids={"20260924_060000_01"})
+
+    assert cuts == ["full"] and written == []
+    first, second = game["candidates"]
+    assert first["user"] == {"savedClipId": "20260924_060000_01"}
+    assert second["user"] == {}
+
+
+def test_an_empty_existing_clip_set_still_means_an_old_game_so_nothing_is_cut(tmp_path, monkeypatch):
+    from lumia_briefing_room.pipeline import orchestrator as orch
+
+    cuts = _patch_pipeline(monkeypatch, orch, intervals=[ci(10.0, 20.0, {"kill"})])
+    written, game = _run_process(orch, tmp_path, existing_clip_ids=set())
+
+    assert cuts == ["full"] and written == [] and game["candidates"][0]["user"] == {}

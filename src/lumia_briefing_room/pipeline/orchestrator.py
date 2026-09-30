@@ -1,7 +1,7 @@
 import logging
 import shutil
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -406,6 +406,7 @@ def process_match(
     on_progress: Callable[[float], None] | None = None,
     games_dir: Path | None = None,
     on_full_video_error: Callable[[str], None] | None = None,
+    existing_clip_ids: Collection[str] | None = None,
 ) -> list[Path]:
     """SPEC §3 다이어그램 전체: 매치 하나를 검출부터 메타데이터 저장까지 처리한다.
 
@@ -414,6 +415,9 @@ def process_match(
 
     검출 직후 게임 전체 영상을 `games/<경기키>/full.mp4` 로 먼저 자르고(실패해도 계속), 클립은
     `clip.saveMode` 가 `auto` 일 때만 자른다(풀영상이 없으면 확실한 후보만). 후보·마커는 `game.json` 에 남긴다.
+
+    `existing_clip_ids` 를 주면(빈 집합도) 이전 버전에서 분석한 게임의 풀영상을 새로 만드는 것이다: 그 ID 의 후보는 저장됨으로
+    표시만 하고, 클립은 `saveMode` 와 무관하게 새로 자르지 않는다(사용자가 이미 고른 클립을 두 번 만들지 않는다).
 
     반환값은 만들어진 메타데이터 JSON 경로 목록이다(클립 0개면 빈 리스트).
     `on_progress(0~1)` 는 이 게임 하나의 내부 진행률이다(plan-backfill B8) — 검출 프레임 비율 →
@@ -466,10 +470,13 @@ def process_match(
 
     candidates = _name_candidates(plans, match_start)
     to_save = plans_to_save(
-        candidates, cfg.clip.save_mode, full.video is not None, is_certain=lambda c: is_certain(c.aggregated.tags)
+        candidates, "manual" if existing_clip_ids is not None else cfg.clip.save_mode, full.video is not None,
+        is_certain=lambda c: is_certain(c.aggregated.tags),
     )
 
-    saved_ids: dict[str, str] = {}
+    already = existing_clip_ids or ()
+    saved_ids: dict[str, str] = {c.candidate_id: c.clip_id for c in candidates if c.clip_id in already}
+    to_save = [c for c in to_save if c.clip_id not in already]
     written: list[Path] = []
     try:
         for n, cand in enumerate(to_save, start=1):

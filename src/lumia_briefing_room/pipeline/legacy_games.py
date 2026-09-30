@@ -10,10 +10,11 @@ from __future__ import annotations
 import json
 import logging
 import shutil
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from lumia_briefing_room.pipeline.clip_assets import resolve_character_portrait, resolve_result_image
+from lumia_briefing_room.pipeline.game_files import list_games
 from lumia_briefing_room.pipeline.game_store import FULL_VIDEO, GAME_JSON, SCHEMA_VERSION, game_key, is_certain, write_game_json
 from lumia_briefing_room.pipeline.game_records import RECORDS_DIRNAME
 
@@ -191,3 +192,25 @@ def migrate_legacy_games(clips_dir: Path, games_dir: Path) -> list[str]:
             continue
         created.append(key)
     return created
+
+
+def existing_clip_ids(
+    games_dir: Path, clips_dir: Path, window_start: datetime, window_end: datetime | None = None, tolerance_sec: float = 240.0
+) -> set[str] | None:
+    """이 구간에서 시작한 옛 게임이 이미 저장해 둔 클립 ID(파일이 아직 있는 것만). 그런 게임이 없으면 None.
+
+    풀영상을 새로 만들 때 클립을 두 번 만들지 않는 기준이다.
+    """
+    lo = window_start - timedelta(seconds=tolerance_sec)
+    hi = window_end if window_end is not None else window_start + timedelta(seconds=tolerance_sec)
+    found: set[str] | None = None
+    for game in list_games(games_dir):
+        start = _parse_utc(game.get("matchStartUtc"))
+        if start is None or not lo <= start <= hi:
+            continue
+        found = found if found is not None else set()
+        for cand in game.get("candidates") or []:
+            clip_id = (cand.get("user") or {}).get("savedClipId")
+            if clip_id and (clips_dir / f"{clip_id}.json").is_file():
+                found.add(clip_id)
+    return found

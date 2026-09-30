@@ -174,3 +174,20 @@ def test_process_window_on_progress_defaults_to_none(monkeypatch, tmp_path: Path
     process(Path("bg_1049590_x"), _window(), tmp_path / "stage", None)
 
     assert calls["on_progress"] is None
+
+
+def test_process_window_passes_the_clip_ids_that_already_exist_for_that_game(monkeypatch, tmp_path: Path):
+    calls = {}
+    monkeypatch.setattr(rt, "process_match", lambda *a, **kw: calls.update(kw) or [])
+    monkeypatch.setattr(rt.RecordingSession, "load", classmethod(lambda cls, d: "session"))
+    monkeypatch.setattr(rt, "learn_nickname", lambda *a: None)
+    seen = []
+    process = rt.make_process_window(
+        Config(paths=PathsConfig(clips=Path("REAL"))), Path("ffmpeg"), k_templates=None, a_templates=None,
+        hwaccel=None, config_path=None, existing_clip_ids=lambda w: seen.append(w) or {"x_01"},
+    )
+    window = _window()
+
+    process(Path("bg_1049590_x"), window, tmp_path, None)
+
+    assert seen == [window] and calls["existing_clip_ids"] == {"x_01"}

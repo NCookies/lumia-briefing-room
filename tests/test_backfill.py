@@ -369,3 +369,36 @@ def test_overlap_uses_a_tolerance_before_the_hud_start():
     assert backfill.overlaps_known(window, [window.hud_start_utc - timedelta(minutes=10)]) is False
     assert backfill.overlaps_known(window, [window.end_utc + timedelta(seconds=1)]) is False
     assert backfill.overlaps_known(window, []) is False
+
+
+def _game_json(games: Path, key: str, start: str, *, video: bool, deleted: bool = False) -> None:
+    folder = games / key
+    folder.mkdir(parents=True)
+    data = {"gameKey": key, "matchStartUtc": start, "fullVideo": {"path": "full.mp4"} if video else None}
+    if deleted:
+        data["fullVideoDeletedAt"] = "2026-09-29T00:00:00Z"
+    (folder / "game.json").write_text(json.dumps(data), encoding="utf-8")
+    if video:
+        (folder / "full.mp4").write_bytes(b"v")
+
+
+def test_known_starts_with_games_dir_count_only_games_that_have_or_had_a_full_video(tmp_path: Path):
+    clips, games = tmp_path / "clips", tmp_path / "games"
+    (clips / ".trash").mkdir(parents=True)
+    _game_json(games, "20260923_100000", "2026-09-23T10:00:00Z", video=True)
+    _game_json(games, "20260923_110000", "2026-09-23T11:00:00Z", video=False)  # 이전 버전 게임 - 풀영상을 새로 만든다
+    _game_json(games, "20260923_120000", "2026-09-23T12:00:00Z", video=False, deleted=True)  # 자동 정리로 지운 것
+    (clips / "a.json").write_text(json.dumps({"matchStartUtc": "2026-09-23T11:00:00Z"}), encoding="utf-8")
+    (clips / ".trash" / "t.json").write_text(json.dumps({"matchStartUtc": "2026-09-23T13:00:00Z"}), encoding="utf-8")
+
+    starts = backfill.collect_known_starts(clips, games)
+
+    assert sorted(s.hour for s in starts) == [10, 12, 13]
+
+
+def test_known_starts_without_games_dir_keep_the_old_behaviour(tmp_path: Path):
+    clips = tmp_path / "clips"
+    clips.mkdir()
+    (clips / "a.json").write_text(json.dumps({"matchStartUtc": "2026-09-23T10:00:00Z"}), encoding="utf-8")
+
+    assert len(backfill.collect_known_starts(clips)) == 1

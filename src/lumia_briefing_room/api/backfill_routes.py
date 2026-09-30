@@ -22,6 +22,7 @@ from lumia_briefing_room.pipeline.backfill import (
     collect_known_starts,
     run_backfill,
 )
+from lumia_briefing_room.pipeline.legacy_games import existing_clip_ids, migrate_legacy_games
 from lumia_briefing_room.pipeline.backfill_runtime import (
     SteamSessionScanner,
     estimate_backfill,
@@ -145,11 +146,14 @@ def register_backfill_routes(app: FastAPI, *, current_config: Callable[[], Confi
         def run() -> None:
             try:
                 scanner = SteamSessionScanner(root, ffmpeg, state_dir=state_dir, hwaccel=cfg.vod.hwaccel)
+                games_dir = resolve_paths(cfg.paths).games
+                migrate_legacy_games(clips_dir, games_dir)
                 process = make_process_window(
                     cfg, ffmpeg, k_templates=None, a_templates=None,
                     hwaccel=cfg.vod.hwaccel, config_path=app.state.config_path,
+                    existing_clip_ids=lambda w: existing_clip_ids(games_dir, clips_dir, w.start_utc, w.end_utc),
                 )
-                known = collect_known_starts(clips_dir) + collect_log_starts(cfg)
+                known = collect_known_starts(clips_dir, games_dir) + collect_log_starts(cfg)
                 result = run_backfill(
                     scanner=scanner, process_window=process, clips_dir=clips_dir, state_dir=state_dir,
                     staging_root=staging_root, known_starts=known, cancel=cancel, on_progress=on_progress,

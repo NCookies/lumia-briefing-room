@@ -17,6 +17,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from lumia_briefing_room import activity
 from lumia_briefing_room.config import Config, discover_ffmpeg, resolve_paths
 from lumia_briefing_room.pipeline import game_candidates as gcand
 from lumia_briefing_room.pipeline.clip_from_full import FullVideoMissing, save_candidate_clip
@@ -25,6 +26,8 @@ from lumia_briefing_room.pipeline.ffmpeg_errors import describe_clip_error
 from lumia_briefing_room.pipeline.game_files import GameNotFound, game_dir, has_full_video, list_games, load_game, update_game
 from lumia_briefing_room.pipeline.game_store import FULL_VIDEO
 from lumia_briefing_room.pipeline.legacy_games import migrate_legacy_games
+from lumia_briefing_room.pipeline.rebuild_full_video import RebuildError, can_rebuild, rebuild_full_video
+from lumia_briefing_room.steam_paths import resolve_recording_root
 
 log = logging.getLogger(__name__)
 
@@ -119,7 +122,51 @@ def register_game_routes(
     @app.get("/api/games/{key}")
     def get_game(key: str):
         game = load_or_404(key)
-        return {**game, "hasFullVideo": has_full_video(games_dir(), key)}
+        root = resolve_recording_root(current_config().paths.steam_recording)
+        return {
+            **game,
+            "hasFullVideo": has_full_video(games_dir(), key),
+            "canRebuildFullVideo": can_rebuild(game, games_dir(), root),
+        }
+
+    rebuild_jobs: dict[str, dict] = {}
+
+    @app.post("/api/games/{key}/full-video", status_code=202)
+    def start_rebuild(key: str):
+        """원본 녹화가 남은 옛 게임의 풀영상·후보·마커를 새로 만든다. 저장한 클립은 다시 자르지 않는다."""
+        game = load_or_404(key)
+        cfg = current_config()
+        root = resolve_recording_root(cfg.paths.steam_recording)
+        if not can_rebuild(game, games_dir(), root):
+            raise HTTPException(409, "원본 녹화가 남아 있지 않거나 이미 풀영상이 있는 게임입니다")
+        if any(j["state"] == "running" for j in rebuild_jobs.values()):
+            raise HTTPException(409, "다른 게임의 풀영상을 만드는 중입니다. 끝난 뒤 다시 시도하세요")
+        ffmpeg = _ffmpeg()
+        job = {"state": "running", "message": "", "fraction": 0.0}
+        rebuild_jobs[key] = job
+        gdir, cdir = games_dir(), clips_dir()
+
+        def run() -> None:
+            try:
+                with activity.registry.track("rebuild-full-video", f"풀영상 만드는 중 ({key})"):
+                    rebuild_full_video(
+                        games_dir=gdir, clips_dir=cdir, key=key, recording_root=root, cfg=cfg, ffmpeg_path=ffmpeg,
+                        on_progress=lambda f: job.update(fraction=f),
+                    )
+                job.update(state="done", fraction=1.0)
+            except RebuildError as exc:
+                job.update(state="error", message=str(exc))
+            except Exception as exc:
+                log.exception("풀영상 만들기 실패: %s", key)
+                job.update(state="error", message=f"풀영상을 만들지 못했습니다: {exc}")
+
+        threading.Thread(target=run, daemon=True).start()
+        return job
+
+    @app.get("/api/games/{key}/full-video/status")
+    def rebuild_status(key: str):
+        load_or_404(key)
+        return rebuild_jobs.get(key) or {"state": "idle", "message": "", "fraction": 0.0}
 
     @app.get("/api/games/{key}/video")
     def get_game_video(key: str):
