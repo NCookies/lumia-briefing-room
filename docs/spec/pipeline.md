@@ -151,3 +151,12 @@ result.jpg / portrait_{me,teammate1,teammate2}.jpg   클립 쪽 썸네일 폴더
 - `game.json` 필드: `fullVideo{path,sizeBytes,durationSec,offsetSec,segmentStart/End,sourceIncomplete,audioStatus}`, `candidates[]`(시각은 풀영상 기준 초 - 후보 범위 `start/end`, 교전 `combatStart/End`, `certain`, 태그·pvp·지역·일차, `user{savedClipId}`), `userCandidates[]`(비어 있음), `markers[]{t,kind}`(kill/assist/death/teammate_death - 검출이 이미 읽는 값), 결과표·초상화 파일명. 풀영상 0초 = 세션 기준 `offsetSec`(첫 세그먼트 시작)라 후보 시각 = 세션 기준 시각 - `offsetSec`.
 - 스테이징(다시 분석·백필)으로 클립만 옮기는 경우에도 `games/` 는 스테이징을 거치지 않고 바로 쓴다(같은 경기키를 덮어쓴다).
 - 실측(2026-09-30, 스팀 녹화 24분 게임): 검출 + 풀영상 컷 + 클립 12개 전체 81초, 풀영상 4.02GB.
+
+## 12. 저장 공간 알림 (`pipeline/disk_space.py`, `disk_alert.py`, `notices.py`, `api/disk_routes.py`)
+
+- **예상 게임 용량** = 최근 풀영상 5개(`game.json` 의 `fullVideo.sizeBytes`)의 평균, 기록이 없으면 분당 190MB × 15분.
+- **부족 기준** = 여유 공간 < `max(예상 × 5, paths.minFreeGb)`. 문구는 남은 GB 와 해결책(풀영상 자동 정리 한도, 오래된 풀영상, 저장한 클립 정리)을 같이 준다.
+- **재는 때**: 앱 시작(트레이 준비 뒤 백그라운드)과 게임 하나를 처리하기 직전(`cli/watch.py::make_processor`). 부족하면 `NoticeCenter`(메모리)에 `disk_low` 를 올리고 **트레이 알림**을 띄운다(같은 내용은 한 번만, 남은 GB 가 바뀌면 다시). 충분해지면 알림을 거둔다.
+- 풀영상 컷이 실패하면 `full_video_failed` 알림(원인 문구 포함)을 올린다.
+- API: `GET /api/disk`(여유 GB·경고 여부·권장 50~100GB 미만 여부, 잴 수 없으면 `available:false`), `GET /api/notices`, `POST /api/notices/{kind}/dismiss`, `GET /api/first-run` 에 `disk` 포함.
+

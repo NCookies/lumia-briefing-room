@@ -23,6 +23,8 @@ from lumia_briefing_room.single_instance import SingleInstance
 from lumia_briefing_room.config import load_config, resolve_config_path, resolve_paths
 from lumia_briefing_room.pipeline.cleanup import cleanup_loop, make_cleanup_runner
 from lumia_briefing_room.pipeline.watch_failures import WatchFailureTracker
+from lumia_briefing_room.pipeline.disk_alert import check_and_notify
+from lumia_briefing_room.pipeline.notices import notices
 from lumia_briefing_room.tray import build_icon
 
 log = logging.getLogger("lumia_briefing_room.app")
@@ -391,6 +393,8 @@ def _run_app(args, instance: SingleInstance) -> None:
 
     def on_tray_ready(tray_icon) -> None:
         tray_icon.visible = True
+        notices.set_notifier(lambda title, message: tray_icon.notify(message, title))
+        threading.Thread(target=check_and_notify, args=(cfg,), daemon=True).start()
         announce_first_run(cfg, tray_icon.notify, open_ui=args.open_ui)
         start_update_checks(
             resolve_config_path(args.config),

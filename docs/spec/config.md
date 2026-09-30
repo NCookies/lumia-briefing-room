@@ -16,7 +16,7 @@
 | `paths.steamRecording` | 자동 탐지 | 탐지 실패 시 수동 |
 | `paths.thumbnails` | `<clips>\.thumbs` | |
 | `paths.proxies` | `<clips>\.proxy` | 미사용 — 프록시는 항상 `<클립 폴더>\.proxy` |
-| `paths.minFreeGb` | 20 | 미사용 — 풀영상 부족 알림에서 쓸 예정([plan-fullvideo.md](../plan-fullvideo.md)) |
+| `paths.minFreeGb` | 20 | 저장 공간 부족 알림의 최소 기준(GB). 실제 기준은 `max(예상 게임 용량 × 5, 이 값)` |
 
 ## 감시 `watch.*`
 

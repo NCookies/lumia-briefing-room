@@ -10,6 +10,7 @@ from pathlib import Path
 from fastapi import FastAPI, Response
 
 from lumia_briefing_room import __version__, paths
+from lumia_briefing_room.api.disk_routes import disk_report
 from lumia_briefing_room.appmode import resolve_mode
 from lumia_briefing_room.config import Config, dataclass_to_camel_dict, discover_ffmpeg, resolve_paths
 from lumia_briefing_room.consent import CONSENT_VERSION, pending_items
@@ -72,6 +73,7 @@ def register_onboarding_routes(
             "recording": _recording_report(cfg),
             "clipsDir": str(resolve_paths(cfg.paths).clips),
             "ffmpegFound": discover_ffmpeg() is not None,
+            "disk": disk_report(cfg),
         }
 
     @app.post("/api/first-run/complete")
