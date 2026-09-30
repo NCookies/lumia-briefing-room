@@ -224,11 +224,11 @@ python tools/rescore_clips.py --source all  # 스팀+다시보기 클립을 모�
 
 ```bash
 python -m lumia_briefing_room.cli.analyze_vod "<영상.mp4>" \
-  [--config PATH] [--ffmpeg PATH] [--clips-dir PATH] [--streamer 이름] [--hwaccel d3d11va] \
+  [--config PATH] [--ffmpeg PATH] [--clips-dir PATH] [--games-dir PATH] [--streamer 이름] [--hwaccel d3d11va] \
   [--force] [--rebuild]
 ```
 
-- 진행률이 단계(`decode`/`games`/`cut`)별로 출력된다. 8시간 영상은 디코딩·판독에 수십 분이 걸린다(3시간 18분 영상이 약 12분 — [spec/vod.md](spec/vod.md)).
+- 진행률이 단계(`decode`/`games`/`full`/`cut`)별로 출력된다. `--games-dir` 는 풀영상·게임 기록을 둘 폴더(기본 `paths.games`). 8시간 영상은 디코딩·판독에 수십 분이 걸린다(3시간 18분 영상이 약 12분 — [spec/vod.md](spec/vod.md)).
 - **Ctrl+C 로 멈춰도 된다.** 판독은 120프레임마다 `<클립폴더>/.vods/<영상id>.states.jsonl.gz` 에 저장되고, 같은 명령을 다시 실행하면 저장된 시각부터 이어간다. 영상 id 는 파일 내용(크기 + 앞뒤 1MiB)이라 파일을 옮겨도 이어진다.
 - 이미 끝난 영상은 아무것도 안 한다. `--rebuild` 는 저장된 판독으로 클립만 다시 만들고(설정의 `clip.*`·`filter.*` 를 바꾼 뒤), `--force` 는 판독까지 처음부터 다시 한다. 다시 만들 때는 새 클립을 임시 폴더에 만들어 성공한 뒤에만 기존 클립을 지우고(설정한 삭제 방식) 옮긴다.
 - 스트리머 이름은 `--streamer` 또는 설정 `vod.streamers` 에 영상 id 로 넣는다. `vod.gameGapSec`(게임 안 끊김 허용, 기본 30초)·`vod.minGameSec`(기본 60초)로 게임 분할을 조절한다.

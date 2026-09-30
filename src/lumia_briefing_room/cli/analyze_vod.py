@@ -2,9 +2,9 @@
 
 usage:
     python -m lumia_briefing_room.cli.analyze_vod <video> [--config PATH] [--ffmpeg PATH]
-        [--clips-dir PATH] [--streamer NAME] [--hwaccel NAME] [--force] [--rebuild]
+        [--clips-dir PATH] [--games-dir PATH] [--streamer NAME] [--hwaccel NAME] [--force] [--rebuild]
 
-클립은 스팀 클립과 다른 폴더(paths.vodClips)에 만들어진다. 중간에 Ctrl+C 로 멈추면 다음에 이어서 한다.
+게임마다 풀영상·게임 기록은 게임 폴더(paths.games, 스팀 게임과 같은 곳)에, 클립은 스팀 클립과 다른 폴더(paths.vodClips)에 만들어진다. 중간에 Ctrl+C 로 멈추면 다음에 이어서 한다.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", type=Path, default=None)
     parser.add_argument("--ffmpeg", type=Path, default=None)
     parser.add_argument("--clips-dir", type=Path, default=None)
+    parser.add_argument("--games-dir", type=Path, default=None)
     parser.add_argument("--streamer", type=str, default=None)
     parser.add_argument("--hwaccel", type=str, default=None)
     parser.add_argument("--force", action="store_true", help="캐시까지 지우고 처음부터 다시 분석")
@@ -51,7 +52,7 @@ def main(argv: list[str] | None = None) -> None:
     try:
         index = analyze_vod(
             args.video, cfg, ffmpeg_path=ffmpeg_path, clips_dir=args.clips_dir,
-            streamer=args.streamer, hwaccel=args.hwaccel, force=args.force,
+            games_dir=args.games_dir, streamer=args.streamer, hwaccel=args.hwaccel, force=args.force,
             rebuild=args.rebuild, on_progress=_print_progress, cancel=cancel,
         )
     except (KeyboardInterrupt, VodCancelled):

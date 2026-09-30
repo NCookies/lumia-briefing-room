@@ -28,19 +28,27 @@ from lumia_briefing_room.pipeline.clip import ClipRange, make_thumbnail
 from lumia_briefing_room.pipeline.clip_assets import stored_asset_path
 from lumia_briefing_room.pipeline.ffmpeg_errors import describe_clip_error, is_disk_full_error
 from lumia_briefing_room.pipeline.filters import apply_filter
+from lumia_briefing_room.pipeline.game_store import GAME_JSON, is_certain, plans_to_save, vod_game_key
 from lumia_briefing_room.pipeline.label_migrate import load_metas, migrate_labels
 from lumia_briefing_room.pipeline.metadata import match_result_dict
 from lumia_briefing_room.pipeline.orchestrator import (
-    _aggregate_interval,
     _plan_clips,
     _save_result_image,
-    default_title,
-    next_phase_clip_index,
 )
 from lumia_briefing_room.pipeline.portrait_scan import PORTRAIT_SLOTS, find_vod_portraits, save_portrait_image
 from lumia_briefing_room.pipeline.delete_helper import delete_clip, permanently_delete, send_to_recycle_bin
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for
-from lumia_briefing_room.pipeline.vod_clips import build_vod_metadata, cut_vod_clip, vod_clip_id
+from lumia_briefing_room.pipeline.vod_clips import build_vod_metadata, cut_vod_clip
+from lumia_briefing_room.pipeline.vod_full_games import (
+    VodSource,
+    cut_vod_full_video,
+    effective_start,
+    name_vod_candidates,
+    save_game_assets,
+    vod_game_dict,
+    vod_game_range,
+    write_vod_game,
+)
 from lumia_briefing_room.pipeline.vod_detect import detect_games
 from lumia_briefing_room.pipeline.vod_games import GameSpan, split_games
 from lumia_briefing_room.pipeline.vod_result import find_vod_result
@@ -69,7 +77,9 @@ log = logging.getLogger(__name__)
 # `analyze_frame`이 그 자리도 시도하도록 고쳤다. 이전 캐시는 그 자리를 아예 안 봐서
 # k/a/tk 가 전부 None 이라 교전 구간을 하나도 못 만든다(실사용 사고: 코발트 6게임
 # 전부 결과 화면은 읽혔는데 클립이 0개).
-ANALYSIS_VERSION = 5
+# 6: 캐릭터 선택 화면 판독(`select_screen`·`select_practice`, 1080p 프로필 포함) - 이전 캐시에는 이 값이 없어
+# 게임 시작을 선택 화면까지 넓히지도, 연습 모드·닷지를 거르지도 못한다(F6 풀영상 범위가 선택 화면부터라서 필요).
+ANALYSIS_VERSION = 6
 CHECKPOINT_FRAMES = 120
 PROGRESS_EVERY_FRAMES = 30
 # 진행률은 화면의 각 구간이 실제로 걸리는 시간에 비례해야 한다(2026-09-27 사용자 보고 -
@@ -220,6 +230,7 @@ def analyze_vod(
     find_portraits: FindPortraits | None = None,
     source_factory: SourceFactory | None = None,
     delete_source: bool | None = None,
+    games_dir: Path | None = None,
 ) -> dict:
     """다시보기 영상 하나를 분석해 게임별 교전 클립을 만든다.
 
@@ -233,7 +244,9 @@ def analyze_vod(
     않아도 처음에 고른 선택이 이어진다.
     """
     video_path = Path(video_path)
-    root = clips_dir or resolve_paths(cfg.paths).vod_clips
+    resolved = resolve_paths(cfg.paths)
+    root = clips_dir or resolved.vod_clips
+    games_root = games_dir or resolved.games
     root.mkdir(parents=True, exist_ok=True)
     ffprobe_path = find_ffprobe(ffmpeg_path)
     info = probe_video(video_path, ffprobe_path=ffprobe_path)
@@ -283,7 +296,7 @@ def analyze_vod(
             info.duration_sec, cancel, root, report,
         )
         _make_clips(
-            video_path, cfg, ffmpeg_path, root, index, states, info,
+            video_path, cfg, ffmpeg_path, root, games_root, index, states, info,
             find_result or _default_find_result(ffmpeg_path, info.width, info.height, hwaccel),
             find_portraits or _default_find_portraits(ffmpeg_path, info.width, info.height, hwaccel),
             cancel, report,
@@ -304,7 +317,7 @@ def analyze_vod(
 
     index.update(status="done", updatedAt=_now_iso())
     save_index(root, index)
-    if index.get("deleteSourceOnSuccess") and len(index["clips"]) >= 1:
+    if should_delete_source(index):
         _delete_source_video(video_path, mode=cfg.vod.delete_source_mode)
         # 화면이 "영상 파일을 찾을 수 없습니다"(vod.exists=False, VodSection.tsx)를 오류처럼
         # 보여주지 않고 "설정대로 자동 삭제했다"고 구분해서 보여주게 하는 표시
@@ -314,6 +327,14 @@ def analyze_vod(
         save_index(root, index)
     report("done", 1.0, games=len(index["games"]), clips=len(index["clips"]))
     return index
+
+
+def should_delete_source(index: dict) -> bool:
+    """분석이 끝난 원본을 지워도 되는가: 사용자가 골랐고, 게임 풀영상이 하나 이상 저장됐을 때만(plan-fullvideo.md §3.7).
+
+    클립이 아니라 풀영상 기준이다 - 수동 저장 모드는 클립을 안 자르고, 풀영상이 없으면 원본이 유일한 복사본이다.
+    """
+    return bool(index.get("deleteSourceOnSuccess")) and any(g.get("fullVideo") for g in index.get("games") or [])
 
 
 def _delete_source_video(path: Path, *, mode: str) -> None:
@@ -377,11 +398,30 @@ def _decode(
     return states
 
 
+def _remove_stale_games(games_dir: Path, vod: str, keep: set[str]) -> None:
+    """이번 분석으로 다시 만들어지지 않은 이 영상의 옛 게임 폴더(게임 수가 줄었거나 연습 모드로 빠진 게임)를 지운다."""
+    try:
+        folders = [p for p in games_dir.glob(f"vod_{vod}_g*") if p.is_dir() and p.name not in keep]
+    except OSError:
+        return
+    for folder in folders:
+        shutil.rmtree(folder, ignore_errors=True)
+
+
+def _keep_pinned(folder: Path, data: dict) -> dict:
+    try:
+        old = json.loads((folder / GAME_JSON).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return data
+    return {**data, "pinned": True} if isinstance(old, dict) and old.get("pinned") else data
+
+
 def _make_clips(
     video_path: Path,
     cfg: Config,
     ffmpeg_path: Path,
     root: Path,
+    games_root: Path,
     index: dict,
     states: list[FrameState],
     info,
@@ -390,46 +430,64 @@ def _make_clips(
     cancel: threading.Event | None,
     report: Callable[..., None],
 ) -> None:
-    """새 클립은 스테이징 폴더에 만들고, 다 만든 뒤에만 기존 클립을 지우고 실제 위치로 옮긴다.
+    """게임마다 풀영상(`games/<키>/full.mp4`)과 `game.json` 을 만들고, `clip.saveMode` 가 auto 면 후보를 클립으로도 자른다.
 
-    취소되거나 실패하면 스테이징만 지우고 기존 클립은 그대로 둔다(docs/plan-ui.md §0-(6))."""
+    새 클립은 스테이징 폴더에 만들고, 다 만든 뒤에만 기존 클립을 지우고 실제 위치로 옮긴다. 수동 저장 모드에서는 사용자가 이미
+    저장한 옛 클립을 지우지 않고 같은 ID 의 후보에 저장됨으로 이어 준다. 취소되거나 실패하면 스테이징과 이번에 새로 만든 게임
+    폴더만 지우고 기존 것은 그대로 둔다(docs/plan-ui.md §0-(6))."""
     vod = index["id"]
-    spans = split_games(
-        states, max_gap_sec=cfg.vod.game_gap_sec, min_game_sec=cfg.vod.min_game_sec
+    duration = info.duration_sec
+    save_mode = cfg.clip.save_mode
+    source = VodSource(
+        vod_id=vod, path=video_path, streamer=index.get("streamer"), width=info.width, height=info.height,
+        duration_sec=duration, size_bytes=index.get("size") or video_path.stat().st_size,
     )
+    spans = [
+        s for s in split_games(states, max_gap_sec=cfg.vod.game_gap_sec, min_game_sec=cfg.vod.min_game_sec)
+        if not s.practice
+    ]
     detections = detect_games(states, spans)
     old_paths = _existing_clip_paths(root, vod)
     olds = load_metas(old_paths)
+    old_ids = {p.stem for p in old_paths}
+    keep_old = save_mode == "manual"
     staging = root / STAGING_DIRNAME / uuid.uuid4().hex
     thumbs = staging / ".thumbs"
     games: list[dict] = []
     clip_ids: list[str] = []
+    pending_games: list[tuple[Path, dict]] = []
+    new_folders: list[Path] = []
+    full_ends: list[float] = []
     n = max(1, len(detections))
 
-    # 컷 단계 진행률을 게임 수가 아니라 클립 수에 비례하게 하려고 미리 계획을 전부
+    # 컷 단계 진행률을 게임 수가 아니라 컷 수(게임마다 풀영상 1 + 클립 수)에 비례하게 하려고 미리 계획을 전부
     # 세운다(plan-backfill.md B8 - 클립이 몰린 게임 하나 처리하는 동안 막대가 멈춘 듯
     # 보이던 문제, 2026-09-27). apply_filter/_plan_clips 는 이미 계산된 interval 을
     # 훑을 뿐 I/O 가 없어 두 번 부르는 대신 여기서 한 번만 계산해 재사용한다.
-    plans_by_game = [
-        _plan_clips(
-            apply_filter(det.detection.intervals, cfg.filter, game_mode=det.detection.game_mode), cfg.clip,
-            game_mode=det.detection.game_mode,
+    named_by_game = [
+        name_vod_candidates(
+            _plan_clips(
+                apply_filter(det.detection.intervals, cfg.filter, game_mode=det.detection.game_mode), cfg.clip,
+                game_mode=det.detection.game_mode,
+            ),
+            vod, det.span.index, duration=duration,
         )
         for det in detections
     ]
-    total_clips = max(1, sum(len(p) for p in plans_by_game))
+    planned_clips = 0 if keep_old else sum(len(c) for c in named_by_game)
+    total_clips = max(1, planned_clips + len(detections))
     base = DECODE_SHARE + GAMES_SHARE
     cut_share = 1.0 - base
     clips_done = 0
 
     def progress_fraction(games_done: int) -> float:
-        """디코드 이후 진행률. 이미 자른 클립(`clips_done`)은 게임이 넘어가도 절대 줄지 않는다.
+        """디코드 이후 진행률. 이미 자른 컷(`clips_done`)은 게임이 넘어가도 절대 줄지 않는다.
 
         "게임 정리"(결과 화면 판독) 단계를 `games_done/n` 만으로만 계산하면, 클립이 몰린 게임
         하나를 다 자른 뒤 다음 게임 정리로 넘어가는 순간 막대가 앞 게임에서 쌓인 클립 진행률을
         무시하고 뚝 떨어져 보인다(실사용 보고, 2026-09-29 - 85%까지 갔다가 24%로 떨어짐:
         `게임 정리` 리포트가 `클립 만들기` 가 이미 반영한 `clips_done` 을 무시했었다). 게임
-        진행(`games_done`)과 클립 진행(`clips_done`)을 더해서 절대 역행하지 않게 한다.
+        진행(`games_done`)과 컷 진행(`clips_done`)을 더해서 절대 역행하지 않게 한다.
         """
         return DECODE_SHARE + GAMES_SHARE * games_done / n + cut_share * clips_done / total_clips
 
@@ -445,19 +503,35 @@ def _make_clips(
             portraits = _safe_portraits(find_portraits, video_path, span)
             portrait_paths = _save_vod_portrait_images(portraits, vod, span.index, thumbs, staging)
 
+            key = vod_game_key(vod, span.index)
+            folder = games_root / key
+            if not (folder / GAME_JSON).exists():
+                new_folders.append(folder)
+            full_start, full_end = vod_game_range(
+                span, result_at=result.t if result is not None else None, prev_end=full_ends[-1] if full_ends else None,
+                next_start=effective_start(spans[i + 1]) if i + 1 < len(spans) else None, duration=duration,
+            )
+            full_ends.append(full_end)
+            report("full", progress_fraction(i), f"게임 {span.index} 풀영상", games=len(games), clips=len(clip_ids))
+            full = cut_vod_full_video(
+                video_path, full_start, full_end, folder, ffmpeg_path=ffmpeg_path, include_audio=cfg.clip.include_audio,
+                source_size=source.size_bytes, source_duration=duration,
+            )
+            clips_done += 1
+
+            candidates = named_by_game[i]
+            to_save = plans_to_save(
+                candidates, save_mode, full.video is not None, is_certain=lambda c: is_certain(c.aggregated.tags)
+            )
+            saved_ids: dict[str, str] = {c.candidate_id: c.clip_id for c in candidates if keep_old and c.clip_id in old_ids}
             game_clip_ids: list[str] = []
-            phase_clip_counts: dict[int | None, int] = {}
-            for plan in plans_by_game[i]:
+            for cand in to_save:
+                if cand.clip_id in saved_ids:
+                    continue
                 if cancel is not None and cancel.is_set():
                     raise VodCancelled()
-                rng = ClipRange(
-                    start=max(0.0, plan.range.start),
-                    end=min(info.duration_sec, plan.range.end),
-                    preroll_source=plan.range.preroll_source,
-                )
-                aggregated = _aggregate_interval(plan.intervals)
-                phase_clip_index = next_phase_clip_index(phase_clip_counts, aggregated.cobalt_phase)
-                clip_id = vod_clip_id(vod, span.index, rng.start)
+                rng = cand.plan.range
+                clip_id = cand.clip_id
                 clip_path = staging / f"{clip_id}.mp4"
                 report("cut", progress_fraction(i + 1), f"게임 {span.index} 클립 {len(game_clip_ids) + 1}",
                        games=len(games), clips=len(clip_ids))
@@ -474,11 +548,9 @@ def _make_clips(
                         width=cfg.encode.thumbnail.width, ffmpeg_path=ffmpeg_path,
                     )
                     thumb_rel = stored_asset_path(thumb_path, staging)
+                aggregated = cand.aggregated
                 meta = build_vod_metadata(
-                    title=default_title(
-                        aggregated.day_night, aggregated.region, aggregated.game_day,
-                        cobalt_phase=aggregated.cobalt_phase, clip_index=phase_clip_index,
-                    ),
+                    title=cand.title,
                     vod_id=vod, vod_file=str(video_path), streamer=index.get("streamer"),
                     game_mode=det.detection.game_mode,
                     game_index=span.index, game_start=span.start, game_end=span.end,
@@ -495,32 +567,52 @@ def _make_clips(
                 clip_path.with_suffix(".json").write_text(
                     json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
                 )
+                saved_ids[cand.candidate_id] = clip_id
                 game_clip_ids.append(clip_id)
                 clip_ids.append(clip_id)
 
+            result_file, portrait_files = save_game_assets(folder, result, portraits)
+            data = vod_game_dict(
+                source=source, span=span, game_mode=det.detection.game_mode, detection=det.detection,
+                candidates=candidates, saved_ids=saved_ids, full_start=full_start, full_end=full_end,
+                full=full.video, error=full.error, result=result, result_file=result_file, portraits=portrait_files,
+                save_mode=save_mode, cfg=cfg,
+            )
+            pending_games.append((folder, data))
             games.append({
-                "index": span.index, "startSec": span.start, "endSec": span.end,
+                "index": span.index, "gameKey": key, "startSec": span.start, "endSec": span.end,
+                "fullStartSec": full_start, "fullEndSec": full_end, "fullVideo": full.video is not None,
                 "confidence": span.confidence,
                 "kFinal": det.detection.k_final, "aFinal": det.detection.a_final,
                 "gameMode": det.detection.game_mode,
-                "result": match_result_dict(result, result_image), "clipIds": game_clip_ids,
+                "result": match_result_dict(result, result_image), "clipIds": list(saved_ids.values()),
             })
     except BaseException:
         shutil.rmtree(staging, ignore_errors=True)
+        for folder in new_folders:
+            shutil.rmtree(folder, ignore_errors=True)
         raise
 
-    if not clip_ids and old_paths:
+    if not clip_ids and not any(g["fullVideo"] for g in games) and old_paths:
         shutil.rmtree(staging, ignore_errors=True)
-        raise VodAnalyzeError("다시 만들었지만 이 영상에서 클립을 찾지 못했습니다. 기존 클립을 그대로 둡니다")
+        for folder in new_folders:
+            shutil.rmtree(folder, ignore_errors=True)
+        raise VodAnalyzeError("다시 만들었지만 이 영상에서 게임을 찾지 못했습니다. 기존 결과를 그대로 둡니다")
 
-    report_labels = migrate_labels(olds, [staging / f"{cid}.json" for cid in clip_ids])
-
-    archive_dir = archive_dir_for(root)
-    for meta_path in old_paths:
-        delete_clip(meta_path, mode=cfg.ui.delete_mode, archive_dir=archive_dir)
+    report_labels = {"migrated": 0, "conflicts": 0}
+    if not keep_old:
+        report_labels = migrate_labels(olds, [staging / f"{cid}.json" for cid in clip_ids])
+        archive_dir = archive_dir_for(root)
+        for meta_path in old_paths:
+            delete_clip(meta_path, mode=cfg.ui.delete_mode, archive_dir=archive_dir)
     _move_staged_tree(staging, root)
 
+    for folder, data in pending_games:
+        write_vod_game(folder, _keep_pinned(folder, data))
+    _remove_stale_games(games_root, vod, {g["gameKey"] for g in games})
+
     index.update(
-        games=games, clips=clip_ids,
+        games=games,
+        clips=sorted({cid for g in games for cid in g["clipIds"]}) if keep_old else clip_ids,
         labelsMigrated=report_labels["migrated"], labelConflicts=report_labels["conflicts"],
     )
