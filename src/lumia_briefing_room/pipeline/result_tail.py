@@ -15,7 +15,7 @@ import numpy as np
 from lumia_briefing_room.detect.ocr import TextReader
 from lumia_briefing_room.detect.region import load_region_templates
 from lumia_briefing_room.detect.result import ResultScreen, read_result_screen
-from lumia_briefing_room.pipeline.result_scan import get_reader, make_is_ingame, scan_forward_for_result
+from lumia_briefing_room.pipeline.result_scan import EndScreens, get_reader, make_is_ingame, scan_forward_for_result
 from lumia_briefing_room.profiles.models import ResolutionProfile
 from lumia_briefing_room.video.frames import extract_tail_frames, write_merged_segment_file
 from lumia_briefing_room.video.segments import SegmentRange, existing_segment_numbers
@@ -29,20 +29,29 @@ TAIL_FPS = 2.0
 TAIL_SEGMENTS = 12
 
 
+def end_screens_from_frames(
+    frames: Iterable[tuple[int, np.ndarray]],
+    read: Callable[[np.ndarray], ResultScreen | None],
+    *,
+    is_ingame: Callable[[np.ndarray], bool],
+) -> EndScreens:
+    """프레임을 한 장씩 흘려 읽는다(메모리는 프레임 한 장 분량). 결과 화면이 끝나면 더 디코딩하지 않는다. `at` 은 결과 화면이 처음 읽힌 프레임."""
+    batches = ([frame] for frame in frames)
+    try:
+        return scan_forward_for_result(batches, read, is_ingame=is_ingame)
+    finally:
+        close = getattr(frames, "close", None)
+        if close is not None:
+            close()
+
+
 def result_from_frames(
     frames: Iterable[tuple[int, np.ndarray]],
     read: Callable[[np.ndarray], ResultScreen | None],
     *,
     is_ingame: Callable[[np.ndarray], bool],
 ) -> ResultScreen | None:
-    """프레임을 한 장씩 흘려 읽는다(메모리는 프레임 한 장 분량). 결과 화면이 끝나면 더 디코딩하지 않는다."""
-    batches = ([frame] for frame in frames)
-    try:
-        return scan_forward_for_result(batches, read, is_ingame=is_ingame).result
-    finally:
-        close = getattr(frames, "close", None)
-        if close is not None:
-            close()
+    return end_screens_from_frames(frames, read, is_ingame=is_ingame).result
 
 
 def find_result_in_video(

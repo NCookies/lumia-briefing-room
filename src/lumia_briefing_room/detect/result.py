@@ -44,6 +44,7 @@ class ResultScreen:
     nickname: str | None
     stats: dict | None = None
     image: np.ndarray | None = field(default=None, compare=False, repr=False)
+    t: float | None = field(default=None, compare=False)
 
 
 @dataclass(frozen=True)

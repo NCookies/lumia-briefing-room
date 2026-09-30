@@ -23,6 +23,15 @@ def game_key(match_start: datetime) -> str:
     return f"{match_start:%Y%m%d_%H%M%S}"
 
 
+def vod_game_key(vod_id: str, index: int) -> str:
+    """영상 파일 게임의 키. 영상 게임은 실제 시각이 없어 시작 시각 키를 못 쓴다.
+
+    vodId(파일 내용 해시)라 영상끼리 겹치지 않고, 게임 번호는 영상 안에서 유일하다. 기존 영상 클립 ID
+    (`vod_<vodId>_g01_<초>`)와 앞부분이 같아 옛 클립과 게임이 이어지고, 스팀 키(`YYYYMMDD_HHMMSS`)와는 모양이 달라 섞이지 않는다.
+    """
+    return f"vod_{vod_id}_g{index:02d}"
+
+
 def is_certain(tags: frozenset[str] | set[str]) -> bool:
     """킬·어시스트·사망이 있는 후보. 풀영상을 못 만들 때도 클립으로는 남긴다."""
     return bool(CERTAIN_TAGS & set(tags))

@@ -170,3 +170,28 @@ def test_keyframe_result_is_kept_when_the_dense_pass_reads_nothing():
     found = scan_game_end(factory, SPAN, None, read=read, is_ingame=is_ingame, dense_factory=dense_factory)
 
     assert found is not None and found.placement == 1
+
+
+def test_result_time_is_the_first_frame_where_the_result_screen_was_read():
+    frames = {100.0 + i: frame(200 if i == 0 else 0) for i in range(0, 100)}
+    frames[108.0] = frame(100)
+    factory, _ = make(frames)
+
+    found = scan_game_end(factory, SPAN, None, read=read, is_ingame=is_ingame)
+
+    assert found.t == 108.0
+
+
+def test_result_time_comes_from_the_dense_pass_when_there_is_one():
+    sparse = {100.0 + i: frame(200 if i == 0 else 0) for i in range(0, 60)}
+    sparse[108.0] = frame(100)
+    dense = {t: frame(101) for t in [107.5, 108.0, 109.0]}
+    factory, _ = make(sparse)
+    dense_factory, _ = make_dense(dense)
+
+    def read_by_value(f):
+        return result(3) if int(f[0, 0, 0]) in (100, 101) else None
+
+    found = scan_game_end(factory, SPAN, None, read=read_by_value, is_ingame=is_ingame, dense_factory=dense_factory)
+
+    assert found.t == 107.5

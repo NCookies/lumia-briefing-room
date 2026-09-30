@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Callable
 from pathlib import Path
 
@@ -15,7 +16,7 @@ from lumia_briefing_room.pipeline.result_scan import (
     make_is_ingame,
     scan_forward_for_result,
 )
-from lumia_briefing_room.pipeline.result_tail import result_from_frames
+from lumia_briefing_room.pipeline.result_tail import end_screens_from_frames
 from lumia_briefing_room.pipeline.vod_games import GameSpan
 from lumia_briefing_room.profiles.models import ResolutionProfile
 from lumia_briefing_room.video.source import FrameSource
@@ -45,6 +46,8 @@ def scan_game_end(
     키프레임만 읽는 훑기는 빠르지만 결과 화면이 키프레임 사이에 끼면 놓치거나 한두 장만 잡힌다. `dense_factory`(초당 여러 장으로
     전부 디코딩하는 읽기)가 있으면, 훑기가 찾은 자리 앞뒤를 촘촘히 다시 읽어 다수결로 정한다. 훑기가 못 찾았으면 게임 끝 직후
     DENSE_PROBE_SEC 초를 촘촘히 읽어 본다. 결과 화면을 안 본 채 나간 게임은 None 이다.
+
+    돌려주는 결과의 `t` 는 결과 화면이 처음 읽힌 영상 시각이다(풀영상 끝을 정하는 기준).
     """
     end = span.end + window_sec
     if next_start is not None:
@@ -66,16 +69,24 @@ def scan_game_end(
     finally:
         frames.close()
     if dense_factory is None:
-        return sparse.result
+        return _with_time(sparse.result, sparse.at)
 
     if sparse.result is not None:
         start, stop = max(span.end, sparse.at - DENSE_BEFORE_SEC), min(end, sparse.at + DENSE_AFTER_SEC)
     else:
         start, stop = span.end, min(end, span.end + DENSE_PROBE_SEC)
     if stop <= start:
-        return sparse.result
-    dense = result_from_frames(dense_factory(start, stop).frames(), read, is_ingame=is_ingame)
-    return dense or sparse.result
+        return _with_time(sparse.result, sparse.at)
+    dense = end_screens_from_frames(dense_factory(start, stop).frames(), read, is_ingame=is_ingame)
+    if dense.result is not None:
+        return _with_time(dense.result, dense.at)
+    return _with_time(sparse.result, sparse.at)
+
+
+def _with_time(result: ResultScreen | None, at: float | int | None) -> ResultScreen | None:
+    if result is None or at is None:
+        return result
+    return dataclasses.replace(result, t=float(at))
 
 
 def find_vod_result(

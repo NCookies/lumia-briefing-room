@@ -10,7 +10,7 @@ from pathlib import Path
 
 from lumia_briefing_room.pipeline.game_store import FULL_VIDEO, GAME_JSON, write_game_json
 
-_KEY = re.compile(r"^\d{8}_\d{6}$")
+_KEY = re.compile(r"^(\d{8}_\d{6}|vod_[0-9a-f]{12}_g\d{2,})$")
 _lock = threading.Lock()
 
 
