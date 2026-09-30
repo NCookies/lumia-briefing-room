@@ -20,11 +20,12 @@ import { FolderPicker } from './FolderPicker'
 import { RecordingRootSection } from './RecordingRootSection'
 import { VodSettingsPanel } from './VodSettingsPanel'
 
-type Tab = 'general' | 'export' | 'vod' | 'cleanup' | 'about'
+type Tab = 'general' | 'export' | 'steam' | 'vod' | 'cleanup' | 'about'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'general', label: '일반' },
   { id: 'export', label: '클립 내보내기' },
+  { id: 'steam', label: '스팀 녹화' },
   { id: 'vod', label: '영상 파일' },
   { id: 'cleanup', label: '자동 정리' },
   { id: 'about', label: '정보·진단' },
@@ -128,7 +129,6 @@ function GeneralPanel({
       </p>
       {autoStartError && <p className="text-xs text-rose-300">{autoStartError}</p>}
     </section>
-    <RecordingRootSection />
     <StorageSection onChanged={onClipsDirChanged} />
     <section className="flex flex-col gap-2">
       <h3 className="text-sm font-medium text-zinc-200">클립 저장 방식</h3>
@@ -348,6 +348,7 @@ export function SettingsModal({
               />
             )}
             {tab === 'export' && <ExportPanel />}
+            {tab === 'steam' && <RecordingRootSection />}
             {tab === 'vod' && <VodSettingsPanel onClipsDirChanged={onClipsDirChanged} />}
             {tab === 'cleanup' && <CleanupPanel />}
             {tab === 'about' && <AboutPanel />}
