@@ -35,10 +35,12 @@ def test_reanalyze_runs_in_the_background_and_reports_progress_and_the_mode(clie
         return REANALYZE_CANDIDATES
 
     monkeypatch.setattr(game_routes, "reanalyze_game", fake)
+    monkeypatch.setattr(game_routes, "reanalyze_mode", lambda *a, **k: REANALYZE_CANDIDATES)
     resp = client.post(f"/api/games/{KEY}/reanalyze")
     assert resp.status_code == 202
     status = wait_done(client)
     assert status["state"] == "done" and status["mode"] == "candidates" and status["fraction"] == 1.0
+    assert resp.json()["mode"] == "candidates", "진행 문구가 방식을 알 수 있게 시작할 때 이미 알려 준다"
     assert calls == [KEY]
 
 

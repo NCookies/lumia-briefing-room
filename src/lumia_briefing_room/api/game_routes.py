@@ -311,7 +311,7 @@ def register_game_routes(
         ffmpeg = _ffmpeg()
         resolved = resolve_paths(cfg.paths)
         root = resolve_recording_root(cfg.paths.steam_recording)
-        job = {"state": "running", "message": "", "fraction": 0.0, "mode": None}
+        job = {"state": "running", "message": "", "fraction": 0.0, "mode": reanalyze_mode(game, games_dir(key), root)}
         reanalyze_jobs[key] = job
         gdir, cdir, staging = games_dir(key), clips_dir(), resolved.staging_games
 

@@ -10,6 +10,9 @@ import { useCleanupPreview } from '../useCleanupPreview'
 import { useStorageUsage } from '../useStorageUsage'
 import { useDayFold } from '../useDayFold'
 import { useGameDelete } from '../useGameDelete'
+import { useConfirm } from '../confirmContext'
+import { reanalyzeConfirmMessage } from '../reanalyze'
+import { useReanalyzeGame } from '../useReanalyzeGame'
 import { useRebuildFullVideo } from '../useRebuildFullVideo'
 import type { DeleteMode } from '../deleteConfirm'
 import { DueOnlyToggle } from './DueOnlyToggle'
@@ -68,6 +71,29 @@ export function GameList({
       .catch((e: Error) => setError(e.message))
   }, [])
   const rebuild = useRebuildFullVideo(load)
+  const [viewerTick, setViewerTick] = useState(0)
+  const reanalyze = useReanalyzeGame(
+    useCallback(() => {
+      load()
+      setViewerTick((t) => t + 1)
+    }, [load]),
+  )
+  const ask = useConfirm()
+  const reanalyzeItem = (key: string) => ({
+    label: '다시 분석',
+    disabled: reanalyze.running !== null || rebuild.running !== null,
+    title: '원본 녹화가 남아 있으면 풀영상·후보·결과표·초상화를 전부 다시 만들고, 없으면 풀영상에서 후보만 다시 찾습니다',
+    onSelect: async () => {
+      try {
+        const mode = await reanalyze.plan(key)
+        if (mode === null) return reanalyze.fail(key, '원본 녹화도 풀영상도 남아 있지 않아 다시 분석할 수 없습니다')
+        const answer = await ask({ message: reanalyzeConfirmMessage(mode), confirmLabel: '다시 분석' })
+        if (answer.ok) reanalyze.start(key)
+      } catch (e) {
+        reanalyze.fail(key, (e as Error).message)
+      }
+    },
+  })
   const gameDelete = useGameDelete({
     confirmDelete,
     onConfirmDeleteChange,
@@ -96,7 +122,7 @@ export function GameList({
     const summary = games?.find((g) => g.key === open)
     return (
       <>
-        <GameViewer gameKey={open} onBack={() => setOpen(null)} onChanged={load} menu={summary && viewerDelete.menuFor(open, summary)} />
+        <GameViewer key={`${open}-${viewerTick}`} gameKey={open} onBack={() => setOpen(null)} onChanged={load} menu={summary && viewerDelete.menuFor(open, summary, [reanalyzeItem(open)])} />
         {viewerDelete.dialog}
       </>
     )
@@ -173,7 +199,7 @@ export function GameList({
                 game={g}
                 time={{ main: formatShort(g.matchStartUtc), sub: g.matchStartUtc ? formatAgo(g.matchStartUtc) : '' }}
                 due={cleanup[g.key]}
-                menu={gameDelete.menuFor(g.key, g)}
+                menu={gameDelete.menuFor(g.key, g, [reanalyzeItem(g.key)])}
                 onOpen={() => setOpen(g.key)}
                 rebuild={
                   g.canRebuildFullVideo && !g.hasFullVideo
@@ -195,6 +221,9 @@ export function GameList({
           )}
         </section>
       ))}
+      {reanalyze.state.text && (
+        <p className={`text-sm ${reanalyze.state.error ? 'text-rose-300' : reanalyze.running ? 'text-sky-300' : 'text-emerald-300'}`}>{reanalyze.state.text}</p>
+      )}
       {rebuild.state.text && rebuild.running === null && (
         <p className={`text-sm ${rebuild.state.error ? 'text-rose-300' : 'text-emerald-300'}`}>{rebuild.state.text}</p>
       )}

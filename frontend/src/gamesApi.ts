@@ -1,4 +1,5 @@
 import type { RebuildStatus } from './legacyGame'
+import type { ReanalyzeMode, ReanalyzeStatus } from './reanalyze'
 import type { Candidate, CandidateUser, GameDetail, GameSummary } from './games'
 
 const BASE = '/api/games'
@@ -91,4 +92,16 @@ export async function deleteGameFiles(key: string, target: 'fullVideo' | 'clips'
 
 export async function unsaveCandidate(key: string, id: string): Promise<Candidate> {
   return jsonOrThrow(await send('POST', `${BASE}/${key}/candidates/${id}/unsave`), '보관 해제')
+}
+
+export async function getReanalyzePlan(key: string): Promise<ReanalyzeMode | null> {
+  return (await jsonOrThrow<{ mode: ReanalyzeMode | null }>(await fetch(`${BASE}/${key}/reanalyze`), '다시 분석 방식 확인')).mode
+}
+
+export async function startReanalyze(key: string): Promise<ReanalyzeStatus> {
+  return jsonOrThrow(await send('POST', `${BASE}/${key}/reanalyze`), '다시 분석')
+}
+
+export async function getReanalyzeStatus(key: string): Promise<ReanalyzeStatus> {
+  return jsonOrThrow(await fetch(`${BASE}/${key}/reanalyze/status`), '다시 분석 상태 확인')
 }
