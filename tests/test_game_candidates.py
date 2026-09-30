@@ -89,3 +89,25 @@ def test_batch_selection_skips_dismissed_and_already_saved():
 def test_unknown_batch_mode_is_rejected():
     with pytest.raises(ValueError):
         gcand.select_for_batch({"candidates": []}, "weird")
+
+
+def test_edit_title_is_stored_in_the_user_section_and_blank_clears_it():
+    c = cand()
+    c["title"] = "1일차 낮 교전"
+    gcand.apply_edit(c, {"title": "  내 하이라이트  "}, 600.0)
+    assert c["user"]["title"] == "내 하이라이트" and c["title"] == "1일차 낮 교전"
+    assert gcand.effective_title(c) == "내 하이라이트"
+    gcand.apply_edit(c, {"title": "   "}, 600.0)
+    assert "title" not in c["user"] and gcand.effective_title(c) == "1일차 낮 교전"
+
+
+def test_edit_title_rejects_non_text_and_overlong_titles():
+    with pytest.raises(ValueError):
+        gcand.apply_edit(cand(), {"title": 5}, 600.0)
+    with pytest.raises(ValueError):
+        gcand.apply_edit(cand(), {"title": "가" * 101}, 600.0)
+
+
+def test_a_title_change_alone_is_not_a_range_change():
+    c = cand(user={"savedClipId": "x", "title": "새 이름"})
+    assert gcand.range_changed(c, 600.0) is False

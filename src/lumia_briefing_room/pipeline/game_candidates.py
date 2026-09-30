@@ -5,7 +5,8 @@ from __future__ import annotations
 
 MIN_LENGTH_SEC = 1.0
 LABELS = ("combat", "hunt")
-_EDITABLE = {"start", "end", "dismissed", "label"}
+MAX_TITLE_LEN = 100
+_EDITABLE = {"start", "end", "dismissed", "label", "title"}
 
 
 def all_candidates(game: dict) -> list[dict]:
@@ -21,6 +22,10 @@ def effective_range(cand: dict, duration_sec: float) -> tuple[float, float]:
     start = float(user.get("start", cand["start"]))
     end = float(user.get("end", cand["end"]))
     return max(0.0, start), min(duration_sec, end)
+
+
+def effective_title(cand: dict) -> str:
+    return (cand.get("user") or {}).get("title") or cand.get("title") or "직접 추가한 구간"
 
 
 def range_changed(cand: dict, duration_sec: float) -> bool:
@@ -49,6 +54,18 @@ def apply_edit(cand: dict, patch: dict, duration_sec: float) -> None:
         if end - start < MIN_LENGTH_SEC:
             raise ValueError(f"구간은 {MIN_LENGTH_SEC:g}초 이상이어야 합니다")
         user["start"], user["end"] = round(start, 3), round(end, 3)
+
+    if "title" in patch:
+        title = patch["title"]
+        if title is not None and not isinstance(title, str):
+            raise ValueError("이름은 글자여야 합니다")
+        title = (title or "").strip()
+        if len(title) > MAX_TITLE_LEN:
+            raise ValueError(f"이름은 {MAX_TITLE_LEN}자 이하여야 합니다")
+        if title:
+            user["title"] = title
+        else:
+            user.pop("title", None)
 
     if "dismissed" in patch:
         if patch["dismissed"]:

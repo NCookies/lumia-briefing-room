@@ -170,3 +170,21 @@ def test_summary_counts_candidates_edited_but_not_saved(client):
     assert client.get("/api/games").json()["games"][0]["unsavedEditCount"] == 2
     client.patch(f"/api/games/{KEY}/candidates/{KEY}_02", json={"dismissed": True})
     assert client.get("/api/games").json()["games"][0]["unsavedEditCount"] == 1
+
+
+def test_renaming_a_saved_candidate_renames_its_clip_without_recutting(client):
+    url = f"/api/games/{KEY}/candidates/{KEY}_01"
+    client.post(f"{url}/save")
+    assert client.patch(url, json={"title": "멋진 교전"}).json()["user"]["title"] == "멋진 교전"
+    meta = json.loads((client.tmp / "clips" / f"{KEY}_01.json").read_text(encoding="utf-8"))
+    assert meta["title"] == "멋진 교전"
+    client.post(f"{url}/save")
+    assert len(client.cuts) == 1
+
+
+def test_a_renamed_candidate_is_saved_under_the_new_title(client):
+    url = f"/api/games/{KEY}/candidates/{KEY}_02"
+    client.patch(url, json={"title": "내 이름"})
+    client.post(f"{url}/save")
+    meta = json.loads((client.tmp / "clips" / f"{KEY}_02.json").read_text(encoding="utf-8"))
+    assert meta["title"] == "내 이름"

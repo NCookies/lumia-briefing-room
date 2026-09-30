@@ -15,7 +15,7 @@ from lumia_briefing_room.config import Config
 from lumia_briefing_room.pipeline.clip import make_thumbnail
 from lumia_briefing_room.pipeline.clip_assets import stored_asset_path
 from lumia_briefing_room.pipeline.clip_uid import new_clip_uid
-from lumia_briefing_room.pipeline.game_candidates import effective_range
+from lumia_briefing_room.pipeline.game_candidates import effective_range, effective_title
 from lumia_briefing_room.pipeline.game_store import FULL_VIDEO
 from lumia_briefing_room.pipeline.metadata import ClipMetadata, phase_index, revive_cost, write_metadata
 from lumia_briefing_room.procs import run_hidden
@@ -140,7 +140,7 @@ def save_candidate_clip(
     combat_end = offset + float(cand.get("combatEnd", end))
 
     meta = ClipMetadata(
-        title=cand.get("title") or "직접 추가한 구간",
+        title=effective_title(cand),
         session_dir=game.get("sessionDir", ""),
         session_start_utc=game.get("sessionStartUtc", ""),
         match_start_utc=game.get("matchStartUtc", ""),

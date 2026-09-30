@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -120,6 +121,18 @@ def register_game_routes(
             cleanup_preview_registry.notify_clips_changed()
         return _summary(load_or_404(key), games_dir())
 
+    def _rename_saved_clip(cand: dict) -> None:
+        clip_id = (cand.get("user") or {}).get("savedClipId")
+        path = clips_dir() / f"{clip_id}.json" if clip_id else None
+        if path is None or not path.is_file():
+            return
+        try:
+            meta = json.loads(path.read_text(encoding="utf-8"))
+            meta["title"] = gcand.effective_title(cand)
+            path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+        except (OSError, ValueError):
+            pass
+
     @app.patch("/api/games/{key}/candidates/{candidate_id}")
     def patch_candidate(key: str, candidate_id: str, body: dict):
         game = load_or_404(key)
@@ -137,7 +150,10 @@ def register_game_routes(
         updated = update_game(games_dir(), key, change)
         if error:
             raise HTTPException(400, error[0])
-        return gcand.find_candidate(updated, candidate_id)
+        result = gcand.find_candidate(updated, candidate_id)
+        if "title" in body:
+            _rename_saved_clip(result)
+        return result
 
     @app.post("/api/games/{key}/candidates", status_code=201)
     def add_candidate(key: str, body: CandidateCreate):
