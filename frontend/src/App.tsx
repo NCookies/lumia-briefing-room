@@ -163,16 +163,6 @@ export default function App() {
           </nav>
         </div>
         <div className="mb-2 flex items-center gap-2">
-          {tab === 'steam' && (
-            <button
-              type="button"
-              className="rounded border border-zinc-600 px-2 py-1 text-sm text-zinc-300 hover:bg-zinc-700"
-              title="게임 로그에 남지 않은 과거 녹화에서 게임을 찾아 클립으로 만듭니다"
-              onClick={() => setShowBackfill(true)}
-            >
-              {backfillRunning ? `과거 녹화 분석 중 ${progressPercent(backfill)}%` : '과거 녹화 분석'}
-            </button>
-          )}
           <button
             type="button"
             className="rounded border border-zinc-600 px-2 py-1 text-sm text-zinc-300 hover:bg-zinc-700"
@@ -201,7 +191,13 @@ export default function App() {
       )}
 
       <div className={tab === 'steam' ? 'flex flex-1 flex-col' : 'hidden'}>
-        <GameList key={browserKey} active={tab === 'steam'} refreshTick={refreshTick} />
+        <GameList
+          key={browserKey}
+          active={tab === 'steam'}
+          refreshTick={refreshTick}
+          onBackfill={() => setShowBackfill(true)}
+          backfillLabel={backfillRunning ? `과거 녹화 분석 중 ${progressPercent(backfill)}%` : '과거 녹화 분석'}
+        />
       </div>
 
       {TABS.filter((t) => t.id === 'vod').map((t) => (

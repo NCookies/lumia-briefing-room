@@ -24,7 +24,14 @@ function barColor(g: GameSummary): string {
   return 'bg-zinc-500'
 }
 
-export function GameList({ active, refreshTick }: { active: boolean; refreshTick: number }) {
+interface Props {
+  active: boolean
+  refreshTick: number
+  onBackfill: () => void
+  backfillLabel: string
+}
+
+export function GameList({ active, refreshTick, onBackfill, backfillLabel }: Props) {
   const [games, setGames] = useState<GameSummary[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState<string | null>(null)
@@ -53,6 +60,14 @@ export function GameList({ active, refreshTick }: { active: boolean; refreshTick
       <div className="flex items-baseline gap-3 text-sm text-zinc-300">
         <span>게임 {games.length}개</span>
         <span className="text-xs text-zinc-500">풀영상 {formatBytes(total)}</span>
+        <button
+          type="button"
+          className="ml-auto rounded border border-zinc-600 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
+          title="게임 로그에 남지 않은 과거 녹화에서 게임을 찾아 만듭니다"
+          onClick={onBackfill}
+        >
+          {backfillLabel}
+        </button>
       </div>
       {games.length === 0 && (
         <p className="text-sm text-zinc-500">
