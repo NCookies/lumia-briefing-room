@@ -7,17 +7,14 @@ interface Props {
   duration: number
   selectedId: string | null
   currentId: string | null
-  checked: Set<string>
-  showDismissed: boolean
+  modifiedCount: number
   busy: boolean
   canSave: boolean
-  onShowDismissed: (v: boolean) => void
-  onToggleChecked: (id: string) => void
   onSelect: (c: Candidate) => void
   onSave: (id: string) => void
   onDismiss: (c: Candidate) => void
   onDelete: (id: string) => void
-  onBatch: (mode: 'all' | 'certain' | 'ids') => void
+  onSaveModified: () => void
 }
 
 export function ViewerCandidates(p: Props) {
@@ -31,27 +28,16 @@ export function ViewerCandidates(p: Props) {
 
   return (
     <aside data-testid="viewer-candidates" className="flex w-80 shrink-0 flex-col gap-2 overflow-hidden rounded border border-zinc-700 bg-zinc-800/60 p-2">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-medium">후보 {pending}개 저장 대기</h3>
-        <label className="flex items-center gap-1 text-xs text-zinc-400">
-          <input type="checkbox" checked={p.showDismissed} onChange={(e) => p.onShowDismissed(e.target.checked)} />
-          무시한 후보 보기
-        </label>
-      </div>
-      <div className="flex flex-wrap gap-1 text-xs">
-        <button type="button" disabled={p.busy || !p.canSave} className="rounded bg-sky-600 px-2 py-1 hover:bg-sky-500 disabled:opacity-40" onClick={() => p.onBatch('all')}>
-          전부 저장
-        </button>
-        <button type="button" disabled={p.busy || !p.canSave} className="rounded bg-sky-700 px-2 py-1 hover:bg-sky-600 disabled:opacity-40" onClick={() => p.onBatch('certain')}>
-          확실한 것만
-        </button>
         <button
           type="button"
-          disabled={p.busy || !p.canSave || p.checked.size === 0}
-          className="rounded border border-sky-600 px-2 py-1 hover:bg-zinc-700 disabled:opacity-40"
-          onClick={() => p.onBatch('ids')}
+          disabled={p.busy || !p.canSave || p.modifiedCount === 0}
+          className="rounded bg-sky-600 px-2 py-1 text-xs hover:bg-sky-500 disabled:opacity-40"
+          title="범위를 고친 후보를 전부 클립으로 저장(저장한 클립은 새 범위로 교체)"
+          onClick={p.onSaveModified}
         >
-          선택한 {p.checked.size}개
+          전부 저장{p.modifiedCount > 0 ? ` (${p.modifiedCount})` : ''}
         </button>
       </div>
       <ul ref={list} className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
@@ -71,14 +57,6 @@ export function ViewerCandidates(p: Props) {
               } ${dismissed ? 'opacity-50' : ''}`}
             >
               <div className="flex items-center gap-2">
-                {!saved && !dismissed && (
-                  <input
-                    type="checkbox"
-                    title="위의 '선택한 N개' 일괄 저장에 포함"
-                    checked={p.checked.has(c.id)}
-                    onChange={() => p.onToggleChecked(c.id)}
-                  />
-                )}
                 <button type="button" className="min-w-0 flex-1 truncate text-left text-sm hover:underline" title={c.title} onClick={() => p.onSelect(c)}>
                   {c.title}
                 </button>

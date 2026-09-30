@@ -6,7 +6,6 @@ import {
   gameVideoUrl,
   getGame,
   patchCandidate,
-  saveBatch,
   saveCandidate,
   setGamePinned,
 } from '../gamesApi'
@@ -19,7 +18,7 @@ import { ViewerCandidates } from './ViewerCandidates'
 const SEEK_STEP_SEC = 5
 const SKIP_SEC = 10
 
-type Undo = { kind: 'range'; id: string; prev: [number, number] } | { kind: 'add'; id: string }
+type Undo = { kind: 'range'; id: string; prev: [number, number] } | { kind: 'add'; id: string } | { kind: 'dismiss'; id: string }
 
 const BTN = 'rounded border border-zinc-600 px-2 py-1 text-sm hover:bg-zinc-700 disabled:opacity-40'
 
@@ -29,8 +28,6 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
-  const [checked, setChecked] = useState<Set<string>>(new Set())
-  const [showDismissed, setShowDismissed] = useState(false)
   const [videoError, setVideoError] = useState(false)
   const [time, setTime] = useState(0)
   const [playing, setPlaying] = useState(false)
@@ -55,7 +52,7 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
   }, [reload])
 
   const duration = game?.fullVideo?.durationSec ?? 0
-  const cands = useMemo(() => (game ? visibleCandidates(game, showDismissed) : []), [game, showDismissed])
+  const cands = useMemo(() => (game ? visibleCandidates(game) : []), [game])
   const selectedCand = cands.find((c) => c.id === selected) ?? null
   const rangeOf = (c: Candidate): [number, number] => overrides[c.id] ?? effectiveRange(c, duration)
   const view: View = zoomWindow ?? [0, duration]
@@ -158,6 +155,7 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
     if (!last || busy) return
     setUndo((u) => u.slice(0, -1))
     if (last.kind === 'range') setRange(last.id, last.prev)
+    else if (last.kind === 'dismiss') void run(() => patchCandidate(gameKey, last.id, { dismissed: false }), '무시한 후보를 되살렸습니다')
     else {
       setSelected(null)
       void run(() => deleteCandidate(gameKey, last.id))
@@ -187,8 +185,15 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
   }
 
   const dismissOrDelete = (c: Candidate) => {
-    if (c.id.includes('_u')) void run(() => deleteCandidate(gameKey, c.id))
-    else void run(() => patchCandidate(gameKey, c.id, { dismissed: !isDismissed(c) }))
+    if (c.id.includes('_u')) {
+      void run(() => deleteCandidate(gameKey, c.id))
+      return
+    }
+    setSelected((sel) => (sel === c.id ? null : sel))
+    void run(async () => {
+      await patchCandidate(gameKey, c.id, { dismissed: true })
+      setUndo((u) => [...u, { kind: 'dismiss', id: c.id }])
+    }, '후보를 무시했습니다 — Ctrl+Z 로 되돌릴 수 있습니다')
   }
 
   const saveOne = (id: string) => {
@@ -202,21 +207,19 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
     setZoomWindow(zoomBy(base, factor, center, duration))
   }
 
-  const batch = (mode: 'all' | 'certain' | 'ids') =>
-    void run(async () => {
-      const result = await saveBatch(gameKey, mode, mode === 'ids' ? [...checked] : undefined)
-      setChecked(new Set())
-      setNotice(
-        `${result.saved.length}개 저장${result.failed.length ? `, ${result.failed.length}개 실패(${result.failed[0].error})` : ''}`,
-      )
-    })
+  const modifiedIds = cands.filter((c) => rangeModified(c, duration)).map((c) => c.id)
 
-  const toggleChecked = (id: string) =>
-    setChecked((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
+  const saveModified = () =>
+    void run(async () => {
+      const failed: string[] = []
+      for (const id of modifiedIds) {
+        try {
+          await saveCandidate(gameKey, id)
+        } catch (e) {
+          failed.push((e as Error).message)
+        }
+      }
+      setNotice(`${modifiedIds.length - failed.length}개 저장${failed.length ? `, ${failed.length}개 실패(${failed[0]})` : ''}`)
     })
 
   const handleKey = (e: KeyboardEvent) => {
@@ -277,17 +280,14 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
       duration={duration}
       selectedId={selected}
       currentId={currentId}
-      checked={checked}
-      showDismissed={showDismissed}
+      modifiedCount={modifiedIds.length}
       busy={busy}
       canSave={game.hasFullVideo}
-      onShowDismissed={setShowDismissed}
-      onToggleChecked={toggleChecked}
       onSelect={select}
       onSave={saveOne}
       onDismiss={dismissOrDelete}
       onDelete={(id) => void run(() => deleteCandidate(gameKey, id))}
-      onBatch={batch}
+      onSaveModified={saveModified}
     />
   )
 
@@ -391,33 +391,26 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
             />
             <ViewerScroll duration={duration} view={view} onPan={setZoomWindow} />
 
-            <div className="flex flex-wrap items-center gap-1 pt-1">
-              <button type="button" disabled={undo.length === 0 || busy} className={BTN} title="되돌리기 (Ctrl+Z)" onClick={undoLast}>
-                되돌리기
-              </button>
-              <button
-                type="button"
-                disabled={!selectedCand && !zoomWindow}
-                className={BTN}
-                title="선택한 구간 앞뒤 30초를 막대 전체로 확대"
-                onClick={() => setZoomWindow(zoomWindow || !selectedCand ? null : zoomView(rangeOf(selectedCand), duration))}
-              >
-                {zoomWindow ? '전체 보기' : '구간 확대'}
-              </button>
-              <button type="button" className={`${BTN} flex items-center`} title="배율 확대" onClick={() => zoomStep(0.5)}>
-                <ZoomInIcon />
-              </button>
-              <button type="button" disabled={!zoomWindow} className={`${BTN} flex items-center`} title="배율 축소" onClick={() => zoomStep(2)}>
-                <ZoomOutIcon />
-              </button>
-              <button type="button" disabled={busy} className="rounded border border-yellow-600/60 px-2 py-1 text-sm hover:bg-zinc-700 disabled:opacity-40" onClick={addHere}>
-                + 여기서 구간 추가
-              </button>
-              <span className="ml-2 truncate text-xs text-zinc-500">
+            <div className="flex items-center gap-2 pt-1">
+              <span className="min-w-0 flex-1 truncate text-xs text-zinc-500">
                 {selectedCand
-                  ? `선택: ${selectedCand.title} — 양 끝 손잡이를 끌어 범위를 바꾸면 바로 기록됩니다`
+                  ? `선택: ${selectedCand.title} — 양 끝 손잡이를 끌어 범위를 바꾸고, 저장을 눌러야 클립에 반영됩니다`
                   : '막대에서 노란 구간을 누르면 선택됩니다. 초록 킬 · 파랑 어시 · 빨강 사망 · 주황 팀원 사망'}
               </span>
+              <div className="flex shrink-0 items-center gap-1 text-white">
+                <button type="button" disabled={undo.length === 0 || busy} className={BTN} title="되돌리기 (Ctrl+Z)" onClick={undoLast}>
+                  되돌리기
+                </button>
+                <button type="button" disabled={!zoomWindow} className={`${BTN} flex items-center`} title="배율 축소" onClick={() => zoomStep(2)}>
+                  <ZoomOutIcon />
+                </button>
+                <button type="button" className={`${BTN} flex items-center`} title="배율 확대" onClick={() => zoomStep(0.5)}>
+                  <ZoomInIcon />
+                </button>
+                <button type="button" disabled={busy} className="rounded border border-yellow-600/60 px-2 py-1 text-sm hover:bg-zinc-700 disabled:opacity-40" onClick={addHere}>
+                  + 여기서 구간 추가
+                </button>
+              </div>
             </div>
           </div>
         )}
