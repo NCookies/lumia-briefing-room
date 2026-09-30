@@ -8,7 +8,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 
-from lumia_briefing_room.api.clip_index import locate_clip, norm, summaries_by_video
+from lumia_briefing_room.api.clip_index import light_index, locate_clip, norm
 from lumia_briefing_room.config import ARCHIVE_FOLDER, AUTO_ARCHIVE_FOLDER, Config
 from lumia_briefing_room.pipeline import categories as cats
 from lumia_briefing_room.pipeline.cleanup_registry import registry as cleanup_preview_registry
@@ -46,16 +46,16 @@ def register_category_routes(app: FastAPI, *, lock, current_config: Callable[[],
             return {"enabled": False, "categories": []}
         root = cats.clips_root(cfg)
         with lock:
-            index = summaries_by_video(cfg)
+            index = light_index(cfg)
             result = []
             for name in cats.category_names(cfg):
                 folder = root / name
                 videos = list(walk_videos([folder])) if folder.is_dir() else []
-                clips = [c for v in videos if (c := index.get(norm(v))) is not None]
-                newest = max(clips, key=lambda c: c.created_at, default=None)
+                known = [entry for v in videos if (entry := index.get(norm(v))) is not None]
+                newest = max(known, key=lambda entry: entry[1], default=None)
                 result.append({
                     "name": name, "auto": name == AUTO_ARCHIVE_FOLDER, "default": name == ARCHIVE_FOLDER,
-                    "clipCount": len(videos), "thumbnailClipId": newest.id if newest else None,
+                    "clipCount": len(videos), "thumbnailClipId": newest[0] if newest else None,
                 })
         return {"enabled": True, "categories": result}
 

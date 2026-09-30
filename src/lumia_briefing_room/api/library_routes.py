@@ -72,7 +72,7 @@ def register_library_routes(
         lib = _roots(cfg)
         with lock:
             folders, videos = lib.list_folder(path)
-            mapping = summaries_by_video(cfg)
+            mapping = summaries_by_video(cfg, {_norm(v) for v in videos})
             clips = []
             for video in videos:
                 clip = mapping.get(_norm(video))
@@ -129,7 +129,7 @@ def register_library_routes(
                 lib.ensure_entry(rel)
             targets = [(rel, lib.resolve(rel)) for rel in items]
             videos = lib.collect_videos(items)
-            mapping = summaries_by_video(cfg)
+            mapping = summaries_by_video(cfg, {_norm(v) for v in videos})
             users: dict[str, int] = {}
             for clip in mapping.values():
                 users[_norm(clip.meta_path)] = users.get(_norm(clip.meta_path), 0) + 1
