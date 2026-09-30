@@ -3,18 +3,25 @@ import { cleanupReasonLabel, cleanupReasonTooltip } from '../cleanupPreview'
 import { groupByDay } from '../gameDays'
 import { gameHeadline, matchTypeLabel, type GameSummary } from '../games'
 import { gameAssetUrl, getGames, setGamePinned } from '../gamesApi'
+import { formatAgo } from '../grouping'
 import { formatBytes } from '../retention'
 import { useCleanupPreview } from '../useCleanupPreview'
 import { GameDayHeader } from './GameDayHeader'
 import { GameViewer } from './GameViewer'
 
-function formatStart(iso: string | null): string {
+function formatShort(iso: string | null): string {
   if (!iso) return '시각 미상'
   const d = new Date(iso)
-  const days = ['일', '월', '화', '수', '목', '금', '토']
   const hh = String(d.getHours()).padStart(2, '0')
   const mm = String(d.getMinutes()).padStart(2, '0')
-  return `${d.getMonth() + 1}월 ${d.getDate()}일 (${days[d.getDay()]}) ${hh}:${mm}`
+  return `${d.getMonth() + 1}/${d.getDate()} ${hh}:${mm}`
+}
+
+function barColor(g: GameSummary): string {
+  const p = g.matchResult?.placement
+  if (p === 1 || g.matchResult?.outcome === '승리') return 'bg-emerald-500'
+  if (p != null && p <= 3) return 'bg-sky-500'
+  return 'bg-zinc-500'
 }
 
 export function GameList({ active, refreshTick }: { active: boolean; refreshTick: number }) {
@@ -67,30 +74,36 @@ export function GameList({ active, refreshTick }: { active: boolean; refreshTick
               return (
                 <li
                   key={g.key}
-                  className="flex cursor-pointer flex-wrap items-center gap-3 rounded border border-zinc-700 bg-zinc-800/60 p-3 hover:border-zinc-500 hover:bg-zinc-800"
+                  className="flex cursor-pointer items-stretch overflow-hidden rounded border border-zinc-700 bg-zinc-800/60 hover:border-zinc-500 hover:bg-zinc-800"
                   onClick={() => setOpen(g.key)}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="flex flex-col">
-                      <span className="font-medium">
+                  <div className={`w-1.5 shrink-0 ${barColor(g)}`} />
+                  <div className="flex flex-1 flex-wrap items-center gap-x-8 gap-y-2 px-4 py-3">
+                    <div className="w-20">
+                      <div
+                        className={`text-xl font-bold ${g.matchResult?.placement === 1 || g.matchResult?.outcome === '승리' ? 'text-emerald-400' : 'text-zinc-200'}`}
+                      >
                         {gameHeadline(g.matchResult)}
-                        {matchTypeLabel(g.matchResult) && (
-                          <span className="ml-2 rounded bg-zinc-700 px-1.5 py-0.5 text-xs font-normal text-zinc-200">
-                            {matchTypeLabel(g.matchResult)}
-                          </span>
-                        )}
-                      </span>
-                      <span className="text-xs text-zinc-400">{formatStart(g.matchStartUtc)}</span>
-                    </div>
-                    {g.matchResult?.kills != null && (
-                      <div className="flex flex-col">
-                        <span className="text-base font-bold text-zinc-100">
-                          {g.matchResult.tk ?? '-'} / {g.matchResult.kills} / {g.matchResult.assists ?? '-'}
-                        </span>
-                        <span className="text-xs text-zinc-500">TK / K / A</span>
                       </div>
-                    )}
-                    <div className="flex items-center gap-1">
+                      <div className="text-sm font-semibold text-zinc-300">
+                        {g.gameMode === 'cobalt' ? '코발트' : matchTypeLabel(g.matchResult)}
+                      </div>
+                    </div>
+                    <div className="w-32 text-sm">
+                      <div className="text-zinc-200">{formatShort(g.matchStartUtc)}</div>
+                      <div className="text-xs text-zinc-500">{g.matchStartUtc ? formatAgo(g.matchStartUtc) : ''}</div>
+                    </div>
+                    <div className="w-28">
+                      {g.matchResult?.kills != null && (
+                        <>
+                          <div className="text-base font-bold text-zinc-100">
+                            {g.matchResult.tk ?? '-'} / {g.matchResult.kills} / {g.matchResult.assists ?? '-'}
+                          </div>
+                          <div className="text-xs text-zinc-500">TK / K / A</div>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex min-w-[7.5rem] items-center gap-1">
                       {(['me', 'teammate1', 'teammate2'] as const).map((slot) =>
                         g.portraits[slot] ? (
                           <img
@@ -103,7 +116,7 @@ export function GameList({ active, refreshTick }: { active: boolean; refreshTick
                       )}
                     </div>
                   </div>
-                  <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
+                  <div className="flex flex-wrap items-center justify-end gap-3 py-3 pr-4">
                     {g.unsavedEditCount > 0 && (
                       <span
                         className="rounded bg-red-600 px-2 py-0.5 text-xs font-semibold text-white"
