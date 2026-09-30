@@ -47,3 +47,13 @@ export function structureLines(root: string, fullVideos: string | null): Structu
     },
   ]
 }
+
+export function recordingDiskWarning(flags: { clips: boolean; fullVideos: boolean } | undefined): string | null {
+  if (!flags) return null
+  const names = [flags.fullVideos && '풀영상', flags.clips && '클립'].filter(Boolean).join('·')
+  if (!names) return null
+  return (
+    `${names} 폴더가 스팀 녹화와 같은 디스크에 있습니다. 게임 중 스팀 녹화가 끊기지 않도록 복사 속도를 줄여서 만들기 때문에 판이 끝난 뒤 ` +
+    '풀영상·클립이 늦게 생깁니다. 녹화와 다른 디스크로 옮기는 것을 권합니다(한 하드디스크를 나눈 드라이브는 문자가 달라도 같은 디스크입니다).'
+  )
+}

@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException
 
 from lumia_briefing_room import activity
 from lumia_briefing_room.config import Config, PathsConfig, resolve_paths, suggested_root, uses_legacy_layout
+from lumia_briefing_room.disk_identity import same_disk
 from lumia_briefing_room.pipeline.disk_space import GB, free_bytes_at
 from lumia_briefing_room.pipeline.storage_migrate import (
     StorageMoveError,
@@ -19,6 +20,7 @@ from lumia_briefing_room.pipeline.storage_migrate import (
     previous_paths,
     undo_storage_move,
 )
+from lumia_briefing_room.steam_paths import resolve_recording_root
 
 log = logging.getLogger("lumia_briefing_room.storage")
 
@@ -30,6 +32,16 @@ def _free_gb(folder: Path) -> float | None:
         return round(free_bytes_at(folder) / GB, 1)
     except OSError:
         return None
+
+
+def _on_recording_disk(folder: Path, recording_root: Path | None) -> bool:
+    """녹화와 같은 물리 디스크면 게임이 끝날 때마다 스팀 녹화와 디스크를 다툰다(복사 속도는 제한하지만 느려진다)."""
+    if recording_root is None:
+        return False
+    try:
+        return same_disk(folder, recording_root)
+    except OSError:
+        return False
 
 
 def register_storage_routes(
@@ -45,6 +57,7 @@ def register_storage_routes(
         cfg = current_config()
         resolved = resolve_paths(cfg.paths)
         legacy = uses_legacy_layout(cfg.paths)
+        recording = resolve_recording_root(cfg.paths.steam_recording)
         return {
             "layout": "legacy" if legacy else "new",
             "root": None if cfg.paths.root is None else str(cfg.paths.root),
@@ -63,6 +76,10 @@ def register_storage_routes(
                 "clips": _free_gb(resolved.clips_steam), "fullVideos": _free_gb(resolved.games_steam),
             },
             "canUndo": ledger().is_file(),
+            "recordingSameDisk": {
+                "clips": _on_recording_disk(resolved.clips_steam, recording),
+                "fullVideos": _on_recording_disk(resolved.games_steam, recording),
+            },
         }
 
     @app.post("/api/storage/migrate", status_code=202)

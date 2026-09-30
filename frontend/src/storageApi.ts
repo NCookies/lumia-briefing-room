@@ -9,6 +9,7 @@ export interface StorageInfo {
   legacy: { clips: string; vodClips: string; games: string }
   freeGb: { clips: number | null; fullVideos: number | null }
   canUndo: boolean
+  recordingSameDisk?: { clips: boolean; fullVideos: boolean }
 }
 
 interface MoveJob {

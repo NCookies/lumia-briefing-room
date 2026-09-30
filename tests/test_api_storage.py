@@ -147,3 +147,24 @@ def test_moving_an_already_new_layout_to_another_root(tmp_path):
     assert status["state"] == "done"
     assert (tmp_path / "B" / "clips" / "아야" / "a.mp4").read_bytes() == b"VIDEO"
     assert client.get("/api/clips/a/video").content == b"VIDEO"
+
+
+def test_status_flags_folders_on_the_same_disk_as_the_steam_recording(tmp_path, monkeypatch):
+    from lumia_briefing_room.api import storage_routes
+
+    recording = tmp_path / "steam video" / "video"
+    recording.mkdir(parents=True)
+    cfg = Config(paths=PathsConfig(root=tmp_path / "store", full_videos=tmp_path / "hdd" / "full", steam_recording=recording, temp=tmp_path / "tmp"))
+    monkeypatch.setattr(storage_routes, "same_disk", lambda a, b: "hdd" in str(a) and b == recording)
+    body = TestClient(create_app(cfg, config_path=tmp_path / "config.json")).get("/api/storage").json()
+    assert body["recordingSameDisk"] == {"clips": False, "fullVideos": True}
+
+
+def test_status_does_not_flag_anything_without_a_steam_recording_folder(tmp_path, monkeypatch):
+    from lumia_briefing_room.api import storage_routes
+
+    cfg = Config(paths=PathsConfig(root=tmp_path / "store", temp=tmp_path / "tmp"))
+    monkeypatch.setattr(storage_routes, "resolve_recording_root", lambda configured: None)
+    monkeypatch.setattr(storage_routes, "same_disk", lambda a, b: True)
+    body = TestClient(create_app(cfg, config_path=tmp_path / "config.json")).get("/api/storage").json()
+    assert body["recordingSameDisk"] == {"clips": False, "fullVideos": False}

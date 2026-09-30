@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getStorage, migrateStorage, undoStorage, type StorageInfo } from '../storageApi'
-import { samePath, structureLines, suggestedRootFromLegacy } from '../storage'
+import { recordingDiskWarning, samePath, structureLines, suggestedRootFromLegacy } from '../storage'
 import { FolderPicker } from './FolderPicker'
 
 interface Props {
@@ -34,6 +34,7 @@ export function StorageSection({ variant = 'options', onChanged }: Props) {
   const isNew = info.layout === 'new'
   const root = info.root ?? ''
   const percent = Math.round(fraction * 100)
+  const diskWarning = recordingDiskWarning(info.recordingSameDisk)
 
   const run = async (newRoot: string, fullVideos: string | null, done: string) => {
     setBusy(true)
@@ -134,6 +135,12 @@ export function StorageSection({ variant = 'options', onChanged }: Props) {
             </div>
           )}
         </>
+      )}
+
+      {diskWarning && mode === 'view' && (
+        <p className="rounded border border-amber-600/60 bg-amber-950/30 px-3 py-2 text-xs text-amber-300" data-testid="recording-disk-warning">
+          {diskWarning}
+        </p>
       )}
 
       {mode === 'pickRoot' && (

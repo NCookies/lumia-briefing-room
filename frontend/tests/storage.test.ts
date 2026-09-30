@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { folderName, joinPath, parentPath, samePath, suggestedRootFromLegacy, structureLines } from '../src/storage.ts'
+import { folderName, joinPath, parentPath, recordingDiskWarning, samePath, suggestedRootFromLegacy, structureLines } from '../src/storage.ts'
 
 test('parentPath handles windows and forward slashes and trailing separators', () => {
   assert.equal(parentPath('H:\\lumia_briefingroom_vod\\clips'), 'H:\\lumia_briefingroom_vod')
@@ -42,4 +42,14 @@ test('structureLines describes the folders and marks the full video override', (
   const moved = structureLines('H:\\store', 'D:\\big')
   assert.ok(moved.some((l) => l.path === 'D:\\big' && l.note.includes('자동으로 지워')))
   assert.ok(!moved.some((l) => l.path === 'H:\\store\\full_video'))
+})
+
+test('recordingDiskWarning names the folders that share the steam recording disk', () => {
+  assert.equal(recordingDiskWarning(undefined), null)
+  assert.equal(recordingDiskWarning({ clips: false, fullVideos: false }), null)
+  const full = recordingDiskWarning({ clips: false, fullVideos: true })
+  assert.ok(full?.startsWith('풀영상 폴더가 스팀 녹화와 같은 디스크'))
+  assert.ok(full?.includes('다른 디스크'))
+  assert.ok(recordingDiskWarning({ clips: true, fullVideos: true })?.startsWith('풀영상·클립 폴더가'))
+  assert.ok(recordingDiskWarning({ clips: true, fullVideos: false })?.startsWith('클립 폴더가'))
 })
