@@ -13,8 +13,9 @@ import {
 import { DEFAULT_CHOICES, consentPatch, isPending, type ConsentChoices } from '../consent'
 import { saveConsentPatch } from '../consentApi'
 import { startBackfill } from '../backfillApi'
-import { completeFirstRun, getFirstRun, setClipsDir, setRecordingRoot } from '../onboardingApi'
+import { completeFirstRun, getFirstRun, setRecordingRoot } from '../onboardingApi'
 import { ConsentChoicesForm } from './ConsentChoicesForm'
+import { StorageSection } from './StorageSection'
 import { FolderPicker } from './FolderPicker'
 import { useLabelingState } from '../labelingContext'
 
@@ -75,7 +76,7 @@ export function FirstRunScreen({ onDone }: { onDone: (backfillStarted: boolean) 
   const [choices, setChoices] = useState<ConsentChoices>(DEFAULT_CHOICES)
   const [info, setInfo] = useState<FirstRunInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [editing, setEditing] = useState<'recording' | 'clips' | null>(null)
+  const [editing, setEditing] = useState<'recording' | null>(null)
   const [analyzePast, setAnalyzePast] = useState(true)
   const [diskAcknowledged, setDiskAcknowledged] = useState(false)
 
@@ -107,12 +108,6 @@ export function FirstRunScreen({ onDone }: { onDone: (backfillStarted: boolean) 
 
   const saveRecording = async (path: string) => {
     await setRecordingRoot(path)
-    setEditing(null)
-    load()
-  }
-
-  const saveClips = async (path: string) => {
-    await setClipsDir(path)
     setEditing(null)
     load()
   }
@@ -194,30 +189,7 @@ export function FirstRunScreen({ onDone }: { onDone: (backfillStarted: boolean) 
           )}
         </section>
 
-        <section className="flex flex-col gap-2">
-          <h3 className="text-base font-medium">클립 저장 폴더</h3>
-          <p className="break-all rounded border border-zinc-700 bg-zinc-800 px-3 py-2 font-mono text-xs">
-            {info.clipsDir}
-          </p>
-          {editing === 'clips' ? (
-            <FolderEditor
-              title="클립 저장 폴더 고르기"
-              hint="잘라 낸 클립이 저장될 폴더입니다. 옵션에서 나중에도 바꿀 수 있습니다."
-              onSave={saveClips}
-              onCancel={() => setEditing(null)}
-            />
-          ) : (
-            <div>
-              <button
-                type="button"
-                className="rounded border border-zinc-600 px-3 py-1 text-sm hover:bg-zinc-700"
-                onClick={() => setEditing('clips')}
-              >
-                클립 폴더 바꾸기
-              </button>
-            </div>
-          )}
-        </section>
+        <StorageSection variant="firstRun" onChanged={load} />
 
         <section className="flex flex-col gap-2" data-testid="disk-notice">
           <h3 className="text-base font-medium">저장 공간</h3>

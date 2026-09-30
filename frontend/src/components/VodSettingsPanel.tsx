@@ -3,7 +3,6 @@ import { getVodSettings, pickVideoFiles, saveVodSettings } from '../vodApi'
 import { needsAlwaysPermanentWarning, type DeleteSourceAfter, type DeleteSourceMode } from '../vodDeleteSource'
 import { useConfirm } from '../confirmContext'
 import { pickFolder } from '../exportApi'
-import { ClipsDirSection } from './ClipsDirSection'
 import { VideoFormatHelp } from './VideoFormatHelp'
 
 export function VodSettingsPanel({ onClipsDirChanged }: { onClipsDirChanged: () => void }) {
@@ -189,12 +188,12 @@ export function VodSettingsPanel({ onClipsDirChanged }: { onClipsDirChanged: () 
         </label>
       </section>
 
-      <ClipsDirSection
-        source="vod"
-        title="영상 파일 클립 저장 폴더"
-        description="스팀 녹화 클립과 섞이지 않게 따로 저장합니다. 비워 두면 기본 위치(내 비디오 폴더의 LumiaBriefingRoom)를 씁니다."
-        onChanged={onClipsDirChanged}
-      />
+      <section className="flex flex-col gap-1">
+        <h3 className="text-sm font-medium text-zinc-200">영상 파일 클립 저장 위치</h3>
+        <p className="text-xs text-zinc-500">
+          일반 탭의 저장 폴더 안 클립 폴더(영상 파일)에 저장됩니다. 저장 폴더를 바꾸려면 일반 탭에서 바꾸세요.
+        </p>
+      </section>
 
       {status && <p className="text-xs text-zinc-400">{status}</p>}
     </div>

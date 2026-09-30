@@ -30,7 +30,6 @@ const info: FirstRunInfo = {
   answeredVersion: 0,
   currentVersion: 3,
   recording: { ...base, session },
-  clipsDir: 'C:/clips',
   ffmpegFound: true,
   disk: { available: true, freeGb: 30, belowRecommended: true, low: false, recommendedGb: [50, 100] },
 }

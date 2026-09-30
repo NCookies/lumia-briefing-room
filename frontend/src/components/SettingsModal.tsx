@@ -15,7 +15,7 @@ import {
 import { needsPermanentSkipWarning, type DeleteMode } from '../deleteConfirm'
 import { AboutPanel } from './AboutPanel'
 import { CleanupPanel } from './CleanupPanel'
-import { ClipsDirSection } from './ClipsDirSection'
+import { StorageSection } from './StorageSection'
 import { FolderPicker } from './FolderPicker'
 import { RecordingRootSection } from './RecordingRootSection'
 import { VodSettingsPanel } from './VodSettingsPanel'
@@ -129,12 +129,7 @@ function GeneralPanel({
       {autoStartError && <p className="text-xs text-rose-300">{autoStartError}</p>}
     </section>
     <RecordingRootSection />
-    <ClipsDirSection
-      source="steam"
-      title="스팀 녹화 클립 저장 폴더"
-      description="게임이 끝날 때마다 만드는 클립이 저장되는 폴더입니다. 비워 두면 기본 위치(내 비디오 폴더의 LumiaBriefingRoom)를 씁니다."
-      onChanged={onClipsDirChanged}
-    />
+    <StorageSection onChanged={onClipsDirChanged} />
     <section className="flex flex-col gap-2">
       <h3 className="text-sm font-medium text-zinc-200">클립 저장 방식</h3>
       <label className="flex items-start gap-2 text-sm text-zinc-300">

@@ -24,7 +24,6 @@ export interface FirstRunInfo {
   answeredVersion: number
   currentVersion: number
   recording: RecordingReport
-  clipsDir: string
   ffmpegFound: boolean
   disk: DiskReport
 }
