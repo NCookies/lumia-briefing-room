@@ -270,14 +270,13 @@ export function GameViewer({ gameKey, onBack, onChanged }: { gameKey: string; on
         </button>
         <h2 className="text-lg font-semibold">{gameHeadline(game.matchResult)}</h2>
         <span className="text-xs text-zinc-500">{game.gameKey}</span>
+        {error && <span className="text-sm text-rose-300">{error}</span>}
+        {notice && <span className="text-sm text-emerald-300">{notice}</span>}
         <label className="ml-auto flex items-center gap-1 text-sm text-zinc-300">
           <input type="checkbox" checked={game.pinned} onChange={(e) => void run(() => setGamePinned(gameKey, e.target.checked))} />
           고정(자동 정리에서 제외)
         </label>
       </div>
-
-      {error && <p className="text-sm text-rose-300">{error}</p>}
-      {notice && <p className="text-sm text-emerald-300">{notice}</p>}
 
       <div className="flex min-h-0 gap-3" style={{ height: 'calc(100vh - 9.5rem)', minHeight: 460 }}>
         {!game.hasFullVideo ? (
