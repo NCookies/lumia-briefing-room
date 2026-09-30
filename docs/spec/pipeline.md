@@ -162,6 +162,10 @@ result.jpg / portrait_{me,teammate1,teammate2}.jpg   클립 쪽 썸네일 폴더
 - **원본이 남은 옛 게임의 풀영상 만들기**(`pipeline/rebuild_full_video.py`): 과거 녹화 분석과 같은 처리(`process_match(existing_clip_ids=…)`)를 그 게임 하나에만 돌린다. `GET /api/games/{key}` 의 `canRebuildFullVideo`(풀영상이 없고 자동 정리로 지운 게임이 아니며, 시작 지점 세그먼트가 링버퍼에 남음) 가 참일 때 `POST /api/games/{key}/full-video`(202) 로 시작하고 `GET /api/games/{key}/full-video/status`(`state`: idle/running/done/error, `message`)로 본다. 한 번에 하나만. 저장한 클립은 그대로이고, 결과가 안 나오면 기존 게임 기록을 둔다. 다시 만든 `game.json` 은 새 후보·마커·결과로 덮이며 `pinned` 만 이어 간다(후보 ID 가 클립 ID 와 같으면 저장됨으로 이어진다).
 - 이미 `game.json` 이 있는 경기, `full.mp4` 만 있는(자르는 중일 수 있는) 폴더는 건드리지 않는다. 옛 파일은 지우지 않는다. 클립이 모두 지워지고 게임 기록만 남은 경기는 후보 없는 게임이 된다.
 
+### 영상 파일 게임
+
+같은 `games/` 폴더에 `vod_<vodId>_g<번호>` 폴더로 들어가고 같은 게임 API·화면을 쓴다([vod.md §4](vod.md)). 구분: `game.json` 의 `source:"vod"`. `GET /api/games?source=steam|vod|all`(기본 steam)로 탭마다 따로 본다. 후보 저장은 풀영상에서 잘라 **영상 클립 폴더**(`paths.vodClips`)에 영상 클립 형식으로 만든다(`clip_from_full._vod_clip_metadata`). 영상 전체 삭제·목록에서 삭제·게임 삭제는 그 게임 폴더도 지운다(풀영상은 설정한 삭제 방식). 과거 결과 채우기 도구는 영상 게임을 건너뛴다.
+
 ### 게임 API (`api/game_routes.py`, F4 백엔드)
 
 기존 클립 API 는 그대로 두고 새 경로만 둔다. `{key}` 는 경기 키(`YYYYMMDD_HHMMSS`, 형식이 아니면 404).

@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { showTuningUi, useAppInfo, versionLabel } from './appInfo'
 import { AdminPanel } from './components/AdminPanel'
 import { BackfillDialog } from './components/BackfillDialog'
-import { ClipBrowser, type ClipSource } from './components/ClipBrowser'
+import type { ClipSource } from './components/ClipBrowser'
 import { FirstRunScreen } from './components/FirstRunScreen'
 import { GameList } from './components/GameList'
 import { SettingsModal } from './components/SettingsModal'
+import { VodGameList } from './components/VodGameList'
 import { UpdateBanner } from './components/UpdateBanner'
 import { UpdateBadge } from './components/UpdateBadge'
 import { ActivityBar } from './components/ActivityBar'
@@ -200,25 +201,20 @@ export default function App() {
         />
       </div>
 
-      {TABS.filter((t) => t.id === 'vod').map((t) => (
-        <div key={`${t.id}-${browserKey}`} className={tab === t.id ? 'flex flex-1 flex-col' : 'hidden'}>
-          <ClipBrowser
-            source={t.id}
-            active={tab === t.id}
-            confirmDelete={confirmDelete}
-            onConfirmDeleteChange={changeConfirmDelete}
-            deleteMode={deleteMode}
-            onDeleteModeChange={changeDeleteMode}
-            refreshTick={refreshTick}
-            onBackfill={() => setShowBackfill(true)}
-            backfillLabel={backfillRunning ? `과거 녹화 분석 중 ${progressPercent(backfill)}%` : '과거 녹화 분석'}
-            onAddVodSources={() => {
-              setSettingsTab('vod')
-              setShowSettings(true)
-            }}
-          />
-        </div>
-      ))}
+      <div key={`vod-${browserKey}`} className={tab === 'vod' ? 'flex flex-1 flex-col' : 'hidden'}>
+        <VodGameList
+          active={tab === 'vod'}
+          refreshTick={refreshTick}
+          confirmDelete={confirmDelete}
+          onConfirmDeleteChange={changeConfirmDelete}
+          deleteMode={deleteMode}
+          onDeleteModeChange={changeDeleteMode}
+          onAddVodSources={() => {
+            setSettingsTab('vod')
+            setShowSettings(true)
+          }}
+        />
+      </div>
 
       {showBackfill && (
         <BackfillDialog
