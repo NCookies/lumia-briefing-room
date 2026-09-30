@@ -71,14 +71,60 @@ def test_unknown_target_and_unknown_game(client):
     assert client.post("/api/games/20990101_000000/delete", json={"target": "both"}).status_code == 404
 
 
-def test_unsave_deletes_the_clip_and_dismisses_the_candidate(client):
+def test_unsave_removes_the_clip_but_keeps_the_candidate_visible_and_unarchived(client):
     client.post(f"/api/games/{KEY}/candidates/{KEY}_01/save")
     resp = client.post(f"/api/games/{KEY}/candidates/{KEY}_01/unsave")
     assert resp.status_code == 200
     cand = _game(client)["candidates"][0]
-    assert "savedClipId" not in cand["user"] and cand["user"]["dismissed"] is True
+    assert "savedClipId" not in cand["user"] and "savedStart" not in cand["user"]
+    assert not cand["user"].get("dismissed"), "보관 해제는 삭제·무시가 아니다 - 후보는 목록에 남는다"
     assert _clip_videos(client) == []
+    assert client.post(f"/api/games/{KEY}/candidates/{KEY}_01/save").status_code == 200, "다시 보관할 수 있다"
+
+
+def test_unsave_keeps_a_range_the_user_had_edited(client):
+    client.post(f"/api/games/{KEY}/candidates/{KEY}_01/save")
+    client.patch(f"/api/games/{KEY}/candidates/{KEY}_01", json={"start": 90, "end": 150})
+    client.post(f"/api/games/{KEY}/candidates/{KEY}_01/unsave")
+    user = _game(client)["candidates"][0]["user"]
+    assert user["start"] == 90 and user["end"] == 150
 
 
 def test_unsave_of_a_candidate_that_was_not_saved_is_a_conflict(client):
     assert client.post(f"/api/games/{KEY}/candidates/{KEY}_01/unsave").status_code == 409
+
+
+def _seed_record(client):
+    from lumia_briefing_room.pipeline.game_records import game_key, records_dir_for
+
+    records = records_dir_for(client.library)
+    records.mkdir(parents=True, exist_ok=True)
+    path = records / f"{game_key('bg_1', '2026-09-30T00:24:00Z')}.json"
+    path.write_text("{}", encoding="utf-8")
+    return path
+
+
+def test_deleting_the_whole_game_removes_the_row_the_files_and_the_game_record(client):
+    _save_all(client)
+    record = _seed_record(client)
+    resp = client.post(f"/api/games/{KEY}/delete", json={"target": "all"})
+    assert resp.status_code == 200 and resp.json()["deletedClips"] == 2 and resp.json()["deletedFullVideo"] is True
+    assert client.get("/api/games").json()["games"] == []
+    assert client.get(f"/api/games/{KEY}").status_code == 404
+    assert not (client.tmp / "games" / KEY).exists() and _clip_videos(client) == []
+    assert not record.exists(), "기록이 남으면 앱을 다시 켤 때 이전 버전 게임으로 되살아난다"
+
+
+def test_deleting_the_whole_game_also_works_when_nothing_else_is_left(client):
+    client.post(f"/api/games/{KEY}/delete", json={"target": "both"})
+    assert client.post(f"/api/games/{KEY}/delete", json={"target": "all"}).status_code == 200
+    assert client.get("/api/games").json()["games"] == []
+
+
+def test_clips_deleted_with_the_whole_game_do_not_leave_a_new_game_record(client):
+    from lumia_briefing_room.pipeline.game_records import records_dir_for
+
+    _save_all(client)
+    client.post(f"/api/games/{KEY}/delete", json={"target": "all"})
+    records = records_dir_for(client.library)
+    assert not records.exists() or list(records.glob("*.json")) == []
