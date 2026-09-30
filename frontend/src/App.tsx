@@ -3,7 +3,7 @@ import { showTuningUi, useAppInfo, versionLabel } from './appInfo'
 import { AdminPanel } from './components/AdminPanel'
 import { BackfillDialog } from './components/BackfillDialog'
 import type { ClipSource } from './components/ClipBrowser'
-import { ClipLibrary } from './components/ClipLibrary'
+import { ClipArchive } from './components/ClipArchive'
 import { FirstRunScreen } from './components/FirstRunScreen'
 import { GameList } from './components/GameList'
 import { SettingsModal } from './components/SettingsModal'
@@ -223,7 +223,7 @@ export default function App() {
       </div>
 
       <div className={tab === 'library' ? 'flex flex-1 flex-col' : 'hidden'}>
-        <ClipLibrary
+        <ClipArchive
           key={`library-${browserKey}`}
           active={tab === 'library'}
           refreshTick={refreshTick}
