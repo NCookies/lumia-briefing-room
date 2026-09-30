@@ -71,18 +71,6 @@ export function GameList({ active, refreshTick }: { active: boolean; refreshTick
                   onClick={() => setOpen(g.key)}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1">
-                      {(['me', 'teammate1', 'teammate2'] as const).map((slot) =>
-                        g.portraits[slot] ? (
-                          <img
-                            key={slot}
-                            className="h-10 w-10 rounded-full object-cover"
-                            src={gameAssetUrl(g.key, g.portraits[slot]!)}
-                            alt=""
-                          />
-                        ) : null,
-                      )}
-                    </div>
                     <div className="flex flex-col">
                       <span className="font-medium">
                         {gameHeadline(g.matchResult)}
@@ -95,10 +83,25 @@ export function GameList({ active, refreshTick }: { active: boolean; refreshTick
                       <span className="text-xs text-zinc-400">{formatStart(g.matchStartUtc)}</span>
                     </div>
                     {g.matchResult?.kills != null && (
-                      <span className="text-xs text-zinc-400">
-                        TK {g.matchResult.tk ?? '-'} · K {g.matchResult.kills} · A {g.matchResult.assists ?? '-'}
-                      </span>
+                      <div className="flex flex-col">
+                        <span className="text-base font-bold text-zinc-100">
+                          {g.matchResult.tk ?? '-'} / {g.matchResult.kills} / {g.matchResult.assists ?? '-'}
+                        </span>
+                        <span className="text-xs text-zinc-500">TK / K / A</span>
+                      </div>
                     )}
+                    <div className="flex items-center gap-1">
+                      {(['me', 'teammate1', 'teammate2'] as const).map((slot) =>
+                        g.portraits[slot] ? (
+                          <img
+                            key={slot}
+                            className="h-10 w-10 rounded-full object-cover"
+                            src={gameAssetUrl(g.key, g.portraits[slot]!)}
+                            alt=""
+                          />
+                        ) : null,
+                      )}
+                    </div>
                   </div>
                   <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
                     {g.unsavedEditCount > 0 && (
