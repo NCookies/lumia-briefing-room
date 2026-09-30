@@ -198,7 +198,7 @@ python -m lumia_briefing_room.cli.detect_match \
 
 **영상 저장(내보내기)**: 카드/플레이어의 "저장" 버튼 → "폴더 선택…" 으로 윈도우 탐색기 창을 띄워 폴더를 골라(새 폴더 만들기도 그 창에서) 파일 이름과 함께 복사한다. 같은 이름이 있으면 `(2)` 를 붙여 덮어쓰지 않는다. 마지막에 저장한 폴더가 `paths.exportDefault` 로 기억돼 다음 저장 창의 시작 위치가 된다. 헤더의 "⚙ 옵션" 에서 이 기본 폴더를 직접 바꿀 수 있다. 실행 방법은 그대로다(프론트를 고쳤으면 `npm run build`).
 
-**게임 결과(순위·랭크 여부)**: 경기가 끝날 때 나오는 결과 화면(`4/7 실험 종료`)을 OCR 로 읽어 클립 메타데이터의 `matchResult`(`matchType` rank/normal, `placement`, `total`, `outcome`, `nickname`)에 넣고, 게임 행에 `#4 랭크 … 13 / 3 / 6` 으로 표시한다. 원본 녹화가 남아 있는 새 경기부터 채워진다. 이미 저장된 클립은 영상에 결과 화면이 없어서, 원본이 아직 남은 경기만 `python tools/backfill_result.py [clips_dir] [--recording-root DIR] [--force]` 로 채운다(게임별로 마지막 클립 뒤에서 원본을 훑어 첫 결과 화면을 읽는다. 링버퍼가 지운 경기는 건너뛴다. `matchResultSource="manual"` 로 잠근 게임은 건너뛴다 — 아래 "판독값 수동 보정"). 결과 화면은 1280px JPEG 로 `clips/.thumbs/<경기시작>_result.jpg` 에 저장돼 게임 섹션의 첫 칸에 썸네일처럼 보이고(클릭하면 크게), 이미 저장된 경기는 `backfill_result.py` 가 같이 만든다. 닉네임은 첫 결과 화면에서 자동으로 읽어 설정에 저장하고(비어 있을 때만), 헤더 "⚙ 옵션" 에서 직접 고칠 수 있다. 캐릭터 이름은 더 이상 OCR 로 읽지 않는다(아래 "캐릭터 표시(초상화)").
+**게임 결과(순위·랭크 여부)**: 경기가 끝날 때 나오는 결과 화면(`4/7 실험 종료`)을 OCR 로 읽어 클립 메타데이터의 `matchResult`(`matchType` rank/normal, `placement`, `total`, `outcome`, `nickname`)에 넣고, 게임 행에 `#4 랭크 … 13 / 3 / 6` 으로 표시한다. 원본 녹화가 남아 있는 새 경기부터 채워진다. 이미 저장된 게임(풀영상이 있는 것)은 `python tools/backfill_game_result.py` 로 풀영상 끝부분에서 다시 채운다. 예전 클립만 남은 경기는 원본이 아직 남은 것만 `python tools/backfill_result.py [clips_dir] [--recording-root DIR] [--force]` 로 채운다(게임별로 마지막 클립 뒤에서 원본을 훑어 첫 결과 화면을 읽는다. 링버퍼가 지운 경기는 건너뛴다. `matchResultSource="manual"` 로 잠근 게임은 건너뛴다 — 아래 "판독값 수동 보정"). 결과 화면은 1280px JPEG 로 `clips/.thumbs/<경기시작>_result.jpg` 에 저장돼 게임 섹션의 첫 칸에 썸네일처럼 보이고(클릭하면 크게), 이미 저장된 경기는 `backfill_result.py` 가 같이 만든다. 닉네임은 첫 결과 화면에서 자동으로 읽어 설정에 저장하고(비어 있을 때만), 헤더 "⚙ 옵션" 에서 직접 고칠 수 있다. 캐릭터 이름은 더 이상 OCR 로 읽지 않는다(아래 "캐릭터 표시(초상화)").
 
 **판독값 수동 보정**: 게임 행의 순위 배지 옆 `✎` 를 누르면 순위·결과 문구를 직접 고칠 수 있다. 저장하면 그 게임의 모든 클립에 `matchResultSource="manual"` 이 붙어 `backfill_result.py`·다시 분석(`pipeline/reprocess.py`)이 값을 덮어쓰지 않는다(다시 분석해도 잠긴 값이 새 클립으로 그대로 옮겨진다). 잠금 해제(🔒 옆 버튼)를 누르면 값은 남긴 채 잠금만 풀려 다음 자동 판독이 다시 채울 수 있다. `PATCH /api/clips/{id}` 가 `matchResult`(`placement`/`outcome` 만)·`matchResultSource` 를 받는다.
 
@@ -406,6 +406,8 @@ git push origin v0.1.4
 | `tools/build_templates.py` | 라벨셋 → 숫자 본보기(npz) |
 | `tools/build_regions.py` | 라벨셋 → 지역명 본보기(npz) |
 | `tools/migrate_labels.py` | 클립을 새 경계로 다시 만들 때 옛 클립의 교전/사냥 라벨을 시간이 겹치는 새 클립으로 이관 |
+| `tools/backfill_game_result.py` | 결과가 없거나 일반/랭크 `unknown`·순위 빈 게임의 결과를 풀영상 끝 30초로 다시 읽어 `game.json`·클립 메타를 채움 (`[게임키 ...] [--games-dir] [--clips-dir] [--force]`, 수동 고친 게임은 건너뜀) |
+| `tools/build_rank_templates.py` | 결과 화면 순위 숫자 본보기(npz) — `숫자=결과화면.png` 표본을 주면 만든다 |
 | `tools/backfill_day.py` | 이미 만든 클립의 일차·제목을 재처리 없이 채움 (클립 영상의 HUD 에서 읽음) |
 | `tools/rescore_clips.py` | 저장된 클립 메타데이터의 교전 점수를 재검출 없이 다시 계산 (`--source steam\|vod\|all`, 기본 `steam`) |
 | `tools/eval_pvp.py` | UI 에서 찍은 교전/사냥 라벨로 점수를 평가 (가중치·임계 튜닝, `--source steam\|vod\|all`, 기본 `steam`) |
