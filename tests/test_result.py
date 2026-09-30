@@ -147,3 +147,37 @@ def test_read_result_screen_keeps_the_frame_without_affecting_equality():
 
     assert result.image is frame
     assert result == read_result_screen(blank_frame(profile), profile, FakeReader(PANEL, [line("랭크", 5)]))
+
+
+class ChipSequenceReader:
+    """패널 → (칩 읽기 시도들) → 닉네임 순으로 답하고, 칩 시도 횟수를 센다."""
+
+    def __init__(self, chip_attempts):
+        self.chip_attempts = list(chip_attempts)
+        self.calls = 0
+
+    def read(self, rgb, *, lang="korean"):
+        self.calls += 1
+        if self.calls == 1:
+            return PANEL
+        if self.calls - 2 < len(self.chip_attempts):
+            return self.chip_attempts[self.calls - 2]
+        return []
+
+
+def test_chip_is_read_from_plain_upscale_first_without_trying_binarized():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    reader = ChipSequenceReader([[line("일반", 5)], [line("랭크", 5)]])
+
+    result = read_result_screen(blank_frame(profile), profile, reader)
+
+    assert (result.match_type, result.match_label) == ("normal", "일반")
+
+
+def test_chip_falls_back_to_binarized_when_plain_upscale_reads_nothing():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    reader = ChipSequenceReader([[], [line("랭크 대전", 5)]])
+
+    result = read_result_screen(blank_frame(profile), profile, reader)
+
+    assert (result.match_type, result.match_label) == ("rank", "랭크 대전")

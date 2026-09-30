@@ -119,6 +119,20 @@ def _binarize_dark_on_light(rgb: np.ndarray, threshold: int = CHIP_THRESHOLD) ->
     return np.stack([padded] * 3, axis=-1)
 
 
+def _upscale(rgb: np.ndarray) -> np.ndarray:
+    return cv2.resize(rgb, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+
+
+def read_chip(chip: np.ndarray, reader: TextReader) -> str:
+    """모드 칩 글자. 그냥 3배 확대가 먼저(실측: 이진화보다 훨씬 잘 읽힌다), 못 읽으면 이진화(파란 랭크 칩용)."""
+    for prepare in (_upscale, _binarize_dark_on_light):
+        lines = reader.read(prepare(chip))
+        text = " ".join(l.text.strip() for l in lines if l.score >= 0.8)
+        if text:
+            return text
+    return ""
+
+
 def read_nickname(panel: np.ndarray, line: TextLine, reader: TextReader) -> str | None:
     """닉네임 줄만 잘라 키운 뒤 한글/한자·일본어 모델을 둘 다 돌려 점수가 높은 쪽을 쓴다."""
     y0 = max(line.y - NICKNAME_MARGIN, 0)
@@ -150,8 +164,7 @@ def read_result_screen(
     if parsed is None:
         return None
 
-    chip_lines = reader.read(_binarize_dark_on_light(crop_roi(frame, profile.rois["result_chip"])))
-    chip_text = " ".join(l.text.strip() for l in chip_lines if l.score >= 0.8)
+    chip_text = read_chip(crop_roi(frame, profile.rois["result_chip"]), reader)
     nickname = read_nickname(panel, parsed.nickname_line, reader) if parsed.nickname_line else None
 
     return ResultScreen(
