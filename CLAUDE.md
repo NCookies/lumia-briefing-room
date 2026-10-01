@@ -11,7 +11,8 @@
   - [docs/SPEC.md](docs/SPEC.md) + [docs/spec/](docs/spec/) = **확정·구현된 것만.** 작업에 필요한 영역
     파일만 읽는다(SPEC.md 의 문서 지도). "계획·미구현"을 쓰지 않는다.
   - [docs/plan.md](docs/plan.md) = **남은 작업·확인 필요·우선순위만.** 큰 진행 중 작업은
-    `docs/plan-<주제>.md` 로 따로 두되(지금은 [plan-fullvideo.md](docs/plan-fullvideo.md)), 끝나면 없앤다.
+    `docs/plan-<주제>.md` 로 따로 두되(지금은 [plan-fullvideo.md](docs/plan-fullvideo.md),
+    [plan-release-automation.md](docs/plan-release-automation.md)), 끝나면 없앤다.
   - 작업을 끝내면: 결론(무엇을·왜)과 다시 밟지 말아야 할 함정만 해당 spec 파일에 짧게 옮기고,
     plan 에서는 그 항목을 **지운다**(완료 체크로 남겨 두지 않는다). 실측 경위·사고 서술은 커밋 메시지에 쓴다.
   - 새로 생긴 할 일·확인 필요는 plan 의 해당 절에, 우선순위가 바뀌면 plan §1 표도 고친다.

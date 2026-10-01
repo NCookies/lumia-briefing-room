@@ -3,7 +3,7 @@
 사용자용 안내(설치·사용법)는 저장소 루트의 [README.md](../README.md) 에 있다. 이 문서는 소스에서 실행·빌드·테스트하는 개발자용이다. 설계 문서는 이 폴더에 있다.
 
 - [docs/SPEC.md](SPEC.md) — 확정·구현된 설계. 목적·원칙과 문서 지도, 세부는 [docs/spec/](spec/) 의 영역별 파일
-- [docs/plan.md](plan.md) — 남은 작업·확인 필요·우선순위 / [docs/plan-fullvideo.md](plan-fullvideo.md) — 진행 중인 풀영상 전환
+- [docs/plan.md](plan.md) — 남은 작업·확인 필요·우선순위 / [docs/plan-fullvideo.md](plan-fullvideo.md) — 진행 중인 풀영상 전환, [docs/plan-release-automation.md](plan-release-automation.md) — 진행 중인 릴리스 검증 자동화
 - [docs/research.md](research.md) — 0단계 조사 결과(실측)
 - [docs/release-checklist.md](release-checklist.md) — 릴리스 전 사람이 확인할 것
 - [docs/friend-guide.md](friend-guide.md) — **친구에게 설치기와 같이 주는 안내문**(설치·확인 항목·진단 파일 보내는 법)

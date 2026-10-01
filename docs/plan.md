@@ -1,13 +1,14 @@
 # 남은 작업
 
 > **구현 예정·확인 필요만 둔다.** 끝난 것은 결론을 [spec/](spec/) 에 옮기고 여기서 지운다(경위는 커밋 메시지로). 확정 설계는 [SPEC.md](SPEC.md).
-> 진행 중인 큰 작업은 별도 문서: [plan-fullvideo.md](plan-fullvideo.md). 마지막 정리 2026-09-29.
+> 진행 중인 큰 작업은 별도 문서: [plan-fullvideo.md](plan-fullvideo.md), [plan-release-automation.md](plan-release-automation.md). 마지막 정리 2026-09-29.
 
 ## 1. 우선순위
 
 | 순위 | 작업 | 절 |
 |---|---|---|
 | **P0** | 풀영상 전환 남은 것: 클립 보관·카테고리(F7) → 게임 행 `⋯` 메뉴(F10) → 클립 메모(F11) → 안내 가이드(F9) → 옛 화면 제거(F5) | [plan-fullvideo.md](plan-fullvideo.md) |
+| P1 | 릴리스 검증 자동화 — 실측 체크리스트를 테스트로 옮기고 사람 확인은 고정 4개만(R1 → R5 규칙 전환 → R2~R4) | [plan-release-automation.md](plan-release-automation.md) |
 | P1 | 다시 분석 요청 대기열 | §2-1 |
 | P1 | 실측 대기 항목 — 샌드박스, 다른 PC·해상도(기회가 올 때) | §4 |
 | P2 | `clipUid` 서버 전송 | §2-2 |
