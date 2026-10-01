@@ -346,7 +346,7 @@ export function ClipBrowser({
 
   const handleReprocess = async (group: GameGroup<Clip>) => {
     const result = await ask({
-      message: `다음 게임을 원본 녹화에서 다시 분석합니다.\n${gameLabel(group)}\n분석에 성공하면 이 게임의 기존 클립을 보관 카테고리로 옮긴 것까지 모두 지우고 새로 만듭니다(라벨만 옮겨집니다). 실패하면 기존 클립은 그대로 남습니다.\n분석에는 몇 분이 걸릴 수 있습니다. 다른 분석이 돌고 있으면 줄을 서서 차례로 합니다. 계속하시겠습니까?`,
+      message: `다음 게임을 원본 녹화에서 다시 분석합니다.\n${gameLabel(group)}\n분석에 성공하면 이 게임의 기존 클립을 지우고 새로 만듭니다(라벨은 그대로 옮겨집니다). 실패하면 기존 클립은 그대로 남습니다.\n분석에는 몇 분이 걸릴 수 있습니다. 계속하시겠습니까?`,
       confirmLabel: '다시 분석',
     })
     if (!result.ok) return

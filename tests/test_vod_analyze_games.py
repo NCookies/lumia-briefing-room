@@ -195,9 +195,43 @@ def test_cancelled_analysis_leaves_no_half_made_game_folder(vod_file, tmp_path):
     assert not cfg.paths.games.exists() or not any(cfg.paths.games.iterdir())
 
 
+def new_layout_cfg(base):
+    cfg = make_cfg(base)
+    cfg.paths.root = base / "store"
+    cfg.paths.vod_clips = None
+    cfg.paths.games = None
+    return cfg
+
+
 @requires_ffmpeg
-def test_auto_mode_rebuild_also_deletes_clips_the_user_moved_into_a_category(vod_file, tmp_path):
-    """`다시 분석` 확인 창 문구의 근거: 저장 방식이 auto 면 그 영상의 클립은 보관 카테고리에 있어도 모두 지우고 새로 만든다."""
+def test_auto_mode_rebuild_keeps_user_archived_clips_and_replaces_the_auto_saved_ones(vod_file, tmp_path):
+    """`다시 분석`: 사용자가 보관 카테고리로 옮긴 클립만 두고 자동 보관 클립은 지워 새로 만든다."""
+    from lumia_briefing_room.config import resolve_paths
+
+    cfg = new_layout_cfg(tmp_path)
+    first, _ = run(tmp_path, vod_file, cfg=cfg)
+    clips_root = resolve_paths(cfg.paths).clips_vod
+    kept = first["clips"][0]
+    library = resolve_paths(cfg.paths).library_vod
+    stale = f"vod_{vod_id(vod_file)}_g01_999999"
+    (library / f"{stale}.json").write_text("{}", encoding="utf-8")
+    (clips_root / f"{stale}.mp4").write_bytes(b"old auto clip")
+    archived = clips_root.parent / "보관함"
+    archived.mkdir()
+    (clips_root / f"{kept}.mp4").replace(archived / f"{kept}.mp4")
+
+    again = analyze_vod(vod_file, cfg, ffmpeg_path=FFMPEG_PATH, read_frame=read_frame, find_result=no_result, rebuild=True)
+
+    assert (archived / f"{kept}.mp4").is_file(), "보관한 클립은 그대로"
+    assert not (clips_root / f"{kept}.mp4").exists(), "보관한 클립을 자동 보관에 또 만들지 않는다"
+    assert not (clips_root / f"{stale}.mp4").exists() and not (library / f"{stale}.json").exists(), "자동 보관 클립은 지운다"
+    assert again["clips"] == first["clips"]
+    data = read_game(next(p for p in resolve_paths(cfg.paths).games_vod.iterdir() if p.is_dir()))
+    assert next(c for c in data["candidates"] if c["id"] == kept)["user"]["savedClipId"] == kept
+
+
+@requires_ffmpeg
+def test_legacy_layout_has_no_archive_concept_so_auto_mode_rebuild_replaces_every_clip(vod_file, tmp_path):
     first, cfg = run(tmp_path, vod_file)
     kept = first["clips"][0]
     category = cfg.paths.vod_clips / "보관함"

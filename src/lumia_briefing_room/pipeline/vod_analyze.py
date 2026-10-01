@@ -12,7 +12,8 @@ from pathlib import Path
 
 import numpy as np
 
-from lumia_briefing_room.config import Config, resolve_paths
+from lumia_briefing_room.config import AUTO_ARCHIVE_FOLDER, Config, resolve_paths
+from lumia_briefing_room.pipeline import categories
 from lumia_briefing_room.detect.match import (
     analyze_frame,
     resolve_day_templates,
@@ -205,6 +206,22 @@ STAGING_DIRNAME = ".staging"
 
 def _existing_clip_paths(root: Path, vod: str) -> list[Path]:
     return sorted(root.glob(f"vod_{vod}_*.json"))
+
+
+def _kept_clip_ids(cfg: Config, old_paths: list[Path], video_roots: tuple[Path, ...], *, manual: bool) -> set[str]:
+    """다시 분석해도 지우지 않는 옛 클립: 수동 저장이면 전부, 자동이면 사용자가 보관한 것(`자동 보관` 카테고리가 아닌 곳에 있는 것).
+    카테고리가 없는 옛 경로 모드는 구분할 수 없어 전부 지운다(예전 동작)."""
+    if manual:
+        return {p.stem for p in old_paths}
+    if not categories.enabled(cfg):
+        return set()
+    kept = set()
+    for meta_path in old_paths:
+        video = find_video_for(meta_path, video_roots)
+        name = categories.category_of(cfg, video) if video is not None else None
+        if name is not None and name != AUTO_ARCHIVE_FOLDER:
+            kept.add(meta_path.stem)
+    return kept
 
 
 @dataclass(frozen=True)
@@ -461,9 +478,7 @@ def _make_clips(
     ]
     detections = detect_games(states, spans)
     old_paths = _existing_clip_paths(root, vod)
-    olds = load_metas(old_paths)
-    old_ids = {p.stem for p in old_paths}
-    keep_old = save_mode == "manual"
+    kept_ids = _kept_clip_ids(cfg, old_paths, place.video_roots, manual=save_mode == "manual")
     staging = place.staging_base / uuid.uuid4().hex
     thumbs = staging / ".thumbs"
     games: list[dict] = []
@@ -487,7 +502,7 @@ def _make_clips(
         )
         for det in detections
     ]
-    planned_clips = 0 if keep_old else sum(len(c) for c in named_by_game)
+    planned_clips = sum(1 for named in named_by_game for c in named if c.clip_id not in kept_ids) if save_mode != "manual" else 0
     total_clips = max(1, planned_clips + len(detections))
     base = DECODE_SHARE + GAMES_SHARE
     cut_share = 1.0 - base
@@ -536,7 +551,7 @@ def _make_clips(
             to_save = plans_to_save(
                 candidates, save_mode, full.video is not None, is_certain=lambda c: is_certain(c.aggregated.tags)
             )
-            saved_ids: dict[str, str] = {c.candidate_id: c.clip_id for c in candidates if keep_old and c.clip_id in old_ids}
+            saved_ids: dict[str, str] = {c.candidate_id: c.clip_id for c in candidates if c.clip_id in kept_ids}
             game_clip_ids: list[str] = []
             for cand in to_save:
                 if cand.clip_id in saved_ids:
@@ -616,10 +631,11 @@ def _make_clips(
         raise VodAnalyzeError("다시 만들었지만 이 영상에서 게임을 찾지 못했습니다. 기존 결과를 그대로 둡니다")
 
     report_labels = {"migrated": 0, "conflicts": 0}
-    if not keep_old:
-        report_labels = migrate_labels(olds, [staging / f"{cid}.json" for cid in clip_ids])
+    stale_paths = [p for p in old_paths if p.stem not in kept_ids]
+    if stale_paths:
+        report_labels = migrate_labels(load_metas(stale_paths), [staging / f"{cid}.json" for cid in clip_ids])
         archive_dir = archive_dir_for(root)
-        for meta_path in old_paths:
+        for meta_path in stale_paths:
             delete_clip(
                 meta_path, mode=cfg.ui.delete_mode, archive_dir=archive_dir,
                 video=find_video_for(meta_path, place.video_roots),
@@ -632,6 +648,6 @@ def _make_clips(
 
     index.update(
         games=games,
-        clips=sorted({cid for g in games for cid in g["clipIds"]}) if keep_old else clip_ids,
+        clips=sorted({cid for g in games for cid in g["clipIds"]}),
         labelsMigrated=report_labels["migrated"], labelConflicts=report_labels["conflicts"],
     )
