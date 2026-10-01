@@ -32,16 +32,31 @@ export function buildableGameCount(games: Pick<GameSummary, 'legacy' | 'hasFullV
   return games.filter((g) => g.legacy && !g.hasFullVideo && !g.fullVideoDeletedAt).length
 }
 
-export function vodTotals(games: Pick<GameSummary, 'savedClipCount' | 'fullVideoSizeBytes'>[]): {
+export function vodTotals(games: Pick<GameSummary, 'savedClipCount' | 'autoClipCount' | 'fullVideoSizeBytes'>[]): {
   games: number
   clips: number
+  autoClips: number
   bytes: number
 } {
   return {
     games: games.length,
     clips: games.reduce((n, g) => n + g.savedClipCount, 0),
+    autoClips: games.reduce((n, g) => n + g.autoClipCount, 0),
     bytes: games.reduce((n, g) => n + (g.fullVideoSizeBytes ?? 0), 0),
   }
+}
+
+/** 영상 한 편의 `전체 삭제` 확인 문구. 자동 보관 클립만 지우고 사용자가 보관한 클립은 남는다. */
+export function vodDeleteAllMessage(name: string, gameCount: number, autoClips: number, keptClips: number): string {
+  const what = autoClips > 0 ? `게임 ${gameCount}개(풀영상)와 자동 보관 클립 ${autoClips}개` : `게임 ${gameCount}개(풀영상)`
+  const kept = keptClips > 0 ? ` 보관한 클립 ${keptClips}개는 남고,` : ''
+  return `"${name}" 영상의 ${what}를 삭제합니다.${kept} 영상 파일은 지우지 않습니다.`
+}
+
+/** 영상 한 편의 `목록에서 삭제` 확인 문구. 사용자가 보관한 클립은 클립 탭에 남는다. */
+export function vodRemoveMessage(name: string, keptClips: number): string {
+  const kept = keptClips > 0 ? `보관한 클립 ${keptClips}개는 클립 탭에 남습니다. ` : ''
+  return `"${name}" 을(를) 영상 목록에서 삭제합니다. 게임 풀영상·자동 보관 클립·판독 기록이 함께 지워집니다. ${kept}원본 영상은 지우지 않으며, 아직 있으면 다음에 새 영상으로 다시 나타납니다. 되돌릴 수 없습니다. 계속하시겠습니까?`
 }
 
 /** 게임 행의 시간 칸: 게임 번호와 원본 영상 안 위치(선택 화면 ~ 결과 화면). */

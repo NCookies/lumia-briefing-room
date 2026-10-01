@@ -30,7 +30,7 @@ import {
 import { groupVodsByDate } from '../vodDates'
 import { resolvedDeleteSource } from '../vodDeleteSource'
 import { vodAnalyzeConfirmMessage, vodDoneNotice } from '../vodAnalyzeConfirm'
-import { analysisEnded, buildableGameCount, groupGamesByVod, vodGameTime, vodTotals } from '../vodGames'
+import { analysisEnded, buildableGameCount, groupGamesByVod, vodDeleteAllMessage, vodGameTime, vodRemoveMessage, vodTotals } from '../vodGames'
 import { probeProgress, type Vod } from '../vodGrouping'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { DueOnlyToggle } from './DueOnlyToggle'
@@ -298,15 +298,12 @@ export function VodGameList({
       .then(reloadVods)
       .catch((e: Error) => setActionError(e.message))
 
-  const handleDeleteAll = (vod: Vod, name: string, gameCount: number, clipCount: number) =>
-    requestDelete(
-      `"${name}" 영상의 게임 ${gameCount}개(풀영상)와 클립 ${clipCount}개를 모두 삭제합니다. 영상 파일은 지우지 않습니다.`,
-      () => deleteVodClips(vod.id),
-    )
+  const handleDeleteAll = (vod: Vod, name: string, totals: ReturnType<typeof vodTotals>) =>
+    requestDelete(vodDeleteAllMessage(name, totals.games, totals.autoClips, totals.clips), () => deleteVodClips(vod.id))
 
-  const handleRemoveVod = async (id: string, name: string) => {
+  const handleRemoveVod = async (id: string, name: string, keptClips: number) => {
     const result = await ask({
-      message: `"${name}" 을(를) 영상 목록에서 삭제합니다. 남은 게임 풀영상·클립과 판독 기록도 함께 지워집니다(원본 영상은 지우지 않으며, 아직 있으면 다음에 새 영상으로 다시 나타납니다). 되돌릴 수 없습니다. 계속하시겠습니까?`,
+      message: vodRemoveMessage(name, keptClips),
       confirmLabel: '목록에서 삭제',
       danger: true,
     })
@@ -450,8 +447,8 @@ export function VodGameList({
                     onCancel={() => vod && handleCancel(vod)}
                     onRenameStreamer={(name) => vod && handleRenameStreamer(vod, name)}
                     onEditDate={(date) => vod && handleEditVideoDate(vod, date)}
-                    onDeleteClips={() => vod && handleDeleteAll(vod, vg.name, totals.games, totals.clips)}
-                    onDeleteVod={() => handleRemoveVod(vg.vodId, vg.name)}
+                    onDeleteClips={() => vod && handleDeleteAll(vod, vg.name, totals)}
+                    onDeleteVod={() => handleRemoveVod(vg.vodId, vg.name, totals.clips)}
                   >
                     <ul className="flex flex-col gap-2">
                       {vg.games.map((g) => (

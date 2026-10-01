@@ -7,6 +7,8 @@ import {
   groupGamesByVod,
   vodGameHeading,
   vodGameTime,
+  vodDeleteAllMessage,
+  vodRemoveMessage,
   vodTotals,
 } from '../src/vodGames.ts'
 
@@ -56,7 +58,7 @@ test('only old games without a full video (not auto-cleaned ones) can be built',
 
 test('totals of a video: games, saved clips and full video bytes', () => {
   const totals = vodTotals([game('a', 1), game('a', 2, { fullVideoSizeBytes: null, savedClipCount: 0 })])
-  assert.deepEqual(totals, { games: 2, clips: 2, bytes: 1000 })
+  assert.deepEqual(totals, { games: 2, clips: 2, autoClips: 0, bytes: 1000 })
 })
 
 test('game time shows its number and where it sits in the video', () => {
@@ -88,4 +90,26 @@ test('games are reloaded whenever a running analysis stops running, even if the 
   assert.equal(analysisEnded(null, 'abc'), false)
   assert.equal(analysisEnded('abc', 'abc'), false)
   assert.equal(analysisEnded(null, null), false)
+})
+
+test('vodTotals 는 자동 보관 클립 수를 따로 센다', () => {
+  const totals = vodTotals([game('a', 1, { autoClipCount: 2 }), game('a', 2, { autoClipCount: 1, savedClipCount: 0 })])
+  assert.equal(totals.autoClips, 3)
+  assert.equal(totals.clips, 2)
+})
+
+test('전체 삭제 확인 문구는 지워질 자동 보관 클립과 남는 보관 클립을 구분한다', () => {
+  const text = vodDeleteAllMessage('방송', 2, 3, 4)
+  assert.match(text, /게임 2개\(풀영상\)와 자동 보관 클립 3개를 삭제합니다/)
+  assert.match(text, /보관한 클립 4개는 남고/)
+  assert.match(text, /영상 파일은 지우지 않습니다/)
+  assert.doesNotMatch(vodDeleteAllMessage('방송', 2, 3, 0), /보관한 클립/)
+  assert.doesNotMatch(vodDeleteAllMessage('방송', 2, 0, 0), /자동 보관 클립/)
+})
+
+test('목록에서 삭제 확인 문구는 보관한 클립이 클립 탭에 남는다고 알린다', () => {
+  const text = vodRemoveMessage('방송', 4)
+  assert.match(text, /보관한 클립 4개는 클립 탭에 남습니다/)
+  assert.match(text, /되돌릴 수 없습니다/)
+  assert.doesNotMatch(vodRemoveMessage('방송', 0), /클립 탭에 남습니다/)
 })
