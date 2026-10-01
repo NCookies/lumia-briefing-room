@@ -28,12 +28,15 @@ interface Props {
   onDelete: (id: string) => void
   onRename: (id: string, title: string) => void
   onSaveModified: () => void
+  /** 메모 칸이 열린 후보. 위(`GameViewer`)가 들고 있어 `M` 키로도 열고 닫는다. */
+  memoOpenId: string | null
+  onMemoOpenChange: (id: string | null) => void
 }
 
 export function ViewerCandidates(p: Props) {
   const list = useRef<HTMLUListElement>(null)
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null)
-  const [memoOpen, setMemoOpen] = useState<string | null>(null)
+  const memoOpen = p.memoOpenId
 
   const commitRename = () => {
     if (!editing) return
@@ -151,7 +154,7 @@ export function ViewerCandidates(p: Props) {
                       className={`rounded border px-2 py-0.5 hover:bg-zinc-600 ${c.user.savedMemo ? 'border-amber-500/60 text-amber-300' : 'border-zinc-600'}`}
                       title="이 클립에 대한 나만의 메모(서버로 보내지 않음)"
                       aria-expanded={memoOpen === c.id}
-                      onClick={() => setMemoOpen((open) => (open === c.id ? null : c.id))}
+                      onClick={() => p.onMemoOpenChange(memoOpen === c.id ? null : c.id)}
                     >
                       {c.user.savedMemo ? '메모 ●' : '메모'}
                     </button>
@@ -177,6 +180,7 @@ export function ViewerCandidates(p: Props) {
                         : 'bg-emerald-600/30 text-emerald-200 hover:bg-emerald-600/40'
                     }`}
                     title={state.bookmark === 'none' ? (saved ? '카테고리를 골라 보관합니다(클립을 그 카테고리로 옮깁니다)' : '클립으로 만들어 카테고리에 보관합니다') : `보관됨(${c.user.savedCategory ?? '카테고리 없음'}) — 눌러서 카테고리 바꾸기`}
+                    data-archive-btn
                     onClick={(e) => p.onArchive(c.id, e.currentTarget.getBoundingClientRect())}
                   >
                     {state.bookmark === 'none' ? <BookmarkIcon /> : <BookmarkFilledIcon />}
@@ -219,7 +223,15 @@ export function ViewerCandidates(p: Props) {
                 </span>
               </div>
               {saved && memoOpen === c.id && (
-                <ClipMemoInput clipId={c.id} value={c.user.savedMemo} rows={3} compact onSave={(memo) => p.onMemo(c.id, memo)} />
+                <ClipMemoInput
+                  clipId={c.id}
+                  value={c.user.savedMemo}
+                  rows={3}
+                  compact
+                  autoFocus
+                  onSave={(memo) => p.onMemo(c.id, memo)}
+                  onClose={() => p.onMemoOpenChange(null)}
+                />
               )}
             </li>
           )

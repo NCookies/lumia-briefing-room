@@ -7,10 +7,13 @@ interface Props {
   onSave: (memo: string | null) => void
   rows?: number
   compact?: boolean
+  autoFocus?: boolean
+  /** 주면 Ctrl+Enter 로 저장하고 이 함수를 불러 닫는다. */
+  onClose?: () => void
 }
 
 /** 클립 메모: 좋았던 점·아쉬웠던 점을 적는 나만의 메모. 서버로 보내지 않는다(라벨 메모와 별개). 포커스를 잃으면 저장한다. */
-export function ClipMemoInput({ clipId, value, onSave, rows = 3, compact = false }: Props) {
+export function ClipMemoInput({ clipId, value, onSave, rows = 3, compact = false, autoFocus = false, onClose }: Props) {
   const [draft, setDraft] = useState(value ?? '')
 
   useEffect(() => setDraft(value ?? ''), [clipId, value])
@@ -30,7 +33,15 @@ export function ClipMemoInput({ clipId, value, onSave, rows = 3, compact = false
         placeholder="원하시는 내용을 작성해 주세요"
         value={draft}
         onChange={(e) => setDraft(clampMemo(e.target.value))}
+        autoFocus={autoFocus}
         onBlur={commit}
+        onKeyDown={(e) => {
+          if (onClose && e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault()
+            e.currentTarget.blur()
+            onClose()
+          }
+        }}
       />
       {!compact && <p className="text-xs text-zinc-500">나만 보는 메모입니다. 서버로 보내지 않습니다.</p>}
     </div>

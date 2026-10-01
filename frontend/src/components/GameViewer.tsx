@@ -26,9 +26,17 @@ import { ArchivePopup } from './ArchivePopup'
 import { SavedClipPlayer } from './SavedClipPlayer'
 import { GameMenu, type GameMenuItem } from './GameMenu'
 import { ViewerCandidates } from './ViewerCandidates'
+import { ShortcutTable } from './ShortcutTable'
+import { SEEK_STEP_SEC, decideKey, isTextEntry, loadHelpSeen, saveHelpSeen, type TargetInfo, type ViewerAction } from '../viewerShortcuts'
 
-const SEEK_STEP_SEC = 5
 const SKIP_SEC = 10
+
+const isModalOpen = () => document.querySelector('[role="dialog"], [role="menu"]') !== null
+
+const targetInfo = (t: EventTarget | null): TargetInfo | null => {
+  const el = t as HTMLElement | null
+  return el && el.tagName ? { tag: el.tagName, type: (el as HTMLInputElement).type, editable: el.isContentEditable } : null
+}
 
 type Undo = { kind: 'range'; id: string; prev: [number, number] } | { kind: 'add'; id: string } | { kind: 'dismiss'; id: string }
 
@@ -72,6 +80,9 @@ export function GameViewer({
   const [fullscreen, setFullscreen] = useState(false)
   const [showDismissed, setShowDismissed] = useState(false)
   const ask = useConfirm()
+  const [memoOpenId, setMemoOpenId] = useState<string | null>(null)
+  const [helpOpen, setHelpOpen] = useState(() => !loadHelpSeen())
+  const root = useRef<HTMLDivElement>(null)
   const [archiveTarget, setArchiveTarget] = useState<{ id: string; anchor: DOMRect } | null>(null)
   const video = useRef<HTMLVideoElement>(null)
   const shell = useRef<HTMLDivElement>(null)
@@ -97,6 +108,10 @@ export function GameViewer({
   useEffect(() => {
     if (!active) video.current?.pause()
   }, [active])
+
+  useEffect(() => {
+    if (helpOpen) saveHelpSeen()
+  }, [helpOpen])
 
   const duration = game?.fullVideo?.durationSec ?? 0
   const cands = useMemo(() => (game ? visibleCandidates(game, showDismissed) : []), [game, showDismissed])
@@ -306,54 +321,108 @@ export function GameViewer({
       setNotice(`${modifiedIds.length - failed.length}개 저장했습니다${failed.length ? `, ${failed.length}개 실패(${failed[0]})` : ''}`)
     })
 
-  const handleKey = (e: KeyboardEvent) => {
-    if (!active) return
-    const target = e.target as HTMLElement | null
-    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return
-    if (!game?.hasFullVideo) return
-    if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && !e.shiftKey) {
-      e.preventDefault()
-      undoLast()
+  const openArchivePopup = (c: Candidate) => {
+    if (busy || (!isSaved(c) && (!game?.hasFullVideo || isDismissed(c)))) return
+    const row = document.querySelector(`[data-cand="${c.id}"]`)
+    row?.scrollIntoView({ block: 'nearest' })
+    const anchor =
+      row?.querySelector('[data-archive-btn]')?.getBoundingClientRect() ??
+      document.querySelector('[data-testid="viewer-candidates"]')?.getBoundingClientRect() ??
+      new DOMRect(window.innerWidth - 340, 120, 0, 0)
+    setArchiveTarget({ id: c.id, anchor })
+  }
+
+  const toggleMemo = () => {
+    if (!selectedCand) return
+    if (!isSaved(selectedCand)) {
+      setNotice('메모는 보관한 클립에만 적을 수 있습니다 — 먼저 보관하세요')
       return
     }
-    if (e.ctrlKey || e.metaKey || e.altKey) return
-    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key
-    const actions: Record<string, () => void> = {
-      ' ': togglePlay,
-      ArrowLeft: () => seek(time - SEEK_STEP_SEC),
-      ArrowRight: () => seek(time + SEEK_STEP_SEC),
-      n: () => jump('next'),
-      p: () => jump('prev'),
-      s: () =>
-        selectedCand &&
-        !busy &&
-        !isDismissed(selectedCand) &&
-        (!isSaved(selectedCand)
-          ? archive(selectedCand.id)
-          : rangeModified({ ...selectedCand, user: { ...selectedCand.user, start: rangeOf(selectedCand)[0], end: rangeOf(selectedCand)[1] } }, duration) &&
-            resave(selectedCand.id)),
-      d: () => selectedCand && !busy && dismissOrDelete(selectedCand),
-      i: () => mark('start'),
-      o: () => mark('end'),
+    setMemoOpenId((open) => (open === selectedCand.id ? null : selectedCand.id))
+  }
+
+  const quickArchive = () => {
+    if (!selectedCand || busy || isDismissed(selectedCand)) return
+    if (!isSaved(selectedCand)) return archive(selectedCand.id)
+    const [start, end] = rangeOf(selectedCand)
+    if (rangeModified({ ...selectedCand, user: { ...selectedCand.user, start, end } }, duration)) resave(selectedCand.id)
+  }
+
+  const dispatch = (action: ViewerAction) => {
+    switch (action) {
+      case 'togglePlay':
+        return togglePlay()
+      case 'seekBack':
+        return seek(time - SEEK_STEP_SEC)
+      case 'seekForward':
+        return seek(time + SEEK_STEP_SEC)
+      case 'nextClip':
+        return jump('next')
+      case 'prevClip':
+        return jump('prev')
+      case 'archive':
+        return quickArchive()
+      case 'archivePopup':
+        return selectedCand && openArchivePopup(selectedCand)
+      case 'dismiss':
+        return selectedCand && !busy && dismissOrDelete(selectedCand)
+      case 'deleteClip':
+        if (!selectedCand || busy) return
+        return isSaved(selectedCand) ? void deleteClip(selectedCand.id) : dismissOrDelete(selectedCand)
+      case 'markStart':
+        return mark('start')
+      case 'markEnd':
+        return mark('end')
+      case 'undo':
+        return undoLast()
+      case 'memo':
+        return toggleMemo()
+      case 'help':
+        return setHelpOpen((open) => !open)
     }
-    const action = actions[key]
-    if (!action) return
-    e.preventDefault()
-    action()
+  }
+
+  const handleKey = (e: KeyboardEvent) => {
+    if (!active) return
+    const modalOpen = isModalOpen()
+    if (e.key === 'Escape' && helpOpen && !modalOpen) setHelpOpen(false)
+    const decision = decideKey({
+      key: e.key,
+      code: e.code,
+      ctrl: e.ctrlKey,
+      meta: e.metaKey,
+      alt: e.altKey,
+      shift: e.shiftKey,
+      repeat: e.repeat,
+      textEntry: isTextEntry(targetInfo(e.target)),
+      modalOpen,
+    })
+    if (!game?.hasFullVideo) {
+      if (decision.preventDefault && (e.ctrlKey || e.metaKey)) e.preventDefault()
+      return
+    }
+    if (decision.preventDefault) e.preventDefault()
+    if (decision.action) dispatch(decision.action)
   }
   const keyRef = useRef(handleKey)
   keyRef.current = handleKey
   useEffect(() => {
     const down = (e: KeyboardEvent) => keyRef.current(e)
     const upSpace = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement | null)?.tagName
-      if (e.key === ' ' && tag !== 'INPUT' && tag !== 'TEXTAREA') e.preventDefault()
+      if (e.key === ' ' && !isTextEntry(targetInfo(e.target)) && !isModalOpen()) e.preventDefault()
+    }
+    const releaseFocus = (e: MouseEvent) => {
+      if (e.detail === 0) return
+      const el = (e.target as HTMLElement | null)?.closest<HTMLElement>('button, input[type="checkbox"], input[type="range"], input[type="radio"]')
+      if (el && root.current?.contains(el)) el.blur()
     }
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', upSpace)
+    window.addEventListener('click', releaseFocus)
     return () => {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', upSpace)
+      window.removeEventListener('click', releaseFocus)
     }
   }, [])
 
@@ -384,11 +453,13 @@ export function GameViewer({
       onRename={(id, title) => void run(() => patchCandidate(gameKey, id, { title }))}
       onDelete={(id) => void run(() => deleteCandidate(gameKey, id))}
       onSaveModified={saveModified}
+      memoOpenId={memoOpenId}
+      onMemoOpenChange={setMemoOpenId}
     />
   )
 
   return (
-    <div className="flex flex-1 flex-col gap-2 p-4">
+    <div ref={root} className="flex flex-1 flex-col gap-2 p-4">
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" className={BTN} onClick={onBack}>
           {backLabel}
@@ -420,7 +491,7 @@ export function GameViewer({
             title={noVideoClip ? candidateTitle(noVideoClip) : null}
           />
         ) : (
-          <div ref={shell} data-testid="viewer-shell" className="flex min-w-0 flex-1 flex-col gap-1 bg-zinc-900 [&:fullscreen]:p-3">
+          <div ref={shell} data-testid="viewer-shell" className="relative flex min-w-0 flex-1 flex-col gap-1 bg-zinc-900 [&:fullscreen]:p-3">
             <video
               ref={video}
               data-testid="viewer-video"
@@ -443,6 +514,20 @@ export function GameViewer({
               }}
               onError={() => setVideoError(true)}
             />
+            {helpOpen && (
+              <div
+                data-testid="shortcut-help"
+                className="absolute right-2 top-2 z-10 max-h-[70%] w-[26rem] max-w-[calc(100%-1rem)] overflow-y-auto rounded border border-zinc-600 bg-zinc-900/95 p-3 shadow-lg"
+              >
+                <div className="mb-2 flex items-center justify-between text-sm font-medium text-zinc-100">
+                  단축키
+                  <button type="button" className="rounded px-1.5 text-xs text-zinc-400 hover:bg-zinc-700" title="닫기 (? 또는 Esc)" onClick={() => setHelpOpen(false)}>
+                    닫기
+                  </button>
+                </div>
+                <ShortcutTable />
+              </div>
+            )}
             {videoError && (
               <p className="text-sm text-amber-300">
                 이 브라우저에서 풀영상을 재생하지 못했습니다. 스팀 녹화(HEVC)라면 설치된 Edge/Chrome 에서 열거나 HEVC 확장을 설치해 주세요.
@@ -459,10 +544,10 @@ export function GameViewer({
               <button type="button" className={BTN} title="10초 앞으로" onClick={() => seek(time + SKIP_SEC)}>
                 10↻
               </button>
-              <button type="button" className={`${BTN} flex items-center gap-1`} title="이전 클립 (P)" onClick={() => jump('prev')}>
+              <button type="button" className={`${BTN} flex items-center gap-1`} title="이전 클립 (P · Ctrl+←)" onClick={() => jump('prev')}>
                 <PrevIcon /> 이전 클립
               </button>
-              <button type="button" className={`${BTN} flex items-center gap-1`} title="다음 클립 (N)" onClick={() => jump('next')}>
+              <button type="button" className={`${BTN} flex items-center gap-1`} title="다음 클립 (N · Ctrl+→)" onClick={() => jump('next')}>
                 다음 클립 <NextIcon />
               </button>
               <span className="ml-2 text-sm tabular-nums text-zinc-300">
@@ -482,6 +567,9 @@ export function GameViewer({
                   className="w-20"
                   onChange={(e) => setVol({ volume: Number(e.target.value), muted: false })}
                 />
+                <button type="button" className={BTN} title="단축키 (?)" aria-pressed={helpOpen} onClick={() => setHelpOpen((open) => !open)}>
+                  ⌨
+                </button>
                 <button type="button" className={BTN} title="전체화면" onClick={toggleFullscreen}>
                   {fullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
                 </button>
