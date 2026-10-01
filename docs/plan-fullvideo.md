@@ -6,8 +6,8 @@
 
 ## 0. 진행 상태 (세션이 끊겨도 여기부터 이어간다)
 
-- [ ] F4 — 나머지: 후보 라벨(교전/사냥)·태그 필터 UI. 후보 단위 라벨이 생기면 서버 전송 계약(`receiver.schema.json`)도 바꿔야 한다 — 라벨링을 다시 시작할 때 한다
-- [ ] F5 — 기존 카드 뷰 제거 (피드백 확인 후, 단독 커밋)
+- [ ] F4 — 나머지: 태그 필터 UI. 후보 라벨 UI 는 만들지 않기로 했다(2026-10-02 — 편집 흔적 수집으로 대신, [plan.md](plan.md) §3 라벨링 재설계)
+- [ ] F5 — 기존 카드 뷰 제거 (v0.2.0 피드백 확인 후, 단독 커밋). 지우는 것은 옛 화면(`ClipBrowser`·`GameSection`·`ClipCard`·`GamePlayer`·`ClipLibrary`·`PlayerModal` 중 안 쓰게 된 것)과 `/api/games/reprocess` 까지 — **이전 버전 데이터 이전 코드(library 이전·폴더 이름·옛 게임/영상 합치기)는 지우지 않는다**(0.1.x 사용자 업그레이드에 필요). `pipeline/reprocess.py` 의 `clear_saved_marks` 는 다른 곳이 쓰므로 옮긴 뒤 지운다
 
 ## 1. 결정 사항 (사용자, 2026-09-29)
 
