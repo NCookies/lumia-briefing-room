@@ -207,6 +207,17 @@ def test_portrait_files_left_in_the_folder_are_shown_even_if_game_json_lost_the_
     assert client.get(f"/api/games/{KEY}/asset/portrait_me.jpg").content == b"me"
 
 
+def test_cobalt_games_never_show_leftover_portrait_files(client):
+    folder = client.tmp / "games" / KEY
+    game = json.loads((folder / "game.json").read_text(encoding="utf-8"))
+    game["gameMode"] = "cobalt"
+    (folder / "game.json").write_text(json.dumps(game), encoding="utf-8")
+    (folder / "portrait_me.jpg").write_bytes(b"me")
+    (game,) = client.get("/api/games").json()["games"]
+    assert not any(game["portraits"].values())
+    assert not any(client.get(f"/api/games/{KEY}").json()["portraits"].values())
+
+
 def test_a_game_recorded_before_the_steam_recording_stopped_is_flagged_with_the_cause(client):
     from lumia_briefing_room.pipeline.recording_stop import STOPPED_BEFORE_MESSAGE
 

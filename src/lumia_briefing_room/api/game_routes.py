@@ -78,6 +78,8 @@ _PORTRAIT_SLOTS = ("me", "teammate1", "teammate2")
 def with_existing_portraits(game: dict, folder: Path) -> dict:
     """`game.json` 이 이름을 잃었어도(다시 분석 등) 게임 폴더에 초상화 파일이 남아 있으면 그 이름을 쓴다."""
     portraits = dict(game.get("portraits") or {})
+    if game.get("gameMode") == "cobalt":
+        return {**game, "portraits": portraits}
     for slot in _PORTRAIT_SLOTS:
         name = f"portrait_{slot}.jpg"
         if not portraits.get(slot) and (folder / name).is_file():
