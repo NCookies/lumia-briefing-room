@@ -62,6 +62,15 @@ test('previous and next candidate jump by start time and can be limited to certa
   assert.equal(neighborCandidate(list, 5, 'prev', 600), null)
 })
 
+test('이전 클립: 현재 후보 시작 후 3초 안이면 바로 그 앞 후보로, 그보다 지났으면 현재 후보 시작으로', () => {
+  const list = [c('a', 10, 40), c('b', 100, 130)]
+  assert.equal(neighborCandidate(list, 101, 'prev', 600)?.id, 'a')
+  assert.equal(neighborCandidate(list, 103, 'prev', 600)?.id, 'a', '정확히 3초')
+  assert.equal(neighborCandidate(list, 104, 'prev', 600)?.id, 'b')
+  assert.equal(neighborCandidate(list, 12, 'prev', 600), null, '앞 후보가 없으면 아무 데도 안 간다')
+  assert.equal(neighborCandidate(list, 300, 'prev', 600)?.id, 'b', '후보 사이 빈 구간에서는 바로 앞 후보 시작')
+})
+
 test('dismissed candidates are skipped when jumping', () => {
   const list = [c('a', 10, 40), c('b', 100, 130, { user: { dismissed: true } }), c('c', 200, 230)]
   assert.equal(neighborCandidate(list, 10, 'next', 600)?.id, 'c')

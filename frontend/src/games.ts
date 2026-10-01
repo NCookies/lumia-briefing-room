@@ -141,6 +141,8 @@ export function timeFromPointer(clientX: number, left: number, width: number, du
 }
 
 const EPS = 0.5
+/** 현재 후보 시작 후 이 시간 안이면 "이전"이 현재 후보 시작이 아니라 바로 앞 후보로 간다(유튜브 재생목록의 이전 버튼처럼). */
+export const PREV_RESTART_SEC = 3
 
 /** 이전/다음 후보의 시작 시각. `certainOnly` 면 킬·어시·사망이 있는 후보만 건너뛴다. */
 export function neighborCandidate(
@@ -155,7 +157,7 @@ export function neighborCandidate(
     .map((c) => ({ c, start: effectiveRange(c, duration)[0] }))
     .sort((a, b) => a.start - b.start)
   if (direction === 'next') return pool.find((p) => p.start > now + EPS)?.c ?? null
-  return [...pool].reverse().find((p) => p.start < now - EPS)?.c ?? null
+  return [...pool].reverse().find((p) => p.start < now - PREV_RESTART_SEC)?.c ?? null
 }
 
 export type DragKind = 'start' | 'end' | 'move'
