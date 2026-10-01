@@ -82,3 +82,24 @@ export function gameHeading(g: {
   if (g.title) return g.title
   return g.source === 'vod' ? vodGameHeading(g) : g.gameKey
 }
+
+export type SavePlan = { ok: true; result?: GameEditPatch; title?: string | null } | { ok: false; error: string }
+
+/** 대화상자 입력에서 실제로 바뀐 것만 보낼 값으로 만든다. 결과를 안 건드렸으면 보내지 않아야 결과가 잠기지 않는다. */
+export function buildSave(
+  initial: GameEditDraft,
+  draft: GameEditDraft,
+  initialTitle: string | null | undefined,
+  titleInput: string,
+  cobalt: boolean,
+): SavePlan {
+  const plan: { ok: true; result?: GameEditPatch; title?: string | null } = { ok: true }
+  if (JSON.stringify(initial) !== JSON.stringify(draft)) {
+    const parsed = parseDraft(draft, cobalt)
+    if (!parsed.ok) return parsed
+    plan.result = parsed.patch
+  }
+  const title = titleValue(titleInput)
+  if (title !== (initialTitle || null)) plan.title = title
+  return plan
+}

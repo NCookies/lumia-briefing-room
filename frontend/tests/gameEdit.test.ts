@@ -44,3 +44,25 @@ test('화면 머리줄: 사용자 제목 > 영상 게임 제목(스트리머 · 
   assert.equal(gameHeading({ gameKey: 'k', title: null, source: 'vod', streamer: 's', vodGameIndex: 2 }), 's · 게임 2')
   assert.equal(gameHeading({ gameKey: 'k', title: null, source: 'steam' }), 'k')
 })
+
+import { buildSave } from '../src/gameEdit.ts'
+
+const base = { placement: '3', matchType: 'rank' as const, outcome: '', tk: '1', kills: '2', assists: '3' }
+
+test('저장: 제목만 바꾸면 결과는 보내지 않아 결과가 잠기지 않는다', () => {
+  assert.deepEqual(buildSave(base, base, null, ' 첫 우승 ', false), { ok: true, title: '첫 우승' })
+})
+
+test('저장: 결과만 바꾸면 제목은 보내지 않는다', () => {
+  const r = buildSave(base, { ...base, placement: '1' }, '그대로', '그대로', false)
+  assert.deepEqual(r, { ok: true, result: { placement: 1, matchType: 'rank', tk: 1, kills: 2, assists: 3 } })
+})
+
+test('저장: 제목을 비우면 null, 바뀐 것이 없으면 아무것도 보내지 않는다', () => {
+  assert.deepEqual(buildSave(base, base, '옛 제목', '  ', false), { ok: true, title: null })
+  assert.deepEqual(buildSave(base, base, null, '', false), { ok: true })
+})
+
+test('저장: 결과 입력이 잘못되면 오류', () => {
+  assert.deepEqual(buildSave(base, { ...base, placement: '0' }, null, '', false), { ok: false, error: '순위는 1~99 사이의 정수로 입력하세요' })
+})

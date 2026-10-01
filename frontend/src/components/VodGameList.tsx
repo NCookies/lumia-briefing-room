@@ -447,7 +447,6 @@ export function VodGameList({
                           game={g}
                           time={vodGameTime(g)}
                           menu={gameDelete.menuFor(g.key, g, [gameEdit.menuItem(g.key, g)])}
-                          onRename={(title) => void gameEdit.saveTitle(g.key, title)}
                           due={cleanup[g.key]}
                           onOpen={() => {
                             rememberScroll()

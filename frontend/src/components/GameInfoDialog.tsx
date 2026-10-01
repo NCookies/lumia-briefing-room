@@ -1,21 +1,22 @@
 import { useState } from 'react'
-import { draftOf, parseDraft, type GameEditDraft, type GameEditPatch } from '../gameEdit'
+import { buildSave, draftOf, TITLE_MAX, type GameEditDraft, type GameEditPatch } from '../gameEdit'
 import type { GameSummary } from '../games'
 
 interface Props {
-  game: Pick<GameSummary, 'gameMode' | 'matchResult' | 'matchResultSource'>
-  onSave: (patch: GameEditPatch) => void
+  game: Pick<GameSummary, 'gameMode' | 'matchResult' | 'matchResultSource' | 'title'>
+  onSave: (body: { matchResult?: GameEditPatch; title?: string | null }) => void
   onUnlock: () => void
   onCancel: () => void
 }
 
 const INPUT = 'w-20 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm text-zinc-100'
 
-/** `게임 정보 고치기`: 판독이 틀린 순위·일반/랭크·TK/K/A(코발트는 승리/패배)를 고친다. 저장하면 잠긴다. */
+/** `게임 정보 수정하기`: 제목과, 판독이 틀린 순위·일반/랭크·TK/K/A(코발트는 승리/패배)를 고친다. 저장하면 잠긴다. */
 export function GameInfoDialog({ game, onSave, onUnlock, onCancel }: Props) {
   const cobalt = game.gameMode === 'cobalt'
   const locked = game.matchResultSource === 'manual'
   const [draft, setDraft] = useState<GameEditDraft>(() => draftOf(game.matchResult))
+  const [title, setTitle] = useState(game.title ?? '')
   const [error, setError] = useState<string | null>(null)
   const set = (patch: Partial<GameEditDraft>) => {
     setDraft((d) => ({ ...d, ...patch }))
@@ -23,9 +24,12 @@ export function GameInfoDialog({ game, onSave, onUnlock, onCancel }: Props) {
   }
 
   const submit = () => {
-    const parsed = parseDraft(draft, cobalt)
-    if (!parsed.ok) return setError(parsed.error)
-    onSave(parsed.patch)
+    const plan = buildSave(draftOf(game.matchResult), draft, game.title, title, cobalt)
+    if (!plan.ok) return setError(plan.error)
+    onSave({
+      ...(plan.result !== undefined && { matchResult: plan.result }),
+      ...(plan.title !== undefined && { title: plan.title }),
+    })
   }
 
   const number = (field: 'placement' | 'tk' | 'kills' | 'assists', label: string) => (
@@ -47,7 +51,17 @@ export function GameInfoDialog({ game, onSave, onUnlock, onCancel }: Props) {
           if (e.key === 'Enter') submit()
         }}
       >
-        <h2 className="text-base font-medium">게임 정보 고치기</h2>
+        <h2 className="text-base font-medium">게임 정보 수정하기</h2>
+        <label className="flex flex-col gap-1 text-sm">
+          제목
+          <input
+            className="rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm text-zinc-100"
+            value={title}
+            maxLength={TITLE_MAX}
+            placeholder="제목 없음"
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </label>
         {cobalt ? (
           <label className="flex items-center justify-between gap-3 text-sm">
             결과
@@ -78,7 +92,7 @@ export function GameInfoDialog({ game, onSave, onUnlock, onCancel }: Props) {
         {number('kills', 'K')}
         {number('assists', 'A')}
         <p className="text-xs leading-relaxed text-zinc-400">
-          저장하면 이 값으로 잠깁니다. 다시 분석하거나 과거 결과 채우기를 해도 덮어쓰지 않고, 이 게임의 클립 결과도 같은 값으로 바뀝니다.
+          순위·TK/K/A 를 고쳐 저장하면 그 값으로 잠깁니다. 다시 분석하거나 과거 결과 채우기를 해도 덮어쓰지 않고, 이 게임의 클립 결과도 같은 값으로 바뀝니다.
         </p>
         {error && <p className="text-sm text-rose-300">{error}</p>}
         <div className="flex items-center justify-end gap-2">
