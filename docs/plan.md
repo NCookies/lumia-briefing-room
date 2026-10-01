@@ -7,7 +7,7 @@
 
 | 순위 | 작업 | 절 |
 |---|---|---|
-| **P0** | 풀영상 전환 남은 것: 안내 가이드 도움말(F9) → 옛 화면 제거(F5). 후보 라벨(F4)은 라벨링 재개 때 | [plan-fullvideo.md](plan-fullvideo.md) |
+| **P0** | 풀영상 전환 남은 것: 옛 화면 제거(F5). 후보 라벨(F4)은 라벨링 재개 때 | [plan-fullvideo.md](plan-fullvideo.md) |
 | P1 | 릴리스 검증 자동화 — 실측 체크리스트를 테스트로 옮기고 사람 확인은 고정 4개만(R1 → R5 규칙 전환 → R2~R4) | [plan-release-automation.md](plan-release-automation.md) |
 | P1 | 실측 대기 항목 — 샌드박스, 다른 PC·해상도(기회가 올 때) | §4 |
 | P2 | `clipUid` 서버 전송 | §2-2 |
