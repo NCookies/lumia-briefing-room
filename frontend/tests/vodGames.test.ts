@@ -25,6 +25,7 @@ const game = (vodId: string, index: number, extra: object = {}) =>
     fullVideoDeletedAt: null,
     fullVideoSizeBytes: 1000,
     savedClipCount: 2,
+    autoClipCount: 0,
     ...extra,
   }) as never
 

@@ -75,6 +75,7 @@ export interface GameSummary {
   candidateCount: number
   certainCount: number
   savedClipCount: number
+  autoClipCount: number
   unsavedEditCount: number
 }
 

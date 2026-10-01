@@ -93,6 +93,7 @@ export async function getRebuildStatus(key: string): Promise<RebuildStatus> {
 export interface DeleteGameResult {
   deletedFullVideo: boolean
   deletedClips: number
+  keptClips?: number
   freedBytes: number
 }
 
