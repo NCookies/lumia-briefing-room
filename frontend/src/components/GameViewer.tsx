@@ -16,13 +16,13 @@ import { useConfirm } from '../confirmContext'
 import { moveClipsToCategory } from '../categoriesApi'
 import { EMPTY_HISTORY, pushEdit, redoStep, remapId, undoStep, type Edit } from '../editHistory'
 import { applyMark, candidateAtTime, newRangeAround, rangeModified, zoomBy, zoomView, type View } from '../playerBar'
-import { loadVolume, saveVolume, type VolumeState } from '../volume'
+import { loadVolume, saveVolume, stepVolume, type VolumeState } from '../volume'
 import { isLegacyWithoutVideo } from '../legacyGame'
 import { isPlaybackFailure } from '../playback'
 import { gameHeading } from '../gameEdit'
 import { LegacyGamePanel } from './LegacyGamePanel'
 import { ViewerBar, ViewerScroll } from './ViewerBar'
-import { ExitFullscreenIcon, FullscreenIcon, MuteIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon, VolumeIcon, ZoomInIcon, ZoomOutIcon } from './ViewerIcons'
+import { ExitFullscreenIcon, FullscreenIcon, MuteIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon, SeekBackIcon, SeekForwardIcon, VolumeIcon, ZoomInIcon, ZoomOutIcon } from './ViewerIcons'
 import { ArchivePopup } from './ArchivePopup'
 import { SavedClipPlayer } from './SavedClipPlayer'
 import { GameMenu, type GameMenuItem } from './GameMenu'
@@ -30,7 +30,6 @@ import { ViewerCandidates } from './ViewerCandidates'
 import { ShortcutTable } from './ShortcutTable'
 import { SEEK_STEP_SEC, decideKey, isTextEntry, loadHelpSeen, saveHelpSeen, type TargetInfo, type ViewerAction } from '../viewerShortcuts'
 
-const SKIP_SEC = 10
 
 const isModalOpen = () => document.querySelector('[role="dialog"], [role="menu"]') !== null
 
@@ -41,7 +40,11 @@ const targetInfo = (t: EventTarget | null): TargetInfo | null => {
 
 const SAVING = '저장 중…'
 
-const BTN = 'rounded border border-zinc-600 px-2 py-1 text-sm hover:bg-zinc-700 disabled:opacity-40'
+const BTN =
+  'rounded-md border border-zinc-600/70 bg-zinc-800/60 px-2.5 py-1 text-sm text-zinc-200 transition hover:bg-zinc-700 hover:text-white active:scale-95 disabled:opacity-40 disabled:hover:bg-zinc-800/60'
+const CTRL =
+  'inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2.5 text-sm text-zinc-200 transition hover:bg-zinc-700/80 hover:text-white active:scale-95 disabled:opacity-40'
+const CTRL_ICON = 'inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-200 transition hover:bg-zinc-700/80 hover:text-white active:scale-95'
 
 export function GameViewer({
   gameKey,
@@ -80,6 +83,8 @@ export function GameViewer({
   const [overrides, setOverrides] = useState<Record<string, [number, number]>>({})
   const [vol, setVol] = useState<VolumeState>(loadVolume)
   const [fullscreen, setFullscreen] = useState(false)
+  const [volumeToast, setVolumeToast] = useState<number | null>(null)
+  const toastTimer = useRef(0)
   const [showDismissed, setShowDismissed] = useState(false)
   const ask = useConfirm()
   const [memoOpenId, setMemoOpenId] = useState<string | null>(null)
@@ -162,6 +167,14 @@ export function GameViewer({
   const toggleFullscreen = () => {
     if (document.fullscreenElement) void document.exitFullscreen()
     else void shell.current?.requestFullscreen()
+  }
+
+  const changeVolume = (direction: 1 | -1) => {
+    const next = stepVolume(vol, direction)
+    setVol(next)
+    setVolumeToast(Math.round(next.volume * 100))
+    window.clearTimeout(toastTimer.current)
+    toastTimer.current = window.setTimeout(() => setVolumeToast(null), 1000)
   }
 
   const togglePlay = () => {
@@ -389,6 +402,14 @@ export function GameViewer({
         return seek(time - SEEK_STEP_SEC)
       case 'seekForward':
         return seek(time + SEEK_STEP_SEC)
+      case 'volumeUp':
+        return changeVolume(1)
+      case 'volumeDown':
+        return changeVolume(-1)
+      case 'fullscreen':
+        return toggleFullscreen()
+      case 'addSection':
+        return addHere()
       case 'nextClip':
         return jump('next')
       case 'prevClip':
@@ -547,6 +568,11 @@ export function GameViewer({
               }}
               onError={() => setVideoError(true)}
             />
+            {volumeToast !== null && (
+              <div role="status" className="pointer-events-none absolute left-3 top-3 z-10 rounded-md bg-black/70 px-3 py-1.5 text-sm font-medium tabular-nums text-white">
+                볼륨 {volumeToast}%
+              </div>
+            )}
             {helpOpen && (
               <div
                 data-testid="shortcut-help"
@@ -567,27 +593,37 @@ export function GameViewer({
               </p>
             )}
 
-            <div className="flex flex-wrap items-center gap-1 text-white">
-              <button type="button" className={BTN} title="재생/일시정지 (Space)" onClick={togglePlay}>
+            <div className="flex flex-wrap items-center gap-1 rounded-lg border border-zinc-700/60 bg-zinc-800/60 px-2 py-1.5 text-white">
+              <button
+                type="button"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-sky-600 text-white shadow transition hover:bg-sky-500 active:scale-95"
+                title="재생/일시정지 (Space)"
+                aria-label="재생/일시정지"
+                onClick={togglePlay}
+              >
                 {playing ? <PauseIcon /> : <PlayIcon />}
               </button>
-              <button type="button" className={BTN} title="10초 뒤로" onClick={() => seek(time - SKIP_SEC)}>
-                ↺10
+              <span className="mx-1 h-5 w-px bg-zinc-700" aria-hidden="true" />
+              <button type="button" className={CTRL_ICON} title={`${SEEK_STEP_SEC}초 뒤로 (←)`} aria-label={`${SEEK_STEP_SEC}초 뒤로`} onClick={() => seek(time - SEEK_STEP_SEC)}>
+                <SeekBackIcon seconds={SEEK_STEP_SEC} />
               </button>
-              <button type="button" className={BTN} title="10초 앞으로" onClick={() => seek(time + SKIP_SEC)}>
-                10↻
+              <button type="button" className={CTRL_ICON} title={`${SEEK_STEP_SEC}초 앞으로 (→)`} aria-label={`${SEEK_STEP_SEC}초 앞으로`} onClick={() => seek(time + SEEK_STEP_SEC)}>
+                <SeekForwardIcon seconds={SEEK_STEP_SEC} />
               </button>
-              <button type="button" className={`${BTN} flex items-center gap-1`} title="이전 클립 (P · Ctrl+←)" onClick={() => jump('prev')}>
+              <span className="mx-1 h-5 w-px bg-zinc-700" aria-hidden="true" />
+              <button type="button" className={CTRL} title="이전 클립 (Ctrl+←)" onClick={() => jump('prev')}>
                 <PrevIcon /> 이전 클립
               </button>
-              <button type="button" className={`${BTN} flex items-center gap-1`} title="다음 클립 (N · Ctrl+→)" onClick={() => jump('next')}>
+              <button type="button" className={CTRL} title="다음 클립 (Ctrl+→)" onClick={() => jump('next')}>
                 다음 클립 <NextIcon />
               </button>
-              <span className="ml-2 text-sm tabular-nums text-zinc-300">
-                {formatClock(time)} / {formatClock(duration)}
+              <span className="ml-3 inline-flex items-baseline gap-1 rounded-md bg-zinc-900/70 px-2.5 py-1 font-mono text-sm tabular-nums" aria-label="재생 위치">
+                <span className="font-semibold text-sky-300">{formatClock(time)}</span>
+                <span className="text-zinc-600">/</span>
+                <span className="text-zinc-400">{formatClock(duration)}</span>
               </span>
               <span className="ml-auto flex items-center gap-1">
-                <button type="button" className={BTN} title="음소거" onClick={() => setVol({ ...vol, muted: !vol.muted })}>
+                <button type="button" className={CTRL_ICON} title="음소거" aria-label="음소거" onClick={() => setVol({ ...vol, muted: !vol.muted })}>
                   {vol.muted || vol.volume === 0 ? <MuteIcon /> : <VolumeIcon />}
                 </button>
                 <input
@@ -597,10 +633,10 @@ export function GameViewer({
                   step={0.05}
                   aria-label="볼륨"
                   value={vol.muted ? 0 : vol.volume}
-                  className="w-20"
+                  className="w-24 accent-sky-400"
                   onChange={(e) => setVol({ volume: Number(e.target.value), muted: false })}
                 />
-                <button type="button" className={BTN} title="전체화면" onClick={toggleFullscreen}>
+                <button type="button" className={CTRL_ICON} title="전체화면 (F)" aria-label="전체화면" onClick={toggleFullscreen}>
                   {fullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
                 </button>
               </span>
@@ -643,7 +679,7 @@ export function GameViewer({
                 <button type="button" className={`${BTN} flex items-center`} title="배율 확대" onClick={() => zoomStep(0.5)}>
                   <ZoomInIcon />
                 </button>
-                <button type="button" disabled={busy} className="rounded border border-yellow-600/60 px-2 py-1 text-sm hover:bg-zinc-700 disabled:opacity-40" onClick={addHere}>
+                <button type="button" disabled={busy} className="rounded-md border border-yellow-500/60 bg-yellow-500/10 px-2.5 py-1 text-sm text-yellow-200 transition hover:bg-yellow-500/20 active:scale-95 disabled:opacity-40" title="현재 위치에 구간 추가 (N)" onClick={addHere}>
                   + 여기서 구간 추가
                 </button>
               </div>

@@ -1,10 +1,17 @@
+import { VOLUME_STEP } from './volume.ts'
+
 export const SEEK_STEP_SEC = 5
+const VOLUME_PERCENT = Math.round(VOLUME_STEP * 100)
 
 export type ViewerAction =
   | 'togglePlay'
   | 'seekBack'
   | 'seekForward'
   | 'nextClip'
+  | 'addSection'
+  | 'fullscreen'
+  | 'volumeUp'
+  | 'volumeDown'
   | 'prevClip'
   | 'archivePopup'
   | 'deleteClip'
@@ -31,12 +38,16 @@ export interface Shortcut {
 /** 풀영상 화면 단축키의 유일한 정의. 키 판정(`decideKey`)과 안내 표(`SHORTCUT_GROUPS`)가 둘 다 이걸 쓴다. */
 export const VIEWER_SHORTCUTS: Shortcut[] = [
   { action: 'togglePlay', combos: [{ key: ' ' }], desc: '재생 / 일시정지', group: '재생' },
+  { action: 'fullscreen', combos: [{ key: 'f' }], desc: '전체화면', group: '재생' },
+  { action: 'volumeUp', combos: [{ key: 'ArrowUp' }], desc: `볼륨 ${VOLUME_PERCENT}% 올리기`, group: '재생' },
+  { action: 'volumeDown', combos: [{ key: 'ArrowDown' }], desc: `볼륨 ${VOLUME_PERCENT}% 내리기`, group: '재생' },
   { action: 'seekBack', combos: [{ key: 'ArrowLeft' }], desc: `${SEEK_STEP_SEC}초 뒤로`, group: '재생' },
   { action: 'seekForward', combos: [{ key: 'ArrowRight' }], desc: `${SEEK_STEP_SEC}초 앞으로`, group: '재생' },
-  { action: 'prevClip', combos: [{ key: 'p' }, { key: 'ArrowLeft', ctrl: true }], desc: '이전 클립', group: '이동' },
-  { action: 'nextClip', combos: [{ key: 'n' }, { key: 'ArrowRight', ctrl: true }], desc: '다음 클립', group: '이동' },
-  { action: 'markStart', combos: [{ key: 'i' }], desc: '시작점', group: '범위 편집' },
-  { action: 'markEnd', combos: [{ key: 'o' }], desc: '끝점', group: '범위 편집' },
+  { action: 'prevClip', combos: [{ key: 'ArrowLeft', ctrl: true }], desc: '이전 클립', group: '이동' },
+  { action: 'nextClip', combos: [{ key: 'ArrowRight', ctrl: true }], desc: '다음 클립', group: '이동' },
+  { action: 'markStart', combos: [{ key: 'i' }], desc: '선택한 클립의 시작을 지금 위치로', group: '범위 편집' },
+  { action: 'addSection', combos: [{ key: 'n' }], desc: '구간 추가', group: '범위 편집' },
+  { action: 'markEnd', combos: [{ key: 'o' }], desc: '선택한 클립의 끝을 지금 위치로', group: '범위 편집' },
   { action: 'undo', combos: [{ key: 'z', ctrl: true }], desc: '실행 취소', group: '범위 편집' },
   { action: 'redo', combos: [{ key: 'y', ctrl: true }], desc: '다시 시도', group: '범위 편집' },
   { action: 'archivePopup', combos: [{ key: 's', ctrl: true }], desc: '보관', group: '선택한 클립' },
@@ -106,7 +117,7 @@ export interface KeyDecision {
 }
 
 const NONE: KeyDecision = { action: null, preventDefault: false }
-const REPEATABLE = new Set<ViewerAction>(['seekBack', 'seekForward'])
+const REPEATABLE = new Set<ViewerAction>(['seekBack', 'seekForward', 'volumeUp', 'volumeDown'])
 
 /** 한글 자판이면 `key` 가 `ㅜ` 라 물리 키(`code`)로 글자를 정한다. */
 function normalizeKey(k: Pick<KeyInput, 'key' | 'code'>): string {

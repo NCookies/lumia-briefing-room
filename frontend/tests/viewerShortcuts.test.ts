@@ -31,13 +31,20 @@ test('기존 단축키는 그대로 풀린다', () => {
   assert.equal(action(' '), 'togglePlay')
   assert.equal(action('ArrowLeft'), 'seekBack')
   assert.equal(action('ArrowRight'), 'seekForward')
-  assert.equal(action('n'), 'nextClip')
-  assert.equal(action('p'), 'prevClip')
+  assert.equal(action('n'), 'addSection')
+  assert.equal(action('p'), null)
   assert.equal(action('s'), null)
   assert.equal(action('d'), null)
   assert.equal(action('i'), 'markStart')
   assert.equal(action('o'), 'markEnd')
   assert.equal(action('z', { ctrl: true }), 'undo')
+})
+
+test('화살표 위·아래는 볼륨이고 꾹 누르면 반복한다', () => {
+  assert.equal(action('ArrowUp'), 'volumeUp')
+  assert.equal(action('ArrowDown'), 'volumeDown')
+  assert.equal(action('ArrowUp', { repeat: true }), 'volumeUp')
+  assert.equal(action('ArrowUp', { ctrl: true }), null)
 })
 
 test('Ctrl+Y 는 다시 실행이다(한글 자판 포함)', () => {
@@ -47,13 +54,13 @@ test('Ctrl+Y 는 다시 실행이다(한글 자판 포함)', () => {
 })
 
 test('대문자(Shift·CapsLock)로 눌러도 같은 단축키다', () => {
-  assert.equal(action('N'), 'nextClip')
-  assert.equal(action('P', { shift: true }), 'prevClip')
+  assert.equal(action('N'), 'addSection')
+  assert.equal(action('F', { shift: true }), 'fullscreen')
 })
 
 test('한글 자판에서도 물리 키(code)로 푼다', () => {
-  assert.equal(action('ㅜ', { code: 'KeyN' }), 'nextClip')
-  assert.equal(action('ㅔ', { code: 'KeyP' }), 'prevClip')
+  assert.equal(action('ㅜ', { code: 'KeyN' }), 'addSection')
+  assert.equal(action('ㅍ', { code: 'KeyF' }), 'fullscreen')
   assert.equal(action('ㅋ', { code: 'KeyZ', ctrl: true }), 'undo')
 })
 

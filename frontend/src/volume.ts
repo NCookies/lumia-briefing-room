@@ -27,3 +27,11 @@ export function saveVolume(state: VolumeState): void {
     // 저장 실패는 무시한다
   }
 }
+
+export const VOLUME_STEP = 0.05
+
+/** 화살표로 볼륨을 5% 씩 바꾼다. 음소거 중 올리면 음소거를 푼다. */
+export function stepVolume(state: VolumeState, direction: 1 | -1): VolumeState {
+  const volume = Math.min(1, Math.max(0, Math.round((state.volume + direction * VOLUME_STEP) * 100) / 100))
+  return { volume, muted: direction === 1 ? false : state.muted }
+}

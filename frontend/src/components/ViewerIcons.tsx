@@ -52,3 +52,18 @@ const bookmark = (filled: boolean) => (
 )
 export const BookmarkIcon = () => bookmark(false)
 export const BookmarkFilledIcon = () => bookmark(true)
+
+const seekSvg = (seconds: number, mirror: boolean) => (
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="inline-block align-middle">
+    <g transform={mirror ? 'translate(24 0) scale(-1 1)' : undefined}>
+      <path d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5" />
+      <path d="M4 3.5v4h4" />
+    </g>
+    <text x="12" y="15.2" textAnchor="middle" fontSize="8.5" fontWeight="700" fill="currentColor" stroke="none" fontFamily="inherit">
+      {seconds}
+    </text>
+  </svg>
+)
+
+export const SeekBackIcon = ({ seconds }: { seconds: number }) => seekSvg(seconds, false)
+export const SeekForwardIcon = ({ seconds }: { seconds: number }) => seekSvg(seconds, true)
