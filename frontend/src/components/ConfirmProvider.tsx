@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ConfirmContext, type Ask, type ConfirmOptions, type ConfirmResult } from '../confirmContext'
+import { confirmKeyAction, type ConfirmFocus } from '../confirmKeys'
 
 interface Pending {
   options: ConfirmOptions
@@ -9,13 +10,21 @@ interface Pending {
 function ConfirmDialog({ pending, onDone }: { pending: Pending; onDone: (result: ConfirmResult) => void }) {
   const { options } = pending
   const [skip, setSkip] = useState(false)
+  const cancelButton = useRef<HTMLButtonElement>(null)
+  const confirmButton = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Tab') return
+      const at = document.activeElement
+      const focus: ConfirmFocus = at === cancelButton.current ? 'cancel' : at === confirmButton.current ? 'confirm' : 'other'
+      const result = confirmKeyAction(e.key, focus, e.repeat)
+      if (result.kind === 'pass') return
       e.stopImmediatePropagation()
-      if (e.key === 'Escape') onDone({ ok: false, skipNext: false })
-      if (e.key === 'Enter') onDone({ ok: true, skipNext: skip })
+      if (result.kind === 'native') return
+      e.preventDefault()
+      if (result.kind === 'cancel') onDone({ ok: false, skipNext: false })
+      else if (result.kind === 'confirm') onDone({ ok: true, skipNext: skip })
+      else if (result.kind === 'focus') (result.to === 'cancel' ? cancelButton : confirmButton).current?.focus()
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
@@ -44,6 +53,7 @@ function ConfirmDialog({ pending, onDone }: { pending: Pending; onDone: (result:
         )}
         <div className="flex justify-end gap-2">
           <button
+            ref={cancelButton}
             type="button"
             className="rounded px-4 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700"
             onClick={() => onDone({ ok: false, skipNext: false })}
@@ -51,6 +61,7 @@ function ConfirmDialog({ pending, onDone }: { pending: Pending; onDone: (result:
             {options.cancelLabel ?? '취소'}
           </button>
           <button
+            ref={confirmButton}
             type="button"
             autoFocus
             className={`rounded px-4 py-1.5 text-sm ${
