@@ -149,21 +149,21 @@ def test_unsave_of_a_candidate_that_was_not_saved_is_a_conflict(client):
 def _seed_record(client):
     from lumia_briefing_room.pipeline.game_records import game_key, records_dir_for
 
-    records = records_dir_for(client.library)
+    records = records_dir_for(client.resolved.library_steam)
     records.mkdir(parents=True, exist_ok=True)
     path = records / f"{game_key('bg_1', '2026-09-30T00:24:00Z')}.json"
     path.write_text("{}", encoding="utf-8")
     return path
 
 
-def test_deleting_the_whole_game_removes_the_row_the_files_and_the_game_record(client):
-    _save_all(client)
-    record = _seed_record(client)
-    resp = client.post(f"/api/games/{KEY}/delete", json={"target": "all"})
+def test_deleting_the_whole_game_removes_the_row_the_files_and_the_game_record(cat_client):
+    _save_auto(cat_client, "01", "02")
+    record = _seed_record(cat_client)
+    resp = cat_client.post(f"/api/games/{CKEY}/delete", json={"target": "all"})
     assert resp.status_code == 200 and resp.json()["deletedClips"] == 2 and resp.json()["deletedFullVideo"] is True
-    assert client.get("/api/games").json()["games"] == []
-    assert client.get(f"/api/games/{KEY}").status_code == 404
-    assert not (client.tmp / "games" / KEY).exists() and _clip_videos(client) == []
+    assert cat_client.get("/api/games").json()["games"] == []
+    assert cat_client.get(f"/api/games/{CKEY}").status_code == 404
+    assert not (cat_client.resolved.games_steam / CKEY).exists() and cat_videos(cat_client, "자동 보관") == []
     assert not record.exists(), "기록이 남으면 앱을 다시 켤 때 이전 버전 게임으로 되살아난다"
 
 
@@ -173,10 +173,42 @@ def test_deleting_the_whole_game_also_works_when_nothing_else_is_left(client):
     assert client.get("/api/games").json()["games"] == []
 
 
-def test_clips_deleted_with_the_whole_game_do_not_leave_a_new_game_record(client):
+def test_clips_deleted_with_the_whole_game_do_not_leave_a_new_game_record(cat_client):
     from lumia_briefing_room.pipeline.game_records import records_dir_for
 
-    _save_all(client)
-    client.post(f"/api/games/{KEY}/delete", json={"target": "all"})
-    records = records_dir_for(client.library)
+    _save_auto(cat_client, "01", "02")
+    cat_client.post(f"/api/games/{CKEY}/delete", json={"target": "all"})
+    records = records_dir_for(cat_client.resolved.library_steam)
     assert not records.exists() or list(records.glob("*.json")) == []
+
+
+def test_whole_game_delete_removes_the_game_and_auto_clips_but_leaves_archived_clips_in_the_clip_tab(cat_client):
+    _seed_mixed(cat_client)
+    resp = cat_client.post(f"/api/games/{CKEY}/delete", json={"target": "all"})
+    assert resp.status_code == 200 and resp.json()["deletedClips"] == 1 and resp.json()["keptClips"] == 2
+    assert resp.json()["deletedFullVideo"] is True
+    assert cat_client.get(f"/api/games/{CKEY}").status_code == 404
+    assert cat_videos(cat_client, "자동 보관") == []
+    ids = {c["id"] for c in cat_client.get("/api/clips").json()}
+    assert ids == {f"{CKEY}_02", f"{CKEY}_03"}, "게임 기록이 사라져도 남은 클립은 클립 탭에 보인다"
+    for cid in ids:
+        assert cat_client.get(f"/api/clips/{cid}").status_code == 200
+        assert cat_client.get(f"/api/clips/{cid}/video").status_code in (200, 206)
+    assert cat_client.delete(f"/api/clips/{CKEY}_02").status_code == 200, "클립 탭에서 지울 수 있다"
+    assert {c["id"] for c in cat_client.get("/api/clips").json()} == {f"{CKEY}_03"}
+
+
+def test_whole_game_delete_removes_all_clips_when_every_clip_is_auto_archive(cat_client):
+    _save_auto(cat_client, "01", "02")
+    resp = cat_client.post(f"/api/games/{CKEY}/delete", json={"target": "all"}).json()
+    assert resp["deletedClips"] == 2 and resp["keptClips"] == 0
+    assert cat_client.get("/api/clips").json() == []
+
+
+def test_whole_game_delete_keeps_every_clip_in_legacy_layout(client):
+    client.get("/api/games")
+    _save_all(client)
+    resp = client.post(f"/api/games/{KEY}/delete", json={"target": "all"}).json()
+    assert resp["deletedClips"] == 0 and resp["keptClips"] == 2 and len(_clip_videos(client)) == 2
+    assert client.get("/api/games").json()["games"] == []
+

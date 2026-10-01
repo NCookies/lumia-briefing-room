@@ -633,7 +633,7 @@ def register_game_routes(
 
     @app.post("/api/games/{key}/delete")
     def delete_game_files(key: str, body: GameDelete):
-        """풀영상·자동 보관 클립을 지운다(사용자가 보관한 클립은 남긴다). 게임 기록(결과·후보)은 남는다. 휴지통/영구는 `ui.deleteMode`."""
+        """풀영상·자동 보관 클립을 지운다(사용자가 보관한 클립은 남긴다). `all` 은 게임 기록까지 지워 목록에서 없앤다. 휴지통/영구는 `ui.deleteMode`."""
         if body.target not in ("fullVideo", "clips", "both", "all"):
             raise HTTPException(400, "target 은 fullVideo, clips, both, all 중 하나여야 합니다")
         game = load_or_404(key)
@@ -650,7 +650,7 @@ def register_game_routes(
                     clip_id = (cand.get("user") or {}).get("savedClipId")
                     if not clip_id:
                         continue
-                    if body.target != "all" and _is_archived_clip(game, clip_id):
+                    if _is_archived_clip(game, clip_id):
                         kept_ids.add(cand["id"])
                     elif _remove_saved_clip(game, clip_id, keep_record=body.target != "all"):
                         deleted_clips += 1
