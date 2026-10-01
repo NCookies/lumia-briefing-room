@@ -56,6 +56,15 @@ def category_of(cfg: Config, video: Path) -> str | None:
     return parts[0] if len(parts) > 1 else None
 
 
+def is_user_archived(cfg: Config, video: Path | None) -> bool:
+    """사용자가 보관한 클립인가: `자동 보관` 이 아닌 카테고리에 있는 클립. 옛 경로 모드(카테고리 없음)는 구분할 수 없어 전부 보관한 것으로 본다.
+    영상을 못 찾았거나 `clips\` 바로 밑에 있는 클립은 어디에도 속하지 않은 것으로 본다."""
+    if not enabled(cfg):
+        return video is not None
+    name = category_of(cfg, video) if video is not None else None
+    return name is not None and name != AUTO_ARCHIVE_FOLDER
+
+
 def category_names(cfg: Config) -> list[str]:
     """`보관함` → 사용자 카테고리(이름순) → `자동 보관`."""
     root = clips_root(cfg)

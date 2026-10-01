@@ -12,7 +12,7 @@ import shutil
 import subprocess
 import threading
 from types import SimpleNamespace
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -127,6 +127,7 @@ def _summary(game: dict, games_dir: Path, *, can_rebuild_full: bool = False) -> 
         "candidateCount": len(active),
         "certainCount": sum(1 for c in active if c.get("certain")),
         "savedClipCount": sum(1 for c in cands if (c.get("user") or {}).get("archived")),
+        "autoClipCount": sum(1 for c in cands if (c.get("user") or {}).get("archived") is False),
         "unsavedEditCount": sum(1 for c in active if (c.get("user") or {}).get("savedClipId") and gcand.range_changed(c, float(video.get("durationSec") or 0.0))),
     }
 
@@ -265,7 +266,7 @@ def register_game_routes(
             name = cats.category_of(cfg, clip.video) if cats.enabled(cfg) else None
             if name:
                 extra["savedCategory"] = name
-            extra["archived"] = not cats.enabled(cfg) or (name is not None and name != AUTO_ARCHIVE_FOLDER)
+            extra["archived"] = cats.is_user_archived(cfg, clip.video)
             if isinstance(clip.meta.get("memo"), str) and clip.meta["memo"]:
                 extra["savedMemo"] = clip.meta["memo"]
             if extra:
@@ -597,15 +598,20 @@ def register_game_routes(
         remove_orphan_result_images(library)
         return found_video
 
+    def _is_archived_clip(game: dict, clip_id: str) -> bool:
+        cfg = current_config()
+        clip = find_clip(clips_dir_for(game), clip_id, resolve_paths(cfg.paths).clip_roots)
+        return clip is not None and clip.video.exists() and cats.is_user_archived(cfg, clip.video)
+
     def _drop_candidate(data: dict, candidate_id: str) -> None:
         for field in ("candidates", "userCandidates"):
             data[field] = [c for c in data.get(field) or [] if c.get("id") != candidate_id]
 
-    def _clear_saved_marks(key: str, *, only: str | None = None, dismiss: bool = False) -> None:
+    def _clear_saved_marks(key: str, *, only: str | None = None, dismiss: bool = False, keep: Collection[str] = ()) -> None:
         def change(data: dict) -> None:
             for cand in gcand.all_candidates(data):
                 user = cand.get("user") or {}
-                if only is not None and cand.get("id") != only or not user.get("savedClipId"):
+                if only is not None and cand.get("id") != only or not user.get("savedClipId") or cand.get("id") in keep:
                     continue
                 for field in ("savedClipId", "savedStart", "savedEnd"):
                     user.pop(field, None)
@@ -627,7 +633,7 @@ def register_game_routes(
 
     @app.post("/api/games/{key}/delete")
     def delete_game_files(key: str, body: GameDelete):
-        """풀영상·저장한 클립을 지운다. 게임 기록(결과·후보)은 남는다. 휴지통/영구는 `ui.deleteMode`."""
+        """풀영상·자동 보관 클립을 지운다(사용자가 보관한 클립은 남긴다). 게임 기록(결과·후보)은 남는다. 휴지통/영구는 `ui.deleteMode`."""
         if body.target not in ("fullVideo", "clips", "both", "all"):
             raise HTTPException(400, "target 은 fullVideo, clips, both, all 중 하나여야 합니다")
         game = load_or_404(key)
@@ -638,13 +644,18 @@ def register_game_routes(
             if body.target == "fullVideo" and not video.is_file():
                 raise HTTPException(409, "지울 풀영상이 없습니다")
             deleted_clips = 0
+            kept_ids: set[str] = set()
             if body.target in ("clips", "both", "all"):
                 for cand in gcand.all_candidates(game):
                     clip_id = (cand.get("user") or {}).get("savedClipId")
-                    if clip_id and _remove_saved_clip(game, clip_id, keep_record=body.target != "all"):
+                    if not clip_id:
+                        continue
+                    if body.target != "all" and _is_archived_clip(game, clip_id):
+                        kept_ids.add(cand["id"])
+                    elif _remove_saved_clip(game, clip_id, keep_record=body.target != "all"):
                         deleted_clips += 1
                 if body.target != "all":
-                    _clear_saved_marks(key)
+                    _clear_saved_marks(key, keep=kept_ids)
             deleted_full = False
             if body.target in ("fullVideo", "both") and video.is_file():
                 delete_full_video(folder, mode=current_config().ui.delete_mode)
@@ -653,7 +664,10 @@ def register_game_routes(
                 deleted_full = video.is_file()
                 _remove_game_entirely(game, folder)
         cleanup_preview_registry.notify_clips_changed()
-        return {"deletedFullVideo": deleted_full, "deletedClips": deleted_clips, "freedBytes": freed if deleted_full else 0}
+        return {
+            "deletedFullVideo": deleted_full, "deletedClips": deleted_clips, "keptClips": len(kept_ids),
+            "freedBytes": freed if deleted_full else 0,
+        }
 
     @app.post("/api/games/{key}/candidates/{candidate_id}/unsave")
     def unsave_candidate(key: str, candidate_id: str):

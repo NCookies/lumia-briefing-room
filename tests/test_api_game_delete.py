@@ -1,10 +1,16 @@
 import pytest
+from test_api_categories import KEY as CKEY
+from test_api_categories import client as cat_client  # noqa: F401  (카테고리 폴더가 있는 저장소)
+from test_api_categories import save as cat_save
+from test_api_categories import videos as cat_videos
 from test_api_games import KEY, client  # noqa: F401  (같은 게임 픽스처를 쓴다)
 
 
 @pytest.fixture(autouse=True)
-def permanent_delete(client):
-    client.put("/api/config", json={"ui": {"deleteMode": "permanent"}})
+def permanent_delete(request):
+    for name in ("client", "cat_client"):
+        if name in request.fixturenames:
+            request.getfixturevalue(name).put("/api/config", json={"ui": {"deleteMode": "permanent"}})
 
 
 def _game(client):
@@ -23,38 +29,78 @@ def test_deleting_only_the_full_video_keeps_clips_and_the_game_record(client):
     _save_all(client)
     resp = client.post(f"/api/games/{KEY}/delete", json={"target": "fullVideo"})
     assert resp.status_code == 200
-    assert resp.json() == {"deletedFullVideo": True, "deletedClips": 0, "freedBytes": 1000}
+    assert resp.json() == {"deletedFullVideo": True, "deletedClips": 0, "keptClips": 0, "freedBytes": 1000}
     game = _game(client)
     assert game["hasFullVideo"] is False and game["fullVideoDeletedAt"]
     assert all(c["user"].get("savedClipId") for c in game["candidates"])
     assert len(_clip_videos(client)) == 2
 
 
-def test_deleting_only_clips_keeps_the_full_video_and_clears_saved_marks(client):
-    _save_all(client)
-    resp = client.post(f"/api/games/{KEY}/delete", json={"target": "clips"})
+def _cat_game(client):
+    return client.get(f"/api/games/{CKEY}").json()
+
+
+def _save_auto(client, *ids):
+    for cid in ids:
+        cat_save(client, cid, category="자동 보관")
+
+
+def test_deleting_only_clips_keeps_the_full_video_and_clears_saved_marks(cat_client):
+    _save_auto(cat_client, "01", "02")
+    resp = cat_client.post(f"/api/games/{CKEY}/delete", json={"target": "clips"})
     assert resp.json()["deletedClips"] == 2 and resp.json()["deletedFullVideo"] is False
-    game = _game(client)
+    game = _cat_game(cat_client)
     assert game["hasFullVideo"] is True
     for cand in game["candidates"]:
         assert "savedClipId" not in cand["user"] and "savedStart" not in cand["user"]
-    assert _clip_videos(client) == []
-    assert client.get("/api/clips").json() == [] or client.get("/api/clips").json().get("clips") == []
+    assert cat_videos(cat_client, "자동 보관") == []
 
 
-def test_deleting_both(client):
-    _save_all(client)
-    resp = client.post(f"/api/games/{KEY}/delete", json={"target": "both"}).json()
+def test_deleting_both(cat_client):
+    _save_auto(cat_client, "01", "02")
+    resp = cat_client.post(f"/api/games/{CKEY}/delete", json={"target": "both"}).json()
     assert resp["deletedFullVideo"] is True and resp["deletedClips"] == 2
-    assert _game(client)["hasFullVideo"] is False and _clip_videos(client) == []
+    assert _cat_game(cat_client)["hasFullVideo"] is False and cat_videos(cat_client, "자동 보관") == []
 
 
-def test_deleting_a_missing_full_video_is_a_conflict_but_both_still_removes_clips(client):
-    _save_all(client)
-    client.post(f"/api/games/{KEY}/delete", json={"target": "fullVideo"})
-    assert client.post(f"/api/games/{KEY}/delete", json={"target": "fullVideo"}).status_code == 409
-    resp = client.post(f"/api/games/{KEY}/delete", json={"target": "both"})
+def test_deleting_a_missing_full_video_is_a_conflict_but_both_still_removes_clips(cat_client):
+    _save_auto(cat_client, "01", "02")
+    cat_client.post(f"/api/games/{CKEY}/delete", json={"target": "fullVideo"})
+    assert cat_client.post(f"/api/games/{CKEY}/delete", json={"target": "fullVideo"}).status_code == 409
+    resp = cat_client.post(f"/api/games/{CKEY}/delete", json={"target": "both"})
     assert resp.status_code == 200 and resp.json()["deletedFullVideo"] is False and resp.json()["deletedClips"] == 2
+
+
+def _seed_mixed(client):
+    cat_save(client, "01", category="자동 보관")
+    cat_save(client, "02", category="아야")
+    cat_save(client, "03")
+
+
+def test_clip_delete_removes_only_auto_archive_clips_and_keeps_the_user_archived_ones(cat_client):
+    _seed_mixed(cat_client)
+    resp = cat_client.post(f"/api/games/{CKEY}/delete", json={"target": "clips"}).json()
+    assert resp["deletedClips"] == 1 and resp["keptClips"] == 2
+    assert cat_videos(cat_client, "자동 보관") == []
+    assert cat_videos(cat_client, "아야") == [f"{CKEY}_02.mp4"] and cat_videos(cat_client, "보관함") == [f"{CKEY}_03.mp4"]
+    cands = {c["id"]: c["user"] for c in _cat_game(cat_client)["candidates"]}
+    assert "savedClipId" not in cands[f"{CKEY}_01"], "지운 클립의 표시만 뗀다"
+    assert cands[f"{CKEY}_02"]["savedClipId"] == f"{CKEY}_02" and cands[f"{CKEY}_03"]["savedClipId"] == f"{CKEY}_03"
+    assert cands[f"{CKEY}_02"]["archived"] is True
+
+
+def test_both_target_deletes_the_full_video_and_auto_clips_but_keeps_archived_ones(cat_client):
+    _seed_mixed(cat_client)
+    resp = cat_client.post(f"/api/games/{CKEY}/delete", json={"target": "both"}).json()
+    assert resp["deletedFullVideo"] is True and resp["deletedClips"] == 1
+    assert len(cat_videos(cat_client, "아야")) == 1 and len(cat_videos(cat_client, "보관함")) == 1
+
+
+def test_legacy_layout_clips_are_all_treated_as_archived_and_survive_clip_delete(client):
+    _save_all(client)
+    resp = client.post(f"/api/games/{KEY}/delete", json={"target": "clips"}).json()
+    assert resp["deletedClips"] == 0 and resp["keptClips"] == 2 and len(_clip_videos(client)) == 2
+    assert all(c["user"].get("savedClipId") for c in _game(client)["candidates"])
 
 
 def test_clips_that_were_already_removed_elsewhere_are_just_unmarked(client):

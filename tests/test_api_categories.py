@@ -194,7 +194,7 @@ def test_game_list_counts_only_archived_clips_not_auto_archive_ones(client):
     save(client, "02", category="자동 보관")
     save(client, "03", category="자동 보관")
     (game,) = client.get("/api/games").json()["games"]
-    assert game["savedClipCount"] == 1
+    assert game["savedClipCount"] == 1 and game["autoClipCount"] == 2
 
 
 def test_unsaved_candidates_have_no_archive_flag(client):
