@@ -42,7 +42,11 @@ const targetInfo = (t: EventTarget | null): TargetInfo | null => {
 
 const SAVING = '저장 중…'
 
-const LEGEND_HELP = '다시 저장을 눌러야 새 범위가 반영됩니다'
+const LEGEND_HELP = [
+  '노란 구간: 앱이 찾은 교전 후보입니다. 선택하면 양 끝 손잡이를 끌어 범위를 바꿀 수 있습니다.',
+  '다시 저장을 눌러야 새 범위가 반영됩니다.',
+  '막대 눈금: 초록 킬 · 파랑 어시 · 빨강 사망 · 주황 팀원 사망',
+].join('\n')
 
 const BTN =
   'rounded-md border border-zinc-600/70 bg-zinc-800/60 px-2.5 py-1 text-sm text-zinc-200 transition hover:bg-zinc-700 hover:text-white active:scale-95 disabled:opacity-40 disabled:hover:bg-zinc-800/60'
@@ -719,7 +723,7 @@ export function GameViewer({
                   ? `선택: ${candidateTitle(selectedCand)}`
                   : '막대의 노란 구간을 눌러 선택'}
               </span>
-              <HelpTip label="저장 안내" hover alignRight text={LEGEND_HELP} />
+              <HelpTip label="막대 보는 법" hover alignRight wide text={LEGEND_HELP} />
               </span>
             </div>
           </div>
