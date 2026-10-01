@@ -5,11 +5,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from lumia_briefing_room.config import Config
+from lumia_briefing_room.config import Config, PathsConfig
 from lumia_briefing_room.pipeline.playerlog import MatchBoundary
 from lumia_briefing_room.pipeline.reprocess import (
     GameRef,
     ReprocessError,
+    clear_saved_marks,
     find_match_end,
     reprocess_game,
 )
@@ -26,6 +27,16 @@ def write_clip(root: Path, clip_id: str, *, start=REF.match_start, **meta):
     data = {"title": clip_id, "sessionDir": REF.session_name, "matchStartUtc": start, "thumbnailPath": None,
             **meta}
     (root / f"{clip_id}.json").write_text(json.dumps(data), encoding="utf-8")
+
+
+def cat_cfg(tmp_path: Path) -> Config:
+    """카테고리 폴더 저장소 - `clips_root` 가 `tmp_path/clips` 라서 그 바로 밑 영상은 `자동 보관`처럼(보관한 게 아닌 것으로) 본다."""
+    return Config(paths=PathsConfig(root=tmp_path))
+
+
+def move_to_category(clips: Path, clip_id: str, category: str) -> None:
+    (clips / category).mkdir(exist_ok=True)
+    (clips / f"{clip_id}.mp4").rename(clips / category / f"{clip_id}.mp4")
 
 
 def make_recording(tmp_path: Path, *, first_segment=1, last_segment=700) -> Path:
@@ -46,7 +57,8 @@ def call(tmp_path, *, process, boundaries=None, root=None, cfg=None, **kw):
         clips_dir=tmp_path / "clips", ref=REF,
         recording_root=root or make_recording(tmp_path), boundaries=boundaries if boundaries is not None
         else [MatchBoundary(start_utc=START, end_utc=END)],
-        cfg=cfg or Config(), ffmpeg_path=Path("ffmpeg"), process=process, load_session=fake_session, **kw,
+        cfg=cfg or cat_cfg(tmp_path), ffmpeg_path=Path("ffmpeg"), process=process, load_session=fake_session,
+        video_roots=[tmp_path / "clips"], **kw,
     )
 
 
@@ -72,7 +84,7 @@ def test_reprocess_writes_new_clips_into_a_staging_dir_then_deletes_old_ones_on_
         write_clip(clips_dir, "a_01", title="새 클립")
         return [clips_dir / "a_01.json"]
 
-    written = call(tmp_path, process=process, cfg=Config())
+    written = call(tmp_path, process=process)
 
     assert written == [clips / "a_01.json"]
     assert calls[0][0] == START and calls[0][1] == END
@@ -218,7 +230,7 @@ def test_reprocess_keeps_the_new_clips_when_label_migration_itself_fails(tmp_pat
 def test_reprocess_permanent_mode_deletes_old_clip_files(tmp_path):
     clips = tmp_path / "clips"
     write_clip(clips, "a_01")
-    cfg = Config()
+    cfg = cat_cfg(tmp_path)
     cfg.ui.delete_mode = "permanent"
 
     def process(session, start, end, cfg, *, ffmpeg_path, clips_dir):
@@ -237,7 +249,7 @@ def test_reprocess_recycle_mode_sends_old_clip_files_to_recycle_bin(tmp_path, mo
     write_clip(clips, "a_01")
     sent = []
     monkeypatch.setattr(delete_helper, "_send2trash", lambda path: sent.append(Path(path).name))
-    cfg = Config()
+    cfg = cat_cfg(tmp_path)
     cfg.ui.delete_mode = "recycle"
 
     def process(session, start, end, cfg, *, ffmpeg_path, clips_dir):
@@ -257,15 +269,14 @@ def test_find_match_end_also_matches_clips_made_before_the_boundary_was_widened(
     assert find_match_end(START - timedelta(seconds=80), [boundary]) == END
 
 
-def test_reprocess_splits_info_and_video_and_replaces_old_video_wherever_it_is(tmp_path, monkeypatch):
+def test_reprocess_splits_info_and_video_and_replaces_old_auto_video_wherever_it_is(tmp_path, monkeypatch):
     from lumia_briefing_room.pipeline import delete_helper
 
     monkeypatch.setattr(delete_helper, "_send2trash", lambda p: Path(p).unlink())
-    lib, videos = tmp_path / "lib", tmp_path / "videos"
+    lib, videos = tmp_path / "lib", tmp_path / "clips"
     write_clip(lib, "a_01")
-    (lib / "a_01.mp4").rename(tmp_path / "moved_a_01.mp4")
-    (videos / "캐릭터").mkdir(parents=True)
-    (tmp_path / "moved_a_01.mp4").rename(videos / "캐릭터" / "a_01.mp4")
+    (videos / "자동 보관" / "하위").mkdir(parents=True)
+    (lib / "a_01.mp4").rename(videos / "자동 보관" / "하위" / "a_01.mp4")
 
     def process(session, start, end, cfg, *, ffmpeg_path, clips_dir):
         write_clip(clips_dir, "a_01", title="새 클립")
@@ -273,13 +284,97 @@ def test_reprocess_splits_info_and_video_and_replaces_old_video_wherever_it_is(t
 
     written = reprocess_game(
         clips_dir=lib, ref=REF, recording_root=make_recording(tmp_path),
-        boundaries=[MatchBoundary(start_utc=START, end_utc=END)], cfg=Config(), ffmpeg_path=Path("ffmpeg"),
-        process=process, load_session=fake_session, video_dir=videos, video_roots=[videos],
+        boundaries=[MatchBoundary(start_utc=START, end_utc=END)], cfg=cat_cfg(tmp_path), ffmpeg_path=Path("ffmpeg"),
+        process=process, load_session=fake_session, video_dir=videos / "자동 보관", video_roots=[videos],
         staging_root=videos / ".staging",
     )
 
     assert written == [lib / "a_01.json"]
-    assert (videos / "a_01.mp4").read_bytes() == b"old-a_01" and not (lib / "a_01.mp4").exists()
-    assert not (videos / "캐릭터" / "a_01.mp4").exists(), "옛 영상은 사용자가 옮긴 자리에서 지운다"
+    assert (videos / "자동 보관" / "a_01.mp4").read_bytes() == b"old-a_01" and not (lib / "a_01.mp4").exists()
+    assert not (videos / "자동 보관" / "하위" / "a_01.mp4").exists(), "옛 영상은 있던 자리에서 지운다"
     assert json.loads((lib / "a_01.json").read_text(encoding="utf-8"))["title"] == "새 클립"
     assert not (videos / ".staging").exists() or not list((videos / ".staging").iterdir())
+
+
+def _kept_and_auto(tmp_path):
+    """a_01 은 자동 보관(영상이 clips 바로 밑), a_02(300~330초)는 사용자가 `보관함` 에 둔 것."""
+    clips = tmp_path / "clips"
+    write_clip(clips, "a_01", videoOffsetSec=100.0, durationSec=30.0)
+    write_clip(clips, "a_02", videoOffsetSec=300.0, durationSec=30.0)
+    move_to_category(clips, "a_02", "보관함")
+    return clips
+
+
+def _process_overlapping_the_kept_clip(session, start, end, cfg, *, ffmpeg_path, clips_dir):
+    write_clip(clips_dir, "n_01", videoOffsetSec=310.0, durationSec=20.0)
+    write_clip(clips_dir, "n_02", videoOffsetSec=900.0, durationSec=20.0)
+    (clips_dir / ".thumbs").mkdir(exist_ok=True)
+    (clips_dir / ".thumbs" / "n_01.jpg").write_bytes(b"t")
+    return [clips_dir / "n_01.json", clips_dir / "n_02.json"]
+
+
+def test_reprocess_keeps_user_archived_clips_replaces_auto_ones_and_skips_new_clips_overlapping_kept(tmp_path):
+    clips = _kept_and_auto(tmp_path)
+    dropped = []
+
+    written = call(tmp_path, process=_process_overlapping_the_kept_clip, on_dropped=dropped.extend)
+
+    assert (clips / "보관함" / "a_02.mp4").read_bytes() == b"old-a_02" and (clips / "a_02.json").exists(), "보관한 클립은 그대로"
+    assert not (clips / "a_01.json").exists() and not (clips / "a_01.mp4").exists(), "자동 보관 클립은 지금처럼 교체된다"
+    assert written == [clips / "n_02.json"] and (clips / "n_02.mp4").exists()
+    assert not (clips / "n_01.json").exists() and not (clips / "n_01.mp4").exists() and not (clips / ".thumbs" / "n_01.jpg").exists()
+    assert dropped == ["n_01"]
+    assert not any((clips / ".staging").glob("**/*")) if (clips / ".staging").exists() else True
+
+
+def test_reprocess_never_overwrites_a_kept_clip_with_a_new_clip_of_the_same_id(tmp_path):
+    clips = _kept_and_auto(tmp_path)
+
+    def process(session, start, end, cfg, *, ffmpeg_path, clips_dir):
+        write_clip(clips_dir, "a_02", title="새 클립", videoOffsetSec=900.0, durationSec=20.0)
+        return [clips_dir / "a_02.json"]
+
+    dropped = []
+    written = call(tmp_path, process=process, on_dropped=dropped.extend)
+
+    assert written == [] and dropped == ["a_02"]
+    assert json.loads((clips / "a_02.json").read_text(encoding="utf-8"))["title"] == "a_02"
+    assert (clips / "보관함" / "a_02.mp4").read_bytes() == b"old-a_02"
+
+
+def test_reprocess_in_the_legacy_layout_keeps_every_old_clip_and_adds_only_non_overlapping_new_ones(tmp_path):
+    clips = tmp_path / "clips"
+    write_clip(clips, "a_01", videoOffsetSec=100.0, durationSec=30.0)
+    write_clip(clips, "a_02", videoOffsetSec=300.0, durationSec=30.0)
+
+    written = call(tmp_path, process=_process_overlapping_the_kept_clip, cfg=Config())
+
+    assert (clips / "a_01.json").exists() and (clips / "a_02.json").exists()
+    assert (clips / "a_01.mp4").exists() and (clips / "a_02.mp4").exists()
+    assert written == [clips / "n_02.json"] and not (clips / "n_01.json").exists()
+
+
+def test_reprocess_with_only_user_archived_old_clips_still_adds_new_non_overlapping_ones(tmp_path):
+    clips = tmp_path / "clips"
+    write_clip(clips, "a_02", videoOffsetSec=300.0, durationSec=30.0)
+    move_to_category(clips, "a_02", "보관함")
+
+    written = call(tmp_path, process=_process_overlapping_the_kept_clip)
+
+    assert (clips / "a_02.json").exists() and written == [clips / "n_02.json"]
+
+
+def test_clear_saved_marks_unlinks_only_the_candidates_of_the_dropped_clips():
+    data = {
+        "candidates": [
+            {"id": "c1", "user": {"savedClipId": "n_01", "savedStart": 1.0, "savedEnd": 2.0, "pinned": True}},
+            {"id": "c2", "user": {"savedClipId": "a_02", "savedStart": 3.0, "savedEnd": 4.0}},
+        ],
+        "userCandidates": [{"id": "u1", "user": {"savedClipId": "n_01"}}],
+    }
+
+    clear_saved_marks(data, ["n_01"])
+
+    assert data["candidates"][0]["user"] == {"pinned": True}
+    assert data["candidates"][1]["user"]["savedClipId"] == "a_02", "남긴 클립과의 연결은 유지한다"
+    assert data["userCandidates"][0]["user"] == {}

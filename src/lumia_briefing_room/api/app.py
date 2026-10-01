@@ -73,7 +73,9 @@ from lumia_briefing_room.pipeline.legacy_trash import count_legacy_trash, recycl
 from lumia_briefing_room.pipeline.move_clips import MoveError, execute_move, plan_move
 from lumia_briefing_room.pipeline.proxy import create_proxy, is_proxy_fresh, proxy_file, remove_orphan_proxies
 from lumia_briefing_room.pipeline.proxy_queue import DIRECT, PREFETCH, PriorityGate, Ticket
-from lumia_briefing_room.pipeline.reprocess import GameRef, ReprocessError, reprocess_game
+from lumia_briefing_room.pipeline.game_files import GameNotFound, update_game
+from lumia_briefing_room.pipeline.game_store import game_key as store_game_key
+from lumia_briefing_room.pipeline.reprocess import GameRef, ReprocessError, clear_saved_marks, reprocess_game
 from lumia_briefing_room.pipeline.trim import split_clip, trim_clip, validate_range, validate_ranges
 from lumia_briefing_room.steam_paths import resolve_recording_root
 
@@ -632,11 +634,20 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         key = f"{ref.session_name}|{ref.match_start}"
         clips_dir = _clips_dir(app)
         resolved_paths = resolve_paths(cfg.paths)
+        match_start = None
         try:
             match_start = datetime.fromisoformat(ref.match_start.replace("Z", "+00:00"))
             label = f"게임 다시 분석 중 ({match_start.astimezone().strftime('%m/%d %H:%M')} 시작)"
         except ValueError:
             label = "게임 다시 분석 중"
+
+        def forget_dropped(clip_ids: list[str]) -> None:
+            if match_start is None:
+                return
+            try:
+                update_game(resolved_paths.games_steam, store_game_key(match_start), lambda data: clear_saved_marks(data, clip_ids))
+            except (GameNotFound, ValueError, OSError):
+                logging.getLogger("lumia_briefing_room").warning("만들지 않은 클립의 저장됨 표시를 떼지 못했다: %s", key, exc_info=True)
 
         def run(job: dict) -> None:
             job.update(state="running")
@@ -646,7 +657,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
                         clips_dir=clips_dir, ref=ref, recording_root=recording_root,
                         boundaries=read_boundaries(cfg), cfg=cfg, ffmpeg_path=ffmpeg, guard=lock,
                         video_dir=resolved_paths.clips_steam, video_roots=resolved_paths.clip_roots,
-                        staging_root=resolved_paths.staging_clips,
+                        staging_root=resolved_paths.staging_clips, on_dropped=forget_dropped,
                     )
                 job.update(state="done", clips=len(written))
             except ReprocessError as e:

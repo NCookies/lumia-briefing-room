@@ -21,7 +21,7 @@ MIN_OVERLAP_SEC = 3.0
 MIN_CARRY_SHARE = 0.5
 
 
-def _overlap(a: dict, b: dict) -> float:
+def overlap(a: dict, b: dict) -> float:
     a0, a1 = a["videoOffsetSec"], a["videoOffsetSec"] + a["durationSec"]
     b0, b1 = b["videoOffsetSec"], b["videoOffsetSec"] + b["durationSec"]
     return max(0.0, min(a1, b1) - max(a0, b0))
@@ -40,7 +40,7 @@ def _trusted(new: dict, hits: list[dict]) -> list[dict]:
         return hits
     return [
         o for o in hits
-        if o["userLabel"] != "pvp" or _overlap(new, o) >= MIN_CARRY_SHARE * o["durationSec"]
+        if o["userLabel"] != "pvp" or overlap(new, o) >= MIN_CARRY_SHARE * o["durationSec"]
     ]
 
 
@@ -48,7 +48,7 @@ def migrate_label(new: dict, olds: list[dict]) -> tuple[str | None, bool, list[s
     origin = _origin(new)
     hits = [
         o for o in olds
-        if o.get("userLabel") and origin is not None and _origin(o) == origin and _overlap(new, o) >= MIN_OVERLAP_SEC
+        if o.get("userLabel") and origin is not None and _origin(o) == origin and overlap(new, o) >= MIN_OVERLAP_SEC
     ]
     hits = _trusted(new, hits)
     if not hits:
