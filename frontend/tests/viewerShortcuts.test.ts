@@ -40,6 +40,12 @@ test('기존 단축키는 그대로 풀린다', () => {
   assert.equal(action('z', { ctrl: true }), 'undo')
 })
 
+test('Ctrl+Y 는 다시 실행이다(한글 자판 포함)', () => {
+  assert.equal(action('y', { ctrl: true }), 'redo')
+  assert.equal(action('ㅛ', { code: 'KeyY', ctrl: true }), 'redo')
+  assert.equal(action('y'), null)
+})
+
 test('대문자(Shift·CapsLock)로 눌러도 같은 단축키다', () => {
   assert.equal(action('N'), 'nextClip')
   assert.equal(action('P', { shift: true }), 'prevClip')
@@ -120,6 +126,6 @@ test('키 이름 표기', () => {
 
 test('안내 표에는 새 단축키와 창 안의 키가 모두 있고 이동 간격이 코드 상수와 같다', () => {
   const text = SHORTCUT_GROUPS.flatMap((g) => g.rows.map((r) => `${r.keys} ${r.desc}`)).join('\n')
-  for (const need of ['Space', 'Ctrl\\+←', 'Ctrl\\+→', 'Delete', 'Ctrl\\+S', 'M', 'Ctrl\\+Enter', 'Ctrl\\+Z', 'Esc']) assert.match(text, new RegExp(need))
+  for (const need of ['Space', 'Ctrl\\+←', 'Ctrl\\+→', 'Delete', 'Ctrl\\+S', 'M', 'Ctrl\\+Enter', 'Ctrl\\+Z', 'Ctrl\\+Y', 'Esc']) assert.match(text, new RegExp(need))
   assert.match(text, new RegExp(`${SEEK_STEP_SEC}초`))
 })

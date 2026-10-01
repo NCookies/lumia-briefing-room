@@ -13,6 +13,7 @@ export type ViewerAction =
   | 'markStart'
   | 'markEnd'
   | 'undo'
+  | 'redo'
   | 'memo'
   | 'help'
 
@@ -39,6 +40,7 @@ export const VIEWER_SHORTCUTS: Shortcut[] = [
   { action: 'markStart', combos: [{ key: 'i' }], desc: '선택한 클립의 시작을 지금 위치로', group: '범위 편집' },
   { action: 'markEnd', combos: [{ key: 'o' }], desc: '선택한 클립의 끝을 지금 위치로', group: '범위 편집' },
   { action: 'undo', combos: [{ key: 'z', ctrl: true }], desc: '되돌리기', group: '범위 편집' },
+  { action: 'redo', combos: [{ key: 'y', ctrl: true }], desc: '다시 실행(되돌린 것을 되살리기)', group: '범위 편집' },
   { action: 'archive', combos: [{ key: 's' }], desc: '선택한 클립 보관(보관한 클립은 고친 범위 다시 저장)', group: '선택한 클립' },
   { action: 'archivePopup', combos: [{ key: 's', ctrl: true }], desc: '보관 위치 고르기(보관한 클립의 범위를 고쳤으면 먼저 저장)', group: '선택한 클립' },
   { action: 'dismiss', combos: [{ key: 'd' }], desc: '무시(직접 추가한 구간은 삭제)', group: '선택한 클립' },

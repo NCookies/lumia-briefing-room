@@ -14,6 +14,7 @@ import {
 import { patchClip } from '../api'
 import { useConfirm } from '../confirmContext'
 import { moveClipsToCategory } from '../categoriesApi'
+import { EMPTY_HISTORY, pushEdit, redoStep, remapId, undoStep, type Edit } from '../editHistory'
 import { applyMark, candidateAtTime, newRangeAround, rangeModified, zoomBy, zoomView, type View } from '../playerBar'
 import { loadVolume, saveVolume, type VolumeState } from '../volume'
 import { isLegacyWithoutVideo } from '../legacyGame'
@@ -37,8 +38,6 @@ const targetInfo = (t: EventTarget | null): TargetInfo | null => {
   const el = t as HTMLElement | null
   return el && el.tagName ? { tag: el.tagName, type: (el as HTMLInputElement).type, editable: el.isContentEditable } : null
 }
-
-type Undo = { kind: 'range'; id: string; prev: [number, number] } | { kind: 'add'; id: string } | { kind: 'dismiss'; id: string }
 
 const SAVING = '저장 중…'
 
@@ -77,7 +76,7 @@ export function GameViewer({
   const [time, setTime] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [zoomWindow, setZoomWindow] = useState<View | null>(null)
-  const [undo, setUndo] = useState<Undo[]>([])
+  const [history, setHistory] = useState(EMPTY_HISTORY)
   const [overrides, setOverrides] = useState<Record<string, [number, number]>>({})
   const [vol, setVol] = useState<VolumeState>(loadVolume)
   const [fullscreen, setFullscreen] = useState(false)
@@ -209,7 +208,7 @@ export function GameViewer({
 
   const commitRange = (id: string, next: [number, number], prev: [number, number]) => {
     const saved = cands.find((c) => c.id === id)
-    setRange(id, next, () => setUndo((u) => [...u, { kind: 'range', id, prev }]))
+    setRange(id, next, () => setHistory((h) => pushEdit(h, { kind: 'range', id, prev, next })))
     setNotice(
       saved && isSaved(saved)
         ? '범위를 수정했습니다 — 보관한 클립은 "다시 저장"을 눌러야 새 범위로 바뀝니다'
@@ -225,14 +224,33 @@ export function GameViewer({
   }
 
   const undoLast = () => {
-    const last = undo[undo.length - 1]
-    if (!last || busy) return
-    setUndo((u) => u.slice(0, -1))
+    const step = busy ? null : undoStep(history)
+    if (!step) return
+    setHistory(step.history)
+    const last = step.edit
     if (last.kind === 'range') setRange(last.id, last.prev)
     else if (last.kind === 'dismiss') void run(() => patchCandidate(gameKey, last.id, { dismissed: false }), '무시한 후보를 되살렸습니다')
     else {
       setSelected(null)
       void run(() => deleteCandidate(gameKey, last.id))
+    }
+  }
+
+  const redoLast = () => {
+    const step = busy ? null : redoStep(history)
+    if (!step) return
+    setHistory(step.history)
+    const next: Edit = step.edit
+    if (next.kind === 'range') setRange(next.id, next.next)
+    else if (next.kind === 'dismiss') {
+      setSelected((sel) => (sel === next.id ? null : sel))
+      void run(() => patchCandidate(gameKey, next.id, { dismissed: true }), '무시했습니다')
+    } else {
+      void run(async () => {
+        const created = await addCandidate(gameKey, next.range[0], next.range[1])
+        setHistory((h) => remapId(h, next.id, created.id))
+        setSelected(created.id)
+      })
     }
   }
 
@@ -242,7 +260,7 @@ export function GameViewer({
     void run(async () => {
       const created = await addCandidate(gameKey, s, e)
       setSelected(created.id)
-      setUndo((u) => [...u, { kind: 'add', id: created.id }])
+      setHistory((h) => pushEdit(h, { kind: 'add', id: created.id, range: [s, e] }))
     }, '직접 구간을 추가했습니다 — 손잡이나 I/O 로 다듬으세요')
   }
 
@@ -270,7 +288,7 @@ export function GameViewer({
     setSelected((sel) => (sel === c.id ? null : sel))
     void run(async () => {
       await patchCandidate(gameKey, c.id, { dismissed: true })
-      setUndo((u) => [...u, { kind: 'dismiss', id: c.id }])
+      setHistory((h) => pushEdit(h, { kind: 'dismiss', id: c.id }))
     }, '후보를 무시했습니다 — Ctrl+Z 로 되돌릴 수 있습니다')
   }
 
@@ -396,6 +414,8 @@ export function GameViewer({
         return mark('end')
       case 'undo':
         return undoLast()
+      case 'redo':
+        return redoLast()
       case 'memo':
         return toggleMemo()
       case 'help':
@@ -621,8 +641,11 @@ export function GameViewer({
                   : '막대에서 노란 구간을 누르면 선택됩니다. 초록 킬 · 파랑 어시 · 빨강 사망 · 주황 팀원 사망'}
               </span>
               <div className="flex shrink-0 items-center gap-1 text-white">
-                <button type="button" disabled={undo.length === 0 || busy} className={BTN} title="되돌리기 (Ctrl+Z)" onClick={undoLast}>
+                <button type="button" disabled={history.undo.length === 0 || busy} className={BTN} title="되돌리기 (Ctrl+Z)" onClick={undoLast}>
                   되돌리기
+                </button>
+                <button type="button" disabled={history.redo.length === 0 || busy} className={BTN} title="다시 실행 (Ctrl+Y)" onClick={redoLast}>
+                  다시 실행
                 </button>
                 <button type="button" disabled={!zoomWindow} className={`${BTN} flex items-center`} title="배율 축소" onClick={() => zoomStep(2)}>
                   <ZoomOutIcon />
