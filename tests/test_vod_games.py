@@ -187,3 +187,26 @@ def test_selection_cluster_marked_practice_marks_the_game_as_practice():
 def test_normal_selection_is_not_practice():
     (game,) = split_games(_game_with_selection([(500.0, 600.0)], (624.0, 1900.0), step=3.0))
     assert game.practice is False
+
+
+def test_lobby_frames_misread_as_day_icon_do_not_stretch_the_game_end_past_the_result_screen():
+    """실측(2026-10-01, 치지직 1080p 게임 11): 결과 화면(15562초) 뒤 로비 그림이 낮/밤 아이콘으로 세 장 읽혀 게임 끝이 15589초로
+    늘어났고, 결과 탐색이 게임 끝 뒤부터라 결과 화면을 놓쳤다."""
+    game = [fs(t, day=4) for t in range(100, 558)]
+    lobby = [fs(t, ingame=False) for t in range(558, 600)]
+    for i, s in enumerate(lobby):
+        if s.t in (580, 587, 589):
+            lobby[i] = FrameState(
+                t=s.t, combat=None, face_value=None, face_sat=None, k=None, a=None,
+                day_night="day", spectating=True, game_day=None,
+            )
+
+    games = split_games(game + lobby)
+
+    assert [(g.start, g.end) for g in games] == [(100.0, 557.0)]
+
+
+def test_a_game_read_only_from_the_day_icon_keeps_its_end():
+    states = [fs(t, day=None) for t in range(100, 300)]
+
+    assert [(g.start, g.end) for g in split_games(states)] == [(100.0, 299.0)]

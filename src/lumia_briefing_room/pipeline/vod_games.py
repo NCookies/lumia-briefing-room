@@ -37,6 +37,24 @@ def is_ingame(state: FrameState) -> bool:
     )
 
 
+def _strong_ingame(state: FrameState) -> bool:
+    """낮/밤 아이콘만으로는 약하다 - 로비 그림이 아이콘으로 읽히는 프레임이 있다(2026-10-01 치지직 1080p)."""
+    return (
+        state.game_day is not None
+        or state.cobalt_phase is not None
+        or (state.k is not None and state.spectating is False)
+    )
+
+
+def _trim_weak_tail(piece: list[FrameState]) -> list[FrameState]:
+    """게임 끝은 확실한 인게임 신호가 마지막으로 읽힌 프레임이다. 그런 프레임이 하나도 없으면 그대로 둔다.
+
+    결과 탐색이 게임 끝 뒤부터라, 결과 화면 뒤 로비가 아이콘으로 잘못 읽혀 끝이 늘어나면 결과 화면을 지나친다.
+    """
+    last = next((i for i in range(len(piece) - 1, -1, -1) if _strong_ingame(piece[i])), None)
+    return piece if last is None else piece[: last + 1]
+
+
 def _runs(states: list[FrameState], max_gap_sec: float) -> list[list[FrameState]]:
     runs: list[list[FrameState]] = []
     current: list[FrameState] | None = None
@@ -87,7 +105,7 @@ def split_games(
     pieces: list[list[FrameState]] = []
     for run in _runs(states, max_gap_sec):
         bounds = [0, *_split_points_by_day(run), len(run)]
-        pieces.extend(run[a:b] for a, b in zip(bounds, bounds[1:]))
+        pieces.extend(_trim_weak_tail(run[a:b]) for a, b in zip(bounds, bounds[1:]))
 
     games: list[GameSpan] = []
     prev_end = float("-inf")

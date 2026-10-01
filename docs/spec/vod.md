@@ -45,7 +45,7 @@
 ## 4. 분석 (`pipeline/vod_analyze.py::analyze_vod`)
 
 1. **프레임 판독 → 캐시**(`VodFileSource`, 키프레임만). 일정 간격 체크포인트라 취소·앱 종료·오류 뒤 이어서 한다.
-2. **게임 분할**(`vod_games.split_games`): 인게임 = 일차·낮밤이 읽히거나, 관전 아닌 채 K 가 읽히거나, **`cobalt_phase` 가 읽히는** 프레임. 인게임이 `vod.gameGapSec`(30초) 이내로 이어지면 한 게임, 일차가 2 이상에서 1 로 5프레임 연속 돌아가면 새 게임, `vod.minGameSec`(60초) 미만은 게임 아님. 못 나누면 버리지 않고 확신도만 낮춘다. 관전 화면은 게임 안으로 본다.
+2. **게임 분할**(`vod_games.split_games`): 인게임 = 일차·낮밤이 읽히거나, 관전 아닌 채 K 가 읽히거나, **`cobalt_phase` 가 읽히는** 프레임. 인게임이 `vod.gameGapSec`(30초) 이내로 이어지면 한 게임, 일차가 2 이상에서 1 로 5프레임 연속 돌아가면 새 게임, `vod.minGameSec`(60초) 미만은 게임 아님. 못 나누면 버리지 않고 확신도만 낮춘다. 관전 화면은 게임 안으로 본다. **게임 끝은 확실한 신호(일차·Phase·관전 아닌 K)가 마지막으로 읽힌 프레임**이다 - 낮/밤 아이콘만 읽힌 꼬리는 자른다. 결과 화면 뒤 로비 그림이 아이콘으로 읽혀 끝이 결과 화면 뒤로 늘어나면, 결과 탐색(게임 끝 뒤부터)이 결과 화면을 지나친다(치지직 1080p 게임 11).
 3. **게임별 결과 화면**(`vod_result.scan_game_end`): 게임 끝 근처 키프레임만 OCR(전 프레임 OCR 은 너무 비싸다). 결과 화면이 잡히면 그 앞 3초~뒤 12초를, 못 잡으면 게임 끝 직후 30초를 초당 2장으로 전부 디코딩(`VodFileSource(fps=2)`)해 다수결로 정한다([detection.md §8](detection.md)). 스트리머가 결과 화면을 안 보면 비운다.
 4. **게임별 검출**(`vod_detect.detect_games`): 게임마다 `finalize_match`.
 5. **게임 풀영상**(`vod_full_games.py`): 게임마다 원본에서 `-c copy` 로 `games/vod_<vodId>_g<번호>/full.mp4` + `game.json`(스팀 게임과 같은 형식, `source:"vod"`·`vodId`·`vodStartSec/EndSec`(원본 안 위치)·`spanStartSec/EndSec`(인게임 구간)). 후보·마커 시각은 풀영상 기준 초(0 = `vodStartSec`).
