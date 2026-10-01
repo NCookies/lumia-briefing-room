@@ -188,6 +188,16 @@ def test_chip_falls_back_to_binarized_when_plain_upscale_reads_nothing():
     assert (result.match_type, result.match_label) == ("rank", "랭크 대전")
 
 
+def test_chip_text_without_hangul_is_garbage_not_a_normal_game():
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+
+    retried = read_result_screen(blank_frame(profile), profile, ChipSequenceReader([[line("{0", 5)], [line("랭크 대전", 5)]]))
+    unread = read_result_screen(blank_frame(profile), profile, ChipSequenceReader([[line("{0", 5)], [line("l0", 5)]]))
+
+    assert (retried.match_type, retried.match_label) == ("rank", "랭크 대전")
+    assert (unread.match_type, unread.match_label) == ("unknown", "")
+
+
 UNREADABLE_RANK_PANEL = [
     line("L/E", 41, 0.81),
     line("실험 종료", 225, 0.99),

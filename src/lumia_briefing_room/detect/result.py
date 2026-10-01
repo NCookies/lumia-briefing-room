@@ -155,11 +155,14 @@ def _upscale(rgb: np.ndarray) -> np.ndarray:
 
 
 def read_chip(chip: np.ndarray, reader: TextReader) -> str:
-    """모드 칩 글자. 그냥 3배 확대가 먼저(실측: 이진화보다 훨씬 잘 읽힌다), 못 읽으면 이진화(파란 랭크 칩용)."""
+    """모드 칩 글자. 그냥 3배 확대가 먼저(실측: 이진화보다 훨씬 잘 읽힌다), 못 읽으면 이진화(파란 랭크 칩용).
+
+    한글이 없는 글자(`{0` 등)는 못 읽은 것으로 본다 - 아니면 랭크 칩이 일반 게임으로 저장된다(2026-10-01 치지직).
+    """
     for prepare in (_upscale, _binarize_dark_on_light):
         lines = reader.read(prepare(chip))
         text = " ".join(l.text.strip() for l in lines if l.score >= 0.8)
-        if text:
+        if _HANGUL.search(text):
             return text
     return ""
 
