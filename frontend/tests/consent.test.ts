@@ -36,8 +36,8 @@ test('isPending checks the pending item list', () => {
   assert.equal(isPending(['setup'], 'update'), false)
 })
 
-test('labeling UI shows only in dev mode, even when label sending is on', () => {
-  assert.equal(showLabelingUi('dev'), true)
+test('labeling UI is hidden in every mode until the labeling redesign', () => {
+  assert.equal(showLabelingUi('dev'), false)
   assert.equal(showLabelingUi('release'), false)
 })
 

@@ -3,6 +3,7 @@ import type { Clip } from '../types'
 
 interface Props {
   clip: Clip | undefined
+  size?: 'md' | 'sm'
 }
 
 const SLOTS: { slot: PortraitSlot; label: string; hasPath: (clip: Clip) => boolean }[] = [
@@ -12,13 +13,13 @@ const SLOTS: { slot: PortraitSlot; label: string; hasPath: (clip: Clip) => boole
 ]
 
 /** 게임 행의 캐릭터 표시: 이름 텍스트 대신 캐릭터 선택 화면 초상화 3장(SPEC §2.10, plan-ui.md §0). */
-export function PortraitRow({ clip }: Props) {
+export function PortraitRow({ clip, size = 'md' }: Props) {
   return (
     <div className="flex gap-1">
       {SLOTS.map(({ slot, label, hasPath }) => (
         <div
           key={slot}
-          className="aspect-[157/77] h-10 shrink-0 overflow-hidden rounded-md border border-zinc-700 bg-zinc-900"
+          className={`aspect-[157/77] ${size === 'sm' ? 'h-7' : 'h-10'} shrink-0 overflow-hidden rounded-md border border-zinc-700 bg-zinc-900`}
           title={label}
         >
           {clip && hasPath(clip) && (

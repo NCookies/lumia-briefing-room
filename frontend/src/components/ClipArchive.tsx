@@ -3,7 +3,6 @@ import { patchClip, splitClip, thumbnailUrl, trimClip } from '../api'
 import { cardHeadline, filterClips, formatWhen, sortedForCategory } from '../clipArchive'
 import { idAfterRemoval } from '../clipViewer'
 import { createCategory, getCategories, moveClipsToCategory, type Category } from '../categoriesApi'
-import type { UserLabel } from '../types'
 import type { DeleteMode } from '../deleteConfirm'
 import { getExportDefault, pickFolder } from '../exportApi'
 import { deleteEntries, exportEntries, getLibrary, renameEntry, revealEntry, type LibraryClip } from '../libraryApi'
@@ -176,8 +175,6 @@ export function ClipArchive({ active, category, onCategoryChange, clipId, onClip
         onOpen={(id) => onClipChange(current, id, true)}
         onRename={(clip, title) => void run(() => patchClip(clip.id, { title }))}
         onMemo={(clip, memo) => void run(() => patchClip(clip.id, { memo }))}
-        onLabel={(clip, label: UserLabel) => void run(() => patchClip(clip.id, { userLabel: label }))}
-        onNote={(clip, note) => void run(() => patchClip(clip.id, { labelNote: note }))}
         onMove={(clip, to) => {
           const next = idAfterRemoval(viewerClips.map((c) => c.id), clip.id)
           onClipChange(current, next, true)
