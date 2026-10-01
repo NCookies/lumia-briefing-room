@@ -36,10 +36,12 @@ test('게임 전체 삭제 경고는 기록까지 지워진다고 알리고 고�
   const text = deleteWarning(game(), 'all')
   assert.match(text, /목록에서 완전히 삭제/)
   assert.match(text, /풀영상/)
-  assert.match(text, /클립 3개/)
+  assert.match(text, /자동 보관 클립 2개/)
+  assert.match(text, /보관한 클립 3개는 클립 탭에 남습니다/)
   assert.match(text, /게임 기록/)
   assert.match(deleteWarning(game({ pinned: true }), 'all'), /고정한 게임입니다/)
-  assert.doesNotMatch(deleteWarning(game({ hasFullVideo: false, savedClipCount: 0 }), 'all'), /풀영상|클립/)
+  assert.doesNotMatch(deleteWarning(game({ hasFullVideo: false, savedClipCount: 0, autoClipCount: 0 }), 'all'), /풀영상|클립/)
+  assert.doesNotMatch(deleteWarning(game({ savedClipCount: 0 }), 'all'), /클립 탭에 남습니다/)
 })
 
 test('경고 창에는 지워질 풀영상 크기와 자동 보관 클립 수, 남는 보관 클립 수를 적는다', () => {

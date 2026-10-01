@@ -28,8 +28,9 @@ export function deleteMenuItems(game: DeletableGame): DeleteMenuItem[] {
 
 export function deleteWarning(game: DeletableGame, target: DeleteTarget): string {
   if (target === 'all') {
-    const what = [game.hasFullVideo ? '풀영상' : null, game.savedClipCount > 0 ? `클립 ${game.savedClipCount}개` : null, '게임 기록(결과·후보)']
+    const what = [game.hasFullVideo ? '풀영상' : null, game.autoClipCount > 0 ? `자동 보관 클립 ${game.autoClipCount}개` : null, '게임 기록(결과·후보)']
     const lines = [`이 게임을 목록에서 완전히 삭제합니다. ${what.filter(Boolean).join(', ')}이(가) 모두 지워집니다.`]
+    if (game.savedClipCount > 0) lines.push(`보관한 클립 ${game.savedClipCount}개는 클립 탭에 남습니다.`)
     if (game.pinned) lines.push('고정한 게임입니다. 자동 정리에서 제외해 둔 게임을 지우려는 것이 맞나요?')
     return lines.join('\n')
   }
