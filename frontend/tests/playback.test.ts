@@ -36,3 +36,12 @@ test('does not prefetch before the current proxy is ready, in native mode, or at
   assert.equal(prefetchTarget([], 0, 'proxy', true), null)
   assert.equal(prefetchTarget(IDS, -1, 'proxy', true), null)
 })
+
+test('an interrupted or blocked play() is not a playback failure, anything else is', async () => {
+  const { isPlaybackFailure } = await import('../src/playback.ts')
+  assert.equal(isPlaybackFailure({ name: 'AbortError' }), false)
+  assert.equal(isPlaybackFailure({ name: 'NotAllowedError' }), false)
+  assert.equal(isPlaybackFailure({ name: 'NotSupportedError' }), true)
+  assert.equal(isPlaybackFailure(new Error('boom')), true)
+  assert.equal(isPlaybackFailure(undefined), true)
+})

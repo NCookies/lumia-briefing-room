@@ -16,6 +16,7 @@ import { moveClipsToCategory } from '../categoriesApi'
 import { applyMark, candidateAtTime, newRangeAround, rangeModified, zoomBy, zoomView, type View } from '../playerBar'
 import { loadVolume, saveVolume, type VolumeState } from '../volume'
 import { isLegacyWithoutVideo } from '../legacyGame'
+import { isPlaybackFailure } from '../playback'
 import { vodGameHeading } from '../vodGames'
 import { LegacyGamePanel } from './LegacyGamePanel'
 import { ViewerBar, ViewerScroll } from './ViewerBar'
@@ -129,7 +130,7 @@ export function GameViewer({
   const togglePlay = () => {
     const v = video.current
     if (!v) return
-    if (v.paused) void v.play().catch(() => setVideoError(true))
+    if (v.paused) void v.play().catch((err: unknown) => setVideoError(isPlaybackFailure(err)))
     else v.pause()
   }
 
@@ -407,6 +408,7 @@ export function GameViewer({
               preload="metadata"
               onClick={togglePlay}
               onPlay={() => setPlaying(true)}
+              onPlaying={() => setVideoError(false)}
               onPause={() => setPlaying(false)}
               onEnded={() => setPlaying(false)}
               onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
@@ -418,7 +420,7 @@ export function GameViewer({
             />
             {videoError && (
               <p className="text-sm text-amber-300">
-                이 브라우저에서 풀영상을 재생하지 못했습니다(HEVC). 설치된 Edge/Chrome 에서 열거나 HEVC 확장을 설치해 주세요.
+                이 브라우저에서 풀영상을 재생하지 못했습니다. 스팀 녹화(HEVC)라면 설치된 Edge/Chrome 에서 열거나 HEVC 확장을 설치해 주세요.
               </p>
             )}
 

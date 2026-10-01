@@ -22,6 +22,12 @@ export function prefetchTarget(ids: string[], index: number, mode: PlaybackMode,
   return ids[index + 1] ?? null
 }
 
+// play() 는 일시정지·새 로드에 끊기거나(AbortError) 자동 재생 정책에 막혀도(NotAllowedError) 거부된다 - 영상을 못 읽은 게 아니다.
+export function isPlaybackFailure(err: unknown): boolean {
+  const name = (err as { name?: unknown } | null | undefined)?.name
+  return name !== 'AbortError' && name !== 'NotAllowedError'
+}
+
 export const CODEC_STORE_URL = 'https://apps.microsoft.com/detail/9nmzlz57r3t7'
 
 export function browserCanPlayHevc(): string {
