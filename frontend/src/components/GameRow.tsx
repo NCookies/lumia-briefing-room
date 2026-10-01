@@ -62,13 +62,7 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, menu }: Pr
         <div className="flex min-w-[15.5rem] items-center gap-1">
           {(['me', 'teammate1', 'teammate2'] as const).map((slot) =>
             g.portraits[slot] ? (
-              <div
-                key={slot}
-                className={`aspect-[157/77] h-10 shrink-0 overflow-hidden rounded-lg shadow-md shadow-black/40 ring-1 ${
-                  slot === 'me' ? 'ring-2 ring-sky-400/60' : 'ring-white/10'
-                }`}
-                title={slot === 'me' ? '내 캐릭터' : '팀원'}
-              >
+              <div key={slot} className="aspect-[157/77] h-10 shrink-0 overflow-hidden rounded-lg border border-zinc-700">
                 <img
                   className={`h-full w-full object-cover ${slot === 'me' ? 'origin-right scale-[1.08]' : ''}`}
                   src={gameAssetUrl(g.key, g.portraits[slot]!)}
