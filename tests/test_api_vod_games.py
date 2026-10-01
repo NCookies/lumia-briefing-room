@@ -252,3 +252,36 @@ def test_deleting_a_vod_removes_its_game_folders(env):
     assert env.delete(f"/api/vods/{env.vid}").status_code == 200
 
     assert not (env.games / env.key).exists() and (env.games / STEAM_KEY).exists()
+
+
+def test_without_the_original_video_analysis_reextracts_clips_from_the_saved_full_videos(env):
+    from types import SimpleNamespace
+
+    save_index(env.vod_dir, {
+        "id": env.vid, "path": str(env.a), "status": "done", "decodeDone": True, "width": 1920, "height": 1080, "sourceDeleted": True,
+        "durationSec": 1800.0, "clips": [],
+        "games": [{"index": 1, "gameKey": env.key, "fullVideo": True, "clipIds": []}],
+    })
+    env.a.unlink()
+    entry = {v["id"]: v for v in env.get("/api/vods").json()}[env.vid]
+    assert entry["exists"] is False and entry["canReanalyzeFromFullVideos"] is True
+
+    calls = []
+
+    def fake(key, ffmpeg, *, on_progress=None, cancel=None):
+        calls.append(key)
+        on_progress(0.5)
+        return "candidates", 2, 0
+
+    env.app.state.game_reanalyze = SimpleNamespace(run=fake)
+    assert env.post(f"/api/vods/{env.vid}/analyze", json={}).status_code == 202
+    job = wait_state(env, env.vid, "done")
+    assert calls == [env.key] and job["fromFullVideos"] is True and job["clipsMade"] == 2 and job["clipsFailed"] == 0
+
+
+def test_without_original_or_saved_full_videos_analysis_is_still_refused(env):
+    save_index(env.vod_dir, {"id": env.vid, "path": str(env.a), "status": "done", "games": [], "clips": []})
+    env.a.unlink()
+    entry = {v["id"]: v for v in env.get("/api/vods").json()}[env.vid]
+    assert entry["canReanalyzeFromFullVideos"] is False
+    assert env.post(f"/api/vods/{env.vid}/analyze", json={}).status_code == 404

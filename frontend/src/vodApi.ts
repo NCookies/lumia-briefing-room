@@ -14,6 +14,10 @@ export interface AnalysisJob {
   games?: number
   clips?: number
   message?: string
+  /** 원본 영상이 없어 저장한 풀영상에서 클립만 다시 추출한 작업. */
+  fromFullVideos?: boolean
+  clipsMade?: number
+  clipsFailed?: number
 }
 
 async function jsonOrThrow<T>(res: Response, action: string): Promise<T> {

@@ -17,3 +17,13 @@ test('처음 분석은 풀영상이 디스크를 쓴다는 것만 알린다', ()
   assert.match(message, /디스크/)
   assert.doesNotMatch(message, /카테고리|줄을 서서/)
 })
+
+import { vodDoneNotice } from '../src/vodAnalyzeConfirm.ts'
+
+test('원본 없이 풀영상에서 다시 추출했으면 그 사실을 알리고 확인 창도 같은 안내를 한다', () => {
+  assert.match(vodAnalyzeConfirmMessage('방송.mp4', {}, true), /원본 영상이 없어 저장된 게임 풀영상에서 클립만 다시 추출/)
+  assert.equal(vodDoneNotice({ fromFullVideos: true }), '원본 영상이 없어 저장된 풀영상에서 클립만 다시 추출했습니다.')
+  assert.match(vodDoneNotice({ fromFullVideos: true, clipsFailed: 2 }), /2개는 만들지 못했습니다/)
+  assert.equal(vodDoneNotice({}), '분석을 마쳤습니다.')
+  assert.equal(vodDoneNotice({ kind: 'fullVideos' }), '풀영상을 만들었습니다.')
+})

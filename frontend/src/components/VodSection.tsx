@@ -268,7 +268,7 @@ export function VodSection({
   const buildingFullVideos = running && job?.kind === 'fullVideos'
   const percent = running ? Math.round((job?.fraction ?? 0) * 100) : vod ? analysisPercent(vod) : 0
   const resolution = vod?.width && vod.height ? `${vod.height}p` : ''
-  const canStart = vod !== null && vod.exists
+  const canStart = vod !== null && (vod.exists || vod.canReanalyzeFromFullVideos === true)
   const blockedReason = analysisBlockedReason(vod)
 
   return (
@@ -333,6 +333,15 @@ export function VodSection({
           ) : queued ? (
             <button type="button" className="text-amber-300 hover:underline" onClick={onCancel}>
               대기 취소
+            </button>
+          ) : vod && vod.status === 'done' && !vod.exists && vod.canReanalyzeFromFullVideos ? (
+            <button
+              type="button"
+              className="text-zinc-400 hover:text-sky-300"
+              title="원본 영상이 없어 저장된 게임 풀영상에서 클립만 다시 추출합니다"
+              onClick={() => onAnalyze({})}
+            >
+              다시 분석
             </button>
           ) : vod && vod.status === 'done' ? (
             <ReanalyzeMenu disabled={!canStart} blockedReason={blockedReason} onAnalyze={onAnalyze} />

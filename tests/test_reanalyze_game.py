@@ -276,3 +276,15 @@ def test_auto_saved_clips_are_not_carried_over_but_user_archived_ones_are(tmp_pa
     assert any(v == "clip_far" for v in saved.values()) or any(
         (c.get("user") or {}).get("savedClipId") == "clip_far" for c in load_game(games, KEY)["userCandidates"]
     )
+
+
+@requires_ffmpeg
+def test_a_vod_game_is_reanalyzed_from_its_saved_full_video_without_any_original(vod_file, tmp_path):
+    games, library = seed(tmp_path)
+    (games / KEY / "full.mp4").write_bytes(vod_file.read_bytes())
+    update_game(games, KEY, lambda d: (d["fullVideo"].update(durationSec=60.0, offsetSec=0.0), d.update(source="vod", vodId="v1")))
+    mode = reanalyze_game(
+        games_dir=games, clips_dir=library, key=KEY, recording_root=None, cfg=make_cfg(tmp_path), ffmpeg_path=FFMPEG_PATH,
+        staging_dir=tmp_path / "staging", read_frame=read_frame, find_result=lambda v, s, n: screen(), find_portraits=lambda v, s: None,
+    )
+    assert mode == REANALYZE_CANDIDATES and load_game(games, KEY)["source"] == "vod"

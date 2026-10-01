@@ -25,6 +25,8 @@ from lumia_briefing_room.pipeline.ffmpeg_errors import describe_clip_error
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for
 from lumia_briefing_room.pipeline.cleanup_registry import registry as cleanup_preview_registry
 from lumia_briefing_room.pipeline.vod_analyze import VodCancelled, VodProgress, analyze_vod
+from lumia_briefing_room.pipeline.game_files import GameNotFound, has_full_video, load_game
+from lumia_briefing_room.pipeline.reanalyze_game import ReanalyzeError
 from lumia_briefing_room.pipeline.vod_full_games import delete_vod_games
 from lumia_briefing_room.pipeline.vod_upgrade import UpgradeError, can_upgrade, upgrade_vod_games
 from lumia_briefing_room.pipeline.vod_dates import is_valid_iso_date, resolve_video_date
@@ -174,6 +176,29 @@ def register_vod_routes(
         status = index.get("status", "new")
         return "interrupted" if status == "analyzing" else status
 
+    def saved_full_video_keys(index: dict | None) -> list[str]:
+        """저장한 풀영상이 남아 있는 게임 키(원본 영상이 없어도 이것으로 다시 분석할 수 있다)."""
+        return [
+            g["gameKey"] for g in (index or {}).get("games", [])
+            if g.get("gameKey") and has_full_video(games_root(), g["gameKey"])
+        ]
+
+    def sync_index_clips(vid: str) -> None:
+        """게임 기록(`game.json`)의 연결된 클립으로 색인의 게임별 `clipIds` 와 `clips` 를 다시 맞춘다."""
+        base = root()
+        index = load_index(base, vid)
+        if index is None:
+            return
+        for game in index.get("games", []):
+            try:
+                data = load_game(games_root(), game["gameKey"])
+            except (GameNotFound, KeyError):
+                continue
+            rows = [*(data.get("candidates") or []), *(data.get("userCandidates") or [])]
+            game["clipIds"] = sorted({(c.get("user") or {}).get("savedClipId") for c in rows} - {None})
+        index["clips"] = sorted({cid for g in index.get("games", []) for cid in g.get("clipIds", [])})
+        save_index(base, index)
+
     def entry_for(vid: str, path: Path, index: dict | None, active: dict, cfg: Config) -> dict:
         exists = path.exists()
         stat = path.stat() if exists else None
@@ -207,6 +232,7 @@ def register_vod_routes(
             "errorKind": (index or {}).get("errorKind"),
             "sourceDeleted": (index or {}).get("sourceDeleted", False),
             "canBuildFullVideos": exists and can_upgrade(index, path, root()),
+            "canReanalyzeFromFullVideos": not exists and bool(saved_full_video_keys(index)),
             "streamer": cfg.vod.streamers.get(vid) or (index or {}).get("streamer"),
             "videoDate": video_date,
             "games": (index or {}).get("games", []),
@@ -304,12 +330,16 @@ def register_vod_routes(
     @app.post("/api/vods/{vid}/analyze", status_code=202)
     def start_analysis(vid: str, body: dict | None = None):
         body = body or {}
-        path, _ = require(vid)
-        if not path.exists():
+        path, index = require(vid)
+        from_full = not path.exists() and bool(saved_full_video_keys(index))
+        if not path.exists() and not from_full:
             raise HTTPException(404, "영상 파일이 없습니다. 파일을 옮겼다면 옵션에서 경로를 다시 지정하세요")
         ffmpeg = discover_ffmpeg()
         if ffmpeg is None:
             raise HTTPException(503, "ffmpeg를 찾을 수 없습니다")
+        if from_full:
+            reanalyze_from_full_videos(vid, path, ffmpeg)
+            return {"id": vid}
         cfg = current_config()
         force, rebuild = bool(body.get("force")), bool(body.get("rebuild"))
         delete_source = body.get("deleteSource")
@@ -333,6 +363,39 @@ def register_vod_routes(
 
         submit(vid, "analyze", f"analyze:{vid}", f"영상 분석 ({path.name})", {}, run)
         return {"id": vid}
+
+    def reanalyze_from_full_videos(vid: str, path: Path, ffmpeg: Path) -> None:
+        """원본 영상이 없을 때: 저장한 게임 풀영상마다 후보·결과·초상화를 다시 찾고 자동 저장 클립을 다시 뽑는다(보관한 클립은 그대로)."""
+        keys = saved_full_video_keys(load_index(root(), vid))
+
+        def run(job: dict) -> None:
+            reanalyze = app.state.game_reanalyze.run
+            made = failed = 0
+            try:
+                for i, key in enumerate(keys):
+                    if job["cancel"].is_set():
+                        raise VodCancelled()
+                    job.update(message=f"게임 {i + 1}/{len(keys)} 풀영상에서 클립 다시 추출", games=i + 1)
+                    _, m, f = reanalyze(
+                        key, ffmpeg, cancel=job["cancel"],
+                        on_progress=lambda fr, i=i: job.update(fraction=(i + fr) / len(keys)),
+                    )
+                    made, failed = made + m, failed + f
+                sync_index_clips(vid)
+                job.update(state="done", fraction=1.0, message="", clipsMade=made, clipsFailed=failed)
+            except VodCancelled:
+                sync_index_clips(vid)
+                job.update(state="cancelled", message="멈췄습니다. 다시 누르면 처음부터 다시 추출합니다.")
+            except ReanalyzeError as exc:
+                sync_index_clips(vid)
+                cancelled = job["cancel"].is_set()
+                job.update(state="cancelled" if cancelled else "error", message="멈췄습니다." if cancelled else str(exc))
+            except Exception as exc:
+                job.update(state="error", message=describe_clip_error(exc))
+            finally:
+                cleanup_preview_registry.notify_clips_changed()
+
+        submit(vid, "analyze", f"analyze:{vid}", f"풀영상에서 클립 다시 추출 ({path.name})", {"fromFullVideos": True, "games": len(keys)}, run)
 
     def start_full_videos(vid: str, only: set[int] | None = None) -> None:
         """이미 분석한 영상의 게임을 풀영상으로 만든다(분석 작업과 같은 대기열: 한 번에 하나, 진행률·취소 공용)."""

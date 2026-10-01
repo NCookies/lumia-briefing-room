@@ -11,6 +11,7 @@ import logging
 import shutil
 import subprocess
 import threading
+from types import SimpleNamespace
 from collections.abc import Callable
 from pathlib import Path
 
@@ -330,35 +331,41 @@ def register_game_routes(
         root = resolve_recording_root(current_config().paths.steam_recording)
         return {"mode": reanalyze_mode(game, games_dir(key), root)}
 
+    def reanalyze_one(key: str, ffmpeg: Path, *, on_progress=None, cancel=None) -> tuple[str, int, int]:
+        """게임 하나를 다시 분석하고 자동 저장 클립을 정리한다 → (방식, 새로 만든 클립 수, 못 만든 수). 영상 파일 게임은 풀영상에서만 다시 찾는다."""
+        cfg = current_config()
+        gdir = games_dir(key)
+        before = load_game(gdir, key)
+        auto_ids = auto_saved_clip_ids(before, is_auto=lambda cid: category_of_clip(before, cid) == AUTO_ARCHIVE_FOLDER)
+        mode = reanalyze_game(
+            games_dir=gdir, clips_dir=clips_dir_for(before), key=key, recording_root=resolve_recording_root(cfg.paths.steam_recording),
+            cfg=cfg, ffmpeg_path=ffmpeg, staging_dir=resolve_paths(cfg.paths).staging_games,
+            on_progress=(lambda f: on_progress(f * 0.9)) if on_progress else None, cancel=cancel, auto_clip_ids=auto_ids,
+        )
+        made, failed = refresh_auto_clips(
+            gdir, key, auto_ids, cfg=cfg, ffmpeg_path=ffmpeg, delete=lambda cid: _remove_saved_clip(before, cid, keep_record=False),
+        )
+        return mode, made, failed
+
+    app.state.game_reanalyze = SimpleNamespace(run=reanalyze_one)
+
     @app.post("/api/games/{key}/reanalyze", status_code=202)
     def start_reanalyze(key: str):
         """게임의 풀영상·후보·결과·초상화를 다시 만든다(원본이 없으면 풀영상에서 후보만). 한 번에 하나만 돈다."""
         game = load_or_404(key)
         if game.get("source") == "vod":
             raise HTTPException(409, "영상 파일 게임은 영상 묶음에서 다시 분석합니다")
-        cfg = current_config()
         ffmpeg = _ffmpeg()
-        resolved = resolve_paths(cfg.paths)
-        root = resolve_recording_root(cfg.paths.steam_recording)
+        root = resolve_recording_root(current_config().paths.steam_recording)
         mode = reanalyze_mode(game, games_dir(key), root)
         if mode is None:
             raise HTTPException(409, "원본 녹화도 풀영상도 남아 있지 않아 다시 분석할 수 없습니다")
-        gdir, cdir, staging = games_dir(key), clips_dir(), resolved.staging_games
 
         def run(job: dict) -> None:
             job.update(state="running")
             try:
                 with activity.registry.track("reanalyze-game", f"게임 다시 분석 중 ({key})"):
-                    before = load_game(gdir, key)
-                    auto_ids = auto_saved_clip_ids(before, is_auto=lambda cid: category_of_clip(before, cid) == AUTO_ARCHIVE_FOLDER)
-                    job["mode"] = reanalyze_game(
-                        games_dir=gdir, clips_dir=cdir, key=key, recording_root=root, cfg=cfg, ffmpeg_path=ffmpeg,
-                        staging_dir=staging, on_progress=lambda f: job.update(fraction=f * 0.9), auto_clip_ids=auto_ids,
-                    )
-                    made, failed = refresh_auto_clips(
-                        gdir, key, auto_ids, cfg=cfg, ffmpeg_path=ffmpeg,
-                        delete=lambda cid: _remove_saved_clip(before, cid, keep_record=False),
-                    )
+                    job["mode"], made, failed = reanalyze_one(key, ffmpeg, on_progress=lambda f: job.update(fraction=f))
                 job.update(state="done", fraction=1.0, clipsMade=made, clipsFailed=failed)
             except (ReanalyzeError, RebuildError) as exc:
                 job.update(state="error", message=str(exc))

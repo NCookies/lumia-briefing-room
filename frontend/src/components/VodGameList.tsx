@@ -29,7 +29,7 @@ import {
 } from '../vodApi'
 import { groupVodsByDate } from '../vodDates'
 import { resolvedDeleteSource } from '../vodDeleteSource'
-import { vodAnalyzeConfirmMessage } from '../vodAnalyzeConfirm'
+import { vodAnalyzeConfirmMessage, vodDoneNotice } from '../vodAnalyzeConfirm'
 import { analysisEnded, buildableGameCount, groupGamesByVod, vodGameTime, vodTotals } from '../vodGames'
 import { probeProgress, type Vod } from '../vodGrouping'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
@@ -187,7 +187,7 @@ export function VodGameList({
         setVods(await listVods())
         if (status.state === 'running') return
         if (status.state === 'error') setActionError(status.message ?? '작업에 실패했습니다')
-        if (status.state === 'done') setNotice(status.kind === 'fullVideos' ? '풀영상을 만들었습니다.' : '분석을 마쳤습니다.')
+        if (status.state === 'done') setNotice(vodDoneNotice(status))
         reloadGames()
       } catch (e) {
         setActionError((e as Error).message)
@@ -224,11 +224,24 @@ export function VodGameList({
   }
 
   const handleAnalyze = async (vod: Vod, options: { force?: boolean; rebuild?: boolean }) => {
+    const fromFull = !vod.exists && vod.canReanalyzeFromFullVideos === true
     const result = await ask({
-      message: vodAnalyzeConfirmMessage(vod.name, options),
+      message: vodAnalyzeConfirmMessage(vod.name, options, fromFull),
       confirmLabel: options.force ? '다시 분석' : options.rebuild ? '다시 만들기' : '분석 시작',
     })
     if (!result.ok) return
+
+    if (fromFull) {
+      setActionError(null)
+      setNotice(null)
+      try {
+        await startAnalysis(vod.id, {})
+        reloadVods()
+      } catch (e) {
+        setActionError((e as Error).message)
+      }
+      return
+    }
 
     let deleteSource = resolvedDeleteSource(await getDeleteSourceAfter())
     if (deleteSource === null) {

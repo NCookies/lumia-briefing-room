@@ -66,6 +66,11 @@ def _default_locate(game: dict, recording_root: Path | None, load_session: Calla
     return _session_and_range(game, recording_root, load_session)
 
 
+def _no_original(game: dict, recording_root: Path | None, load_session: Callable[[Path], RecordingSession]) -> tuple:
+    """영상 파일 게임의 원본 영상은 영상 묶음 쪽이 다루므로 여기서는 저장한 풀영상으로만 다시 찾는다."""
+    raise ReanalyzeError("영상 파일 게임은 저장한 풀영상에서만 다시 분석합니다")
+
+
 def reanalyze_mode(
     game: dict, games_dir: Path, recording_root: Path | None,
     load_session: Callable[[Path], RecordingSession] = RecordingSession.load, locate_source: LocateSource | None = None,
@@ -305,8 +310,8 @@ def reanalyze_game(
         old = load_game(games_dir, key)
     except GameNotFound as exc:
         raise ReanalyzeError("게임을 찾을 수 없습니다") from exc
-    if old.get("source") == "vod":
-        raise ReanalyzeError("영상 파일 게임은 영상 묶음에서 다시 분석합니다")
+    if old.get("source") == "vod" and locate_source is None:
+        locate_source = _no_original
     locate = locate_source or _default_locate
     auto = set(auto_clip_ids)
     if auto:

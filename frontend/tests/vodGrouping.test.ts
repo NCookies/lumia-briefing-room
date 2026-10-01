@@ -207,3 +207,7 @@ test('a source deleted by the auto-delete setting gets its own reason, not "file
   assert.match(reason, /자동 삭제/)
   assert.doesNotMatch(reason, /찾을 수 없/)
 })
+
+test('원본이 없어도 저장한 풀영상이 있으면 다시 분석 버튼이 막히지 않는다', () => {
+  assert.equal(analysisBlockedReason(vod({ exists: false, canReanalyzeFromFullVideos: true })), '')
+})

@@ -28,6 +28,8 @@ export interface Vod {
   status: VodStatus
   /** `status` 가 `queued` 일 때만: 1 = 다음 차례. */
   queuePosition?: number | null
+  /** 원본 영상은 없지만 저장한 게임 풀영상으로 다시 분석할 수 있다. */
+  canReanalyzeFromFullVideos?: boolean
   analyzedSec: number | null
   error: string | null
   errorKind: 'disk_full' | 'other' | null
@@ -189,9 +191,9 @@ export function analysisPercent(vod: Pick<Vod, 'analyzedSec' | 'durationSec'>): 
   return Math.min(100, Math.round((vod.analyzedSec / vod.durationSec) * 100))
 }
 
-export function analysisBlockedReason(vod: Pick<Vod, 'exists' | 'sourceDeleted'> | null): string {
+export function analysisBlockedReason(vod: Pick<Vod, 'exists' | 'sourceDeleted' | 'canReanalyzeFromFullVideos'> | null): string {
   if (vod === null) return ''
-  if (!vod.exists) {
+  if (!vod.exists && !vod.canReanalyzeFromFullVideos) {
     return vod.sourceDeleted
       ? '설정에 따라 원본을 자동 삭제해 다시 분석할 수 없습니다'
       : '영상 파일을 찾을 수 없어 분석할 수 없습니다'
