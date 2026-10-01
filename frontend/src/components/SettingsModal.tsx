@@ -61,7 +61,7 @@ function GeneralPanel({
   const [autoStart, setAutoStartState] = useState(true)
   const [autoStartError, setAutoStartError] = useState<string | null>(null)
   const [prefetch, setPrefetchState] = useState(true)
-  const [saveMode, setSaveModeState] = useState<SaveMode>('manual')
+  const [saveMode, setSaveModeState] = useState<SaveMode>('auto')
   const [saveModeError, setSaveModeError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -146,7 +146,7 @@ function GeneralPanel({
           onChange={() => void changeSaveMode('auto')}
         />
         <span>
-          자동 보관
+          자동 보관 (기본)
           <span className="block text-xs text-zinc-500">
             게임 분석이 끝나면 교전 후보를 전부 클립으로 만들어 "자동 보관" 카테고리에 보관합니다. 보관한 클립은 자동으로 지워지지 않아 게임마다 1.5~2GB 씩 쌓입니다.
           </span>
@@ -161,7 +161,7 @@ function GeneralPanel({
           onChange={() => void changeSaveMode('manual')}
         />
         <span>
-          직접 보관 (기본)
+          직접 보관
           <span className="block text-xs text-zinc-500">
             클립을 자동으로 만들지 않습니다. 게임의 풀영상 화면에서 남기고 싶은 교전 후보만 골라 보관합니다. 이미 보관한 클립에는 영향이 없습니다.
           </span>

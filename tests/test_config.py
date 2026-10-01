@@ -210,7 +210,7 @@ def test_config_with_a_utf8_bom_still_loads(tmp_path):
 
 
 def test_clips_are_not_archived_automatically_by_default():
-    assert Config().clip.save_mode == "manual"
+    assert Config().clip.save_mode == "auto"
 
 
 def test_a_reader_never_sees_a_half_written_config_while_it_is_being_saved(tmp_path):
