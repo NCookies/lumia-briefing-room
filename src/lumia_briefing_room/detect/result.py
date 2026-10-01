@@ -16,6 +16,10 @@ from lumia_briefing_room.profiles.models import ResolutionProfile
 from lumia_briefing_room.video.frames import crop_roi
 
 PLACEMENT_RE = re.compile(r"^(\d{1,2})\s*/\s*(\d{1,2})$")
+RANK_DIGIT_RE = re.compile(r"^(\d{1,2})$")
+TOTAL_RE = re.compile(r"^/\s*(\d{1,2})$")
+DIGIT_CROP_SCALE = 3
+DIGIT_CROP_PAD = 30
 CHIP_THRESHOLD = 200
 NICKNAME_SCALE = 3
 NICKNAME_MARGIN = 8
@@ -192,14 +196,44 @@ def _rank_from_template(frame: np.ndarray, profile: ResolutionProfile) -> int | 
     return read_rank_digit(profile.crop(frame, "result_rank"), _load_rank_templates(profile.rank_templates))
 
 
-def _resolve_placement(
-    parsed: PanelParse, frame: np.ndarray, profile: ResolutionProfile
+def _read_digit_crop(crop: np.ndarray, reader: TextReader, pattern: re.Pattern) -> int | None:
+    big = cv2.resize(crop, None, fx=DIGIT_CROP_SCALE, fy=DIGIT_CROP_SCALE, interpolation=cv2.INTER_CUBIC)
+    padded = cv2.copyMakeBorder(big, *(DIGIT_CROP_PAD,) * 4, cv2.BORDER_REPLICATE)
+    for line in reader.read(padded):
+        m = pattern.match(line.text.strip().replace(" ", ""))
+        if m and line.score >= MIN_STAT_SCORE:
+            return int(m.group(1))
+    return None
+
+
+def read_placement_digits(
+    frame: np.ndarray, profile: ResolutionProfile, reader: TextReader
 ) -> tuple[int | None, int | None]:
-    """순위: 숫자 본보기(OCR 이 못 읽는 숫자가 있다) → OCR `N/M` → 결과 문구 `최종 생존` 이면 1위 순으로 정한다."""
+    """큰 순위 숫자와 작은 `/총원` 을 따로 잘라 읽는다.
+
+    실측(2026-10-01, 치지직 1080p 12판): 패널 통째 OCR 은 `3/8`→`8/E`, `6/7`→`L/9` 로 깨졌지만 따로 자르면 12판 모두 맞았다.
+    """
+    if "result_rank" not in profile.rois or "result_total" not in profile.rois:
+        return None, None
+    placement = _read_digit_crop(crop_roi(frame, profile.rois["result_rank"]), reader, RANK_DIGIT_RE)
+    total = _read_digit_crop(crop_roi(frame, profile.rois["result_total"]), reader, TOTAL_RE)
+    return placement, total
+
+
+def _resolve_placement(
+    parsed: PanelParse, frame: np.ndarray, profile: ResolutionProfile, reader: TextReader
+) -> tuple[int | None, int | None]:
+    """순위: 숫자 본보기(OCR 이 못 읽는 숫자가 있다) → OCR `N/M` → 숫자만 따로 자른 OCR → 결과 문구 `최종 생존` 이면 1위 순으로 정한다."""
     placement, total = parsed.placement, parsed.total
     digit = _rank_from_template(frame, profile)
     if digit is not None and (total is None or digit <= total):
         placement = digit
+    if placement is None or total is None:
+        crop_placement, crop_total = read_placement_digits(frame, profile, reader)
+        total = total if total is not None else crop_total
+        placement = placement if placement is not None else crop_placement
+        if placement is not None and total is not None and placement > total:
+            placement = digit if digit is not None and digit <= total else None
     if placement is None and parsed.outcome and parsed.outcome.replace(" ", "") == SURVIVOR_OUTCOME:
         placement = 1
     return placement, total
@@ -218,7 +252,7 @@ def read_result_screen(
     chip_text = read_chip(crop_roi(frame, profile.rois["result_chip"]), reader)
     nickname = read_nickname(panel, parsed.nickname_line, reader) if parsed.nickname_line else None
 
-    placement, total = _resolve_placement(parsed, frame, profile)
+    placement, total = _resolve_placement(parsed, frame, profile, reader)
 
     return ResultScreen(
         placement=placement,

@@ -346,3 +346,67 @@ def test_a_placement_that_exceeds_the_total_is_dropped_in_favor_of_nothing(monke
     result = read_result_screen(blank_frame(profile), profile, FakeReader(PANEL, [line("일반", 5)]))
 
     assert result.placement == 4
+
+
+class QueueReader:
+    def __init__(self, *answers):
+        self.answers = list(answers)
+
+    def read(self, rgb, *, lang="korean"):
+        return self.answers.pop(0) if self.answers else []
+
+
+def test_placement_digits_are_read_from_their_own_crops():
+    from lumia_briefing_room.detect.result import read_placement_digits
+
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    reader = QueueReader([line("6", 30)], [line("/7", 30, 0.98)])
+
+    assert read_placement_digits(blank_frame(profile), profile, reader) == (6, 7)
+
+
+def test_placement_digits_ignore_unreadable_or_non_numeric_text():
+    from lumia_briefing_room.detect.result import read_placement_digits
+
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+    reader = QueueReader([line("L", 30)], [line("/E", 30)])
+
+    assert read_placement_digits(blank_frame(profile), profile, reader) == (None, None)
+
+
+def test_placement_crops_fill_in_what_the_panel_ocr_garbled(monkeypatch):
+    from lumia_briefing_room.detect import result as result_module
+
+    monkeypatch.setattr(result_module, "_rank_from_template", lambda frame, profile: 3)
+    monkeypatch.setattr(result_module, "read_placement_digits", lambda frame, profile, reader: (3, 8))
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+
+    result = read_result_screen(blank_frame(profile), profile, FakeReader(UNREADABLE_RANK_PANEL, [line("랭크 대전", 5)]))
+
+    assert (result.placement, result.total) == (3, 8)
+
+
+def test_placement_crops_are_not_read_when_the_panel_already_had_both(monkeypatch):
+    from lumia_briefing_room.detect import result as result_module
+
+    def fail(*a):
+        raise AssertionError("should not OCR the crops")
+
+    monkeypatch.setattr(result_module, "read_placement_digits", fail)
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+
+    result = read_result_screen(blank_frame(profile), profile, FakeReader(PANEL, [line("일반", 5)]))
+
+    assert (result.placement, result.total) == (4, 7)
+
+
+def test_placement_from_crops_larger_than_total_is_dropped(monkeypatch):
+    from lumia_briefing_room.detect import result as result_module
+
+    monkeypatch.setattr(result_module, "_rank_from_template", lambda frame, profile: None)
+    monkeypatch.setattr(result_module, "read_placement_digits", lambda frame, profile, reader: (9, 7))
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+
+    result = read_result_screen(blank_frame(profile), profile, FakeReader(UNREADABLE_RANK_PANEL, [line("일반", 5)]))
+
+    assert (result.placement, result.total) == (None, 7)
