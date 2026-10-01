@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { patchClip, splitClip, thumbnailUrl, trimClip } from '../api'
 import { cardHeadline, filterClips, sortedForCategory } from '../clipArchive'
 import { createCategory, getCategories, moveClipsToCategory, type Category } from '../categoriesApi'
@@ -16,6 +16,9 @@ import { PromptDialog } from './PromptDialog'
 
 interface Props {
   active: boolean
+  /** 주소가 정한 카테고리(없으면 맨 위 카테고리). */
+  category: string | null
+  onCategoryChange: (name: string | null, replace?: boolean) => void
   refreshTick: number
   confirmDelete: boolean
   onConfirmDeleteChange: (value: boolean) => void
@@ -37,10 +40,9 @@ function formatWhen(iso: string | undefined): string {
 }
 
 /** "클립" 탭: 보관한 클립을 카테고리(= `clips\` 아래 폴더)별로 본다. 왼쪽 카테고리 목록, 오른쪽 그 카테고리의 클립 카드(게임 정보 중심). */
-export function ClipArchive({ active, refreshTick, confirmDelete, onConfirmDeleteChange, deleteMode, onDeleteModeChange }: Props) {
+export function ClipArchive({ active, category, onCategoryChange, refreshTick, confirmDelete, onConfirmDeleteChange, deleteMode, onDeleteModeChange }: Props) {
   const [enabled, setEnabled] = useState(true)
   const [categories, setCategories] = useState<Category[] | null>(null)
-  const [current, setCurrent] = useState<string | null>(null)
   const [clips, setClips] = useState<LibraryClip[]>([])
   const [query, setQuery] = useState('')
   const [selectMode, setSelectMode] = useState(false)
@@ -53,6 +55,9 @@ export function ClipArchive({ active, refreshTick, confirmDelete, onConfirmDelet
   const [renaming, setRenaming] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [moveAnchor, setMoveAnchor] = useState<DOMRect | null>(null)
+  const current = category ?? categories?.[0]?.name ?? null
+  const wanted = useRef({ category, onCategoryChange })
+  wanted.current = { category, onCategoryChange }
 
   const loadCategories = useCallback(
     () =>
@@ -61,7 +66,8 @@ export function ClipArchive({ active, refreshTick, confirmDelete, onConfirmDelet
           setEnabled(list.enabled)
           setCategories(list.categories)
           setError(null)
-          setCurrent((now) => (now && list.categories.some((c) => c.name === now) ? now : (list.categories[0]?.name ?? null)))
+          const { category: want, onCategoryChange: change } = wanted.current
+          if (want && !list.categories.some((c) => c.name === want)) change(list.categories[0]?.name ?? null, true)
         })
         .catch((e: Error) => setError(e.message)),
     [],
@@ -152,7 +158,7 @@ export function ClipArchive({ active, refreshTick, confirmDelete, onConfirmDelet
               current === c.name ? 'border-sky-500 bg-zinc-800' : 'border-transparent hover:bg-zinc-800/70'
             } ${c.auto ? 'opacity-60' : ''}`}
           >
-            <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => { setCurrent(c.name); leaveSelectMode() }}>
+            <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => { onCategoryChange(c.name); leaveSelectMode() }}>
               <span className="h-8 w-12 shrink-0 overflow-hidden rounded bg-zinc-900">
                 {c.thumbnailClipId && <img className="h-full w-full object-cover" src={thumbnailUrl(c.thumbnailClipId)} alt="" loading="lazy" />}
               </span>
@@ -280,7 +286,7 @@ export function ClipArchive({ active, refreshTick, confirmDelete, onConfirmDelet
           onSubmit={async (value) => {
             const name = await createCategory(value)
             setCreating(false)
-            setCurrent(name)
+            onCategoryChange(name)
             reload()
           }}
         />
@@ -295,7 +301,7 @@ export function ClipArchive({ active, refreshTick, confirmDelete, onConfirmDelet
           onSubmit={async (value) => {
             const next = await renameEntry(renaming, value)
             setRenaming(null)
-            if (current === renaming) setCurrent(next)
+            if (current === renaming) onCategoryChange(next, true)
             reload()
           }}
         />

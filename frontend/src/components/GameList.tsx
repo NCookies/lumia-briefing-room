@@ -8,6 +8,8 @@ import { formatAgo } from '../grouping'
 import { formatBytes } from '../retention'
 import { useCleanupPreview } from '../useCleanupPreview'
 import { useStorageUsage } from '../useStorageUsage'
+import { useListScroll } from '../useListScroll'
+import type { GameNav } from '../useRoute'
 import { useDayFold } from '../useDayFold'
 import { useGameDelete } from '../useGameDelete'
 import { useConfirm } from '../confirmContext'
@@ -31,6 +33,7 @@ function formatShort(iso: string | null): string {
 
 interface Props {
   active: boolean
+  nav: GameNav
   refreshTick: number
   onBackfill: () => void
   backfillLabel: string
@@ -42,6 +45,7 @@ interface Props {
 
 export function GameList({
   active,
+  nav,
   refreshTick,
   onBackfill,
   backfillLabel,
@@ -52,7 +56,8 @@ export function GameList({
 }: Props) {
   const [games, setGames] = useState<GameSummary[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [open, setOpen] = useState<string | null>(null)
+  const open = nav.openKey
+  const rememberScroll = useListScroll(open, active)
   const [dueOnly, setDueOnly] = useState(false)
   const cleanup = useCleanupPreview(active)
   const storage = useStorageUsage(active, games)
@@ -108,7 +113,7 @@ export function GameList({
     deleteMode,
     onDeleteModeChange,
     onDone: () => {
-      setOpen(null)
+      nav.close()
       load()
     },
     onError: setError,
@@ -122,7 +127,7 @@ export function GameList({
     const summary = games?.find((g) => g.key === open)
     return (
       <>
-        <GameViewer key={`${open}-${viewerTick}`} gameKey={open} autoPlay={viewerTick === 0} onBack={() => setOpen(null)} onChanged={load} menu={summary && viewerDelete.menuFor(open, summary, [reanalyzeItem(open)])} />
+        <GameViewer key={`${open}-${viewerTick}`} gameKey={open} autoPlay={viewerTick === 0 && nav.userOpened} onMissing={nav.missing} onBack={nav.close} onChanged={load} menu={summary && viewerDelete.menuFor(open, summary, [reanalyzeItem(open)])} />
         {viewerDelete.dialog}
       </>
     )
@@ -200,7 +205,10 @@ export function GameList({
                 time={{ main: formatShort(g.matchStartUtc), sub: g.matchStartUtc ? formatAgo(g.matchStartUtc) : '' }}
                 due={cleanup[g.key]}
                 menu={gameDelete.menuFor(g.key, g, [reanalyzeItem(g.key)])}
-                onOpen={() => setOpen(g.key)}
+                onOpen={() => {
+                  rememberScroll()
+                  nav.open(g.key)
+                }}
                 rebuild={
                   g.canRebuildFullVideo && !g.hasFullVideo
                     ? {

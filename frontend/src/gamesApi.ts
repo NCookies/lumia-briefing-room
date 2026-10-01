@@ -21,8 +21,12 @@ export async function getGames(source: 'steam' | 'vod' | 'all' = 'steam'): Promi
   return (await jsonOrThrow<{ games: GameSummary[] }>(await fetch(`${BASE}?source=${source}`), '게임 목록 불러오기')).games
 }
 
+export class GameNotFoundError extends Error {}
+
 export async function getGame(key: string): Promise<GameDetail> {
-  return jsonOrThrow(await fetch(`${BASE}/${key}`), '게임 불러오기')
+  const res = await fetch(`${BASE}/${key}`)
+  if (res.status === 404) throw new GameNotFoundError('게임을 찾을 수 없습니다')
+  return jsonOrThrow(res, '게임 불러오기')
 }
 
 export const gameVideoUrl = (key: string) => `${BASE}/${key}/video`

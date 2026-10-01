@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { showTuningUi, useAppInfo, versionLabel } from './appInfo'
 import { AdminPanel } from './components/AdminPanel'
 import { BackfillDialog } from './components/BackfillDialog'
-import type { ClipSource } from './components/ClipBrowser'
 import { ClipArchive } from './components/ClipArchive'
 import { GuideDialog } from './components/GuideDialog'
 import { FirstRunScreen } from './components/FirstRunScreen'
@@ -25,9 +24,11 @@ import { getBackfillStatus } from './backfillApi'
 import { getLegacyTrashCount } from './legacyTrashApi'
 import { browserCanPlayHevc } from './playback'
 import { reportClientCapabilities } from './telemetryApi'
+import type { Route, TabId } from './route'
+import { useRoute, type GameNav } from './useRoute'
 
 const ADMIN_TAB = { id: 'admin', label: '관리자' } as const
-type Tab = ClipSource | 'library' | typeof ADMIN_TAB.id
+type Tab = TabId
 const TABS: { id: Tab; label: string }[] = [
   { id: 'steam', label: '스팀 녹화' },
   { id: 'vod', label: '영상 파일' },
@@ -48,8 +49,8 @@ export default function App() {
   const appInfo = useAppInfo()
   const version = versionLabel(appInfo)
   const isDev = showTuningUi(appInfo)
-  const [savedTab, setTab] = useState<Tab>(loadTab)
-  const tab: Tab = savedTab === 'admin' && !isDev ? 'steam' : savedTab
+  const { route, inApp, memo, navigate, back } = useRoute(loadTab())
+  const tab: Tab = route.tab === 'admin' && !isDev ? 'steam' : route.tab
   const navTabs: { id: Tab; label: string }[] = isDev ? [...TABS, ADMIN_TAB] : TABS
   const [showSettings, setShowSettings] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
@@ -118,12 +119,26 @@ export default function App() {
     setDeleteMode(value).catch(() => {})
   }
 
-  const selectTab = (next: Tab) => {
-    setTab(next)
+  useEffect(() => {
     try {
-      localStorage.setItem(TAB_KEY, next)
+      localStorage.setItem(TAB_KEY, route.tab)
     } catch {
       // 저장하지 못해도 화면은 동작한다
+    }
+  }, [route.tab])
+
+  const routeOf = (id: Tab): Route => (route.tab === id ? route : (memo[id] ?? { tab: id }))
+  const selectTab = (next: Tab) => {
+    if (next !== tab) navigate(routeOf(next))
+  }
+  const gameNav = (id: 'steam' | 'vod'): GameNav => {
+    const own = routeOf(id)
+    return {
+      openKey: own.game ?? null,
+      userOpened: inApp,
+      open: (key) => navigate({ tab: id, game: key }),
+      close: () => back(own),
+      missing: () => navigate({ tab: id }, true),
     }
   }
 
@@ -208,6 +223,7 @@ export default function App() {
         <GameList
           key={browserKey}
           active={tab === 'steam'}
+          nav={gameNav('steam')}
           refreshTick={refreshTick}
           onBackfill={() => setShowBackfill(true)}
           backfillLabel={backfillRunning ? `과거 녹화 분석 중 ${progressPercent(backfill)}%` : '과거 녹화 분석'}
@@ -221,6 +237,7 @@ export default function App() {
       <div key={`vod-${browserKey}`} className={tab === 'vod' ? 'flex flex-1 flex-col' : 'hidden'}>
         <VodGameList
           active={tab === 'vod'}
+          nav={gameNav('vod')}
           refreshTick={refreshTick}
           confirmDelete={confirmDelete}
           onConfirmDeleteChange={changeConfirmDelete}
@@ -237,6 +254,8 @@ export default function App() {
         <ClipArchive
           key={`library-${browserKey}`}
           active={tab === 'library'}
+          category={routeOf('library').category ?? null}
+          onCategoryChange={(name, replace) => navigate({ tab: 'library', category: name ?? undefined }, replace)}
           refreshTick={refreshTick}
           confirmDelete={confirmDelete}
           onConfirmDeleteChange={changeConfirmDelete}

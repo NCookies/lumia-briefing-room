@@ -9,6 +9,8 @@ import { useGameDelete } from '../useGameDelete'
 import { formatBytes } from '../retention'
 import { useCleanupPreview } from '../useCleanupPreview'
 import { useStorageUsage } from '../useStorageUsage'
+import { useListScroll } from '../useListScroll'
+import type { GameNav } from '../useRoute'
 import { useDayFold } from '../useDayFold'
 import {
   cancelAnalysis,
@@ -45,6 +47,7 @@ interface DeleteRequest {
 
 interface Props {
   active: boolean
+  nav: GameNav
   refreshTick: number
   confirmDelete: boolean
   onConfirmDeleteChange: (value: boolean) => void
@@ -56,6 +59,7 @@ interface Props {
 /** 영상 파일 탭: 날짜 머리줄 > 영상 묶음(분석·이름·날짜 조작 그대로) > 게임 행(스팀 녹화 탭과 같은 모양) → 게임을 누르면 풀영상 화면. */
 export function VodGameList({
   active,
+  nav,
   refreshTick,
   confirmDelete,
   onConfirmDeleteChange,
@@ -67,7 +71,8 @@ export function VodGameList({
   const [vodsLoaded, setVodsLoaded] = useState(false)
   const [games, setGames] = useState<GameSummary[] | null>(null)
   const [job, setJob] = useState<AnalysisJob | null>(null)
-  const [open, setOpen] = useState<string | null>(null)
+  const open = nav.openKey
+  const rememberScroll = useListScroll(open, active)
   const [error, setError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -132,7 +137,7 @@ export function VodGameList({
     deleteMode,
     onDeleteModeChange,
     onDone: () => {
-      setOpen(null)
+      nav.close()
       reload()
     },
     onError: setActionError,
@@ -288,7 +293,7 @@ export function VodGameList({
     const summary = games?.find((g) => g.key === open)
     return (
       <>
-        <GameViewer gameKey={open} autoPlay backLabel="← 영상 목록" onBack={() => setOpen(null)} onChanged={reloadGames} menu={summary && viewerDelete.menuFor(open, summary)} />
+        <GameViewer gameKey={open} autoPlay={nav.userOpened} onMissing={nav.missing} backLabel="← 영상 목록" onBack={nav.close} onChanged={reloadGames} menu={summary && viewerDelete.menuFor(open, summary)} />
         {viewerDelete.dialog}
       </>
     )
@@ -432,7 +437,10 @@ export function VodGameList({
                           time={vodGameTime(g)}
                           menu={gameDelete.menuFor(g.key, g)}
                           due={cleanup[g.key]}
-                          onOpen={() => setOpen(g.key)}
+                          onOpen={() => {
+                            rememberScroll()
+                            nav.open(g.key)
+                          }}
                           onPin={() =>
                             void setGamePinned(g.key, !g.pinned)
                               .then(reloadGames)
