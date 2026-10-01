@@ -12,6 +12,8 @@ interface Props {
   currentId: string | null
   modifiedCount: number
   busy: boolean
+  /** 클립 저장(다시 저장·범위 저장)이 진행 중이다 — 저장 버튼 글자를 `저장 중…` 으로 바꿔 멈춘 게 아님을 알린다. */
+  saving: boolean
   canSave: boolean
   onSelect: (c: Candidate) => void
   showDismissed: boolean
@@ -68,7 +70,7 @@ export function ViewerCandidates(p: Props) {
           title="범위를 고친 보관 클립에 새 범위를 전부 반영합니다"
           onClick={p.onSaveModified}
         >
-          전부 저장{p.modifiedCount > 0 ? ` (${p.modifiedCount})` : ''}
+          {p.saving ? '저장 중…' : `전부 저장${p.modifiedCount > 0 ? ` (${p.modifiedCount})` : ''}`}
         </button>
       </div>
       <label className="flex items-center gap-1 text-xs text-zinc-400">
@@ -167,7 +169,7 @@ export function ViewerCandidates(p: Props) {
                       title="고친 범위를 보관한 클립에 반영합니다"
                       onClick={() => p.onResave(c.id)}
                     >
-                      다시 저장
+                      {p.saving ? '저장 중…' : '다시 저장'}
                     </button>
                   )}
                   <button

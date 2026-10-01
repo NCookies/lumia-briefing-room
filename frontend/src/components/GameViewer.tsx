@@ -40,6 +40,8 @@ const targetInfo = (t: EventTarget | null): TargetInfo | null => {
 
 type Undo = { kind: 'range'; id: string; prev: [number, number] } | { kind: 'add'; id: string } | { kind: 'dismiss'; id: string }
 
+const SAVING = '저장 중…'
+
 const BTN = 'rounded border border-zinc-600 px-2 py-1 text-sm hover:bg-zinc-700 disabled:opacity-40'
 
 export function GameViewer({
@@ -69,6 +71,7 @@ export function GameViewer({
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [busyText, setBusyText] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [videoError, setVideoError] = useState(false)
   const [time, setTime] = useState(0)
@@ -169,8 +172,9 @@ export function GameViewer({
     else v.pause()
   }
 
-  const run = async (action: () => Promise<unknown>, done?: string): Promise<boolean> => {
+  const run = async (action: () => Promise<unknown>, done?: string, working = '처리 중…'): Promise<boolean> => {
     setBusy(true)
+    setBusyText(working)
     setNotice(null)
     setError(null)
     try {
@@ -184,6 +188,7 @@ export function GameViewer({
       return false
     } finally {
       setBusy(false)
+      setBusyText(null)
     }
   }
 
@@ -199,7 +204,7 @@ export function GameViewer({
     void run(async () => {
       await patchCandidate(gameKey, id, { start: next[0], end: next[1] })
       after?.()
-    }).finally(() => clearOverride(id))
+    }, undefined, SAVING).finally(() => clearOverride(id))
   }
 
   const commitRange = (id: string, next: [number, number], prev: [number, number]) => {
@@ -271,13 +276,17 @@ export function GameViewer({
 
   const archive = (id: string, category?: string) => {
     setArchiveTarget(null)
-    void run(async () => {
-      const saved = await saveCandidate(gameKey, id, category)
-      setNotice(saved.category ? `"${saved.category}"에 보관했습니다` : '보관했습니다')
-    })
+    void run(
+      async () => {
+        const saved = await saveCandidate(gameKey, id, category)
+        setNotice(saved.category ? `"${saved.category}"에 보관했습니다` : '보관했습니다')
+      },
+      undefined,
+      '보관 중…',
+    )
   }
 
-  const resave = (id: string) => void run(() => saveCandidate(gameKey, id), '고친 범위를 보관한 클립에 저장했습니다')
+  const resave = (id: string) => void run(() => saveCandidate(gameKey, id), '고친 범위를 보관한 클립에 저장했습니다', SAVING)
 
   const moveArchived = (id: string, category: string) => {
     const clipId = cands.find((c) => c.id === id)?.user.savedClipId
@@ -321,7 +330,7 @@ export function GameViewer({
         }
       }
       setNotice(`${modifiedIds.length - failed.length}개 저장했습니다${failed.length ? `, ${failed.length}개 실패(${failed[0]})` : ''}`)
-    })
+    }, undefined, SAVING)
 
   const openArchivePopup = (c: Candidate) => {
     if (busy || (!isSaved(c) && (!game?.hasFullVideo || isDismissed(c)))) return
@@ -356,7 +365,7 @@ export function GameViewer({
 
   const archivePopupWithSave = async (c: Candidate) => {
     if (busy) return
-    if (needsResave(c) && !(await run(() => saveCandidate(gameKey, c.id), '고친 범위를 보관한 클립에 저장했습니다'))) return
+    if (needsResave(c) && !(await run(() => saveCandidate(gameKey, c.id), '고친 범위를 보관한 클립에 저장했습니다', SAVING))) return
     openArchivePopup(c)
   }
 
@@ -450,6 +459,7 @@ export function GameViewer({
       currentId={currentId}
       modifiedCount={modifiedIds.length}
       busy={busy}
+      saving={busyText === SAVING}
       canSave={game.hasFullVideo}
       onSelect={select}
       showDismissed={showDismissed}
@@ -478,6 +488,7 @@ export function GameViewer({
         </button>
         <h2 className="text-lg font-semibold">{gameHeadline(game.matchResult, game.recordingStopped)}</h2>
         <span className={game.title ? 'text-sm font-medium text-zinc-200' : 'text-xs text-zinc-500'}>{gameHeading(game)}</span>
+        {busyText && <span role="status" className="animate-pulse text-sm text-amber-300">{busyText}</span>}
         {error && <span className="text-sm text-rose-300">{error}</span>}
         {notice && <span className="text-sm text-emerald-300">{notice}</span>}
         <label className="ml-auto flex items-center gap-1 text-sm text-zinc-300">
