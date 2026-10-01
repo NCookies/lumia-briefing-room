@@ -59,12 +59,12 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, menu }: Pr
             </>
           )}
         </div>
-        <div className="flex min-w-[7.5rem] items-center gap-1">
+        <div className="flex min-w-[15.5rem] items-center gap-1">
           {(['me', 'teammate1', 'teammate2'] as const).map((slot) =>
             g.portraits[slot] ? (
               <img
                 key={slot}
-                className="h-10 w-10 rounded-full object-cover"
+                className="aspect-[157/77] h-10 shrink-0 rounded border border-zinc-700 object-cover"
                 src={gameAssetUrl(g.key, g.portraits[slot]!)}
                 alt=""
               />
