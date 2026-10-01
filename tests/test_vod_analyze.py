@@ -70,6 +70,15 @@ def make_cfg(base):
     return cfg
 
 
+def make_cat_cfg(base):
+    """카테고리 폴더 저장소: 자동으로 만든 클립은 `자동 보관` 에 놓여 다시 분석이 교체할 수 있다."""
+    cfg = make_cfg(base)
+    cfg.paths.root = base / "store"
+    cfg.paths.vod_clips = None
+    cfg.paths.games = None
+    return cfg
+
+
 def no_result(video, span, next_start):
     return None
 
@@ -349,7 +358,7 @@ def test_second_run_on_a_done_vod_does_nothing(vod_file, tmp_path):
 
 @requires_ffmpeg
 def test_rebuild_reuses_cache_and_replaces_old_clips(vod_file, tmp_path):
-    first, cfg = run(tmp_path, vod_file)
+    first, cfg = run(tmp_path, vod_file, cfg=make_cat_cfg(tmp_path))
     root = resolve_paths(cfg.paths).library_vod
     old_duration = json.loads((root / f"{first['clips'][0]}.json").read_text(encoding="utf-8"))["durationSec"]
     calls = []
@@ -373,7 +382,7 @@ def test_rebuild_reuses_cache_and_replaces_old_clips(vod_file, tmp_path):
 def test_rebuild_uses_the_configured_delete_mode_for_old_clips(vod_file, tmp_path, monkeypatch):
     from lumia_briefing_room.pipeline import delete_helper
 
-    first, cfg = run(tmp_path, vod_file)
+    first, cfg = run(tmp_path, vod_file, cfg=make_cat_cfg(tmp_path))
     cfg.ui.delete_mode = "recycle"
     sent = []
     monkeypatch.setattr(delete_helper, "_send2trash", lambda path: sent.append(path))
@@ -536,7 +545,7 @@ def test_partial_cache_from_an_older_reader_is_discarded_on_resume(vod_file, tmp
 
 @requires_ffmpeg
 def test_rebuild_carries_user_labels_over_to_the_overlapping_new_clips(vod_file, tmp_path):
-    first, cfg = run(tmp_path, vod_file)
+    first, cfg = run(tmp_path, vod_file, cfg=make_cat_cfg(tmp_path))
     root = resolve_paths(cfg.paths).library_vod
     old_id = first["clips"][0]
     meta_path = root / f"{old_id}.json"

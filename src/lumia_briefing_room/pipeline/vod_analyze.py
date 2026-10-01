@@ -12,7 +12,7 @@ from pathlib import Path
 
 import numpy as np
 
-from lumia_briefing_room.config import AUTO_ARCHIVE_FOLDER, Config, resolve_paths
+from lumia_briefing_room.config import Config, resolve_paths
 from lumia_briefing_room.pipeline import categories
 from lumia_briefing_room.detect.match import (
     analyze_frame,
@@ -209,19 +209,11 @@ def _existing_clip_paths(root: Path, vod: str) -> list[Path]:
 
 
 def _kept_clip_ids(cfg: Config, old_paths: list[Path], video_roots: tuple[Path, ...], *, manual: bool) -> set[str]:
-    """다시 분석해도 지우지 않는 옛 클립: 수동 저장이면 전부, 자동이면 사용자가 보관한 것(`자동 보관` 카테고리가 아닌 곳에 있는 것).
-    카테고리가 없는 옛 경로 모드는 구분할 수 없어 전부 지운다(예전 동작)."""
+    """다시 분석해도 지우지 않는 옛 클립: 수동 저장이면 전부, 자동이면 사용자가 보관한 것(`categories.is_user_archived`).
+    카테고리가 없는 옛 경로 모드는 구분할 수 없어 전부 보관한 것으로 본다."""
     if manual:
         return {p.stem for p in old_paths}
-    if not categories.enabled(cfg):
-        return set()
-    kept = set()
-    for meta_path in old_paths:
-        video = find_video_for(meta_path, video_roots)
-        name = categories.category_of(cfg, video) if video is not None else None
-        if name is not None and name != AUTO_ARCHIVE_FOLDER:
-            kept.add(meta_path.stem)
-    return kept
+    return {p.stem for p in old_paths if categories.is_user_archived(cfg, find_video_for(p, video_roots))}
 
 
 @dataclass(frozen=True)

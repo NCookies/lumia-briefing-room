@@ -4,6 +4,7 @@ from dataclasses import replace
 
 import pytest
 
+from lumia_briefing_room.config import resolve_paths
 from lumia_briefing_room.detect.result import ResultScreen
 from lumia_briefing_room.detect.types import FrameState
 from lumia_briefing_room.pipeline import vod_analyze
@@ -231,16 +232,23 @@ def test_auto_mode_rebuild_keeps_user_archived_clips_and_replaces_the_auto_saved
 
 
 @requires_ffmpeg
-def test_legacy_layout_has_no_archive_concept_so_auto_mode_rebuild_replaces_every_clip(vod_file, tmp_path):
+def test_legacy_layout_cannot_tell_archived_from_auto_so_auto_mode_rebuild_keeps_every_clip(vod_file, tmp_path):
+    """카테고리가 없는 옛 경로 모드는 보관한 클립을 구분할 수 없어 전부 사용자가 보관한 것으로 보고 지우지 않는다."""
     first, cfg = run(tmp_path, vod_file)
     kept = first["clips"][0]
-    category = cfg.paths.vod_clips / "보관함"
-    category.mkdir()
-    (cfg.paths.vod_clips / f"{kept}.mp4").replace(category / f"{kept}.mp4")
+    library = resolve_paths(cfg.paths).library_vod
+    stale = f"vod_{vod_id(vod_file)}_g01_999999"
+    (library / f"{stale}.json").write_text("{}", encoding="utf-8")
+    (cfg.paths.vod_clips / f"{stale}.mp4").write_bytes(b"old clip")
 
-    analyze_vod(vod_file, cfg, ffmpeg_path=FFMPEG_PATH, read_frame=read_frame, find_result=no_result, rebuild=True)
+    again = analyze_vod(vod_file, cfg, ffmpeg_path=FFMPEG_PATH, read_frame=read_frame, find_result=no_result, rebuild=True)
 
-    assert not (category / f"{kept}.mp4").exists()
+    assert (cfg.paths.vod_clips / f"{kept}.mp4").is_file()
+    assert (cfg.paths.vod_clips / f"{stale}.mp4").is_file(), "옛 경로 모드에선 지우지 않는다"
+    assert again["clips"] == first["clips"], "같은 ID 의 새 클립을 또 만들지 않는다"
+    assert len(list(cfg.paths.vod_clips.glob("*.mp4"))) == len(first["clips"]) + 1
+    data = read_game(next(p for p in resolve_paths(cfg.paths).games_vod.iterdir() if p.is_dir()))
+    assert next(c for c in data["candidates"] if c["id"] == kept)["user"]["savedClipId"] == kept
 
 
 @requires_ffmpeg
