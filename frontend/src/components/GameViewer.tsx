@@ -610,9 +610,6 @@ export function GameViewer({
                   className="w-20"
                   onChange={(e) => setVol({ volume: Number(e.target.value), muted: false })}
                 />
-                <button type="button" className={BTN} title="단축키 (?)" aria-pressed={helpOpen} onClick={() => setHelpOpen((open) => !open)}>
-                  ⌨
-                </button>
                 <button type="button" className={BTN} title="전체화면" onClick={toggleFullscreen}>
                   {fullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
                 </button>
@@ -641,6 +638,9 @@ export function GameViewer({
                   : '막대에서 노란 구간을 누르면 선택됩니다. 초록 킬 · 파랑 어시 · 빨강 사망 · 주황 팀원 사망'}
               </span>
               <div className="flex shrink-0 items-center gap-1 text-white">
+                <button type="button" className={BTN} title="단축키 표 보기·닫기 (?)" aria-pressed={helpOpen} onClick={() => setHelpOpen((open) => !open)}>
+                  ⌨ 단축키
+                </button>
                 <button type="button" disabled={history.undo.length === 0 || busy} className={BTN} title="되돌리기 (Ctrl+Z)" onClick={undoLast}>
                   되돌리기
                 </button>
