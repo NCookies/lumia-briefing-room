@@ -288,7 +288,7 @@ export function VodGameList({
     const summary = games?.find((g) => g.key === open)
     return (
       <>
-        <GameViewer gameKey={open} backLabel="← 영상 목록" onBack={() => setOpen(null)} onChanged={reloadGames} menu={summary && viewerDelete.menuFor(open, summary)} />
+        <GameViewer gameKey={open} autoPlay backLabel="← 영상 목록" onBack={() => setOpen(null)} onChanged={reloadGames} menu={summary && viewerDelete.menuFor(open, summary)} />
         {viewerDelete.dialog}
       </>
     )

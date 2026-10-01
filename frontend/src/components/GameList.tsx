@@ -122,7 +122,7 @@ export function GameList({
     const summary = games?.find((g) => g.key === open)
     return (
       <>
-        <GameViewer key={`${open}-${viewerTick}`} gameKey={open} onBack={() => setOpen(null)} onChanged={load} menu={summary && viewerDelete.menuFor(open, summary, [reanalyzeItem(open)])} />
+        <GameViewer key={`${open}-${viewerTick}`} gameKey={open} autoPlay={viewerTick === 0} onBack={() => setOpen(null)} onChanged={load} menu={summary && viewerDelete.menuFor(open, summary, [reanalyzeItem(open)])} />
         {viewerDelete.dialog}
       </>
     )

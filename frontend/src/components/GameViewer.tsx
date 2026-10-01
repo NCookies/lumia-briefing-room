@@ -39,6 +39,7 @@ export function GameViewer({
   onChanged,
   backLabel = '← 게임 목록',
   menu,
+  autoPlay = false,
 }: {
   gameKey: string
   onBack: () => void
@@ -46,6 +47,8 @@ export function GameViewer({
   backLabel?: string
   /** 머리줄 `⋯` 메뉴(게임 삭제 등). */
   menu?: GameMenuItem[]
+  /** 게임 행을 눌러 열었을 때 바로 재생한다. 브라우저가 막으면 일시정지로 두고 오류는 내지 않는다. */
+  autoPlay?: boolean
 }) {
   const [game, setGame] = useState<GameDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -65,6 +68,7 @@ export function GameViewer({
   const [archiveTarget, setArchiveTarget] = useState<{ id: string; anchor: DOMRect } | null>(null)
   const video = useRef<HTMLVideoElement>(null)
   const shell = useRef<HTMLDivElement>(null)
+  const autoPlayed = useRef(false)
 
   const reload = useCallback(
     () =>
@@ -415,6 +419,10 @@ export function GameViewer({
               onLoadedMetadata={(e) => {
                 e.currentTarget.volume = vol.volume
                 e.currentTarget.muted = vol.muted
+                if (autoPlay && !autoPlayed.current) {
+                  autoPlayed.current = true
+                  void e.currentTarget.play().catch((err: unknown) => setVideoError(isPlaybackFailure(err)))
+                }
               }}
               onError={() => setVideoError(true)}
             />
