@@ -156,24 +156,24 @@ export default function App() {
           }}
         />
       )}
-      <header className="flex items-end justify-between border-b border-zinc-700 px-4 pt-3">
-        <div className="flex items-end gap-6">
-          <h1 className="pb-2 text-xl font-semibold">
+      <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900/60 px-4 py-2.5">
+        <div className="flex items-center gap-6">
+          <h1 className="text-xl font-semibold">
             루미아 브리핑룸
             {version && <span className="ml-2 text-xs font-normal text-zinc-500">{version}</span>}
             <UpdateBadge />
           </h1>
-          <nav className="flex gap-1" role="tablist">
+          <nav className="flex gap-1 rounded-lg border border-zinc-700/50 bg-zinc-800/60 p-1" role="tablist">
             {navTabs.map((t) => (
               <button
                 key={t.id}
                 type="button"
                 role="tab"
                 aria-selected={tab === t.id}
-                className={`rounded-t border-x border-t px-4 py-2 text-sm ${
+                className={`rounded-md px-4 py-1.5 text-sm transition active:scale-95 ${
                   tab === t.id
-                    ? 'border-zinc-600 bg-zinc-800 font-semibold text-zinc-100'
-                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-zinc-600/70 font-semibold text-white shadow-sm'
+                    : 'text-zinc-400 hover:bg-zinc-700/50 hover:text-zinc-100'
                 }`}
                 onClick={() => selectTab(t.id)}
               >
@@ -182,10 +182,10 @@ export default function App() {
             ))}
           </nav>
         </div>
-        <div className="mb-2 flex items-center gap-2">
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            className="rounded-full border border-zinc-600 px-2 py-1 text-sm leading-none text-zinc-300 hover:bg-zinc-700"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-zinc-700/60 bg-zinc-800/60 text-sm leading-none text-zinc-300 transition hover:bg-zinc-700 hover:text-white active:scale-95"
             aria-label="사용 안내"
             title="풀영상·후보·클립이 무엇인지 안내"
             onClick={() => setShowGuide(true)}
@@ -194,7 +194,7 @@ export default function App() {
           </button>
           <button
             type="button"
-            className="rounded border border-zinc-600 px-2 py-1 text-sm text-zinc-300 hover:bg-zinc-700"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-zinc-700/60 bg-zinc-800/60 px-3 text-sm text-zinc-200 transition hover:bg-zinc-700 hover:text-white active:scale-95"
             onClick={() => {
               setSettingsTab('general')
               setShowSettings(true)

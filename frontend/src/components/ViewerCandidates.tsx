@@ -56,28 +56,28 @@ export function ViewerCandidates(p: Props) {
   return (
     <aside
       data-testid="viewer-candidates"
-      className="flex w-80 shrink-0 flex-col gap-2 overflow-hidden rounded border border-zinc-700 bg-zinc-800/60 p-2"
+      className="flex w-96 shrink-0 flex-col gap-2.5 overflow-hidden rounded-lg border border-zinc-700/60 bg-zinc-800/60 p-3"
     >
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-medium">
+        <h3 className="text-base font-semibold">
           후보 {active}개
           {p.modifiedCount > 0 && <span className="ml-1 text-xs font-normal text-orange-300">· {p.modifiedCount}개 저장 대기</span>}
         </h3>
         <button
           type="button"
           disabled={p.busy || !p.canSave || p.modifiedCount === 0}
-          className="rounded bg-sky-600 px-2 py-1 text-xs hover:bg-sky-500 disabled:opacity-40"
+          className="rounded-md bg-sky-600 px-3 py-1 text-xs font-medium text-white transition hover:bg-sky-500 active:scale-95 disabled:opacity-40"
           title="범위를 고친 보관 클립에 새 범위를 전부 반영합니다"
           onClick={p.onSaveModified}
         >
           {p.saving ? '저장 중…' : `전부 저장${p.modifiedCount > 0 ? ` (${p.modifiedCount})` : ''}`}
         </button>
       </div>
-      <label className="flex items-center gap-1 text-xs text-zinc-400">
+      <label className="flex items-center gap-1.5 text-xs text-zinc-400">
         <input type="checkbox" checked={p.showDismissed} onChange={(e) => p.onToggleDismissed(e.target.checked)} />
         삭제한 후보도 보기
       </label>
-      <ul ref={list} className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+      <ul ref={list} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-0.5">
         {p.cands.length === 0 && (
           <li className="text-xs text-zinc-500">
             교전 후보가 없습니다. 영상에서 원하는 곳으로 가서 "+ 여기서 구간 추가"를 누르세요.
@@ -94,14 +94,14 @@ export function ViewerCandidates(p: Props) {
             <li
               key={c.id}
               data-cand={c.id}
-              className={`flex flex-col gap-1 rounded border px-2 py-1.5 text-xs ${
+              className={`flex flex-col gap-1.5 rounded-lg border px-3 py-2.5 text-xs transition-colors ${
                 selected
-                  ? 'border-white bg-zinc-700'
+                  ? 'border-sky-400/80 bg-sky-500/10 shadow-sm'
                   : p.currentId === c.id
-                    ? 'border-yellow-400/70 bg-yellow-400/10'
+                    ? 'border-yellow-400/60 bg-yellow-400/10'
                     : modified
-                      ? 'border-orange-400/70'
-                      : 'border-zinc-700'
+                      ? 'border-orange-400/60 bg-zinc-800/40'
+                      : 'border-zinc-700/60 bg-zinc-800/40 hover:bg-zinc-700/40'
               } ${dismissed ? 'opacity-50' : ''}`}
             >
               <div className="flex items-center gap-2">
@@ -123,7 +123,7 @@ export function ViewerCandidates(p: Props) {
                   <>
                     <button
                       type="button"
-                      className="min-w-0 flex-1 truncate text-left text-sm hover:underline"
+                      className="min-w-0 flex-1 truncate text-left text-sm font-medium text-zinc-100 hover:text-white"
                       title={candidateTitle(c)}
                       onClick={() => p.onSelect(c)}
                     >
@@ -132,7 +132,7 @@ export function ViewerCandidates(p: Props) {
                     <button
                       type="button"
                       disabled={p.busy}
-                      className="shrink-0 text-zinc-400 hover:text-white disabled:opacity-40"
+                      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-700 hover:text-white disabled:opacity-40"
                       title="이름 바꾸기"
                       aria-label="이름 바꾸기"
                       onClick={() => setEditing({ id: c.id, text: candidateTitle(c) })}
@@ -142,18 +142,18 @@ export function ViewerCandidates(p: Props) {
                   </>
                 )}
               </div>
-              <div className="flex flex-wrap items-center gap-1 text-zinc-400">
+              <div className="flex flex-wrap items-center gap-1.5 text-zinc-400">
                 <span>
                   {formatClock(s)}~{formatClock(e)} ({Math.round(e - s)}초)
                 </span>
                 {modified && (
                   <span className="rounded bg-orange-500/25 px-1.5 text-orange-300">{saved ? '수정됨 · 저장 대기' : '수정됨'}</span>
                 )}
-                <span className="ml-auto flex gap-1">
+                <span className="ml-auto flex gap-1.5">
                   {saved && (
                     <button
                       type="button"
-                      className={`rounded border px-2 py-0.5 hover:bg-zinc-600 ${c.user.savedMemo ? 'border-amber-500/60 text-amber-300' : 'border-zinc-600'}`}
+                      className={`rounded-md border px-2.5 py-1 transition hover:bg-zinc-600 active:scale-95 ${c.user.savedMemo ? 'border-amber-500/60 text-amber-300' : 'border-zinc-600/70 bg-zinc-800/60 text-zinc-200 hover:text-white'}`}
                       title="이 클립에 대한 나만의 메모(서버로 보내지 않음)"
                       aria-expanded={memoOpen === c.id}
                       onClick={() => p.onMemoOpenChange(memoOpen === c.id ? null : c.id)}
@@ -165,7 +165,7 @@ export function ViewerCandidates(p: Props) {
                     <button
                       type="button"
                       disabled={p.busy || !p.canSave}
-                      className="rounded bg-sky-600 px-2 py-0.5 text-zinc-100 hover:bg-sky-500 disabled:opacity-40"
+                      className="rounded-md bg-sky-600 px-2.5 py-1 text-white transition hover:bg-sky-500 active:scale-95 disabled:opacity-40"
                       title="고친 범위를 보관한 클립에 반영합니다"
                       onClick={() => p.onResave(c.id)}
                     >
@@ -176,7 +176,7 @@ export function ViewerCandidates(p: Props) {
                     type="button"
                     disabled={p.busy || (!saved && (!p.canSave || dismissed))}
                     aria-pressed={state.bookmark === 'archived'}
-                    className={`flex items-center gap-1 rounded px-2 py-0.5 disabled:opacity-40 ${
+                    className={`flex items-center gap-1 rounded-md px-2.5 py-1 font-medium transition active:scale-95 disabled:opacity-40 ${
                       state.bookmark === 'none'
                         ? 'bg-sky-600 text-zinc-100 hover:bg-sky-500'
                         : 'bg-emerald-600/30 text-emerald-200 hover:bg-emerald-600/40'
@@ -192,7 +192,7 @@ export function ViewerCandidates(p: Props) {
                     <button
                       type="button"
                       disabled={p.busy}
-                      className="rounded border border-rose-500/50 px-2 py-0.5 text-rose-300 hover:bg-rose-500/20 disabled:opacity-40"
+                      className="rounded-md border border-rose-500/50 bg-rose-500/5 px-2.5 py-1 text-rose-300 transition hover:bg-rose-500/20 active:scale-95 disabled:opacity-40"
                       title="이 후보로 만든 클립 영상과 이 구간을 삭제합니다(되돌릴 수 없습니다)"
                       onClick={() => p.onDeleteClip(c.id)}
                     >
@@ -203,7 +203,7 @@ export function ViewerCandidates(p: Props) {
                     <button
                       type="button"
                       disabled={p.busy}
-                      className="rounded border border-zinc-600 px-2 py-0.5 hover:bg-zinc-600"
+                      className="rounded-md border border-zinc-600/70 bg-zinc-800/60 px-2.5 py-1 text-zinc-200 transition hover:bg-zinc-700 hover:text-white active:scale-95 disabled:opacity-40"
                       title="직접 추가한 구간을 지웁니다"
                       onClick={() => p.onDelete(c.id)}
                     >
@@ -214,7 +214,7 @@ export function ViewerCandidates(p: Props) {
                       <button
                         type="button"
                         disabled={p.busy}
-                        className="rounded border border-zinc-600 px-2 py-0.5 hover:bg-zinc-600"
+                        className="rounded-md border border-zinc-600/70 bg-zinc-800/60 px-2.5 py-1 text-zinc-200 transition hover:bg-zinc-700 hover:text-white active:scale-95 disabled:opacity-40"
                         title="이 후보를 목록에서 삭제합니다"
                         onClick={() => p.onDismiss(c)}
                       >

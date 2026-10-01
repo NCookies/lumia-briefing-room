@@ -46,7 +46,7 @@ export function GameMenu({ items }: { items: GameMenuItem[] }) {
         aria-label="게임 메뉴"
         aria-haspopup="menu"
         aria-expanded={pos !== null}
-        className="rounded border border-zinc-600 px-2 py-1 text-xs leading-none hover:bg-zinc-700"
+        className="inline-flex h-7 w-8 items-center justify-center rounded-md border border-zinc-600/70 bg-zinc-800/60 text-xs leading-none text-zinc-200 transition hover:bg-zinc-700 hover:text-white active:scale-95"
         onClick={toggle}
       >
         ⋯
