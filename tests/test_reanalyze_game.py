@@ -264,3 +264,15 @@ def test_candidates_mode_with_no_game_in_the_video_keeps_the_old_candidates(vod_
             find_result=no_result,
         )
     assert len(load_game(games, KEY)["candidates"]) == 3
+
+
+def test_auto_saved_clips_are_not_carried_over_but_user_archived_ones_are(tmp_path):
+    games, library = seed(tmp_path)
+    process = fake_process(new_game())
+    run_full(tmp_path, games, library, process, auto_clip_ids={"clip_a"})
+    assert process.known == {"clip_far"}
+    saved = {c["id"]: (c.get("user") or {}).get("savedClipId") for c in load_game(games, KEY)["candidates"]}
+    assert "clip_a" not in saved.values()
+    assert any(v == "clip_far" for v in saved.values()) or any(
+        (c.get("user") or {}).get("savedClipId") == "clip_far" for c in load_game(games, KEY)["userCandidates"]
+    )

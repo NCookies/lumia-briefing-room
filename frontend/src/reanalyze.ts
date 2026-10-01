@@ -7,6 +7,9 @@ export interface ReanalyzeStatus {
   mode: ReanalyzeMode | null
   /** 대기 중일 때만: 1 = 다음 차례. */
   position?: number | null
+  /** 끝난 뒤: 자동 저장 클립을 새 후보에서 다시 뽑은 수와 못 뽑은 수. */
+  clipsMade?: number
+  clipsFailed?: number
 }
 
 export function reanalyzeConfirmMessage(): string {
@@ -22,9 +25,12 @@ export function reanalyzeStatusText(status: ReanalyzeStatus): string | null {
   if (status.state === 'queued') return queueLabel(status.position)
   if (status.state === 'running') {
     const pct = Math.round(status.fraction * 100)
-    return status.mode === 'full' ? `풀영상과 후보를 다시 만드는 중… ${pct}%` : `다시 분석하는 중… ${pct}%`
+    return status.mode === 'full' ? `풀영상과 후보를 다시 만드는 중… ${pct}%` : `저장된 풀영상에서 클립을 다시 추출하는 중… ${pct}%`
   }
-  if (status.state === 'done') return status.mode === 'candidates' ? '후보를 다시 찾았습니다' : '풀영상과 후보를 다시 만들었습니다'
+  if (status.state === 'done') {
+    const base = status.mode === 'candidates' ? '원본 녹화가 없어 저장된 풀영상에서 클립만 다시 추출했습니다' : '풀영상과 후보를 다시 만들었습니다'
+    return status.clipsFailed ? `${base} (클립 ${status.clipsFailed}개는 만들지 못했습니다)` : base
+  }
   if (status.state === 'error') return status.message || '다시 분석하지 못했습니다'
   return null
 }

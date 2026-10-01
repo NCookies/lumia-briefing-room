@@ -24,6 +24,7 @@ from lumia_briefing_room.pipeline.recording_stop import error_of_record, stopped
 from lumia_briefing_room.pipeline import categories as cats
 from lumia_briefing_room.pipeline.library_fs import LibraryError
 from lumia_briefing_room.api.analysis_queue import enqueue, with_position
+from lumia_briefing_room.pipeline.reanalyze_clips import auto_saved_clip_ids, refresh_auto_clips
 from lumia_briefing_room.config import AUTO_ARCHIVE_FOLDER, Config, discover_ffmpeg, resolve_paths
 from lumia_briefing_room.pipeline import game_candidates as gcand
 from lumia_briefing_room.pipeline.clip_from_full import FullVideoMissing
@@ -348,11 +349,17 @@ def register_game_routes(
             job.update(state="running")
             try:
                 with activity.registry.track("reanalyze-game", f"게임 다시 분석 중 ({key})"):
+                    before = load_game(gdir, key)
+                    auto_ids = auto_saved_clip_ids(before, is_auto=lambda cid: category_of_clip(before, cid) == AUTO_ARCHIVE_FOLDER)
                     job["mode"] = reanalyze_game(
                         games_dir=gdir, clips_dir=cdir, key=key, recording_root=root, cfg=cfg, ffmpeg_path=ffmpeg,
-                        staging_dir=staging, on_progress=lambda f: job.update(fraction=f),
+                        staging_dir=staging, on_progress=lambda f: job.update(fraction=f * 0.9), auto_clip_ids=auto_ids,
                     )
-                job.update(state="done", fraction=1.0)
+                    made, failed = refresh_auto_clips(
+                        gdir, key, auto_ids, cfg=cfg, ffmpeg_path=ffmpeg,
+                        delete=lambda cid: _remove_saved_clip(before, cid, keep_record=False),
+                    )
+                job.update(state="done", fraction=1.0, clipsMade=made, clipsFailed=failed)
             except (ReanalyzeError, RebuildError) as exc:
                 job.update(state="error", message=str(exc))
             except Exception as exc:

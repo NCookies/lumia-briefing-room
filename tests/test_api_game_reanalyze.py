@@ -133,3 +133,20 @@ def test_queued_work_does_not_start_while_the_live_watcher_is_processing_a_game(
         assert ran == [] and client.get(f"/api/games/{KEY}/reanalyze/status").json()["position"] == 1
     wait_done(client, timeout=5)
     assert ran == [1]
+
+
+def test_reanalyze_removes_auto_saved_clips_afterwards_and_reports_how_many_clips_were_made(client, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(game_routes, "reanalyze_mode", lambda *a, **k: REANALYZE_FULL)
+
+    def fake_reanalyze(**kw):
+        seen["auto_ids"] = kw["auto_clip_ids"]
+        return REANALYZE_FULL
+
+    monkeypatch.setattr(game_routes, "reanalyze_game", fake_reanalyze)
+    monkeypatch.setattr(game_routes, "auto_saved_clip_ids", lambda game, is_auto: {"auto1"})
+    monkeypatch.setattr(game_routes, "refresh_auto_clips", lambda gdir, key, ids, **kw: (seen.update(refreshed=set(ids)) or (4, 1)))
+    client.post(f"/api/games/{KEY}/reanalyze")
+    status = wait_done(client)
+    assert status["state"] == "done" and status["clipsMade"] == 4 and status["clipsFailed"] == 1
+    assert seen == {"auto_ids": {"auto1"}, "refreshed": {"auto1"}}

@@ -17,7 +17,7 @@ import shutil
 import threading
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -84,6 +84,18 @@ def reanalyze_mode(
 
 def _offset(game: dict) -> float:
     return float((game.get("fullVideo") or {}).get("offsetSec") or 0.0)
+
+
+def _without_saved(game: dict, clip_ids: Collection[str]) -> dict:
+    """`clip_ids` 클립과의 연결을 뗀 사본(후보의 `savedClipId`·저장 범위만 지운다)."""
+    stripped = []
+    for cand in game.get("candidates") or []:
+        user = cand.get("user") or {}
+        if user.get("savedClipId") in clip_ids:
+            user = {k: v for k, v in user.items() if k not in ("savedClipId", "savedStart", "savedEnd")}
+            cand = {**cand, "user": user}
+        stripped.append(cand)
+    return {**game, "candidates": stripped}
 
 
 def _saved_entries(old: dict) -> list[dict]:
@@ -283,8 +295,12 @@ def reanalyze_game(
     source_factory=None,
     find_result=None,
     find_portraits=None,
+    auto_clip_ids: Collection[str] = (),
 ) -> str:
-    """방식(`full`/`candidates`)을 돌려준다. `clips_dir` 는 클립 정보(library) 폴더, `staging_dir` 는 게임 폴더와 같은 드라이브의 작업 폴더다."""
+    """방식(`full`/`candidates`)을 돌려준다. `clips_dir` 는 클립 정보(library) 폴더, `staging_dir` 는 게임 폴더와 같은 드라이브의 작업 폴더다.
+
+    `auto_clip_ids`(자동 저장된 클립)는 새 후보에 이어 붙이지 않는다 - 호출한 쪽이 성공한 뒤 지우고 다시 뽑는다(`reanalyze_clips.py`).
+    이 함수 자체는 클립을 지우지도 새로 자르지도 않는다."""
     try:
         old = load_game(games_dir, key)
     except GameNotFound as exc:
@@ -292,6 +308,9 @@ def reanalyze_game(
     if old.get("source") == "vod":
         raise ReanalyzeError("영상 파일 게임은 영상 묶음에서 다시 분석합니다")
     locate = locate_source or _default_locate
+    auto = set(auto_clip_ids)
+    if auto:
+        old = _without_saved(old, auto)
     mode = reanalyze_mode(old, games_dir, recording_root, load_session, locate)
     if mode is None:
         raise ReanalyzeError("원본 녹화도 풀영상도 남아 있지 않아 다시 분석할 수 없습니다")
