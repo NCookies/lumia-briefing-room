@@ -25,6 +25,8 @@ interface Props {
   onClipChange: (category: string | null, clipId: string | null, replace?: boolean) => void
   /** `← 카테고리` 와 브라우저 뒤로 가기가 같은 동작. */
   onCloseClip: () => void
+  /** 클립을 만든 게임의 풀영상 화면을 그 후보가 선택된 채로 연다. */
+  onOpenGame: (tab: 'steam' | 'vod', gameKey: string, candidateId: string) => void
   refreshTick: number
   confirmDelete: boolean
   onConfirmDeleteChange: (value: boolean) => void
@@ -40,7 +42,7 @@ function formatDuration(sec: number): string {
 }
 
 /** "클립" 탭: 보관한 클립을 카테고리(= `clips\` 아래 폴더)별로 본다. 왼쪽 카테고리 목록, 오른쪽 그 카테고리의 클립 카드(게임 정보 중심). */
-export function ClipArchive({ active, category, onCategoryChange, clipId, onClipChange, onCloseClip, refreshTick, confirmDelete, onConfirmDeleteChange, deleteMode, onDeleteModeChange }: Props) {
+export function ClipArchive({ active, category, onCategoryChange, clipId, onClipChange, onCloseClip, onOpenGame, refreshTick, confirmDelete, onConfirmDeleteChange, deleteMode, onDeleteModeChange }: Props) {
   const [enabled, setEnabled] = useState(true)
   const [categories, setCategories] = useState<Category[] | null>(null)
   const [clips, setClips] = useState<LibraryClip[]>([])
@@ -169,6 +171,7 @@ export function ClipArchive({ active, category, onCategoryChange, clipId, onClip
         active={active}
         paused={deleteRequest !== null || exportTarget !== null}
         onBack={onCloseClip}
+        onOpenGame={onOpenGame}
         onOpen={(id) => onClipChange(current, id, true)}
         onRename={(clip, title) => void run(() => patchClip(clip.id, { title }))}
         onMemo={(clip, memo) => void run(() => patchClip(clip.id, { memo }))}

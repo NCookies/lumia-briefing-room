@@ -133,11 +133,14 @@ export default function App() {
   }
   const gameNav = (id: 'steam' | 'vod'): GameNav => {
     const own = routeOf(id)
+    const fromClip = own.cand !== undefined
     return {
       openKey: own.game ?? null,
+      openCand: own.cand ?? null,
+      backLabel: fromClip ? '← 클립' : undefined,
       userOpened: inApp,
       open: (key) => navigate({ tab: id, game: key }),
-      close: () => back(own),
+      close: () => (fromClip ? back(own, routeOf('library')) : back(own)),
       missing: () => navigate({ tab: id }, true),
     }
   }
@@ -259,6 +262,7 @@ export default function App() {
           clipId={routeOf('library').clip ?? null}
           onClipChange={(name, id, replace) => navigate({ tab: 'library', category: name ?? undefined, clip: id ?? undefined }, replace)}
           onCloseClip={() => back(routeOf('library'))}
+          onOpenGame={(tab, gameKey, candidateId) => navigate({ tab, game: gameKey, cand: candidateId })}
           refreshTick={refreshTick}
           confirmDelete={confirmDelete}
           onConfirmDeleteChange={changeConfirmDelete}

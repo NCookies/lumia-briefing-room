@@ -181,6 +181,7 @@ result.jpg / portrait_{me,teammate1,teammate2}.jpg   클립 쪽 썸네일 폴더
 |---|---|
 | `GET /api/games` | 최신순 요약(옛 스팀 게임은 `canRebuildFullVideo` 도): 결과, 초상화 파일명, `hasFullVideo`, 풀영상 크기·길이, 후보 수(무시 제외)·확실한 후보 수·보관한 클립 수(`savedClipCount`)·보관한 클립 중 범위를 고치고 아직 저장(반영)하지 않은 수(`unsavedEditCount` - 보관하지 않은 후보의 수정은 바로 기억되므로 세지 않는다), `pinned` |
 | `GET /api/games/{key}` | `game.json` 전체(게임 폴더에 `portrait_<칸>.jpg` 가 남아 있는데 `game.json` 이 이름을 잃었으면 목록·상세 모두 그 이름을 채워 보여 준다) + `hasFullVideo`(+ 클립이 있는 후보마다 계산 값 `user.savedCategory`·**`user.archived`**(자동 보관이 아닌 카테고리에 있을 때만 true - `자동 보관` 의 클립은 파일은 있어도 어디에도 속하지 않은 것으로 본다, 옛 경로 모드는 클립이 있으면 true)·`user.savedMemo`) |
+| `GET /api/games/by-clip/{clipId}` | 클립을 만든 게임·후보 `{gameKey, candidateId, source, hasFullVideo}`(두 폴더의 `game.json` 에서 후보의 `user.savedClipId` 가 같은 것을 찾는다 — 클립 메타에는 게임 키가 없다). 이어진 게임이 없으면 404(앱 밖 영상·게임 기록이 지워진 클립) |
 | `GET /api/games/{key}/video` | 풀영상 스트리밍(Range 지원, `FileResponse`). 없으면 404 |
 | `GET /api/games/{key}/asset/{name}` | `result.jpg`, `portrait_{me,teammate1,teammate2}.jpg` 만 |
 | `PATCH /api/games/{key}` | `{pinned}`(자동 정리에서 제외) · `{title}`(사용자 제목, 60자 이하, 빈 값 = 제목 없음 → `null`) · `{matchResult}`(**게임 정보 고치기**: `placement` 1~99·`outcome`·`matchType`(`rank`/`normal`/`unknown`)·`tk`/`kills`/`assists` 0~999 중 보낸 것만, 빈 값 = `null`; 코발트는 `outcome` 이 승리/패배만). 검증 실패는 400 이고 아무것도 바꾸지 않는다. 응답은 요약(`title`·`matchResultSource` 포함) |

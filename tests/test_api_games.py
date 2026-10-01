@@ -321,3 +321,16 @@ def test_list_resolves_saved_clip_videos_in_one_pass(client, monkeypatch):
     detail = client.get(f"/api/games/{KEY}").json()
     assert all(c["user"].get("savedClipId") for c in detail["candidates"])
     assert len(calls) == 2
+
+
+def test_clip_source_finds_the_game_and_candidate_a_clip_was_saved_from(client):
+    clip_id = client.post(f"/api/games/{KEY}/candidates/{KEY}_02/save").json()["clipId"]
+    body = client.get(f"/api/games/by-clip/{clip_id}").json()
+    assert body == {"gameKey": KEY, "candidateId": f"{KEY}_02", "source": "steam", "hasFullVideo": True}
+
+
+def test_clip_source_reports_a_deleted_full_video_and_404_for_unlinked_clips(client):
+    clip_id = client.post(f"/api/games/{KEY}/candidates/{KEY}_01/save").json()["clipId"]
+    (client.tmp / "games" / KEY / "full.mp4").unlink()
+    assert client.get(f"/api/games/by-clip/{clip_id}").json()["hasFullVideo"] is False
+    assert client.get("/api/games/by-clip/not-a-clip").status_code == 404

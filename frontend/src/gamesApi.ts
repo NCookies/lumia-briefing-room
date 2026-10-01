@@ -1,6 +1,7 @@
 import type { RebuildStatus } from './legacyGame'
 import type { ReanalyzeMode, ReanalyzeStatus } from './reanalyze'
 import type { GameEditPatch } from './gameEdit'
+import type { ClipSource } from './clipViewer'
 import type { Candidate, CandidateUser, GameDetail, GameSummary } from './games'
 
 const BASE = '/api/games'
@@ -23,6 +24,13 @@ export async function getGames(source: 'steam' | 'vod' | 'all' = 'steam'): Promi
 }
 
 export class GameNotFoundError extends Error {}
+
+/** 클립을 만든 게임·후보. 이어진 게임이 없으면(앱 밖 영상·게임 기록이 지워진 클립) null. */
+export async function getClipSource(clipId: string): Promise<ClipSource | null> {
+  const res = await fetch(`${BASE}/by-clip/${encodeURIComponent(clipId)}`)
+  if (res.status === 404) return null
+  return jsonOrThrow<ClipSource>(res, '클립의 게임 찾기')
+}
 
 export async function getGame(key: string): Promise<GameDetail> {
   const res = await fetch(`${BASE}/${key}`)

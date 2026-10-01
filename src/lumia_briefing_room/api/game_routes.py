@@ -225,6 +225,20 @@ def register_game_routes(
         self_saved_categories(games)
         return {"games": [_summary(g, games_dir(g["gameKey"]), can_rebuild_full=rebuildable(g)) for g in games]}
 
+    @app.get("/api/games/by-clip/{clip_id}")
+    def get_clip_source(clip_id: str):
+        """클립을 만든 게임·후보(게임 기록의 `savedClipId`). 클립 탭이 `풀영상 보기·범위 고치기` 를 열 때 쓴다. 이어진 게임이 없으면 404."""
+        for directory in games_dirs("all"):
+            for game in list_games(directory):
+                for cand in gcand.all_candidates(game):
+                    if (cand.get("user") or {}).get("savedClipId") == clip_id:
+                        key = game["gameKey"]
+                        return {
+                            "gameKey": key, "candidateId": cand["id"], "source": game.get("source") or "steam",
+                            "hasFullVideo": has_full_video(directory, key),
+                        }
+        raise HTTPException(404, "이 클립을 만든 게임을 찾을 수 없습니다")
+
     @app.get("/api/games/{key}")
     def get_game(key: str):
         game = load_or_404(key)

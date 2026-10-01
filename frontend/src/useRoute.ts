@@ -43,8 +43,8 @@ export function useRoute(savedTab: TabId) {
   }, [])
 
   const back = useCallback(
-    (route: Route) => {
-      const target = listRoute(route)
+    (route: Route, to?: Route) => {
+      const target = to ?? listRoute(route)
       if (shouldHistoryBack(fromOf(history.state), target)) history.back()
       else navigate(target, true)
     },
@@ -57,6 +57,10 @@ export function useRoute(savedTab: TabId) {
 /** 탭 하나가 받는 화면 이동 수단. 열린 게임은 주소가 정하고 목록 컴포넌트는 주소를 직접 만지지 않는다. */
 export interface GameNav {
   openKey: string | null
+  /** 풀영상 화면을 열 때 선택해 둘 후보(클립 탭 `풀영상 보기·범위 고치기`). */
+  openCand: string | null
+  /** 돌아가기 버튼 글자. 기본값은 목록 이름. */
+  backLabel?: string
   /** 앱 안에서 눌러 연 경우만 true - 직접 연 주소는 브라우저가 소리 있는 자동 재생을 막는다. */
   userOpened: boolean
   open: (key: string) => void

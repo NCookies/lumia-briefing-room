@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { candidateTitle, effectiveRange, gameHeadline, isDismissed, isSaved, neighborCandidate, visibleCandidates, type Candidate, type GameDetail } from '../games'
+import { allCandidates, candidateTitle, effectiveRange, gameHeadline, isDismissed, isSaved, neighborCandidate, visibleCandidates, type Candidate, type GameDetail } from '../games'
 import {
   GameNotFoundError,
   addCandidate,
@@ -57,6 +57,7 @@ export function GameViewer({
   autoPlay = false,
   onMissing,
   active = true,
+  initialSelected = null,
 }: {
   gameKey: string
   onBack: () => void
@@ -70,6 +71,8 @@ export function GameViewer({
   onMissing?: () => void
   /** 이 화면이 속한 탭이 보이는 중인지. 탭을 바꿔도 화면은 마운트된 채라, 아니면 영상을 멈추고 단축키를 받지 않는다. */
   active?: boolean
+  /** 열 때 선택해 둘 후보(클립 탭에서 범위를 고치러 온 경우). 풀영상이 있으면 그 범위 시작으로 이동한다. */
+  initialSelected?: string | null
 }) {
   const [game, setGame] = useState<GameDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -98,6 +101,7 @@ export function GameViewer({
   const video = useRef<HTMLVideoElement>(null)
   const shell = useRef<HTMLDivElement>(null)
   const autoPlayed = useRef(false)
+  const pendingCand = useRef(initialSelected)
   const missing = useRef(onMissing)
   missing.current = onMissing
 
@@ -119,6 +123,10 @@ export function GameViewer({
   useEffect(() => {
     if (!active) video.current?.pause()
   }, [active])
+
+  useEffect(() => {
+    if (game && pendingCand.current && allCandidates(game).some((c) => c.id === pendingCand.current)) setSelected(pendingCand.current)
+  }, [game])
 
   useEffect(() => {
     if (helpOpen) saveHelpSeen()
@@ -582,6 +590,13 @@ export function GameViewer({
               onLoadedMetadata={(e) => {
                 e.currentTarget.volume = vol.volume
                 e.currentTarget.muted = vol.muted
+                const first = pendingCand.current ? cands.find((c) => c.id === pendingCand.current) : null
+                pendingCand.current = null
+                if (first) {
+                  const start = rangeOf(first)[0]
+                  e.currentTarget.currentTime = start
+                  setTime(start)
+                }
                 if (autoPlay && !autoPlayed.current) {
                   autoPlayed.current = true
                   void e.currentTarget.play().catch((err: unknown) => setVideoError(isPlaybackFailure(err)))

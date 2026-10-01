@@ -322,7 +322,7 @@ export function VodGameList({
     const summary = games?.find((g) => g.key === open)
     return (
       <>
-        <GameViewer key={`${open}-${viewerTick}`} active={active} gameKey={open} autoPlay={nav.userOpened} onMissing={nav.missing} backLabel="← 영상 목록" onBack={nav.close} onChanged={reloadGames} menu={summary && viewerDelete.menuFor(open, summary, [gameEdit.menuItem(open, summary)])} />
+        <GameViewer key={`${open}-${viewerTick}`} active={active} gameKey={open} initialSelected={nav.openCand} autoPlay={nav.userOpened} onMissing={nav.missing} backLabel={nav.backLabel ?? '← 영상 목록'} onBack={nav.close} onChanged={reloadGames} menu={summary && viewerDelete.menuFor(open, summary, [gameEdit.menuItem(open, summary)])} />
         {viewerDelete.dialog}
         {gameEdit.dialog}
       </>

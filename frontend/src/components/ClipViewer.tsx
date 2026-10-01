@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { thumbnailUrl } from '../api'
 import { cardHeadline, formatWhen } from '../clipArchive'
-import { CLIP_VIEWER_ACTIONS, clipViewerAction, neighborClipId } from '../clipViewer'
+import { CLIP_VIEWER_ACTIONS, clipViewerAction, neighborClipId, rangeFixTarget, type ClipSource } from '../clipViewer'
 import { fillHeight } from '../fillHeight'
 import { formatClock } from '../games'
+import { getClipSource } from '../gamesApi'
 import type { LibraryClip } from '../libraryApi'
 import { isPlaybackFailure } from '../playback'
 import type { TrimRange } from '../trimming'
@@ -37,6 +38,8 @@ interface Props {
   /** 확인 창 등 화면 밖 대화상자가 떠 있다. 단축키를 받지 않는다. */
   paused: boolean
   onBack: () => void
+  /** 풀영상 화면을 이 클립의 후보가 선택된 채로 연다(범위는 거기서 고친다). */
+  onOpenGame: (tab: 'steam' | 'vod', gameKey: string, candidateId: string) => void
   onOpen: (clipId: string) => void
   onRename: (clip: LibraryClip, title: string) => void
   onMemo: (clip: LibraryClip, memo: string | null) => void
@@ -48,7 +51,7 @@ interface Props {
 }
 
 /** 클립 탭의 재생 화면. 풀영상 화면과 같은 컨트롤 줄·단축키로 클립 하나를 보고, 오른쪽에 같은 카테고리의 클립 목록을 둔다. */
-export function ClipViewer({ clips, clip, category, active, paused, onBack, onOpen, onRename, onMemo, onMove, onExport, onReveal, onDelete, onTrim }: Props) {
+export function ClipViewer({ clips, clip, category, active, paused, onBack, onOpenGame, onOpen, onRename, onMemo, onMove, onExport, onReveal, onDelete, onTrim }: Props) {
   const [time, setTime] = useState(0)
   const [duration, setDuration] = useState(clip.durationSec)
   const [playing, setPlaying] = useState(false)
@@ -62,6 +65,7 @@ export function ClipViewer({ clips, clip, category, active, paused, onBack, onOp
   const [trimBusy, setTrimBusy] = useState(false)
   const [moveAnchor, setMoveAnchor] = useState<DOMRect | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [source, setSource] = useState<{ clipId: string; value: ClipSource | null } | null>(null)
   const [stageHeight, setStageHeight] = useState<number | null>(null)
   const root = useRef<HTMLDivElement>(null)
   const stage = useRef<HTMLDivElement>(null)
@@ -80,6 +84,17 @@ export function ClipViewer({ clips, clip, category, active, paused, onBack, onOp
   useEffect(() => {
     if (!active) video.current?.pause()
   }, [active])
+
+  useEffect(() => {
+    if (clip.unknownVideo) return
+    let cancelled = false
+    getClipSource(clip.id)
+      .then((value) => !cancelled && setSource({ clipId: clip.id, value }))
+      .catch(() => !cancelled && setSource({ clipId: clip.id, value: null }))
+    return () => {
+      cancelled = true
+    }
+  }, [clip.id, clip.unknownVideo])
 
   useEffect(() => {
     setTime(0)
@@ -243,10 +258,10 @@ export function ClipViewer({ clips, clip, category, active, paused, onBack, onOp
     if (title && title !== clip.title) onRename(clip, title)
   }
 
-  const menu: GameMenuItem[] = [
-    { label: '탐색기에서 열기', onSelect: () => onReveal(clip) },
-    { label: '✂ 자르기·나누기', onSelect: () => setTrimming(true) },
-  ]
+  const sourceLoaded = clip.unknownVideo ? true : source?.clipId === clip.id
+  const target = rangeFixTarget(clip.unknownVideo || source?.clipId !== clip.id ? null : source.value)
+  const menu: GameMenuItem[] = [{ label: '탐색기에서 열기', onSelect: () => onReveal(clip) }]
+  if (sourceLoaded && target.kind === 'trim') menu.push({ label: '✂ 자르기·나누기', onSelect: () => setTrimming(true) })
 
   const headline = clip.unknownVideo ? null : cardHeadline(clip)
 
@@ -282,6 +297,16 @@ export function ClipViewer({ clips, clip, category, active, paused, onBack, onOp
         )}
         {error && <span className="text-sm text-rose-300">{error}</span>}
         <span className="ml-auto flex items-center gap-2">
+          {target.kind === 'game' && (
+            <button
+              type="button"
+              className={BTN}
+              title="이 클립을 만든 게임의 풀영상 화면이 이 구간을 선택한 채로 열립니다. 범위는 거기서 손잡이를 끌어 고치고 다시 저장하세요"
+              onClick={() => onOpenGame(target.tab, target.gameKey, target.candidateId)}
+            >
+              풀영상 보기·범위 고치기
+            </button>
+          )}
           <button type="button" className={BTN} onClick={() => onExport(clip)}>
             내보내기
           </button>
