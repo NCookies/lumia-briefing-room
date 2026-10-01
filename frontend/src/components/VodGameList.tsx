@@ -40,6 +40,8 @@ import { GameRow } from './GameRow'
 import { GameViewer } from './GameViewer'
 import { LoadingBar } from './LoadingBar'
 import { StorageUsageBar } from './StorageUsageBar'
+import { VOD_TAB_HELP } from '../helpTexts'
+import { HelpTip } from './HelpTip'
 import { VideoFormatHelp } from './VideoFormatHelp'
 import { VodSection } from './VodSection'
 
@@ -363,6 +365,7 @@ export function VodGameList({
           </>
         )}
         <DueOnlyToggle checked={dueOnly} count={dueCount} onChange={setDueOnly} />
+        <HelpTip label="영상 파일 탭 설명" wide text={VOD_TAB_HELP} />
         <VideoFormatHelp />
         <button
           type="button"

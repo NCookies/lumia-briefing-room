@@ -3,6 +3,8 @@ import { getVodSettings, pickVideoFiles, saveVodSettings } from '../vodApi'
 import { needsAlwaysPermanentWarning, type DeleteSourceAfter, type DeleteSourceMode } from '../vodDeleteSource'
 import { useConfirm } from '../confirmContext'
 import { pickFolder } from '../exportApi'
+import { VOD_DELETE_SOURCE_HELP } from '../helpTexts'
+import { HelpTip } from './HelpTip'
 import { VideoFormatHelp } from './VideoFormatHelp'
 
 export function VodSettingsPanel({ onClipsDirChanged }: { onClipsDirChanged: () => void }) {
@@ -159,10 +161,13 @@ export function VodSettingsPanel({ onClipsDirChanged }: { onClipsDirChanged: () 
       </section>
 
       <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium text-zinc-200">분석 후 원본 영상 삭제</h3>
+        <h3 className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+          분석 후 원본 영상 삭제
+          <HelpTip label="원본 영상 삭제 설명" wide text={VOD_DELETE_SOURCE_HELP} />
+        </h3>
         <p className="text-xs text-zinc-500">
-          클립 추출이 끝난 원본 영상 파일을 지울지 정합니다. 분석에 성공해 클립이 1개 이상 나온 영상만 대상이고,
-          취소·실패했거나 클립이 하나도 안 나온 영상은 지우지 않습니다.
+          클립 추출이 끝난 원본 영상 파일을 지울지 정합니다. 분석에 성공해 게임 풀영상이 1개 이상 저장된 영상만 대상이고,
+          취소·실패했거나 게임을 못 찾은 영상은 지우지 않습니다.
         </p>
         <label className="flex items-center gap-2 text-sm text-zinc-300">
           <select
