@@ -23,6 +23,7 @@ from lumia_briefing_room import activity
 from lumia_briefing_room.api.clips import find_clip
 from lumia_briefing_room.pipeline.recording_stop import error_of_record, stopped_of_record
 from lumia_briefing_room.pipeline import categories as cats
+from lumia_briefing_room.pipeline import deleted_games
 from lumia_briefing_room.pipeline.library_fs import LibraryError
 from lumia_briefing_room.api.analysis_queue import enqueue, with_position
 from lumia_briefing_room.pipeline.reanalyze_clips import auto_saved_clip_ids, refresh_auto_clips
@@ -663,6 +664,7 @@ def register_game_routes(
             if body.target == "all":
                 deleted_full = video.is_file()
                 _remove_game_entirely(game, folder)
+                deleted_games.add(games_dir(key), key)
         cleanup_preview_registry.notify_clips_changed()
         return {
             "deletedFullVideo": deleted_full, "deletedClips": deleted_clips, "keptClips": len(kept_ids),

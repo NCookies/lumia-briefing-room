@@ -12,6 +12,7 @@ import logging
 from pathlib import Path
 
 from lumia_briefing_room.pipeline.clip_assets import resolve_character_portrait, resolve_result_image
+from lumia_briefing_room.pipeline import deleted_games
 from lumia_briefing_room.pipeline.game_store import FULL_VIDEO, GAME_JSON, SCHEMA_VERSION, vod_game_key, write_game_json
 from lumia_briefing_room.pipeline.legacy_games import LEGACY_ERROR, _candidate, _copy, _read
 
@@ -107,13 +108,14 @@ def _build(folder: Path, vod_clips: Path, index: dict, game: dict) -> dict:
 def migrate_legacy_vod_games(vod_clips: Path, games_dir: Path) -> list[str]:
     """새로 만든 게임 키 목록. 이미 옮긴 게임은 다시 만들지 않으므로 두 번째부터는 빈 목록이다."""
     created: list[str] = []
+    deleted = deleted_games.load(games_dir)
     for index in _indexes(vod_clips):
         for game in index["games"]:
             if not isinstance(game, dict) or "index" not in game:
                 continue
             key = vod_game_key(index["id"], int(game["index"]))
             folder = games_dir / key
-            if (folder / GAME_JSON).exists() or (folder / FULL_VIDEO).exists():
+            if key in deleted or (folder / GAME_JSON).exists() or (folder / FULL_VIDEO).exists():
                 continue
             try:
                 folder.mkdir(parents=True, exist_ok=True)

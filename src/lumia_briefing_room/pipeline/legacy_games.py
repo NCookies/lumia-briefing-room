@@ -13,6 +13,7 @@ import shutil
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from lumia_briefing_room.pipeline import deleted_games
 from lumia_briefing_room.pipeline.clip_assets import resolve_character_portrait, resolve_result_image
 from lumia_briefing_room.pipeline.game_files import list_games, update_game
 from lumia_briefing_room.pipeline.game_store import FULL_VIDEO, GAME_JSON, SCHEMA_VERSION, game_key, is_certain, write_game_json
@@ -181,9 +182,10 @@ def migrate_legacy_games(clips_dir: Path, games_dir: Path) -> list[str]:
     if not clips_dir.is_dir():
         return []
     created: list[str] = []
+    deleted = deleted_games.load(games_dir)
     for (_, key), info in sorted(_collect(clips_dir).items()):
         folder = games_dir / key
-        if (folder / GAME_JSON).exists() or (folder / FULL_VIDEO).exists():
+        if key in deleted or (folder / GAME_JSON).exists() or (folder / FULL_VIDEO).exists():
             continue
         try:
             folder.mkdir(parents=True, exist_ok=True)

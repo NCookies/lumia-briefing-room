@@ -732,3 +732,17 @@ def test_legacy_layout_vod_clips_survive_every_vod_delete(env):
     assert client.delete(f"/api/vods/{vid}/clips").json()["count"] == 0
     assert client.delete(f"/api/vods/{vid}").json()["deletedClips"] == 0
     assert (vod_dir / f"{cid}.json").exists() and (vod_dir / f"{cid}.mp4").exists()
+
+
+def test_a_vod_game_deleted_from_the_game_list_does_not_come_back_from_the_index(cat_env):
+    from lumia_briefing_room.pipeline.legacy_vod_games import migrate_legacy_vod_games
+    from lumia_briefing_room.pipeline.game_store import vod_game_key
+
+    client, a, resolved = cat_env
+    vid, *_ = seed_mixed_vod(resolved, a)
+    key = vod_game_key(vid, 1)
+    client.put("/api/config", json={"ui": {"deleteMode": "permanent"}})
+    migrate_legacy_vod_games(resolved.library_vod, resolved.games_vod)
+    assert client.post(f"/api/games/{key}/delete", json={"target": "all"}).status_code == 200
+
+    assert migrate_legacy_vod_games(resolved.library_vod, resolved.games_vod) == []

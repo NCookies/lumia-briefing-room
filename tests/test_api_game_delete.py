@@ -212,3 +212,14 @@ def test_whole_game_delete_keeps_every_clip_in_legacy_layout(client):
     assert resp["deletedClips"] == 0 and resp["keptClips"] == 2 and len(_clip_videos(client)) == 2
     assert client.get("/api/games").json()["games"] == []
 
+
+
+def test_a_deleted_game_does_not_come_back_after_a_restart_even_with_kept_clips(cat_client):
+    from lumia_briefing_room.pipeline.legacy_games import migrate_legacy_games
+
+    _seed_mixed(cat_client)
+    cat_client.post(f"/api/games/{CKEY}/delete", json={"target": "all"})
+    resolved = cat_client.resolved
+    assert migrate_legacy_games(resolved.library_steam, resolved.games_steam) == []
+    assert cat_client.get("/api/games").json()["games"] == []
+    assert {c["id"] for c in cat_client.get("/api/clips").json()} == {f"{CKEY}_02", f"{CKEY}_03"}
