@@ -391,23 +391,23 @@ def test_missing_ffmpeg_blocks_analysis(env, monkeypatch):
     assert client.post(f"/api/vods/{vod_id(a)}/analyze", json={}).status_code == 503
 
 
-def test_vod_wide_delete_removes_only_that_vods_clips(env):
-    client, a, _, vod_dir, *_ = env
+def test_vod_wide_delete_removes_only_that_vods_clips(cat_env):
+    client, a, resolved = cat_env
     vid = vod_id(a)
-    ids = [write_vod_clip(vod_dir, vid, 1, 10), write_vod_clip(vod_dir, vid, 2, 10)]
-    other = write_vod_clip(vod_dir, "otherid00001", 1, 10)
+    ids = [write_cat_clip(resolved, vid, 1, 10, "자동 보관"), write_cat_clip(resolved, vid, 2, 10, "자동 보관")]
+    other = write_cat_clip(resolved, "otherid00001", 1, 10, "자동 보관")
 
     assert client.delete(f"/api/vods/{vid}/clips").json()["count"] == 2
-    assert not any((vod_dir / f"{i}.json").exists() for i in ids)
-    assert (vod_dir / f"{other}.json").exists()
+    assert not any((resolved.library_vod / f"{i}.json").exists() for i in ids)
+    assert (resolved.library_vod / f"{other}.json").exists()
 
 
-def test_vod_wide_delete_uses_the_configured_delete_mode(env, monkeypatch):
+def test_vod_wide_delete_uses_the_configured_delete_mode(cat_env, monkeypatch):
     from lumia_briefing_room.pipeline import delete_helper
 
-    client, a, _, vod_dir, *_ = env
+    client, a, resolved = cat_env
     vid = vod_id(a)
-    write_vod_clip(vod_dir, vid, 1, 10)
+    write_cat_clip(resolved, vid, 1, 10, "자동 보관")
     client.put("/api/config", json={"ui": {"deleteMode": "recycle"}})
     sent = []
     monkeypatch.setattr(delete_helper, "_send2trash", lambda path: sent.append(Path(path).name))
@@ -439,14 +439,15 @@ def test_vod_wide_delete_also_clears_the_games_summary_so_the_row_resets(env):
     assert saved["decodeDone"] is True and saved["analyzedSec"] == 100.0
 
 
-def test_delete_vod_entirely_removes_index_cache_and_clips(env):
+def test_delete_vod_entirely_removes_index_cache_and_clips(cat_env):
     """"게임 항목"(색인) 자체를 지운다 - `DELETE .../clips`(전체 삭제)는 색인을 남기고
     games/clips 만 비우지만, 이건 색인 파일과 판독 캐시까지 지운다."""
     from lumia_briefing_room.pipeline.vod_store import cache_path, index_path
 
-    client, a, _, vod_dir, *_ = env
+    client, a, resolved = cat_env
+    vod_dir = resolved.library_vod
     vid = vod_id(a)
-    cid = write_vod_clip(vod_dir, vid, 1, 10)
+    cid = write_cat_clip(resolved, vid, 1, 10, "자동 보관")
     save_index(vod_dir, {"id": vid, "path": str(a), "status": "done", "games": [], "clips": [cid]})
     cache_path(vod_dir, vid).parent.mkdir(parents=True, exist_ok=True)
     cache_path(vod_dir, vid).write_bytes(b"cache")
@@ -507,13 +508,13 @@ def test_delete_vod_unknown_id_is_404(env):
     assert client.delete("/api/vods/does-not-exist").status_code == 404
 
 
-def test_delete_vod_game_removes_it_and_deletes_its_clips(env, monkeypatch):
+def test_delete_vod_game_removes_it_and_deletes_its_clips(cat_env, monkeypatch):
     from lumia_briefing_room.pipeline import delete_helper
 
-    client, a, _, vod_dir, *_ = env
+    client, a, resolved = cat_env
     vid = vod_id(a)
-    cid = write_vod_clip(vod_dir, vid, 1, 10)
-    save_index(vod_dir, {
+    cid = write_cat_clip(resolved, vid, 1, 10, "자동 보관")
+    save_index(resolved.library_vod, {
         "id": vid, "path": str(a), "status": "done",
         "games": [
             {"index": 1, "startSec": 0.0, "endSec": 10.0, "result": None, "clipIds": [cid]},
@@ -623,3 +624,111 @@ def test_a_missing_file_is_not_probing(env):
     a.unlink()
     entry = by_id(client.get("/api/vods"))[vid]
     assert entry["exists"] is False and entry["probing"] is False
+
+
+@pytest.fixture
+def cat_env(tmp_path, monkeypatch):
+    """카테고리 폴더 저장소: 영상 클립 영상은 `clips\<카테고리>\`, 정보는 library_vod."""
+    monkeypatch.setattr(vods_module, "discover_ffmpeg", lambda: tmp_path / "ffmpeg.exe")
+    monkeypatch.setattr(vods_module, "_probe_info", lambda path, ffmpeg: None)
+    videos = tmp_path / "videos"
+    a = write_video(videos / "a.mp4", b"A" * 3000)
+    cfg = Config(paths=PathsConfig(root=tmp_path / "store", temp=tmp_path / "tmp"))
+    resolved = resolve_paths(cfg.paths)
+    cfg.vod.sources = [str(videos)]
+    config_path = tmp_path / "config.json"
+    from lumia_briefing_room.config import save_config
+    save_config(cfg, config_path)
+    return TestClient(create_app(cfg, config_path=config_path)), a, resolved
+
+
+def write_cat_clip(resolved, vid: str, game: int, start: int, category: str):
+    cid = write_vod_clip(resolved.library_vod, vid, game, start)
+    (resolved.library_vod / f"{cid}.mp4").unlink()
+    folder = resolved.clips_root / category
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / f"{cid}.mp4").write_bytes(b"x" * 100)
+    return cid
+
+
+def seed_mixed_vod(resolved, a):
+    vid = vod_id(a)
+    auto = write_cat_clip(resolved, vid, 1, 10, "자동 보관")
+    kept = write_cat_clip(resolved, vid, 1, 90, "아야")
+    kept2 = write_cat_clip(resolved, vid, 2, 10, "보관함")
+    save_index(resolved.library_vod, {
+        "id": vid, "path": str(a), "status": "done", "decodeDone": True, "analyzedSec": 100.0,
+        "games": [{"index": 1, "startSec": 0.0, "endSec": 10.0, "result": None, "clipIds": [auto, kept]},
+                  {"index": 2, "startSec": 20.0, "endSec": 30.0, "result": None, "clipIds": [kept2]}],
+        "clips": [auto, kept, kept2],
+    })
+    return vid, auto, kept, kept2
+
+
+def listed_clip_ids(client):
+    return {c["id"] for c in client.get("/api/clips", params={"source": "vod"}).json()}
+
+
+def test_vod_wide_delete_removes_only_auto_archive_clips_and_keeps_user_archived_ones(cat_env):
+    client, a, resolved = cat_env
+    vid, auto, kept, kept2 = seed_mixed_vod(resolved, a)
+
+    body = client.delete(f"/api/vods/{vid}/clips").json()
+
+    assert body["count"] == 1 and body["keptClips"] == 2
+    assert listed_clip_ids(client) == {kept, kept2}, "남은 클립은 클립 탭에 그대로 보인다"
+    assert client.get(f"/api/clips/{kept}").status_code == 200
+    assert client.get(f"/api/clips/{kept}/video").status_code in (200, 206)
+    assert by_id(client.get("/api/vods"))[vid]["status"] == "new", "분석 결과는 그대로 비워진다"
+    assert client.delete(f"/api/clips/{kept}").status_code == 200
+    assert listed_clip_ids(client) == {kept2}
+
+
+def test_delete_vod_entirely_keeps_user_archived_clips_visible_in_the_clip_tab(cat_env):
+    from lumia_briefing_room.pipeline.vod_store import index_path
+
+    client, a, resolved = cat_env
+    vid, auto, kept, kept2 = seed_mixed_vod(resolved, a)
+
+    body = client.delete(f"/api/vods/{vid}").json()
+
+    assert body["deletedClips"] == 1 and body["keptClips"] == 2
+    assert not index_path(resolved.library_vod, vid).exists()
+    assert listed_clip_ids(client) == {kept, kept2}
+    assert client.get(f"/api/clips/{kept2}").status_code == 200
+
+
+def test_delete_vod_game_keeps_user_archived_clips_of_that_game(cat_env):
+    client, a, resolved = cat_env
+    vid, auto, kept, kept2 = seed_mixed_vod(resolved, a)
+
+    body = client.delete(f"/api/vods/{vid}/games/1").json()
+
+    assert body["deletedClips"] == 1 and body["keptClips"] == 1
+    assert listed_clip_ids(client) == {kept, kept2}
+    assert [g["index"] for g in by_id(client.get("/api/vods"))[vid]["games"]] == [2]
+
+
+def test_vod_deletes_remove_everything_when_all_clips_are_auto_archive(cat_env):
+    client, a, resolved = cat_env
+    vid = vod_id(a)
+    ids = [write_cat_clip(resolved, vid, 1, 10, "자동 보관"), write_cat_clip(resolved, vid, 1, 90, "자동 보관")]
+    save_index(resolved.library_vod, {"id": vid, "path": str(a), "status": "done", "games": [], "clips": ids})
+
+    body = client.delete(f"/api/vods/{vid}/clips").json()
+
+    assert body["count"] == 2 and body["keptClips"] == 0 and listed_clip_ids(client) == set()
+
+
+def test_legacy_layout_vod_clips_survive_every_vod_delete(env):
+    client, a, _, vod_dir, *_ = env
+    vid = vod_id(a)
+    cid = write_vod_clip(vod_dir, vid, 1, 10)
+    save_index(vod_dir, {"id": vid, "path": str(a), "status": "done",
+                         "games": [{"index": 1, "startSec": 0.0, "endSec": 10.0, "result": None, "clipIds": [cid]}],
+                         "clips": [cid]})
+
+    assert client.delete(f"/api/vods/{vid}/games/1").json()["keptClips"] == 1
+    assert client.delete(f"/api/vods/{vid}/clips").json()["count"] == 0
+    assert client.delete(f"/api/vods/{vid}").json()["deletedClips"] == 0
+    assert (vod_dir / f"{cid}.json").exists() and (vod_dir / f"{cid}.mp4").exists()
