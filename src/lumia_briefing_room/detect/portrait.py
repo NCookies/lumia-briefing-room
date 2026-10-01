@@ -5,7 +5,7 @@ from collections.abc import Iterable
 import numpy as np
 
 from lumia_briefing_room.detect.color import channel_stats, count, vivid_mask
-from lumia_briefing_room.detect.select_screen import read_select_screen
+from lumia_briefing_room.detect.select_screen import is_select_screen
 from lumia_briefing_room.detect.spectator import read_spectating
 from lumia_briefing_room.detect.types import PortraitCrops
 from lumia_briefing_room.profiles.models import ResolutionProfile
@@ -106,9 +106,12 @@ def _find_on_select_screens(
     로딩·선택 화면이 전부 "관전"으로 읽혀, 관전 판정으로 포기하는 옛 방식은 선택 화면까지 가지
     못했다. 머리띠는 상단 가운데·좌상단이라 오버레이에 덜 가리고, 선택 화면에서만 보므로 이전
     경기의 로비·인게임 화면을 잘못 잡을 걱정이 없어 포기 규칙도 필요 없다.
+
+    재실측(2026-10-01, 치지직 1080p): 선택 화면 동안 왼쪽 위에 다른 게임 창을 띄워 머리띠가 가려진 판이 13판 중
+    8판이었다 - 1080p 는 아래쪽 팀원 카드 막대로도 선택 화면을 알아본다(`is_select_screen`).
     """
     for _, frame in frames:
-        if not read_select_screen(profile.crop(frame, "select_timer"), profile.crop(frame, "select_title")):
+        if not is_select_screen(frame, profile):
             continue
         found = _portraits_if_filled(frame, profile, texture=True)
         if found is not None:

@@ -81,7 +81,9 @@ log = logging.getLogger(__name__)
 # 전부 결과 화면은 읽혔는데 클립이 0개).
 # 6: 캐릭터 선택 화면 판독(`select_screen`·`select_practice`, 1080p 프로필 포함) - 이전 캐시에는 이 값이 없어
 # 게임 시작을 선택 화면까지 넓히지도, 연습 모드·닷지를 거르지도 못한다(F6 풀영상 범위가 선택 화면부터라서 필요).
-ANALYSIS_VERSION = 6
+# 7: 1080p 는 머리띠가 가려져도 팀원 카드 막대로 선택 화면을 읽는다(2026-10-01) - 이전 캐시의 `select_screen` 은
+# 방송 화면에서 13판 중 8판을 놓쳐 풀영상이 선택 화면 없이 게임 10초 앞부터 잘렸다.
+ANALYSIS_VERSION = 7
 CHECKPOINT_FRAMES = 120
 PROGRESS_EVERY_FRAMES = 30
 # 진행률은 화면의 각 구간이 실제로 걸리는 시간에 비례해야 한다(2026-09-27 사용자 보고 -

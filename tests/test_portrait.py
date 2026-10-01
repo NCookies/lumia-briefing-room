@@ -241,3 +241,24 @@ def test_the_texture_rule_only_applies_on_the_select_screen_path():
 
     assert find_portraits_in_frames([(0.0, frame)], LEGACY_PROFILE) is None
 
+
+
+def test_1080p_route_select_with_a_covered_header_is_found_by_the_team_card_bars():
+    """실측(2026-10-01, 치지직 1080p): 선택 화면 동안 왼쪽 위에 다른 게임 창을 띄워 머리띠가 가려져 13판 중 8판의 초상화를 못 찾았다."""
+    profile = ResolutionProfile.for_resolution(1920, 1080)
+    frame = np.full((1080, 1920, 3), 20, dtype=np.uint8)
+
+    def paint(name, color):
+        roi = profile.rois[name]
+        frame[roi.y0 : roi.y1, roi.x0 : roi.x1] = color
+
+    for base in ("portrait", "teammate1", "teammate2"):
+        paint(base, VIVID)
+        paint(f"{base}_display", VIVID)
+    for i, bar in enumerate([(30, 140, 255), (60, 200, 40), (240, 200, 20)], start=1):
+        roi = profile.rois[f"select_card{i}"]
+        frame[roi.y0 : roi.y1, roi.x0 : roi.x1] = (70, 75, 85)
+        frame[roi.y0 : roi.y0 + 6, roi.x0 : roi.x1] = bar
+
+    assert find_portraits_in_frames([(0.0, frame)], profile) is not None
+    assert find_portraits_in_frames([(0.0, _route_select_frame())], PROFILE) is None
