@@ -171,6 +171,7 @@ test('formatGameRange prints the position inside the video', () => {
 
 test('vodStatusLabel and analysisPercent', () => {
   assert.equal(vodStatusLabel('new'), '분석 안 함')
+  assert.equal(vodStatusLabel('queued'), '대기 중')
   assert.equal(vodStatusLabel('analyzing'), '분석 중')
   assert.equal(vodStatusLabel('interrupted'), '분석 중단됨')
   assert.equal(vodStatusLabel('cancelled'), '분석 취소됨')
@@ -196,15 +197,13 @@ test('probe progress is inactive when nothing is being read', () => {
 import { analysisBlockedReason } from '../src/vodGrouping.ts'
 
 test('a disabled analysis button always says why', () => {
-  assert.equal(analysisBlockedReason(vod(), false), '')
-  assert.match(analysisBlockedReason(vod({ exists: false }), false), /찾을 수 없/)
-  assert.match(analysisBlockedReason(vod(), true), /다른 영상을 분석하는 중/)
-  assert.match(analysisBlockedReason(vod({ exists: false }), true), /찾을 수 없/)
-  assert.equal(analysisBlockedReason(null, false), '')
+  assert.equal(analysisBlockedReason(vod()), '')
+  assert.match(analysisBlockedReason(vod({ exists: false })), /찾을 수 없/)
+  assert.equal(analysisBlockedReason(null), '')
 })
 
 test('a source deleted by the auto-delete setting gets its own reason, not "file missing"', () => {
-  const reason = analysisBlockedReason(vod({ exists: false, sourceDeleted: true }), false)
+  const reason = analysisBlockedReason(vod({ exists: false, sourceDeleted: true }))
   assert.match(reason, /자동 삭제/)
   assert.doesNotMatch(reason, /찾을 수 없/)
 })

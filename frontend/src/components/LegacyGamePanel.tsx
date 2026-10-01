@@ -33,7 +33,7 @@ export function LegacyGamePanel({ game, onRebuilt }: { game: GameDetail; onRebui
       .catch((e: Error) => setError(e.message))
   }, [game])
 
-  const running = rebuild?.state === 'running'
+  const running = rebuild?.state === 'running' || rebuild?.state === 'queued'
   useEffect(() => {
     if (!running) return
     const timer = window.setInterval(() => {

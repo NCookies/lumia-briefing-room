@@ -29,6 +29,7 @@ import {
 } from '../vodApi'
 import { groupVodsByDate } from '../vodDates'
 import { resolvedDeleteSource } from '../vodDeleteSource'
+import { vodAnalyzeConfirmMessage } from '../vodAnalyzeConfirm'
 import { analysisEnded, buildableGameCount, groupGamesByVod, vodGameTime, vodTotals } from '../vodGames'
 import { probeProgress, type Vod } from '../vodGrouping'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
@@ -172,10 +173,15 @@ export function VodGameList({
     return () => clearInterval(timer)
   }, [active, probe.active])
 
+  const hasQueuedVod = vods.some((v) => v.status === 'queued')
   useEffect(() => {
-    if (!active || runningVodId === null) return
+    if (!active || (runningVodId === null && !hasQueuedVod)) return
     const timer = setInterval(async () => {
       try {
+        if (runningVodId === null) {
+          setVods(await listVods())
+          return
+        }
         const status = await getAnalysis(runningVodId)
         setJob(status)
         setVods(await listVods())
@@ -188,7 +194,7 @@ export function VodGameList({
       }
     }, 2000)
     return () => clearInterval(timer)
-  }, [active, runningVodId, reloadGames])
+  }, [active, runningVodId, hasQueuedVod, reloadGames])
 
   const runAndReload = async (action: () => Promise<unknown>) => {
     setActionError(null)
@@ -218,13 +224,8 @@ export function VodGameList({
   }
 
   const handleAnalyze = async (vod: Vod, options: { force?: boolean; rebuild?: boolean }) => {
-    const message = options.force
-      ? `"${vod.name}" 영상을 처음부터 다시 분석합니다.\n게임마다 풀영상을 새로 만들고, 클립 자동 보관 설정이면 기존 클립도 새로 만듭니다(라벨은 그대로 옮겨집니다). 실패하면 기존 결과는 그대로 남습니다.\n영상 길이에 따라 수십 분이 걸릴 수 있습니다. 계속하시겠습니까?`
-      : options.rebuild
-        ? `"${vod.name}" 영상의 게임 풀영상과 클립을 저장된 분석 결과로 다시 만듭니다.\n성공하면 기존 풀영상을 새로 바꾸고, 클립 자동 보관 설정이면 기존 클립도 새로 만듭니다. 계속하시겠습니까?`
-        : `"${vod.name}" 영상을 분석합니다.\n게임마다 풀영상(캐릭터 선택 ~ 결과 화면)이 저장되어 디스크를 게임 구간만큼 씁니다. 영상 길이에 따라 수십 분이 걸릴 수 있으며, 도중에 취소해도 다음에 이어서 할 수 있습니다. 계속하시겠습니까?`
     const result = await ask({
-      message,
+      message: vodAnalyzeConfirmMessage(vod.name, options),
       confirmLabel: options.force ? '다시 분석' : options.rebuild ? '다시 만들기' : '분석 시작',
     })
     if (!result.ok) return
@@ -423,7 +424,6 @@ export function VodGameList({
                         ? '이 영상에서 찾은 게임이 없습니다'
                         : '아직 게임이 없습니다. 분석을 시작하면 게임별로 풀영상이 만들어집니다.'
                     }
-                    analysisBusy={runningVodId !== null}
                     buildableCount={buildable}
                     onBuildFullVideos={() => vod && handleBuildFullVideos(vod, buildable)}
                     onToggle={() =>

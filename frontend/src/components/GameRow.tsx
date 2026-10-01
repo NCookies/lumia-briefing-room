@@ -24,12 +24,14 @@ interface Props {
   onOpen: () => void
   onPin: () => void
   rebuild?: { label: string; disabled: boolean; onClick: () => void }
+  /** 분석 대기열에 있는 게임: 대기 중(N번째)·진행 중 문구. 대기 중일 때만 취소할 수 있다. */
+  job?: { text: string; queued: boolean; onCancel: () => void }
   menu?: GameMenuItem[]
   onRename?: (title: string | null) => void
 }
 
 /** 게임 목록의 게임 한 줄. 스팀 녹화 탭과 영상 파일 탭이 같이 쓴다(시간 칸만 다르다). */
-export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, menu, onRename }: Props) {
+export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, job, menu, onRename }: Props) {
   return (
     <li
       className="flex cursor-pointer items-stretch overflow-hidden rounded border border-zinc-700 bg-zinc-800/60 hover:border-zinc-500 hover:bg-zinc-800"
@@ -109,7 +111,24 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, menu, onRe
         ) : (
           g.fullVideoError && <span className="text-xs text-amber-300">{g.fullVideoError}</span>
         )}
-        {rebuild && (
+        {job && (
+          <span className="flex items-center gap-1.5" data-testid="game-job">
+            <span className="rounded bg-sky-500/20 px-1.5 text-xs text-sky-200">{job.text}</span>
+            {job.queued && (
+              <button
+                type="button"
+                className="text-xs text-amber-300 hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  job.onCancel()
+                }}
+              >
+                대기 취소
+              </button>
+            )}
+          </span>
+        )}
+        {rebuild && !job && (
           <button
             type="button"
             className="rounded border border-sky-400 px-2 py-1 text-xs text-sky-100 hover:bg-sky-700/40 disabled:opacity-40"

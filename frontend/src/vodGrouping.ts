@@ -1,7 +1,7 @@
 import type { ClipSort, GameGroup } from './grouping'
 import type { MatchResult } from './types'
 
-export type VodStatus = 'new' | 'analyzing' | 'interrupted' | 'cancelled' | 'error' | 'done'
+export type VodStatus = 'new' | 'queued' | 'analyzing' | 'interrupted' | 'cancelled' | 'error' | 'done'
 
 export interface VodGameSummary {
   index: number
@@ -26,6 +26,8 @@ export interface Vod {
   width: number | null
   height: number | null
   status: VodStatus
+  /** `status` 가 `queued` 일 때만: 1 = 다음 차례. */
+  queuePosition?: number | null
   analyzedSec: number | null
   error: string | null
   errorKind: 'disk_full' | 'other' | null
@@ -170,6 +172,7 @@ export function formatGameRange(startSec: number, endSec: number): string {
 
 const STATUS_LABELS: Record<VodStatus, string> = {
   new: '분석 안 함',
+  queued: '대기 중',
   analyzing: '분석 중',
   interrupted: '분석 중단됨',
   cancelled: '분석 취소됨',
@@ -186,13 +189,12 @@ export function analysisPercent(vod: Pick<Vod, 'analyzedSec' | 'durationSec'>): 
   return Math.min(100, Math.round((vod.analyzedSec / vod.durationSec) * 100))
 }
 
-export function analysisBlockedReason(vod: Pick<Vod, 'exists' | 'sourceDeleted'> | null, analysisBusy: boolean): string {
+export function analysisBlockedReason(vod: Pick<Vod, 'exists' | 'sourceDeleted'> | null): string {
   if (vod === null) return ''
   if (!vod.exists) {
     return vod.sourceDeleted
       ? '설정에 따라 원본을 자동 삭제해 다시 분석할 수 없습니다'
       : '영상 파일을 찾을 수 없어 분석할 수 없습니다'
   }
-  if (analysisBusy) return '다른 영상을 분석하는 중입니다. 끝나면 시작할 수 있습니다'
   return ''
 }

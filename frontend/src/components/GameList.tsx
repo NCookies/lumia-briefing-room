@@ -15,8 +15,7 @@ import { useGameDelete } from '../useGameDelete'
 import { useGameEdit } from '../useGameEdit'
 import { useConfirm } from '../confirmContext'
 import { reanalyzeConfirmMessage } from '../reanalyze'
-import { useReanalyzeGame } from '../useReanalyzeGame'
-import { useRebuildFullVideo } from '../useRebuildFullVideo'
+import { useGameJobs } from '../useGameJobs'
 import type { DeleteMode } from '../deleteConfirm'
 import { DueOnlyToggle } from './DueOnlyToggle'
 import { GameDayHeader } from './GameDayHeader'
@@ -76,9 +75,8 @@ export function GameList({
       .then(setGames)
       .catch((e: Error) => setError(e.message))
   }, [])
-  const rebuild = useRebuildFullVideo(load)
   const [viewerTick, setViewerTick] = useState(0)
-  const reanalyze = useReanalyzeGame(
+  const jobs = useGameJobs(
     useCallback(() => {
       load()
       setViewerTick((t) => t + 1)
@@ -94,16 +92,16 @@ export function GameList({
   const ask = useConfirm()
   const reanalyzeItem = (key: string) => ({
     label: '다시 분석',
-    disabled: reanalyze.running !== null || rebuild.running !== null,
+    disabled: key in jobs.jobs,
     title: '원본 녹화가 남아 있으면 풀영상·후보·결과표·초상화를 전부 다시 만들고, 없으면 풀영상에서 후보만 다시 찾습니다',
     onSelect: async () => {
       try {
-        const mode = await reanalyze.plan(key)
-        if (mode === null) return reanalyze.fail(key, '원본 녹화도 풀영상도 남아 있지 않아 다시 분석할 수 없습니다')
+        const mode = await jobs.plan(key)
+        if (mode === null) return jobs.fail(key, '원본 녹화도 풀영상도 남아 있지 않아 다시 분석할 수 없습니다')
         const answer = await ask({ message: reanalyzeConfirmMessage(mode), confirmLabel: '다시 분석' })
-        if (answer.ok) reanalyze.start(key)
+        if (answer.ok) jobs.startReanalysis(key)
       } catch (e) {
-        reanalyze.fail(key, (e as Error).message)
+        jobs.fail(key, (e as Error).message)
       }
     },
   })
@@ -219,12 +217,17 @@ export function GameList({
                   rememberScroll()
                   nav.open(g.key)
                 }}
+                job={
+                  jobs.jobs[g.key]
+                    ? { text: jobs.jobs[g.key].text, queued: jobs.jobs[g.key].state === 'queued', onCancel: () => void jobs.cancel(g.key) }
+                    : undefined
+                }
                 rebuild={
                   g.canRebuildFullVideo && !g.hasFullVideo
                     ? {
-                        label: rebuild.running === g.key ? rebuild.state.text ?? '만드는 중…' : '풀영상 만들기',
-                        disabled: rebuild.running !== null,
-                        onClick: () => rebuild.start(g.key),
+                        label: '풀영상 만들기',
+                        disabled: g.key in jobs.jobs,
+                        onClick: () => jobs.startRebuild(g.key),
                       }
                     : undefined
                 }
@@ -239,11 +242,8 @@ export function GameList({
           )}
         </section>
       ))}
-      {reanalyze.state.text && (
-        <p className={`text-sm ${reanalyze.state.error ? 'text-rose-300' : reanalyze.running ? 'text-sky-300' : 'text-emerald-300'}`}>{reanalyze.state.text}</p>
-      )}
-      {rebuild.state.text && rebuild.running === null && (
-        <p className={`text-sm ${rebuild.state.error ? 'text-rose-300' : 'text-emerald-300'}`}>{rebuild.state.text}</p>
+      {jobs.result && (
+        <p className={`text-sm ${jobs.result.error ? 'text-rose-300' : 'text-emerald-300'}`}>{jobs.result.text}</p>
       )}
       {error && <p className="text-sm text-rose-300">{error}</p>}
       {gameDelete.dialog}

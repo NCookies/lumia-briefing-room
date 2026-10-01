@@ -66,7 +66,7 @@ export function videoUrl(id: string, version?: number): string {
 }
 
 export interface ReprocessStatus {
-  state: 'running' | 'done' | 'error'
+  state: 'queued' | 'running' | 'done' | 'error'
   message: string
   clips: number
 }

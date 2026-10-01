@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { formatBytes } from '../retention'
+import { queueLabel } from '../reanalyze'
 import { analysisBlockedReason, analysisPercent, formatDuration, vodStatusLabel, type Vod } from '../vodGrouping'
 import { formatDateChip } from '../vodDates'
 import type { AnalysisJob } from '../vodApi'
@@ -14,7 +15,6 @@ interface Props {
   clipCount: number
   visibleGameCount: number
   clipBytes: number
-  analysisBusy: boolean
   onToggle: () => void
   onAnalyze: (options: { force?: boolean; rebuild?: boolean }) => void
   onCancel: () => void
@@ -40,6 +40,7 @@ const PHASE_LABELS: Record<string, string> = {
 
 const STATUS_STYLES: Record<string, string> = {
   new: 'bg-zinc-700 text-zinc-300',
+  queued: 'bg-sky-500/10 text-sky-200',
   analyzing: 'bg-sky-500/20 text-sky-300',
   interrupted: 'bg-amber-500/20 text-amber-300',
   cancelled: 'bg-amber-500/20 text-amber-300',
@@ -248,7 +249,6 @@ export function VodSection({
   clipCount,
   visibleGameCount,
   clipBytes,
-  analysisBusy,
   onToggle,
   onAnalyze,
   onCancel,
@@ -264,11 +264,12 @@ export function VodSection({
   children,
 }: Props) {
   const running = vod?.status === 'analyzing'
+  const queued = vod?.status === 'queued'
   const buildingFullVideos = running && job?.kind === 'fullVideos'
   const percent = running ? Math.round((job?.fraction ?? 0) * 100) : vod ? analysisPercent(vod) : 0
   const resolution = vod?.width && vod.height ? `${vod.height}p` : ''
-  const canStart = vod !== null && vod.exists && !analysisBusy
-  const blockedReason = analysisBlockedReason(vod, analysisBusy)
+  const canStart = vod !== null && vod.exists
+  const blockedReason = analysisBlockedReason(vod)
 
   return (
     <section className="overflow-hidden rounded-xl border-2 border-zinc-600 bg-zinc-900/60">
@@ -305,10 +306,12 @@ export function VodSection({
           <span className={`rounded px-2 py-0.5 text-xs ${STATUS_STYLES[vod.status]}`}>
             {vod.status === 'error' && vod.errorKind === 'disk_full'
               ? '저장 공간 부족으로 중단됨'
-              : buildingFullVideos
-                ? '풀영상 만드는 중'
-                : vodStatusLabel(vod.status)}
-            {vod.status !== 'done' && vod.status !== 'new' && percent > 0 ? ` ${percent}%` : ''}
+              : queued
+                ? queueLabel(vod.queuePosition)
+                : buildingFullVideos
+                  ? '풀영상 만드는 중'
+                  : vodStatusLabel(vod.status)}
+            {vod.status !== 'done' && vod.status !== 'new' && !queued && percent > 0 ? ` ${percent}%` : ''}
           </span>
         )}
 
@@ -327,6 +330,10 @@ export function VodSection({
             <button type="button" className="text-amber-300 hover:underline" onClick={onCancel}>
               {buildingFullVideos ? '취소' : '분석 취소'}
             </button>
+          ) : queued ? (
+            <button type="button" className="text-amber-300 hover:underline" onClick={onCancel}>
+              대기 취소
+            </button>
           ) : vod && vod.status === 'done' ? (
             <ReanalyzeMenu disabled={!canStart} blockedReason={blockedReason} onAnalyze={onAnalyze} />
           ) : vod ? (
@@ -340,16 +347,12 @@ export function VodSection({
               {vod.status === 'new' ? '분석 시작' : '이어서 분석'}
             </button>
           ) : null}
-          {!running && onBuildFullVideos && buildableCount > 0 && vod?.canBuildFullVideos && (
+          {!running && !queued && onBuildFullVideos && buildableCount > 0 && vod?.canBuildFullVideos && (
             <button
               type="button"
               className="rounded border border-sky-500/60 px-3 py-1 text-sky-300 hover:bg-sky-500/20 disabled:opacity-50"
-              disabled={analysisBusy}
-              title={
-                analysisBusy
-                  ? '다른 영상 작업이 끝나면 시작할 수 있습니다'
-                  : '이전 버전에서 분석한 게임의 풀영상을 원본에서 잘라 만듭니다. 보관한 클립은 그대로 둡니다'
-              }
+              title="이전 버전에서 분석한 게임의 풀영상을 원본에서 잘라 만듭니다. 보관한 클립은 그대로 둡니다. 다른 분석이 돌고 있으면 줄을 서서 차례로 합니다"
+
               onClick={onBuildFullVideos}
             >
               풀영상 만들기 ({buildableCount})

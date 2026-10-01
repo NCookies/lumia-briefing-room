@@ -34,6 +34,7 @@ test('the old-game panel is only for legacy games that have no full video', () =
 
 test('rebuild status text shows progress, done and the failure reason', () => {
   assert.equal(rebuildStatusText({ state: 'idle', message: '', fraction: 0 }), null)
+  assert.equal(rebuildStatusText({ state: 'queued', message: '', fraction: 0, position: 2 }), '대기 중 (2번째)')
   assert.equal(rebuildStatusText({ state: 'running', message: '', fraction: 0.456 }), '풀영상을 만드는 중… 46%')
   assert.equal(rebuildStatusText({ state: 'done', message: '', fraction: 1 }), '풀영상을 만들었습니다')
   assert.equal(rebuildStatusText({ state: 'error', message: '원본이 삭제됨', fraction: 0 }), '원본이 삭제됨')

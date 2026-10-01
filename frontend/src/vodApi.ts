@@ -6,7 +6,9 @@ const BASE = '/api'
 export interface AnalysisJob {
   id: string
   kind?: 'analyze' | 'fullVideos'
-  state: 'idle' | 'running' | 'done' | 'error' | 'cancelled'
+  state: 'idle' | 'queued' | 'running' | 'done' | 'error' | 'cancelled'
+  /** 대기 중일 때만: 1 = 다음 차례. */
+  position?: number | null
   phase?: 'decode' | 'games' | 'full' | 'cut' | 'done'
   fraction?: number
   games?: number

@@ -64,6 +64,7 @@ import { dayAnchorId, dayId, shortcutDays } from '../dayFold'
 import { useDayFold } from '../useDayFold'
 import { DayShortcutBar } from './DayShortcutBar'
 import { resolvedDeleteSource } from '../vodDeleteSource'
+import { vodAnalyzeConfirmMessage } from '../vodAnalyzeConfirm'
 import { formatDuration, formatGameRange, groupByVod, probeProgress, type Vod } from '../vodGrouping'
 
 function resolveResultImageUrl(group: { recordId?: string; clips: { id: string }[]; key: string; number: number }): string {
@@ -235,10 +236,15 @@ export function ClipBrowser({
     return () => clearInterval(timer)
   }, [active, source, probe.active])
 
+  const hasQueuedVod = vods.some((v) => v.status === 'queued')
   useEffect(() => {
-    if (!active || source !== 'vod' || runningVodId === null) return
+    if (!active || source !== 'vod' || (runningVodId === null && !hasQueuedVod)) return
     const timer = setInterval(async () => {
       try {
+        if (runningVodId === null) {
+          setVods(await listVods())
+          return
+        }
         const status = await getAnalysis(runningVodId)
         setJob(status)
         setVods(await listVods())
@@ -251,7 +257,7 @@ export function ClipBrowser({
       }
     }, 2000)
     return () => clearInterval(timer)
-  }, [active, source, runningVodId, reload])
+  }, [active, source, runningVodId, hasQueuedVod, reload])
 
   const runAndReload = async (action: () => Promise<unknown>) => {
     setActionError(null)
@@ -322,7 +328,7 @@ export function ClipBrowser({
     const timer = setInterval(() => {
       getReprocessStatus(reprocessKey)
         .then((status) => {
-          if (status.state === 'running') return
+          if (status.state === 'running' || status.state === 'queued') return
           setReprocessKey(null)
           setReprocessGame(null)
           if (status.state === 'done') setNotice(`다시 분석했습니다. 새 클립 ${status.clips}개를 만들었습니다.`)
@@ -340,7 +346,7 @@ export function ClipBrowser({
 
   const handleReprocess = async (group: GameGroup<Clip>) => {
     const result = await ask({
-      message: `다음 게임을 원본 녹화에서 다시 분석합니다.\n${gameLabel(group)}\n분석에 성공하면 기존 클립을 지우고 새로 만듭니다(라벨은 그대로 옮겨집니다). 실패하면 기존 클립은 그대로 남습니다.\n분석에는 몇 분이 걸릴 수 있습니다. 계속하시겠습니까?`,
+      message: `다음 게임을 원본 녹화에서 다시 분석합니다.\n${gameLabel(group)}\n분석에 성공하면 이 게임의 기존 클립을 보관 카테고리로 옮긴 것까지 모두 지우고 새로 만듭니다(라벨만 옮겨집니다). 실패하면 기존 클립은 그대로 남습니다.\n분석에는 몇 분이 걸릴 수 있습니다. 다른 분석이 돌고 있으면 줄을 서서 차례로 합니다. 계속하시겠습니까?`,
       confirmLabel: '다시 분석',
     })
     if (!result.ok) return
@@ -356,13 +362,8 @@ export function ClipBrowser({
   }
 
   const handleAnalyze = async (vod: Vod, options: { force?: boolean; rebuild?: boolean }) => {
-    const message = options.force
-      ? `"${vod.name}" 영상을 처음부터 다시 분석합니다.\n분석에 성공하면 기존 클립을 지우고 새로 만듭니다(라벨은 그대로 옮겨집니다). 실패하면 기존 클립은 그대로 남습니다.\n영상 길이에 따라 수십 분이 걸릴 수 있습니다. 계속하시겠습니까?`
-      : options.rebuild
-        ? `"${vod.name}" 영상의 클립을 저장된 분석 결과로 다시 만듭니다.\n분석에 성공하면 기존 클립을 지우고 새로 만듭니다. 계속하시겠습니까?`
-        : `"${vod.name}" 영상을 분석합니다.\n영상 길이에 따라 수십 분이 걸릴 수 있으며, 도중에 취소해도 다음에 이어서 할 수 있습니다. 계속하시겠습니까?`
     const result = await ask({
-      message,
+      message: vodAnalyzeConfirmMessage(vod.name, options),
       confirmLabel: options.force ? '다시 분석' : options.rebuild ? '다시 만들기' : '분석 시작',
     })
     if (!result.ok) return
@@ -739,7 +740,6 @@ export function ClipBrowser({
                   clipCount={vg.vod?.clipCount ?? visible}
                   visibleGameCount={vg.games.length}
                   clipBytes={vg.vod?.clipBytes ?? visibleBytes}
-                  analysisBusy={runningVodId !== null}
                   onToggle={() =>
                     setCollapsedVods((prev) => {
                       const next = new Set(prev)

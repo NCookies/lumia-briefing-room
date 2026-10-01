@@ -104,6 +104,11 @@ export async function unsaveCandidate(key: string, id: string): Promise<Candidat
   return jsonOrThrow(await send('POST', `${BASE}/${key}/candidates/${id}/unsave`), '보관 해제')
 }
 
+/** 대기 중인 풀영상 만들기·다시 분석 요청을 취소한다(실행 중인 것은 멈추지 않는다). */
+export async function cancelQueuedGameJob(key: string): Promise<void> {
+  await jsonOrThrow(await send('DELETE', `${BASE}/${key}/queue`), '대기 취소')
+}
+
 export async function getReanalyzePlan(key: string): Promise<ReanalyzeMode | null> {
   return (await jsonOrThrow<{ mode: ReanalyzeMode | null }>(await fetch(`${BASE}/${key}/reanalyze`), '다시 분석 방식 확인')).mode
 }
