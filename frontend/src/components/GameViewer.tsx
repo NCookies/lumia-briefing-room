@@ -169,7 +169,7 @@ export function GameViewer({
     else v.pause()
   }
 
-  const run = async (action: () => Promise<unknown>, done?: string) => {
+  const run = async (action: () => Promise<unknown>, done?: string): Promise<boolean> => {
     setBusy(true)
     setNotice(null)
     setError(null)
@@ -178,8 +178,10 @@ export function GameViewer({
       await reload()
       onChanged()
       if (done) setNotice(done)
+      return true
     } catch (e) {
       setError((e as Error).message)
+      return false
     } finally {
       setBusy(false)
     }
@@ -341,11 +343,21 @@ export function GameViewer({
     setMemoOpenId((open) => (open === selectedCand.id ? null : selectedCand.id))
   }
 
+  const needsResave = (c: Candidate) => {
+    const [start, end] = rangeOf(c)
+    return isSaved(c) && rangeModified({ ...c, user: { ...c.user, start, end } }, duration)
+  }
+
   const quickArchive = () => {
     if (!selectedCand || busy || isDismissed(selectedCand)) return
     if (!isSaved(selectedCand)) return archive(selectedCand.id)
-    const [start, end] = rangeOf(selectedCand)
-    if (rangeModified({ ...selectedCand, user: { ...selectedCand.user, start, end } }, duration)) resave(selectedCand.id)
+    if (needsResave(selectedCand)) resave(selectedCand.id)
+  }
+
+  const archivePopupWithSave = async (c: Candidate) => {
+    if (busy) return
+    if (needsResave(c) && !(await run(() => saveCandidate(gameKey, c.id), '고친 범위를 보관한 클립에 저장했습니다'))) return
+    openArchivePopup(c)
   }
 
   const dispatch = (action: ViewerAction) => {
@@ -363,7 +375,7 @@ export function GameViewer({
       case 'archive':
         return quickArchive()
       case 'archivePopup':
-        return selectedCand && openArchivePopup(selectedCand)
+        return selectedCand && void archivePopupWithSave(selectedCand)
       case 'dismiss':
         return selectedCand && !busy && dismissOrDelete(selectedCand)
       case 'deleteClip':

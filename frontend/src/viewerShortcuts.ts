@@ -40,7 +40,7 @@ export const VIEWER_SHORTCUTS: Shortcut[] = [
   { action: 'markEnd', combos: [{ key: 'o' }], desc: '선택한 클립의 끝을 지금 위치로', group: '범위 편집' },
   { action: 'undo', combos: [{ key: 'z', ctrl: true }], desc: '되돌리기', group: '범위 편집' },
   { action: 'archive', combos: [{ key: 's' }], desc: '선택한 클립 보관(보관한 클립은 고친 범위 다시 저장)', group: '선택한 클립' },
-  { action: 'archivePopup', combos: [{ key: 's', ctrl: true }], desc: '보관 위치 고르기', group: '선택한 클립' },
+  { action: 'archivePopup', combos: [{ key: 's', ctrl: true }], desc: '보관 위치 고르기(보관한 클립의 범위를 고쳤으면 먼저 저장)', group: '선택한 클립' },
   { action: 'dismiss', combos: [{ key: 'd' }], desc: '무시(직접 추가한 구간은 삭제)', group: '선택한 클립' },
   { action: 'deleteClip', combos: [{ key: 'Delete' }], desc: '클립 삭제(클립이 없으면 D 와 같음)', group: '선택한 클립' },
   { action: 'memo', combos: [{ key: 'm' }], desc: '메모 열기(보관한 클립)', group: '선택한 클립' },
