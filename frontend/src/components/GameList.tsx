@@ -140,7 +140,7 @@ export function GameList({
     const summary = games?.find((g) => g.key === open)
     return (
       <>
-        <GameViewer key={`${open}-${viewerTick}`} gameKey={open} autoPlay={viewerTick === 0 && nav.userOpened} onMissing={nav.missing} onBack={nav.close} onChanged={load} menu={summary && viewerDelete.menuFor(open, summary, [gameEdit.menuItem(open, summary), reanalyzeItem(open)])} />
+        <GameViewer key={`${open}-${viewerTick}`} active={active} gameKey={open} autoPlay={viewerTick === 0 && nav.userOpened} onMissing={nav.missing} onBack={nav.close} onChanged={load} menu={summary && viewerDelete.menuFor(open, summary, [gameEdit.menuItem(open, summary), reanalyzeItem(open)])} />
         {viewerDelete.dialog}
         {gameEdit.dialog}
       </>

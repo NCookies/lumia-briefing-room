@@ -42,6 +42,7 @@ export function GameViewer({
   menu,
   autoPlay = false,
   onMissing,
+  active = true,
 }: {
   gameKey: string
   onBack: () => void
@@ -53,6 +54,8 @@ export function GameViewer({
   autoPlay?: boolean
   /** 열려는 게임이 없을 때(지워진 주소) 부른다. */
   onMissing?: () => void
+  /** 이 화면이 속한 탭이 보이는 중인지. 탭을 바꿔도 화면은 마운트된 채라, 아니면 영상을 멈추고 단축키를 받지 않는다. */
+  active?: boolean
 }) {
   const [game, setGame] = useState<GameDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -90,6 +93,10 @@ export function GameViewer({
   useEffect(() => {
     void reload()
   }, [reload])
+
+  useEffect(() => {
+    if (!active) video.current?.pause()
+  }, [active])
 
   const duration = game?.fullVideo?.durationSec ?? 0
   const cands = useMemo(() => (game ? visibleCandidates(game, showDismissed) : []), [game, showDismissed])
@@ -300,6 +307,7 @@ export function GameViewer({
     })
 
   const handleKey = (e: KeyboardEvent) => {
+    if (!active) return
     const target = e.target as HTMLElement | null
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return
     if (!game?.hasFullVideo) return
