@@ -94,6 +94,10 @@ export function ClipArchive({ active, category, onCategoryChange, refreshTick, c
   }, [active, loadCategories, refreshTick])
 
   useEffect(() => {
+    setPlayingId(null)
+  }, [active, current])
+
+  useEffect(() => {
     if (active) loadClips()
   }, [active, loadClips, refreshTick])
 
