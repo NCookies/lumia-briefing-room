@@ -3,6 +3,7 @@ import { clipCountsLabel, gameHeadline, matchTypeLabel, recordingStopLabel, type
 import { gameAssetUrl } from '../gamesApi'
 import { formatBytes } from '../retention'
 import { GameMenu, type GameMenuItem } from './GameMenu'
+import { GameTitle } from './GameTitle'
 
 export interface RowTime {
   main: string
@@ -24,10 +25,11 @@ interface Props {
   onPin: () => void
   rebuild?: { label: string; disabled: boolean; onClick: () => void }
   menu?: GameMenuItem[]
+  onRename?: (title: string | null) => void
 }
 
 /** 게임 목록의 게임 한 줄. 스팀 녹화 탭과 영상 파일 탭이 같이 쓴다(시간 칸만 다르다). */
-export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, menu }: Props) {
+export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, menu, onRename }: Props) {
   return (
     <li
       className="flex cursor-pointer items-stretch overflow-hidden rounded border border-zinc-700 bg-zinc-800/60 hover:border-zinc-500 hover:bg-zinc-800"
@@ -72,10 +74,10 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, menu }: Pr
             ) : null,
           )}
         </div>
-        {g.title && (
-          <span className="max-w-xs truncate text-sm font-semibold text-zinc-100" title={g.title}>
-            {g.title}
-          </span>
+        {onRename ? (
+          <GameTitle value={g.title} onSave={onRename} />
+        ) : (
+          g.title && <span className="max-w-xs truncate text-sm font-semibold text-zinc-100">{g.title}</span>
         )}
       </div>
       <div className="flex flex-wrap items-center justify-end gap-3 py-3 pr-4">
@@ -88,7 +90,7 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, menu }: Pr
           </span>
         )}
         {g.matchResultSource === 'manual' && (
-          <span className="text-xs text-amber-400" title="직접 고친 값입니다. 다시 분석해도 덮어쓰지 않습니다">
+          <span className="text-xs text-amber-400" title="직접 고친 값입니다. 다시 분석해도 바뀌지 않습니다">
             🔒
           </span>
         )}

@@ -91,18 +91,12 @@ def read(path):
 
 def test_sync_clip_results_writes_edit_and_lock_but_keeps_the_clips_own_image(tmp_path):
     clip = _clip(tmp_path, "a", matchResult={"placement": 5, "kills": 2, "imagePath": ".thumbs/r.jpg"})
-    sync_clip_results([clip], {"placement": 1}, locked=True)
+    sync_clip_results([clip], {"placement": 1})
     assert read(clip)["matchResult"] == {"placement": 1, "kills": 2, "imagePath": ".thumbs/r.jpg"}
     assert read(clip)["matchResultSource"] == "manual"
-
-
-def test_sync_clip_results_unlock_clears_only_the_lock(tmp_path):
-    clip = _clip(tmp_path, "a", matchResult={"placement": 1}, matchResultSource="manual")
-    sync_clip_results([clip], None, locked=False)
-    assert read(clip)["matchResult"] == {"placement": 1} and read(clip)["matchResultSource"] is None
 
 
 def test_sync_clip_results_skips_unreadable_files(tmp_path):
     bad = tmp_path / "bad.json"
     bad.write_text("{", encoding="utf-8")
-    sync_clip_results([bad, tmp_path / "missing.json"], {"placement": 1}, locked=True)
+    sync_clip_results([bad, tmp_path / "missing.json"], {"placement": 1})

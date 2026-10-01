@@ -49,11 +49,6 @@ export async function saveGameInfo(key: string, body: { matchResult?: GameEditPa
   return jsonOrThrow(await send('PATCH', `${BASE}/${key}`, body), '게임 정보 저장')
 }
 
-/** 잠금만 푼다(값은 그대로). 이후 다시 분석이 새로 읽은 값으로 바꿀 수 있다. */
-export async function unlockGameResult(key: string): Promise<GameSummary> {
-  return jsonOrThrow(await send('PATCH', `${BASE}/${key}`, { matchResultSource: null }), '잠금 해제')
-}
-
 export type CandidatePatch = Partial<Pick<CandidateUser, 'start' | 'end' | 'dismissed' | 'title'>> & { label?: 'combat' | 'hunt' | null }
 
 export async function patchCandidate(key: string, id: string, patch: CandidatePatch): Promise<Candidate> {

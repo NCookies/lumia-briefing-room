@@ -122,10 +122,10 @@ def test_a_bad_result_edit_is_rejected_and_changes_nothing(client):
     assert saved["matchResult"]["placement"] == 1 and "matchResultSource" not in saved
 
 
-def test_unlocking_keeps_the_values(client):
+def test_the_lock_cannot_be_removed_through_the_api(client):
     client.patch(f"/api/games/{KEY}", json={"matchResult": {"placement": 5}})
     body = client.patch(f"/api/games/{KEY}", json={"matchResultSource": None}).json()
-    assert body["matchResultSource"] is None and body["matchResult"]["placement"] == 5
+    assert body["matchResultSource"] == "manual" and body["matchResult"]["placement"] == 5
 
 
 def test_a_cobalt_game_only_takes_victory_or_defeat(client):
@@ -144,9 +144,6 @@ def test_editing_the_result_updates_the_clips_made_from_the_game_too(client):
     assert meta["matchResultSource"] == "manual"
     clip = next(c for c in client.get("/api/clips").json() if c["id"] == f"{KEY}_01")
     assert clip["matchResult"]["placement"] == 2
-    client.patch(f"/api/games/{KEY}", json={"matchResultSource": None})
-    meta = json.loads((client.library / f"{KEY}_01.json").read_text(encoding="utf-8"))
-    assert meta["matchResultSource"] is None and meta["matchResult"]["placement"] == 2
 
 
 def test_a_clip_saved_after_the_edit_carries_the_locked_result(client):

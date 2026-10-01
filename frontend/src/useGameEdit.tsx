@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { GameInfoDialog } from './components/GameInfoDialog'
 import type { GameMenuItem } from './components/GameMenu'
 import type { GameSummary } from './games'
-import { saveGameInfo, unlockGameResult } from './gamesApi'
+import { saveGameInfo } from './gamesApi'
 
 type Editable = Pick<GameSummary, 'gameMode' | 'matchResult' | 'matchResultSource' | 'title'>
 
@@ -35,13 +35,8 @@ export function useGameEdit(options: { onDone: () => void; onError: (message: st
         setTarget(null)
         if (Object.keys(body).length > 0) void run(() => saveGameInfo(key, body))
       }}
-      onUnlock={() => {
-        const key = target.key
-        setTarget(null)
-        void run(() => unlockGameResult(key))
-      }}
     />
   )
 
-  return { menuItem, dialog }
+  return { menuItem, dialog, saveTitle: (key: string, title: string | null) => run(() => saveGameInfo(key, { title })) }
 }

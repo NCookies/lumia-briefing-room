@@ -5,16 +5,14 @@ import type { GameSummary } from '../games'
 interface Props {
   game: Pick<GameSummary, 'gameMode' | 'matchResult' | 'matchResultSource' | 'title'>
   onSave: (body: { matchResult?: GameEditPatch; title?: string | null }) => void
-  onUnlock: () => void
   onCancel: () => void
 }
 
 const INPUT = 'w-20 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm text-zinc-100'
 
 /** `게임 정보 수정하기`: 제목과, 판독이 틀린 순위·일반/랭크·TK/K/A(코발트는 승리/패배)를 고친다. 저장하면 잠긴다. */
-export function GameInfoDialog({ game, onSave, onUnlock, onCancel }: Props) {
+export function GameInfoDialog({ game, onSave, onCancel }: Props) {
   const cobalt = game.gameMode === 'cobalt'
-  const locked = game.matchResultSource === 'manual'
   const [draft, setDraft] = useState<GameEditDraft>(() => draftOf(game.matchResult))
   const [title, setTitle] = useState(game.title ?? '')
   const [error, setError] = useState<string | null>(null)
@@ -92,20 +90,10 @@ export function GameInfoDialog({ game, onSave, onUnlock, onCancel }: Props) {
         {number('kills', 'K')}
         {number('assists', 'A')}
         <p className="text-xs leading-relaxed text-zinc-400">
-          순위·TK/K/A 를 고쳐 저장하면 그 값으로 잠깁니다. 다시 분석하거나 과거 결과 채우기를 해도 덮어쓰지 않고, 이 게임의 클립 결과도 같은 값으로 바뀝니다.
+          순위·TK/K/A 를 고쳐 저장하면 그 값으로 고정됩니다. 다시 분석하거나 과거 결과 채우기를 해도 덮어쓰지 않고, 이 게임의 클립 결과도 같은 값으로 바뀝니다.
         </p>
         {error && <p className="text-sm text-rose-300">{error}</p>}
         <div className="flex items-center justify-end gap-2">
-          {locked && (
-            <button
-              type="button"
-              className="mr-auto rounded px-2 py-1.5 text-xs text-amber-300 hover:bg-zinc-700"
-              title="값은 그대로 두고 잠금만 풉니다. 이후 다시 분석이 새로 읽은 값으로 바꿀 수 있습니다."
-              onClick={onUnlock}
-            >
-              잠금 해제
-            </button>
-          )}
           <button type="button" className="rounded px-4 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700" onClick={onCancel}>
             취소
           </button>

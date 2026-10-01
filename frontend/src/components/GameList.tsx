@@ -214,6 +214,7 @@ export function GameList({
                 time={{ main: formatShort(g.matchStartUtc), sub: g.matchStartUtc ? formatAgo(g.matchStartUtc) : '' }}
                 due={cleanup[g.key]}
                 menu={gameDelete.menuFor(g.key, g, [gameEdit.menuItem(g.key, g), reanalyzeItem(g.key)])}
+                onRename={(title) => void gameEdit.saveTitle(g.key, title)}
                 onOpen={() => {
                   rememberScroll()
                   nav.open(g.key)

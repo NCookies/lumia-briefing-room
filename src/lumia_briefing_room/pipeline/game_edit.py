@@ -89,10 +89,8 @@ def carry_user_fields(old: dict, new: dict) -> None:
         new["matchResult"], new["matchResultSource"] = old["matchResult"], "manual"
 
 
-def sync_clip_results(paths: Iterable[Path], edit: dict | None, *, locked: bool) -> None:
-    """게임의 클립 메타에 같은 결과·잠금을 쓴다. 클립이 가진 결과 이미지 경로는 건드리지 않는다.
-
-    `edit` 가 없으면 잠금만 바꾼다(해제). 읽거나 쓸 수 없는 클립은 건너뛴다."""
+def sync_clip_results(paths: Iterable[Path], edit: dict) -> None:
+    """게임의 클립 메타에 같은 결과·잠금을 쓴다. 클립이 가진 결과 이미지 경로는 건드리지 않는다. 읽거나 쓸 수 없는 클립은 건너뛴다."""
     for path in paths:
         try:
             meta = json.loads(path.read_text(encoding="utf-8"))
@@ -100,12 +98,8 @@ def sync_clip_results(paths: Iterable[Path], edit: dict | None, *, locked: bool)
             continue
         if not isinstance(meta, dict):
             continue
-        if edit is not None:
-            meta["matchResult"] = {**(meta.get("matchResult") or {}), **edit}
-        if locked:
-            meta["matchResultSource"] = "manual"
-        elif meta.get("matchResultSource") == "manual":
-            meta["matchResultSource"] = None
+        meta["matchResult"] = {**(meta.get("matchResult") or {}), **edit}
+        meta["matchResultSource"] = "manual"
         try:
             path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
         except OSError:

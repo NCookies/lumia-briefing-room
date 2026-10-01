@@ -54,7 +54,6 @@ class GamePatch(BaseModel):
     pinned: bool | None = None
     title: str | None = None
     matchResult: dict | None = None
-    matchResultSource: str | None = None
 
 
 class CandidateCreate(BaseModel):
@@ -406,10 +405,6 @@ def register_game_routes(
                 result_edit = validate_result_edit(body.matchResult, cobalt=game.get("gameMode") == "cobalt")
         except GameEditError as e:
             raise HTTPException(400, str(e))
-        unlock = "matchResultSource" in sent and body.matchResultSource is None and result_edit is None
-        if "matchResultSource" in sent and body.matchResultSource is not None:
-            raise HTTPException(400, "잠금은 해제(null)만 직접 바꿀 수 있습니다. 값을 고치면 저절로 잠깁니다")
-
         def change(data: dict) -> None:
             if body.pinned is not None:
                 data["pinned"] = body.pinned
@@ -417,13 +412,11 @@ def register_game_routes(
                 data["title"] = title
             if result_edit is not None:
                 lock_result(data, result_edit)
-            elif unlock:
-                data["matchResultSource"] = None
 
-        if body.pinned is not None or "title" in sent or result_edit is not None or unlock:
+        if body.pinned is not None or "title" in sent or result_edit is not None:
             updated = update_game(games_dir(key), key, change)
-            if result_edit is not None or unlock:
-                sync_clip_results(game_clip_paths(updated), result_edit, locked=result_edit is not None)
+            if result_edit is not None:
+                sync_clip_results(game_clip_paths(updated), result_edit)
             if body.pinned is not None:
                 cleanup_preview_registry.notify_clips_changed()
         return _summary(load_or_404(key), games_dir(key))
