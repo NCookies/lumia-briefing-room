@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { candidateTitle, effectiveRange, formatClock, gameHeadline, isDismissed, isSaved, neighborCandidate, visibleCandidates, type Candidate, type GameDetail } from '../games'
 import {
   GameNotFoundError,
@@ -22,12 +22,14 @@ import { isPlaybackFailure } from '../playback'
 import { gameHeading } from '../gameEdit'
 import { LegacyGamePanel } from './LegacyGamePanel'
 import { ViewerBar, ViewerScroll } from './ViewerBar'
-import { ExitFullscreenIcon, FullscreenIcon, MuteIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon, SeekBackIcon, SeekForwardIcon, VolumeIcon, ZoomInIcon, ZoomOutIcon } from './ViewerIcons'
+import { ExitFullscreenIcon, FullscreenIcon, MuteIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon, SeekBackIcon, SeekForwardIcon, VolumeIcon, ZoomInIcon, ZoomOutIcon, UndoIcon, RedoIcon, KeyboardIcon, PlusIcon } from './ViewerIcons'
 import { ArchivePopup } from './ArchivePopup'
 import { SavedClipPlayer } from './SavedClipPlayer'
 import { GameMenu, type GameMenuItem } from './GameMenu'
 import { ViewerCandidates } from './ViewerCandidates'
 import { ShortcutTable } from './ShortcutTable'
+import { HelpTip } from './HelpTip'
+import { fillHeight } from '../fillHeight'
 import { SEEK_STEP_SEC, decideKey, isTextEntry, loadHelpSeen, saveHelpSeen, type TargetInfo, type ViewerAction } from '../viewerShortcuts'
 
 
@@ -40,11 +42,14 @@ const targetInfo = (t: EventTarget | null): TargetInfo | null => {
 
 const SAVING = '저장 중…'
 
+const LEGEND_HELP = '다시 저장을 눌러야 새 범위가 반영됩니다'
+
 const BTN =
   'rounded-md border border-zinc-600/70 bg-zinc-800/60 px-2.5 py-1 text-sm text-zinc-200 transition hover:bg-zinc-700 hover:text-white active:scale-95 disabled:opacity-40 disabled:hover:bg-zinc-800/60'
 const CTRL =
-  'inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2.5 text-sm text-zinc-200 transition hover:bg-zinc-700/80 hover:text-white active:scale-95 disabled:opacity-40'
-const CTRL_ICON = 'inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-200 transition hover:bg-zinc-700/80 hover:text-white active:scale-95'
+  'inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2.5 text-sm text-zinc-200 transition hover:bg-zinc-700/80 hover:text-white active:scale-95 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-zinc-200'
+const CTRL_ICON =
+  'inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-200 transition hover:bg-zinc-700/80 hover:text-white active:scale-95 disabled:opacity-40 disabled:hover:bg-transparent'
 
 export function GameViewer({
   gameKey,
@@ -90,6 +95,8 @@ export function GameViewer({
   const [memoOpenId, setMemoOpenId] = useState<string | null>(null)
   const [helpOpen, setHelpOpen] = useState(() => !loadHelpSeen())
   const root = useRef<HTMLDivElement>(null)
+  const stage = useRef<HTMLDivElement>(null)
+  const [stageHeight, setStageHeight] = useState<number | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<{ id: string; anchor: DOMRect } | null>(null)
   const video = useRef<HTMLVideoElement>(null)
   const shell = useRef<HTMLDivElement>(null)
@@ -478,6 +485,23 @@ export function GameViewer({
     }
   }, [])
 
+  const loaded = game !== null
+  useLayoutEffect(() => {
+    if (!active || !loaded) return
+    const fit = () => {
+      if (!stage.current) return
+      setStageHeight(fillHeight({ top: stage.current.getBoundingClientRect().top + window.scrollY, viewportHeight: window.innerHeight, bottomGap: 16, min: 460 }))
+    }
+    fit()
+    const observer = new ResizeObserver(fit)
+    observer.observe(document.body)
+    window.addEventListener('resize', fit)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', fit)
+    }
+  }, [active, loaded])
+
   if (!game) {
     return <p className="p-4 text-sm text-zinc-400">{error ?? '불러오는 중…'}</p>
   }
@@ -529,7 +553,7 @@ export function GameViewer({
         {menu && menu.length > 0 && <GameMenu items={menu} />}
       </div>
 
-      <div className="flex min-h-0 gap-3" style={{ height: 'calc(100vh - 9.5rem)', minHeight: 460 }}>
+      <div ref={stage} className="flex min-h-0 gap-3" style={{ height: stageHeight ?? undefined, minHeight: 460 }}>
         {isLegacyWithoutVideo(game) ? (
           <LegacyGamePanel
             game={game}
@@ -593,36 +617,38 @@ export function GameViewer({
               </p>
             )}
 
-            <div className="flex flex-wrap items-center gap-1 rounded-lg border border-zinc-700/60 bg-zinc-800/60 px-2 py-1.5 text-white">
-              <button
-                type="button"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-sky-600 text-white shadow transition hover:bg-sky-500 active:scale-95"
-                title="재생/일시정지 (Space)"
-                aria-label="재생/일시정지"
-                onClick={togglePlay}
-              >
-                {playing ? <PauseIcon /> : <PlayIcon />}
-              </button>
-              <span className="mx-1 h-5 w-px bg-zinc-700" aria-hidden="true" />
-              <button type="button" className={CTRL_ICON} title={`${SEEK_STEP_SEC}초 뒤로 (←)`} aria-label={`${SEEK_STEP_SEC}초 뒤로`} onClick={() => seek(time - SEEK_STEP_SEC)}>
-                <SeekBackIcon seconds={SEEK_STEP_SEC} />
-              </button>
-              <button type="button" className={CTRL_ICON} title={`${SEEK_STEP_SEC}초 앞으로 (→)`} aria-label={`${SEEK_STEP_SEC}초 앞으로`} onClick={() => seek(time + SEEK_STEP_SEC)}>
-                <SeekForwardIcon seconds={SEEK_STEP_SEC} />
-              </button>
-              <span className="mx-1 h-5 w-px bg-zinc-700" aria-hidden="true" />
-              <button type="button" className={CTRL} title="이전 클립 (Ctrl+←)" onClick={() => jump('prev')}>
-                <PrevIcon /> 이전 클립
-              </button>
-              <button type="button" className={CTRL} title="다음 클립 (Ctrl+→)" onClick={() => jump('next')}>
-                다음 클립 <NextIcon />
-              </button>
-              <span className="ml-3 inline-flex items-baseline gap-1 rounded-md bg-zinc-900/70 px-2.5 py-1 font-mono text-sm tabular-nums" aria-label="재생 위치">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-lg border border-zinc-700/60 bg-zinc-800/60 px-2 py-1.5 text-white">
+              <span className="inline-flex items-baseline gap-1 justify-self-start rounded-md bg-zinc-900/70 px-2.5 py-1 font-mono text-sm tabular-nums" aria-label="재생 위치">
                 <span className="font-semibold text-sky-300">{formatClock(time)}</span>
                 <span className="text-zinc-600">/</span>
                 <span className="text-zinc-400">{formatClock(duration)}</span>
               </span>
-              <span className="ml-auto flex items-center gap-1">
+              <span className="flex items-center gap-1">
+                <button type="button" className={CTRL} title="이전 클립 (Ctrl+←)" onClick={() => jump('prev')}>
+                  <PrevIcon /> 이전 클립
+                </button>
+                <span className="mx-1 h-5 w-px bg-zinc-700" aria-hidden="true" />
+                <button type="button" className={CTRL_ICON} title={`${SEEK_STEP_SEC}초 뒤로 (←)`} aria-label={`${SEEK_STEP_SEC}초 뒤로`} onClick={() => seek(time - SEEK_STEP_SEC)}>
+                  <SeekBackIcon seconds={SEEK_STEP_SEC} />
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-sky-600 text-white shadow transition hover:bg-sky-500 active:scale-95"
+                  title="재생/일시정지 (Space)"
+                  aria-label="재생/일시정지"
+                  onClick={togglePlay}
+                >
+                  {playing ? <PauseIcon /> : <PlayIcon />}
+                </button>
+                <button type="button" className={CTRL_ICON} title={`${SEEK_STEP_SEC}초 앞으로 (→)`} aria-label={`${SEEK_STEP_SEC}초 앞으로`} onClick={() => seek(time + SEEK_STEP_SEC)}>
+                  <SeekForwardIcon seconds={SEEK_STEP_SEC} />
+                </button>
+                <span className="mx-1 h-5 w-px bg-zinc-700" aria-hidden="true" />
+                <button type="button" className={CTRL} title="다음 클립 (Ctrl+→)" onClick={() => jump('next')}>
+                  다음 클립 <NextIcon />
+                </button>
+              </span>
+              <span className="flex items-center gap-1 justify-self-end">
                 <button type="button" className={CTRL_ICON} title="음소거" aria-label="음소거" onClick={() => setVol({ ...vol, muted: !vol.muted })}>
                   {vol.muted || vol.volume === 0 ? <MuteIcon /> : <VolumeIcon />}
                 </button>
@@ -657,32 +683,44 @@ export function GameViewer({
             />
             <ViewerScroll duration={duration} view={view} onPan={setZoomWindow} />
 
-            <div className="flex items-center gap-2 pt-1">
-              <span className="min-w-0 flex-1 truncate text-xs text-zinc-500">
-                {selectedCand
-                  ? `선택: ${candidateTitle(selectedCand)} — 양 끝 손잡이를 끌어 범위를 바꿉니다. 보관한 클립은 "다시 저장"을 눌러야 새 범위가 반영됩니다`
-                  : '막대에서 노란 구간을 누르면 선택됩니다. 초록 킬 · 파랑 어시 · 빨강 사망 · 주황 팀원 사망'}
-              </span>
-              <div className="flex shrink-0 items-center gap-1 text-white">
-                <button type="button" className={BTN} title="단축키 표 보기·닫기 (?)" aria-pressed={helpOpen} onClick={() => setHelpOpen((open) => !open)}>
-                  ⌨ 단축키
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 pt-3">
+              <span />
+              <div className="flex items-center gap-1 rounded-lg border border-zinc-700/60 bg-zinc-800/60 px-1.5 py-1 text-white">
+                <button type="button" className={CTRL} title="단축키 표 보기·닫기 (?)" aria-pressed={helpOpen} onClick={() => setHelpOpen((open) => !open)}>
+                  <KeyboardIcon /> 단축키
                 </button>
-                <button type="button" disabled={history.undo.length === 0 || busy} className={BTN} title="실행 취소 (Ctrl+Z)" onClick={undoLast}>
-                  실행 취소
+                <span className="mx-1 h-5 w-px bg-zinc-700" aria-hidden="true" />
+                <button type="button" disabled={history.undo.length === 0 || busy} className={CTRL} title="실행 취소 (Ctrl+Z)" onClick={undoLast}>
+                  <UndoIcon /> 실행 취소
                 </button>
-                <button type="button" disabled={history.redo.length === 0 || busy} className={BTN} title="다시 시도 (Ctrl+Y)" onClick={redoLast}>
-                  다시 시도
+                <button type="button" disabled={history.redo.length === 0 || busy} className={CTRL} title="다시 시도 (Ctrl+Y)" onClick={redoLast}>
+                  <RedoIcon /> 다시 시도
                 </button>
-                <button type="button" disabled={!zoomWindow} className={`${BTN} flex items-center`} title="배율 축소" onClick={() => zoomStep(2)}>
+                <span className="mx-1 h-5 w-px bg-zinc-700" aria-hidden="true" />
+                <button type="button" disabled={!zoomWindow} className={CTRL_ICON} title="배율 축소" aria-label="배율 축소" onClick={() => zoomStep(2)}>
                   <ZoomOutIcon />
                 </button>
-                <button type="button" className={`${BTN} flex items-center`} title="배율 확대" onClick={() => zoomStep(0.5)}>
+                <button type="button" className={CTRL_ICON} title="배율 확대" aria-label="배율 확대" onClick={() => zoomStep(0.5)}>
                   <ZoomInIcon />
                 </button>
-                <button type="button" disabled={busy} className="rounded-md border border-yellow-500/60 bg-yellow-500/10 px-2.5 py-1 text-sm text-yellow-200 transition hover:bg-yellow-500/20 active:scale-95 disabled:opacity-40" title="현재 위치에 구간 추가 (N)" onClick={addHere}>
-                  + 여기서 구간 추가
+                <button
+                  type="button"
+                  disabled={busy}
+                  className="ml-1 inline-flex h-8 items-center gap-1.5 rounded-md bg-amber-500/90 px-3 text-sm font-semibold text-zinc-900 shadow transition hover:bg-amber-400 active:scale-95 disabled:opacity-40"
+                  title="현재 위치에 구간 추가 (N)"
+                  onClick={addHere}
+                >
+                  <PlusIcon /> 여기서 구간 추가
                 </button>
               </div>
+              <span className="flex min-w-0 items-center justify-end gap-1.5">
+              <span className="min-w-0 truncate text-right text-xs text-zinc-500" title={selectedCand ? candidateTitle(selectedCand) : undefined}>
+                {selectedCand
+                  ? `선택: ${candidateTitle(selectedCand)}`
+                  : '막대의 노란 구간을 눌러 선택'}
+              </span>
+              <HelpTip label="저장 안내" hover alignRight text={LEGEND_HELP} />
+              </span>
             </div>
           </div>
         )}

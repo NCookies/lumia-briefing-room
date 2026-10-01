@@ -67,3 +67,15 @@ const seekSvg = (seconds: number, mirror: boolean) => (
 
 export const SeekBackIcon = ({ seconds }: { seconds: number }) => seekSvg(seconds, false)
 export const SeekForwardIcon = ({ seconds }: { seconds: number }) => seekSvg(seconds, true)
+
+const stroke = (children: React.ReactNode, size = 18) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="inline-block align-middle">
+    {children}
+  </svg>
+)
+
+export const UndoIcon = () => stroke(<><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></>)
+export const RedoIcon = () => stroke(<><path d="m15 14 5-5-5-5" /><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" /></>)
+export const KeyboardIcon = () =>
+  stroke(<><rect x="2.5" y="6" width="19" height="12" rx="2" /><path d="M6.5 10h.01M10 10h.01M13.5 10h.01M17 10h.01M7 14h10" /></>)
+export const PlusIcon = () => stroke(<path d="M12 5v14M5 12h14" />, 16)
