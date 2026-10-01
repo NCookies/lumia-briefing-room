@@ -37,7 +37,7 @@ export function ClipMemoInput({ clipId, value, onSave, rows = 3, compact = false
         className="w-full resize-y rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm"
         rows={rows}
         maxLength={CLIP_MEMO_MAX}
-        placeholder="원하시는 내용을 작성해 주세요"
+        placeholder={onClose ? '원하시는 내용을 작성해 주세요. Ctrl+Enter 로 저장할 수 있습니다' : '원하시는 내용을 작성해 주세요'}
         value={draft}
         onChange={(e) => setDraft(clampMemo(e.target.value))}
         autoFocus={autoFocus}

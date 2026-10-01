@@ -6,9 +6,7 @@ export type ViewerAction =
   | 'seekForward'
   | 'nextClip'
   | 'prevClip'
-  | 'archive'
   | 'archivePopup'
-  | 'dismiss'
   | 'deleteClip'
   | 'markStart'
   | 'markEnd'
@@ -35,25 +33,16 @@ export const VIEWER_SHORTCUTS: Shortcut[] = [
   { action: 'togglePlay', combos: [{ key: ' ' }], desc: '재생 / 일시정지', group: '재생' },
   { action: 'seekBack', combos: [{ key: 'ArrowLeft' }], desc: `${SEEK_STEP_SEC}초 뒤로`, group: '재생' },
   { action: 'seekForward', combos: [{ key: 'ArrowRight' }], desc: `${SEEK_STEP_SEC}초 앞으로`, group: '재생' },
-  { action: 'prevClip', combos: [{ key: 'p' }, { key: 'ArrowLeft', ctrl: true }], desc: '이전 클립(현재 클립 시작 후 3초 안이면 바로 그 앞 클립)', group: '이동' },
+  { action: 'prevClip', combos: [{ key: 'p' }, { key: 'ArrowLeft', ctrl: true }], desc: '이전 클립', group: '이동' },
   { action: 'nextClip', combos: [{ key: 'n' }, { key: 'ArrowRight', ctrl: true }], desc: '다음 클립', group: '이동' },
-  { action: 'markStart', combos: [{ key: 'i' }], desc: '선택한 클립의 시작을 지금 위치로', group: '범위 편집' },
-  { action: 'markEnd', combos: [{ key: 'o' }], desc: '선택한 클립의 끝을 지금 위치로', group: '범위 편집' },
-  { action: 'undo', combos: [{ key: 'z', ctrl: true }], desc: '되돌리기', group: '범위 편집' },
-  { action: 'redo', combos: [{ key: 'y', ctrl: true }], desc: '다시 실행(되돌린 것을 되살리기)', group: '범위 편집' },
-  { action: 'archive', combos: [{ key: 's' }], desc: '선택한 클립 보관(보관한 클립은 고친 범위 다시 저장)', group: '선택한 클립' },
-  { action: 'archivePopup', combos: [{ key: 's', ctrl: true }], desc: '보관 위치 고르기(보관한 클립의 범위를 고쳤으면 먼저 저장)', group: '선택한 클립' },
-  { action: 'dismiss', combos: [{ key: 'd' }], desc: '무시(직접 추가한 구간은 삭제)', group: '선택한 클립' },
-  { action: 'deleteClip', combos: [{ key: 'Delete' }], desc: '클립 삭제(클립이 없으면 D 와 같음)', group: '선택한 클립' },
-  { action: 'memo', combos: [{ key: 'm' }], desc: '메모 열기(보관한 클립)', group: '선택한 클립' },
-  { action: 'help', combos: [{ key: '?' }], desc: '이 표 보기·닫기', group: '도움말' },
-]
-
-/** 창 안에서만 먹는 키. 판정은 각 창이 하고 표시만 여기서 한다. */
-export const WINDOW_HINTS: { keys: string; desc: string }[] = [
-  { keys: '↑ / ↓ · Enter · Esc', desc: '보관 위치 창: 칸 옮기기 · 보관 · 닫기' },
-  { keys: '← / → · Space·Enter · Esc', desc: '확인 창: 취소/확인 사이 옮기기 · 누르기 · 취소' },
-  { keys: 'Ctrl+Enter', desc: '메모: 저장하고 닫기' },
+  { action: 'markStart', combos: [{ key: 'i' }], desc: '시작점', group: '범위 편집' },
+  { action: 'markEnd', combos: [{ key: 'o' }], desc: '끝점', group: '범위 편집' },
+  { action: 'undo', combos: [{ key: 'z', ctrl: true }], desc: '실행 취소', group: '범위 편집' },
+  { action: 'redo', combos: [{ key: 'y', ctrl: true }], desc: '다시 시도', group: '범위 편집' },
+  { action: 'archivePopup', combos: [{ key: 's', ctrl: true }], desc: '보관', group: '선택한 클립' },
+  { action: 'deleteClip', combos: [{ key: 'Delete' }], desc: '삭제', group: '선택한 클립' },
+  { action: 'memo', combos: [{ key: 'm' }], desc: '메모', group: '선택한 클립' },
+  { action: 'help', combos: [{ key: '?' }], desc: '단축키', group: '도움말' },
 ]
 
 const KEY_NAMES: Record<string, string> = { ' ': 'Space', ArrowLeft: '←', ArrowRight: '→' }
@@ -75,7 +64,6 @@ function buildGroups(): ShortcutGroup[] {
     if (!g) groups.push((g = { title: s.group, rows: [] }))
     g.rows.push({ keys: s.combos.map(comboLabel).join(' / '), desc: s.desc })
   }
-  groups.push({ title: '창 안에서', rows: WINDOW_HINTS })
   return groups
 }
 

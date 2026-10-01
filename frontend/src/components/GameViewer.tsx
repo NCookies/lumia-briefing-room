@@ -229,7 +229,7 @@ export function GameViewer({
     setHistory(step.history)
     const last = step.edit
     if (last.kind === 'range') setRange(last.id, last.prev)
-    else if (last.kind === 'dismiss') void run(() => patchCandidate(gameKey, last.id, { dismissed: false }), '무시한 후보를 되살렸습니다')
+    else if (last.kind === 'dismiss') void run(() => patchCandidate(gameKey, last.id, { dismissed: false }), '삭제한 후보를 되살렸습니다')
     else {
       setSelected(null)
       void run(() => deleteCandidate(gameKey, last.id))
@@ -244,7 +244,7 @@ export function GameViewer({
     if (next.kind === 'range') setRange(next.id, next.next)
     else if (next.kind === 'dismiss') {
       setSelected((sel) => (sel === next.id ? null : sel))
-      void run(() => patchCandidate(gameKey, next.id, { dismissed: true }), '무시했습니다')
+      void run(() => patchCandidate(gameKey, next.id, { dismissed: true }), '삭제했습니다')
     } else {
       void run(async () => {
         const created = await addCandidate(gameKey, next.range[0], next.range[1])
@@ -278,7 +278,7 @@ export function GameViewer({
 
   const dismissOrDelete = (c: Candidate) => {
     if (isDismissed(c)) {
-      void run(() => patchCandidate(gameKey, c.id, { dismissed: false }), '무시한 후보를 되살렸습니다')
+      void run(() => patchCandidate(gameKey, c.id, { dismissed: false }), '삭제한 후보를 되살렸습니다')
       return
     }
     if (c.id.includes('_u')) {
@@ -289,7 +289,7 @@ export function GameViewer({
     void run(async () => {
       await patchCandidate(gameKey, c.id, { dismissed: true })
       setHistory((h) => pushEdit(h, { kind: 'dismiss', id: c.id }))
-    }, '후보를 무시했습니다 — Ctrl+Z 로 되돌릴 수 있습니다')
+    }, '후보를 삭제했습니다. Ctrl+Z 로 실행 취소할 수 있습니다')
   }
 
   const archive = (id: string, category?: string) => {
@@ -375,12 +375,6 @@ export function GameViewer({
     return isSaved(c) && rangeModified({ ...c, user: { ...c.user, start, end } }, duration)
   }
 
-  const quickArchive = () => {
-    if (!selectedCand || busy || isDismissed(selectedCand)) return
-    if (!isSaved(selectedCand)) return archive(selectedCand.id)
-    if (needsResave(selectedCand)) resave(selectedCand.id)
-  }
-
   const archivePopupWithSave = async (c: Candidate) => {
     if (busy) return
     if (needsResave(c) && !(await run(() => saveCandidate(gameKey, c.id), '고친 범위를 보관한 클립에 저장했습니다', SAVING))) return
@@ -399,14 +393,10 @@ export function GameViewer({
         return jump('next')
       case 'prevClip':
         return jump('prev')
-      case 'archive':
-        return quickArchive()
       case 'archivePopup':
         return selectedCand && void archivePopupWithSave(selectedCand)
-      case 'dismiss':
-        return selectedCand && !busy && dismissOrDelete(selectedCand)
       case 'deleteClip':
-        if (!selectedCand || busy) return
+        if (!selectedCand || busy || isDismissed(selectedCand)) return
         return isSaved(selectedCand) ? void deleteClip(selectedCand.id) : dismissOrDelete(selectedCand)
       case 'markStart':
         return mark('start')
@@ -641,11 +631,11 @@ export function GameViewer({
                 <button type="button" className={BTN} title="단축키 표 보기·닫기 (?)" aria-pressed={helpOpen} onClick={() => setHelpOpen((open) => !open)}>
                   ⌨ 단축키
                 </button>
-                <button type="button" disabled={history.undo.length === 0 || busy} className={BTN} title="되돌리기 (Ctrl+Z)" onClick={undoLast}>
-                  되돌리기
+                <button type="button" disabled={history.undo.length === 0 || busy} className={BTN} title="실행 취소 (Ctrl+Z)" onClick={undoLast}>
+                  실행 취소
                 </button>
-                <button type="button" disabled={history.redo.length === 0 || busy} className={BTN} title="다시 실행 (Ctrl+Y)" onClick={redoLast}>
-                  다시 실행
+                <button type="button" disabled={history.redo.length === 0 || busy} className={BTN} title="다시 시도 (Ctrl+Y)" onClick={redoLast}>
+                  다시 시도
                 </button>
                 <button type="button" disabled={!zoomWindow} className={`${BTN} flex items-center`} title="배율 축소" onClick={() => zoomStep(2)}>
                   <ZoomOutIcon />

@@ -3,7 +3,7 @@ export type Edit =
   | { kind: 'add'; id: string; range: [number, number] }
   | { kind: 'dismiss'; id: string }
 
-/** 풀영상 화면의 되돌리기(Ctrl+Z)·다시 실행(Ctrl+Y) 기록. */
+/** 풀영상 화면의 실행 취소(Ctrl+Z)·다시 시도(Ctrl+Y) 기록. */
 export interface History {
   undo: Edit[]
   redo: Edit[]
@@ -11,7 +11,7 @@ export interface History {
 
 export const EMPTY_HISTORY: History = { undo: [], redo: [] }
 
-/** 새 편집을 하면 다시 실행 기록은 버린다. */
+/** 새 편집을 하면 다시 시도 기록은 버린다. */
 export function pushEdit(h: History, edit: Edit): History {
   return { undo: [...h.undo, edit], redo: [] }
 }

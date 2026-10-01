@@ -75,7 +75,7 @@ export function ViewerCandidates(p: Props) {
       </div>
       <label className="flex items-center gap-1 text-xs text-zinc-400">
         <input type="checkbox" checked={p.showDismissed} onChange={(e) => p.onToggleDismissed(e.target.checked)} />
-        무시한 후보도 보기
+        삭제한 후보도 보기
       </label>
       <ul ref={list} className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
         {p.cands.length === 0 && (
@@ -215,10 +215,10 @@ export function ViewerCandidates(p: Props) {
                         type="button"
                         disabled={p.busy}
                         className="rounded border border-zinc-600 px-2 py-0.5 hover:bg-zinc-600"
-                        title="이 후보를 목록에서 숨긴다(무시한 후보 보기로 다시 볼 수 있다)"
+                        title="이 후보를 목록에서 삭제합니다"
                         onClick={() => p.onDismiss(c)}
                       >
-                        {dismissed ? '되살리기' : '무시'}
+                        {dismissed ? '되살리기' : '삭제'}
                       </button>
                     )
                   )}

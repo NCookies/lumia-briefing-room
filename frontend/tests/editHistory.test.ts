@@ -5,7 +5,7 @@ import { EMPTY_HISTORY, pushEdit, redoStep, remapId, undoStep, type Edit } from 
 
 const range = (id: string, prev: [number, number], next: [number, number]): Edit => ({ kind: 'range', id, prev, next })
 
-test('되돌리면 되돌린 편집이 다시 실행 쪽으로 넘어간다', () => {
+test('되돌리면 되돌린 편집이 다시 시도 쪽으로 넘어간다', () => {
   const a = range('a', [1, 2], [3, 4])
   const b: Edit = { kind: 'dismiss', id: 'b' }
   let h = pushEdit(pushEdit(EMPTY_HISTORY, a), b)

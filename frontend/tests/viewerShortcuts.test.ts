@@ -33,8 +33,8 @@ test('기존 단축키는 그대로 풀린다', () => {
   assert.equal(action('ArrowRight'), 'seekForward')
   assert.equal(action('n'), 'nextClip')
   assert.equal(action('p'), 'prevClip')
-  assert.equal(action('s'), 'archive')
-  assert.equal(action('d'), 'dismiss')
+  assert.equal(action('s'), null)
+  assert.equal(action('d'), null)
   assert.equal(action('i'), 'markStart')
   assert.equal(action('o'), 'markEnd')
   assert.equal(action('z', { ctrl: true }), 'undo')
@@ -71,7 +71,7 @@ test('Ctrl+S 는 보관 위치 팝업이고 브라우저 페이지 저장은 막
 
 test('글자 입력칸 안에서는 단축키를 끄지만 Ctrl+S 의 페이지 저장 창은 막는다', () => {
   assert.deepEqual(decideKey(press(' ', { textEntry: true })), { action: null, preventDefault: false })
-  assert.deepEqual(decideKey(press('s', { textEntry: true })), { action: null, preventDefault: false })
+  assert.deepEqual(decideKey(press('n', { textEntry: true })), { action: null, preventDefault: false })
   assert.deepEqual(decideKey(press('ArrowLeft', { ctrl: true, textEntry: true })), { action: null, preventDefault: false })
   assert.deepEqual(decideKey(press('s', { ctrl: true, textEntry: true })), { action: null, preventDefault: true })
 })
@@ -126,6 +126,14 @@ test('키 이름 표기', () => {
 
 test('안내 표에는 새 단축키와 창 안의 키가 모두 있고 이동 간격이 코드 상수와 같다', () => {
   const text = SHORTCUT_GROUPS.flatMap((g) => g.rows.map((r) => `${r.keys} ${r.desc}`)).join('\n')
-  for (const need of ['Space', 'Ctrl\\+←', 'Ctrl\\+→', 'Delete', 'Ctrl\\+S', 'M', 'Ctrl\\+Enter', 'Ctrl\\+Z', 'Ctrl\\+Y', 'Esc']) assert.match(text, new RegExp(need))
+  for (const need of ['Space', 'Ctrl\\+←', 'Ctrl\\+→', 'Delete', 'Ctrl\\+S', 'M', 'Ctrl\\+Z', 'Ctrl\\+Y']) assert.match(text, new RegExp(need))
+  assert.match(text, /실행 취소/)
+  assert.match(text, /다시 시도/)
+  assert.doesNotMatch(text, /무시|되돌리기|다시 실행/)
   assert.match(text, new RegExp(`${SEEK_STEP_SEC}초`))
+})
+
+test('안내 표의 설명은 짧은 말뿐이고 괄호 설명을 붙이지 않는다', () => {
+  for (const g of SHORTCUT_GROUPS) for (const r of g.rows) assert.doesNotMatch(r.desc, /[()]/, r.desc)
+  assert.ok(!SHORTCUT_GROUPS.some((g) => g.title === '창 안에서'))
 })

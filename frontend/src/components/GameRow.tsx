@@ -142,7 +142,7 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, job, menu,
             {rebuild.label}
           </button>
         )}
-        <span className="text-xs text-zinc-300" title="후보: 앱이 찾은 교전 후보(무시한 것 제외) · 보관: 클립으로 만든 것(자동 보관 포함)">
+        <span className="text-xs text-zinc-300" title="후보: 앱이 찾은 교전 후보(삭제한 것 제외) · 보관: 클립으로 만든 것(자동 보관 포함)">
           {clipCountsLabel(g)}
         </span>
         <span className="text-xs text-zinc-500">
