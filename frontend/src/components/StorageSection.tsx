@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getStorage, migrateStorage, undoStorage, type StorageInfo } from '../storageApi'
+import { FULL_VIDEO_LOCATION_HELP } from '../helpTexts'
+import { HelpTip } from './HelpTip'
 import { recordingDiskWarning, samePath, structureLines, suggestedRootFromLegacy } from '../storage'
 import { FolderPicker } from './FolderPicker'
 
@@ -194,7 +196,10 @@ export function StorageSection({ variant = 'options', onChanged }: Props) {
 
       {isNew && mode !== 'pickRoot' && mode !== 'confirmRoot' && (
         <details className="rounded-md border border-zinc-700 bg-zinc-900/40 px-3 py-2 text-sm" open={info.fullVideos !== null}>
-          <summary className="cursor-pointer text-zinc-300">고급: 풀영상 위치만 따로 두기</summary>
+          <summary className="cursor-pointer text-zinc-300">
+            고급: 풀영상 위치만 따로 두기{' '}
+            <HelpTip label="풀영상 위치 설명" wide text={FULL_VIDEO_LOCATION_HELP} />
+          </summary>
           <p className="mt-2 text-xs text-zinc-500">
             풀영상은 한 판에 수 GB 라 큰 하드디스크로 빼고 싶을 때만 쓰세요. 기본은 저장 폴더 아래 full_video 폴더입니다. 저장 공간 경고는 풀영상이 있는
             드라이브 기준입니다.

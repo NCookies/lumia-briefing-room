@@ -15,6 +15,8 @@ import {
 import { needsPermanentSkipWarning, type DeleteMode } from '../deleteConfirm'
 import { AboutPanel } from './AboutPanel'
 import { CleanupPanel } from './CleanupPanel'
+import { SAVE_MODE_HELP } from '../helpTexts'
+import { HelpTip } from './HelpTip'
 import { StorageSection } from './StorageSection'
 import { FolderPicker } from './FolderPicker'
 import { RecordingRootSection } from './RecordingRootSection'
@@ -131,7 +133,10 @@ function GeneralPanel({
     </section>
     <StorageSection onChanged={onClipsDirChanged} />
     <section className="flex flex-col gap-2">
-      <h3 className="text-sm font-medium text-zinc-200">클립 보관 방식</h3>
+      <h3 className="flex items-center gap-1.5 text-sm font-medium text-zinc-200">
+        클립 보관 방식
+        <HelpTip label="클립 보관 방식 설명" wide text={SAVE_MODE_HELP} />
+      </h3>
       <label className="flex items-start gap-2 text-sm text-zinc-300">
         <input
           type="radio"

@@ -1,6 +1,8 @@
 import { cleanupReasonLabel, cleanupReasonTooltip, preserveLabel, type CleanupPreviewEntry } from '../cleanupPreview'
 import { clipCountsLabel, gameHeadline, matchTypeLabel, recordingStopLabel, type GameSummary } from '../games'
 import { gameAssetUrl } from '../gamesApi'
+import { FULL_VIDEO_MISSING_HELP, RECORDING_STOPPED_HELP } from '../helpTexts'
+import { HelpTip } from './HelpTip'
 import { formatBytes } from '../retention'
 import { GameMenu, type GameMenuItem } from './GameMenu'
 import { GameTitle } from './GameTitle'
@@ -34,10 +36,10 @@ interface Props {
 export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, job, menu, onRename }: Props) {
   return (
     <li
-      className="flex cursor-pointer items-stretch overflow-hidden rounded-lg border border-zinc-700/60 bg-zinc-800/60 transition-colors hover:border-zinc-500 hover:bg-zinc-800"
+      className="flex cursor-pointer items-stretch rounded-lg border border-zinc-700/60 bg-zinc-800/60 transition-colors hover:border-zinc-500 hover:bg-zinc-800"
       onClick={onOpen}
     >
-      <div className={`w-1.5 shrink-0 ${barColor(g)}`} />
+      <div className={`w-1.5 shrink-0 rounded-l-lg ${barColor(g)}`} />
       <div className="flex flex-1 flex-wrap items-center gap-x-8 gap-y-2 px-4 py-3">
         <div className="w-20">
           <div
@@ -103,10 +105,12 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, job, menu,
         {recordingStopLabel(g.recordingStopped) ? (
           <span className="rounded-md bg-rose-600/25 px-1.5 text-xs text-rose-200" title={g.fullVideoError ?? undefined}>
             {recordingStopLabel(g.recordingStopped)}
+            <span className="ml-1.5"><HelpTip label="스팀 녹화 오류 설명" alignRight wide text={RECORDING_STOPPED_HELP} /></span>
           </span>
         ) : g.legacy && !g.hasFullVideo ? (
           <span className="rounded-md bg-amber-500/20 px-1.5 text-xs text-amber-200" title={g.fullVideoError ?? undefined}>
             풀영상 없음(이전 버전)
+            <span className="ml-1.5"><HelpTip label="풀영상 없음 설명" alignRight wide text={FULL_VIDEO_MISSING_HELP} /></span>
           </span>
         ) : (
           g.fullVideoError && <span className="text-xs text-amber-300">{g.fullVideoError}</span>
@@ -153,6 +157,9 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, job, menu,
               : g.fullVideoDeletedAt
                 ? '풀영상 삭제됨'
                 : '풀영상 없음'}
+          {!g.hasFullVideo && !g.legacy && !g.recordingStopped && (
+            <span className="ml-1.5"><HelpTip label="풀영상 없음 설명" alignRight wide text={FULL_VIDEO_MISSING_HELP} /></span>
+          )}
         </span>
         <span className="flex gap-2">
           <button

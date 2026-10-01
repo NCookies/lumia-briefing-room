@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useConfirm } from '../confirmContext'
+import { AUTO_CLEAN_HELP } from '../helpTexts'
+import { HelpTip } from './HelpTip'
 import { getRetention, runCleanup, setRetention } from '../exportApi'
 import { TAG_LABELS } from '../labels'
 import { describeCleanup, parseLimit, type CleanupResult, type RetentionSettings } from '../retention'
@@ -128,6 +130,7 @@ export function CleanupPanel() {
             onChange={(e) => void toggleAutoClean(e.target.checked)}
           />
           자동 정리 켜기
+          <HelpTip label="자동 정리 설명" wide text={AUTO_CLEAN_HELP} />
         </label>
         <p className="text-xs text-zinc-500">
           켜면 1시간마다 아래 기준을 넘은 게임의 풀영상을 자동으로 정리합니다. 보관한 클립은 정리 대상이 아니고, 게임 기록(후보·결과표)도 남습니다. 끄면 풀영상이 계속 쌓입니다.
