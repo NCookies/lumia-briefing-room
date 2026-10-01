@@ -386,11 +386,6 @@ export function GameViewer({
           {backLabel}
         </button>
         <h2 className="text-lg font-semibold">{gameHeadline(game.matchResult, game.recordingStopped)}</h2>
-        {game.matchResultSource === 'manual' && (
-          <span className="text-xs text-amber-400" title="직접 고친 값입니다. 다시 분석해도 바뀌지 않습니다">
-            🔒
-          </span>
-        )}
         <span className={game.title ? 'text-sm font-medium text-zinc-200' : 'text-xs text-zinc-500'}>{gameHeading(game)}</span>
         {error && <span className="text-sm text-rose-300">{error}</span>}
         {notice && <span className="text-sm text-emerald-300">{notice}</span>}

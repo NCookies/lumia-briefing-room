@@ -89,11 +89,6 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, menu, onRe
             {g.unsavedEditCount}개 저장 대기
           </span>
         )}
-        {g.matchResultSource === 'manual' && (
-          <span className="text-xs text-amber-400" title="직접 고친 값입니다. 다시 분석해도 바뀌지 않습니다">
-            🔒
-          </span>
-        )}
         {g.pinned && <span className="rounded bg-sky-600/30 px-1.5 text-xs text-sky-200" title="자동 정리에서 제외됩니다">
             고정
           </span>}
