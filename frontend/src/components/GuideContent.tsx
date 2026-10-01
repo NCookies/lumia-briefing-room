@@ -1,7 +1,19 @@
 import { useState } from 'react'
+import { useAppInfo, videoFormatHelpText } from '../appInfo'
 import { GUIDE_FOLDER_TREE, GUIDE_TABS, type GuideBlock } from '../guide'
 import { GuideText } from './GuideText'
 import { ShortcutTable } from './ShortcutTable'
+
+function VideoFormats() {
+  const text = videoFormatHelpText(useAppInfo().videoFormats)
+  if (!text) return null
+  return (
+    <section className="flex flex-col gap-1.5">
+      <h3 className="text-base font-semibold text-zinc-100">지원하는 영상 형식</h3>
+      <p className="whitespace-pre-line leading-7 text-zinc-200">{text}</p>
+    </section>
+  )
+}
 
 function Block({ block }: { block: GuideBlock }) {
   switch (block.kind) {
@@ -62,6 +74,8 @@ function Block({ block }: { block: GuideBlock }) {
       )
     case 'shortcuts':
       return <ShortcutTable />
+    case 'videoFormats':
+      return <VideoFormats />
   }
 }
 

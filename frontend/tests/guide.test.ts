@@ -22,7 +22,7 @@ const allTexts = GUIDE_TABS.flatMap((t) => [t.label, ...t.blocks.flatMap(textsOf
 const all = allTexts.join('\n')
 
 test('가이드 탭은 시작하기 | 풀영상 화면 | 클립 | 폴더 | 단축키 순서다', () => {
-  assert.deepEqual(GUIDE_TABS.map((t) => t.label), ['시작하기', '풀영상 화면', '클립', '폴더', '단축키'])
+  assert.deepEqual(GUIDE_TABS.map((t) => t.label), ['시작하기', '풀영상 화면', '클립', '영상 파일', '폴더', '단축키'])
   assert.equal(new Set(GUIDE_TABS.map((t) => t.id)).size, GUIDE_TABS.length)
 })
 
@@ -37,8 +37,8 @@ test('시작하기는 4단계 흐름과 알아 두면 좋은 것 3줄이다', ()
 })
 
 test('단축키 탭은 표 블록 하나이고 폴더 탭은 그림 블록을 가진다', () => {
-  assert.deepEqual(GUIDE_TABS[4].blocks.map((b) => b.kind), ['shortcuts'])
-  assert.ok(GUIDE_TABS[3].blocks.some((b) => b.kind === 'tree'))
+  assert.deepEqual(GUIDE_TABS[5].blocks.map((b) => b.kind), ['shortcuts'])
+  assert.ok(GUIDE_TABS[4].blocks.some((b) => b.kind === 'tree'))
 })
 
 test('백틱은 용어 칩, 중괄호는 키로 쪼갠다', () => {

@@ -1,4 +1,4 @@
-export type GuideTabId = 'start' | 'viewer' | 'clips' | 'folders' | 'shortcuts'
+export type GuideTabId = 'start' | 'viewer' | 'clips' | 'vod' | 'folders' | 'shortcuts'
 
 export type GuideBlock =
   | { kind: 'steps'; items: string[] }
@@ -6,6 +6,7 @@ export type GuideBlock =
   | { kind: 'paras'; title?: string; lines: string[] }
   | { kind: 'callout'; title: string; lines: string[] }
   | { kind: 'tree' }
+  | { kind: 'videoFormats' }
   | { kind: 'shortcuts' }
 
 export interface GuideTab {
@@ -134,6 +135,29 @@ export const GUIDE_TABS: GuideTab[] = [
     ],
   },
   {
+    id: 'vod',
+    label: '영상 파일',
+    blocks: [
+      {
+        kind: 'paras',
+        title: '스팀 녹화와 영상 파일',
+        lines: [
+          '스팀 백그라운드 녹화는 자동으로 분석합니다. OBS 녹화나 스트리머 다시보기 같은 영상 파일은 직접 추가해야 합니다.',
+          '영상 파일에서 게임을 찾아 스팀 녹화와 같은 풀영상과 교전 후보를 만듭니다.',
+        ],
+      },
+      {
+        kind: 'steps',
+        items: [
+          '옵션 → 영상 파일에서 영상 파일이나 폴더를 추가합니다. 원본은 옮기거나 복사하지 않고 읽기만 합니다.',
+          '"영상 파일" 탭에서 분석을 시작합니다.',
+          '분석이 끝나면 게임을 눌러 풀영상 화면에서 후보를 다듬고 보관합니다.',
+        ],
+      },
+      { kind: 'videoFormats' },
+    ],
+  },
+  {
     id: 'folders',
     label: '폴더',
     blocks: [
@@ -142,11 +166,6 @@ export const GUIDE_TABS: GuideTab[] = [
         lines: ['저장 폴더 안에 폴더 두 개가 생깁니다. 클립 폴더 아래의 폴더 하나가 카테고리 하나이고, 탐색기에서 폴더를 만들거나 옮겨도 앱에 그대로 보입니다.'],
       },
       { kind: 'tree' },
-      {
-        kind: 'paras',
-        title: '스팀 녹화 / 영상 파일',
-        lines: ['스팀 백그라운드 녹화는 자동으로 분석합니다. 다른 영상(스트리머 다시보기 등)은 옵션 → 영상 파일에서 추가한 뒤 "영상 파일" 탭에서 분석합니다.'],
-      },
       { kind: 'callout', title: SSD_TITLE, lines: SSD_LINES },
     ],
   },
