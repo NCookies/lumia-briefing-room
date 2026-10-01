@@ -9,20 +9,8 @@ export interface ReanalyzeStatus {
   position?: number | null
 }
 
-const KEEP =
-  '이 게임에서 만든 클립은 자동 보관 것까지 하나도 지우지 않고 새 후보에 이어 붙입니다. 고정·직접 추가한 구간도 그대로 두고, 후보의 무시·이름·범위 수정은 초기화됩니다.'
-const QUEUE_NOTE = '다른 분석이 돌고 있으면 줄을 서서 차례로 합니다.'
-
-export function reanalyzeConfirmMessage(mode: ReanalyzeMode): string {
-  const newline = String.fromCharCode(10)
-  if (mode === 'full') {
-    return ['이 게임을 원본 스팀 녹화에서 다시 분석합니다.', `풀영상·교전 후보·결과표·초상화를 전부 새로 만듭니다. ${KEEP}`, `몇 분 걸릴 수 있습니다. ${QUEUE_NOTE} 계속하시겠습니까?`].join(newline)
-  }
-  return [
-    '원본 스팀 녹화가 이미 지워져 있어 저장한 풀영상에서 후보·결과표·초상화만 다시 찾습니다(풀영상은 그대로 둡니다).',
-    KEEP,
-    `몇 분 걸릴 수 있습니다. ${QUEUE_NOTE} 계속하시겠습니까?`,
-  ].join(newline)
+export function reanalyzeConfirmMessage(): string {
+  return ['이 게임을 다시 분석합니다.', '몇 분 정도 소요될 수 있습니다. 계속하시겠습니까?'].join(String.fromCharCode(10))
 }
 
 /** 대기 중 표시: "대기 중 (1번째)" = 지금 도는 작업 다음 차례. */

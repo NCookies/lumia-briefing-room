@@ -98,7 +98,7 @@ export function GameList({
       try {
         const mode = await jobs.plan(key)
         if (mode === null) return jobs.fail(key, '원본 녹화도 풀영상도 남아 있지 않아 다시 분석할 수 없습니다')
-        const answer = await ask({ message: reanalyzeConfirmMessage(mode), confirmLabel: '다시 분석' })
+        const answer = await ask({ message: reanalyzeConfirmMessage(), confirmLabel: '다시 분석' })
         if (answer.ok) jobs.startReanalysis(key)
       } catch (e) {
         jobs.fail(key, (e as Error).message)

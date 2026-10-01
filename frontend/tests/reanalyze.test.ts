@@ -3,20 +3,9 @@ import test from 'node:test'
 
 import { queueLabel, reanalyzeConfirmMessage, reanalyzeStatusText } from '../src/reanalyze.ts'
 
-test('원본 녹화가 있으면 풀영상·후보 전부, 없으면 후보만이라고 알린다', () => {
-  const full = reanalyzeConfirmMessage('full')
-  assert.match(full, /원본 스팀 녹화/)
-  assert.match(full, /풀영상/)
-  assert.match(full, /후보/)
-  assert.match(full, /자동 보관 것까지 하나도 지우지 않고/)
-  const only = reanalyzeConfirmMessage('candidates')
-  assert.match(only, /이미 지워져/)
-  assert.match(only, /풀영상은 그대로/)
-  assert.doesNotMatch(only, /풀영상을 새로/)
-})
-
-test('다시 분석하면 사라지는 수정 사항을 미리 알린다', () => {
-  for (const mode of ['full', 'candidates'] as const) assert.match(reanalyzeConfirmMessage(mode), /무시·이름·범위 수정은 초기화/)
+test('다시 분석 확인 창은 내부 동작 설명 없이 짧게 묻는다', () => {
+  const message = reanalyzeConfirmMessage()
+  assert.equal(message, ['이 게임을 다시 분석합니다.', '몇 분 정도 소요될 수 있습니다. 계속하시겠습니까?'].join(String.fromCharCode(10)))
 })
 
 test('진행 문구: 방식별 문구와 퍼센트, 끝남, 오류', () => {
@@ -26,10 +15,6 @@ test('진행 문구: 방식별 문구와 퍼센트, 끝남, 오류', () => {
   assert.equal(reanalyzeStatusText({ state: 'done', message: '', fraction: 1, mode: 'full' }), '풀영상과 후보를 다시 만들었습니다')
   assert.equal(reanalyzeStatusText({ state: 'error', message: '원본 없음', fraction: 0, mode: null }), '원본 없음')
   assert.equal(reanalyzeStatusText({ state: 'idle', message: '', fraction: 0, mode: null }), null)
-})
-
-test('분석이 돌고 있으면 줄을 선다고 확인 창에 알린다', () => {
-  for (const mode of ['full', 'candidates'] as const) assert.match(reanalyzeConfirmMessage(mode), /줄을 서서 차례로/)
 })
 
 test('대기 중 문구는 몇 번째인지 보이고 번호가 없으면 번호 없이 보인다', () => {
