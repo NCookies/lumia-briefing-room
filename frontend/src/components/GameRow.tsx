@@ -3,6 +3,7 @@ import { clipCountsLabel, gameHeadline, matchTypeLabel, recordingStopLabel, type
 import { gameAssetUrl } from '../gamesApi'
 import { formatBytes } from '../retention'
 import { GameMenu, type GameMenuItem } from './GameMenu'
+import { GameTitle } from './GameTitle'
 
 export interface RowTime {
   main: string
@@ -24,10 +25,11 @@ interface Props {
   onPin: () => void
   rebuild?: { label: string; disabled: boolean; onClick: () => void }
   menu?: GameMenuItem[]
+  onRename?: (title: string | null) => void
 }
 
 /** 게임 목록의 게임 한 줄. 스팀 녹화 탭과 영상 파일 탭이 같이 쓴다(시간 칸만 다르다). */
-export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, menu }: Props) {
+export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, menu, onRename }: Props) {
   return (
     <li
       className="flex cursor-pointer items-stretch overflow-hidden rounded border border-zinc-700 bg-zinc-800/60 hover:border-zinc-500 hover:bg-zinc-800"
@@ -72,6 +74,7 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, menu }: Pr
             ) : null,
           )}
         </div>
+        {onRename && <GameTitle value={g.title} onSave={onRename} />}
       </div>
       <div className="flex flex-wrap items-center justify-end gap-3 py-3 pr-4">
         {g.unsavedEditCount > 0 && (
@@ -80,6 +83,11 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, menu }: Pr
             title="보관한 클립의 범위를 고쳤지만 아직 클립에 반영하지 않았습니다. 열어서 저장하세요(다시 저장)."
           >
             {g.unsavedEditCount}개 저장 대기
+          </span>
+        )}
+        {g.matchResultSource === 'manual' && (
+          <span className="text-xs text-amber-400" title="직접 고친 값입니다. 다시 분석해도 덮어쓰지 않습니다">
+            🔒
           </span>
         )}
         {g.pinned && <span className="rounded bg-sky-600/30 px-1.5 text-xs text-sky-200" title="자동 정리에서 제외됩니다">

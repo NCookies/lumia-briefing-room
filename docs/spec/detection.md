@@ -163,7 +163,7 @@
 
 ### 수동 보정
 
-자동 판독이 틀리면 사용자가 순위·결과 문구를 고친다([ui.md](ui.md)). 저장 시 그 게임의 모든 클립에 `matchResultSource="manual"` 로 잠가 자동 판독(백필·다시 분석)이 덮어쓰지 않는다. 판독 정확도를 끝없이 올리기보다 고칠 수단을 주는 편이 싸다.
+자동 판독이 틀리면 사용자가 순위·결과 문구를 고친다([ui.md](ui.md)). 저장 시 그 게임의 모든 클립에 `matchResultSource="manual"` 로 잠가 자동 판독(백필·다시 분석)이 덮어쓰지 않는다. 새 게임 목록은 같은 잠금을 게임(`game.json`) 단위로 건다(`게임 정보 고치기`, [pipeline.md §11](pipeline.md)). 판독 정확도를 끝없이 올리기보다 고칠 수단을 주는 편이 싸다.
 
 ## 9. 캐릭터 초상화 (`detect/portrait.py`, `pipeline/portrait_scan.py`)
 

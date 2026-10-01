@@ -6,6 +6,7 @@ import { dayAnchorId, dayId } from '../dayFold'
 import type { GameSummary } from '../games'
 import { getGames, setGamePinned } from '../gamesApi'
 import { useGameDelete } from '../useGameDelete'
+import { useGameEdit } from '../useGameEdit'
 import { formatBytes } from '../retention'
 import { useCleanupPreview } from '../useCleanupPreview'
 import { useStorageUsage } from '../useStorageUsage'
@@ -139,6 +140,15 @@ export function VodGameList({
     onDone: () => {
       nav.close()
       reload()
+    },
+    onError: setActionError,
+  })
+
+  const [viewerTick, setViewerTick] = useState(0)
+  const gameEdit = useGameEdit({
+    onDone: () => {
+      reload()
+      setViewerTick((t) => t + 1)
     },
     onError: setActionError,
   })
@@ -293,8 +303,9 @@ export function VodGameList({
     const summary = games?.find((g) => g.key === open)
     return (
       <>
-        <GameViewer gameKey={open} autoPlay={nav.userOpened} onMissing={nav.missing} backLabel="← 영상 목록" onBack={nav.close} onChanged={reloadGames} menu={summary && viewerDelete.menuFor(open, summary)} />
+        <GameViewer key={`${open}-${viewerTick}`} gameKey={open} autoPlay={nav.userOpened} onMissing={nav.missing} backLabel="← 영상 목록" onBack={nav.close} onChanged={reloadGames} menu={summary && viewerDelete.menuFor(open, summary, [gameEdit.menuItem(open, summary)])} />
         {viewerDelete.dialog}
+        {gameEdit.dialog}
       </>
     )
   }
@@ -435,7 +446,8 @@ export function VodGameList({
                           key={g.key}
                           game={g}
                           time={vodGameTime(g)}
-                          menu={gameDelete.menuFor(g.key, g)}
+                          menu={gameDelete.menuFor(g.key, g, [gameEdit.menuItem(g.key, g)])}
+                          onRename={(title) => void gameEdit.saveTitle(g.key, title)}
                           due={cleanup[g.key]}
                           onOpen={() => {
                             rememberScroll()
@@ -457,6 +469,7 @@ export function VodGameList({
       </div>
 
       {gameDelete.dialog}
+      {gameEdit.dialog}
       {deleteRequest && (
         <DeleteConfirmDialog
           label={deleteRequest.label}

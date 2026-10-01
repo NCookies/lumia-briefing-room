@@ -18,7 +18,7 @@ import { applyMark, candidateAtTime, newRangeAround, rangeModified, zoomBy, zoom
 import { loadVolume, saveVolume, type VolumeState } from '../volume'
 import { isLegacyWithoutVideo } from '../legacyGame'
 import { isPlaybackFailure } from '../playback'
-import { vodGameHeading } from '../vodGames'
+import { gameHeading } from '../gameEdit'
 import { LegacyGamePanel } from './LegacyGamePanel'
 import { ViewerBar, ViewerScroll } from './ViewerBar'
 import { ExitFullscreenIcon, FullscreenIcon, MuteIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon, VolumeIcon, ZoomInIcon, ZoomOutIcon } from './ViewerIcons'
@@ -386,7 +386,12 @@ export function GameViewer({
           {backLabel}
         </button>
         <h2 className="text-lg font-semibold">{gameHeadline(game.matchResult, game.recordingStopped)}</h2>
-        <span className="text-xs text-zinc-500">{game.source === 'vod' ? vodGameHeading(game) : game.gameKey}</span>
+        {game.matchResultSource === 'manual' && (
+          <span className="text-xs text-amber-400" title="직접 고친 값입니다. 다시 분석해도 덮어쓰지 않습니다">
+            🔒
+          </span>
+        )}
+        <span className={game.title ? 'text-sm font-medium text-zinc-200' : 'text-xs text-zinc-500'}>{gameHeading(game)}</span>
         {error && <span className="text-sm text-rose-300">{error}</span>}
         {notice && <span className="text-sm text-emerald-300">{notice}</span>}
         <label className="ml-auto flex items-center gap-1 text-sm text-zinc-300">

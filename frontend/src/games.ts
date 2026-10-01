@@ -58,6 +58,9 @@ export interface GameSummary {
   matchEndUtc: string | null
   gameMode: string | null
   matchResult: MatchResult | null
+  /** `manual` 이면 사용자가 고친 값이라 다시 분석·소급 채우기가 덮어쓰지 않는다. */
+  matchResultSource?: 'manual' | null
+  title?: string | null
   portraits: Record<string, string | null>
   pinned: boolean
   sourceIncomplete: boolean
@@ -93,6 +96,9 @@ export interface GameDetail {
   userCandidates: Candidate[]
   markers: Marker[]
   matchResult: MatchResult | null
+  matchResultSource?: 'manual' | null
+  title?: string | null
+  gameMode?: string | null
   pinned: boolean
 }
 

@@ -1,5 +1,6 @@
 import type { RebuildStatus } from './legacyGame'
 import type { ReanalyzeMode, ReanalyzeStatus } from './reanalyze'
+import type { GameEditPatch } from './gameEdit'
 import type { Candidate, CandidateUser, GameDetail, GameSummary } from './games'
 
 const BASE = '/api/games'
@@ -41,6 +42,21 @@ const send = (method: string, url: string, body?: unknown) =>
 
 export async function setGamePinned(key: string, pinned: boolean): Promise<GameSummary> {
   return jsonOrThrow(await send('PATCH', `${BASE}/${key}`, { pinned }), '고정')
+}
+
+/** 사용자가 고친 순위·TK/K/A 를 게임에 쓰고 잠근다(다시 분석이 덮어쓰지 않는다). 서버가 그 게임의 클립에도 같은 값을 쓴다. */
+export async function setGameResult(key: string, matchResult: GameEditPatch): Promise<GameSummary> {
+  return jsonOrThrow(await send('PATCH', `${BASE}/${key}`, { matchResult }), '게임 정보 저장')
+}
+
+/** 잠금만 푼다(값은 그대로). 이후 다시 분석이 새로 읽은 값으로 바꿀 수 있다. */
+export async function unlockGameResult(key: string): Promise<GameSummary> {
+  return jsonOrThrow(await send('PATCH', `${BASE}/${key}`, { matchResultSource: null }), '잠금 해제')
+}
+
+/** `null` 은 제목 없음. */
+export async function setGameTitle(key: string, title: string | null): Promise<GameSummary> {
+  return jsonOrThrow(await send('PATCH', `${BASE}/${key}`, { title }), '제목 저장')
 }
 
 export type CandidatePatch = Partial<Pick<CandidateUser, 'start' | 'end' | 'dismissed' | 'title'>> & { label?: 'combat' | 'hunt' | null }

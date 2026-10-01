@@ -12,6 +12,7 @@ import { useListScroll } from '../useListScroll'
 import type { GameNav } from '../useRoute'
 import { useDayFold } from '../useDayFold'
 import { useGameDelete } from '../useGameDelete'
+import { useGameEdit } from '../useGameEdit'
 import { useConfirm } from '../confirmContext'
 import { reanalyzeConfirmMessage } from '../reanalyze'
 import { useReanalyzeGame } from '../useReanalyzeGame'
@@ -83,6 +84,13 @@ export function GameList({
       setViewerTick((t) => t + 1)
     }, [load]),
   )
+  const gameEdit = useGameEdit({
+    onDone: () => {
+      load()
+      setViewerTick((t) => t + 1)
+    },
+    onError: setError,
+  })
   const ask = useConfirm()
   const reanalyzeItem = (key: string) => ({
     label: '다시 분석',
@@ -127,8 +135,9 @@ export function GameList({
     const summary = games?.find((g) => g.key === open)
     return (
       <>
-        <GameViewer key={`${open}-${viewerTick}`} gameKey={open} autoPlay={viewerTick === 0 && nav.userOpened} onMissing={nav.missing} onBack={nav.close} onChanged={load} menu={summary && viewerDelete.menuFor(open, summary, [reanalyzeItem(open)])} />
+        <GameViewer key={`${open}-${viewerTick}`} gameKey={open} autoPlay={viewerTick === 0 && nav.userOpened} onMissing={nav.missing} onBack={nav.close} onChanged={load} menu={summary && viewerDelete.menuFor(open, summary, [gameEdit.menuItem(open, summary), reanalyzeItem(open)])} />
         {viewerDelete.dialog}
+        {gameEdit.dialog}
       </>
     )
   }
@@ -204,7 +213,8 @@ export function GameList({
                 game={g}
                 time={{ main: formatShort(g.matchStartUtc), sub: g.matchStartUtc ? formatAgo(g.matchStartUtc) : '' }}
                 due={cleanup[g.key]}
-                menu={gameDelete.menuFor(g.key, g, [reanalyzeItem(g.key)])}
+                menu={gameDelete.menuFor(g.key, g, [gameEdit.menuItem(g.key, g), reanalyzeItem(g.key)])}
+                onRename={(title) => void gameEdit.saveTitle(g.key, title)}
                 onOpen={() => {
                   rememberScroll()
                   nav.open(g.key)
@@ -237,6 +247,7 @@ export function GameList({
       )}
       {error && <p className="text-sm text-rose-300">{error}</p>}
       {gameDelete.dialog}
+      {gameEdit.dialog}
     </div>
   )
 }
