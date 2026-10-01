@@ -127,6 +127,8 @@ test('키 이름 표기', () => {
   assert.equal(comboLabel({ key: ' ' }), 'Space')
   assert.equal(comboLabel({ key: 'ArrowLeft', ctrl: true }), 'Ctrl+←')
   assert.equal(comboLabel({ key: 's', ctrl: true }), 'Ctrl+S')
+  assert.equal(comboLabel({ key: 'ArrowUp' }), '↑')
+  assert.equal(comboLabel({ key: 'ArrowDown' }), '↓')
   assert.equal(comboLabel({ key: 'Delete' }), 'Delete')
   assert.equal(comboLabel({ key: '?' }), '?')
 })

@@ -56,7 +56,7 @@ export const VIEWER_SHORTCUTS: Shortcut[] = [
   { action: 'help', combos: [{ key: '?' }], desc: '단축키', group: '도움말' },
 ]
 
-const KEY_NAMES: Record<string, string> = { ' ': 'Space', ArrowLeft: '←', ArrowRight: '→' }
+const KEY_NAMES: Record<string, string> = { ' ': 'Space', ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓' }
 
 export function comboLabel(c: Combo): string {
   const name = KEY_NAMES[c.key] ?? (c.key.length === 1 ? c.key.toUpperCase() : c.key)
