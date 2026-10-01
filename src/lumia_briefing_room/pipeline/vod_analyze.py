@@ -30,6 +30,7 @@ from lumia_briefing_room.pipeline.clip_files import commit_staged_clips, find_vi
 from lumia_briefing_room.pipeline.clip_uid import new_clip_uid
 from lumia_briefing_room.pipeline.ffmpeg_errors import describe_clip_error, is_disk_full_error
 from lumia_briefing_room.pipeline.filters import apply_filter
+from lumia_briefing_room.pipeline.game_edit import carry_user_fields
 from lumia_briefing_room.pipeline.game_store import GAME_JSON, is_certain, plans_to_save, vod_game_key
 from lumia_briefing_room.pipeline.label_migrate import load_metas, migrate_labels
 from lumia_briefing_room.pipeline.metadata import match_result_dict
@@ -416,12 +417,15 @@ def _remove_stale_games(games_dir: Path, vod: str, keep: set[str]) -> None:
         shutil.rmtree(folder, ignore_errors=True)
 
 
-def _keep_pinned(folder: Path, data: dict) -> dict:
+def _keep_user_fields(folder: Path, data: dict) -> dict:
+    """다시 만드는 게임 기록에 옛 기록의 고정·제목·잠근 결과를 잇는다."""
     try:
         old = json.loads((folder / GAME_JSON).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return data
-    return {**data, "pinned": True} if isinstance(old, dict) and old.get("pinned") else data
+    if isinstance(old, dict):
+        carry_user_fields(old, data)
+    return data
 
 
 def _make_clips(
@@ -623,7 +627,7 @@ def _make_clips(
     commit_staged_clips(staging, root, place.video_dir)
 
     for folder, data in pending_games:
-        write_vod_game(folder, _keep_pinned(folder, data))
+        write_vod_game(folder, _keep_user_fields(folder, data))
     _remove_stale_games(games_root, vod, {g["gameKey"] for g in games})
 
     index.update(

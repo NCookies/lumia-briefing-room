@@ -45,7 +45,7 @@ def needs_result(game: dict) -> bool:
     return result.get("matchType") in _EMPTY or result.get("placement") is None
 
 
-def _clip_metas(clips_dir: Path, game: dict) -> list[tuple[Path, dict]]:
+def clip_metas(clips_dir: Path, game: dict) -> list[tuple[Path, dict]]:
     found = []
     for path in sorted(clips_dir.glob("*.json")) if clips_dir.is_dir() else []:
         try:
@@ -94,7 +94,7 @@ def backfill_game_results(
             continue
         if game.get("source") == "vod":
             continue
-        clips = _clip_metas(clips_dir, game)
+        clips = clip_metas(clips_dir, game)
         if game.get("matchResultSource") == "manual" or any(m.get("matchResultSource") == "manual" for _, m in clips):
             report.locked += 1
             note(key, "수동으로 고친 게임이라 건너뜀")

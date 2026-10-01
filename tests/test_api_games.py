@@ -84,6 +84,78 @@ def test_pin_toggles(client):
     assert json.loads((client.tmp / "games" / KEY / "game.json").read_text(encoding="utf-8"))["pinned"] is True
 
 
+def _game_json(client):
+    return json.loads((client.tmp / "games" / KEY / "game.json").read_text(encoding="utf-8"))
+
+
+def test_game_title_is_saved_trimmed_and_cleared_by_an_empty_value(client):
+    assert client.get("/api/games").json()["games"][0]["title"] is None
+    assert client.patch(f"/api/games/{KEY}", json={"title": "  첫 우승  "}).json()["title"] == "첫 우승"
+    assert _game_json(client)["title"] == "첫 우승"
+    assert client.get(f"/api/games/{KEY}").json()["title"] == "첫 우승"
+    assert client.patch(f"/api/games/{KEY}", json={"title": "  "}).json()["title"] is None
+    assert _game_json(client)["title"] is None
+    assert client.patch(f"/api/games/{KEY}", json={"title": "가" * 61}).status_code == 400
+
+
+def test_patching_other_fields_does_not_touch_the_title(client):
+    client.patch(f"/api/games/{KEY}", json={"title": "유지"})
+    client.patch(f"/api/games/{KEY}", json={"pinned": True})
+    assert _game_json(client)["title"] == "유지"
+
+
+def test_editing_the_result_locks_it_on_the_game(client):
+    body = client.patch(
+        f"/api/games/{KEY}", json={"matchResult": {"placement": 3, "matchType": "rank", "tk": 10, "kills": 4, "assists": 2}}
+    ).json()
+    assert body["matchResult"]["placement"] == 3 and body["matchResult"]["tk"] == 10
+    assert body["matchResultSource"] == "manual"
+    saved = _game_json(client)
+    assert saved["matchResult"]["imagePath"] == "result.jpg" and saved["matchResultSource"] == "manual"
+
+
+def test_a_bad_result_edit_is_rejected_and_changes_nothing(client):
+    assert client.patch(f"/api/games/{KEY}", json={"matchResult": {"placement": 0}}).status_code == 400
+    assert client.patch(f"/api/games/{KEY}", json={"matchResult": {"imagePath": "x"}}).status_code == 400
+    assert client.patch(f"/api/games/{KEY}", json={"matchResult": {"placement": 2}, "title": "가" * 61}).status_code == 400
+    saved = _game_json(client)
+    assert saved["matchResult"]["placement"] == 1 and "matchResultSource" not in saved
+
+
+def test_unlocking_keeps_the_values(client):
+    client.patch(f"/api/games/{KEY}", json={"matchResult": {"placement": 5}})
+    body = client.patch(f"/api/games/{KEY}", json={"matchResultSource": None}).json()
+    assert body["matchResultSource"] is None and body["matchResult"]["placement"] == 5
+
+
+def test_a_cobalt_game_only_takes_victory_or_defeat(client):
+    path = client.tmp / "games" / KEY / "game.json"
+    game = json.loads(path.read_text(encoding="utf-8"))
+    path.write_text(json.dumps({**game, "gameMode": "cobalt", "matchResult": {"outcome": "패배"}}), encoding="utf-8")
+    assert client.patch(f"/api/games/{KEY}", json={"matchResult": {"outcome": "실험 종료"}}).status_code == 400
+    assert client.patch(f"/api/games/{KEY}", json={"matchResult": {"outcome": "승리"}}).json()["matchResult"]["outcome"] == "승리"
+
+
+def test_editing_the_result_updates_the_clips_made_from_the_game_too(client):
+    client.post(f"/api/games/{KEY}/candidates/{KEY}_01/save")
+    client.patch(f"/api/games/{KEY}", json={"matchResult": {"placement": 2, "kills": 7}})
+    meta = json.loads((client.library / f"{KEY}_01.json").read_text(encoding="utf-8"))
+    assert meta["matchResult"]["placement"] == 2 and meta["matchResult"]["kills"] == 7
+    assert meta["matchResultSource"] == "manual"
+    clip = next(c for c in client.get("/api/clips").json() if c["id"] == f"{KEY}_01")
+    assert clip["matchResult"]["placement"] == 2
+    client.patch(f"/api/games/{KEY}", json={"matchResultSource": None})
+    meta = json.loads((client.library / f"{KEY}_01.json").read_text(encoding="utf-8"))
+    assert meta["matchResultSource"] is None and meta["matchResult"]["placement"] == 2
+
+
+def test_a_clip_saved_after_the_edit_carries_the_locked_result(client):
+    client.patch(f"/api/games/{KEY}", json={"matchResult": {"placement": 4}})
+    client.post(f"/api/games/{KEY}/candidates/{KEY}_02/save")
+    meta = json.loads((client.library / f"{KEY}_02.json").read_text(encoding="utf-8"))
+    assert meta["matchResult"]["placement"] == 4 and meta["matchResultSource"] == "manual"
+
+
 def test_candidate_edit_dismiss_and_validation(client):
     url = f"/api/games/{KEY}/candidates/{KEY}_01"
     body = client.patch(url, json={"start": 95.0, "end": 150.0}).json()

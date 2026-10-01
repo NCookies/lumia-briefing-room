@@ -27,6 +27,7 @@ from lumia_briefing_room.detect.result import ResultScreen
 from lumia_briefing_room.detect.types import FrameState, PortraitCrops
 from lumia_briefing_room.pipeline.filters import apply_filter
 from lumia_briefing_room.pipeline.game_candidates import MIN_LENGTH_SEC
+from lumia_briefing_room.pipeline.game_edit import carry_user_fields
 from lumia_briefing_room.pipeline.game_files import GameNotFound, game_dir, has_full_video, load_game, update_game
 from lumia_briefing_room.pipeline.game_store import FULL_VIDEO, GAME_JSON, candidate_dict, markers_dict
 from lumia_briefing_room.pipeline.legacy_games import saved_clip_ids
@@ -103,11 +104,10 @@ def carry_over(old: dict, new: dict) -> None:
     old_base, new_base = _offset(old), _offset(new)
     duration = float((new.get("fullVideo") or {}).get("durationSec") or 0.0)
 
-    if old.get("pinned"):
-        new["pinned"] = True
-    if old.get("matchResultSource") == "manual" and old.get("matchResult") is not None:
-        new["matchResult"], new["matchResultSource"] = old["matchResult"], "manual"
-    elif old.get("matchResult") and (not new.get("matchResult") or (new["matchResult"].get("placement") is None and new["matchResult"].get("outcome") is None)):
+    carry_user_fields(old, new)
+    if new.get("matchResultSource") != "manual" and old.get("matchResult") and (
+        not new.get("matchResult") or (new["matchResult"].get("placement") is None and new["matchResult"].get("outcome") is None)
+    ):
         new["matchResult"] = old["matchResult"]
     portraits = dict(new.get("portraits") or {})
     for slot in _PORTRAIT_SLOTS:

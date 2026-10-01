@@ -164,6 +164,7 @@ def _build(folder: Path, clips_dir: Path, info: dict) -> dict:
         "matchKills": first_meta.get("matchKills"),
         "matchAssists": first_meta.get("matchAssists"),
         "matchResult": kept,
+        "matchResultSource": "manual" if kept is not None and any(m.get("matchResultSource") == "manual" for _, _, m in clips) else None,
         "portraits": portraits,
         "saveMode": "auto",
         "fullVideo": None,

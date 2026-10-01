@@ -53,6 +53,16 @@ def test_merges_clips_of_one_game_into_one_game_json(tmp_path):
     assert game["markers"] == [] and game["userCandidates"] == []
 
 
+def test_a_result_the_user_locked_on_a_clip_stays_locked_on_the_game(tmp_path):
+    clips, games = _setup(tmp_path)
+    _clip(clips, f"{KEY}_01", matchResultSource="manual", matchResult={"placement": 1})
+
+    lg.migrate_legacy_games(clips, games)
+
+    game = json.loads((games / KEY / "game.json").read_text(encoding="utf-8"))
+    assert game["matchResult"]["placement"] == 1 and game["matchResultSource"] == "manual"
+
+
 def test_candidates_are_the_saved_clips(tmp_path):
     clips, games = _setup(tmp_path)
     lg.migrate_legacy_games(clips, games)

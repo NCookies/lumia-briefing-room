@@ -22,14 +22,14 @@ def _load(d):
     return _Session(d)
 
 
-def _setup(tmp_path, *, segments=True, pinned=False):
+def _setup(tmp_path, *, segments=True, pinned=False, **extra):
     games, clips, root = tmp_path / "games", tmp_path / "clips", tmp_path / "steam"
     (games / KEY).mkdir(parents=True)
     clips.mkdir()
     (clips / f"{KEY}_01.json").write_text("{}", encoding="utf-8")
     (games / KEY / "game.json").write_text(json.dumps({
         "gameKey": KEY, "legacy": True, "sessionDir": "bg_1", "matchStartUtc": "2026-09-28T16:00:25.975000Z",
-        "matchEndUtc": "2026-09-28T16:18:00Z", "fullVideo": None, "pinned": pinned,
+        "matchEndUtc": "2026-09-28T16:18:00Z", "fullVideo": None, "pinned": pinned, **extra,
         "candidates": [{"id": f"{KEY}_01", "user": {"savedClipId": f"{KEY}_01"}}],
     }), encoding="utf-8")
     (root / "bg_1").mkdir(parents=True)
@@ -81,6 +81,22 @@ def test_rebuild_runs_the_pipeline_with_the_existing_clips_and_cleans_the_stagin
     assert calls["end"] == datetime(2026, 9, 28, 16, 18, tzinfo=timezone.utc)
     assert not calls["clips_dir"].exists()
     assert json.loads((games / KEY / "game.json").read_text(encoding="utf-8"))["pinned"] is True
+
+
+def test_rebuild_keeps_the_user_title_and_locked_result(tmp_path):
+    games, clips, root = _setup(tmp_path, title="내 제목", matchResult={"placement": 1}, matchResultSource="manual")
+
+    def fake_process(session, start, end, cfg, **kw):
+        (games / KEY / "full.mp4").write_bytes(b"v")
+        (games / KEY / "game.json").write_text(
+            json.dumps({"gameKey": KEY, "fullVideo": {"path": "full.mp4"}, "matchResult": {"placement": 9}}), encoding="utf-8"
+        )
+        return []
+
+    _run(games, clips, root, fake_process)
+
+    game = json.loads((games / KEY / "game.json").read_text(encoding="utf-8"))
+    assert game["title"] == "내 제목" and game["matchResult"] == {"placement": 1} and game["matchResultSource"] == "manual"
 
 
 def test_rebuild_reports_why_no_video_came_out(tmp_path):

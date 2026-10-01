@@ -192,6 +192,12 @@ def test_a_manually_fixed_result_survives_reanalysis(tmp_path):
     assert game["matchResult"]["placement"] == 5 and game["matchResultSource"] == "manual"
 
 
+def test_a_user_title_survives_reanalysis(tmp_path):
+    games, library = seed(tmp_path, old_game(title="내 제목"))
+    run_full(tmp_path, games, library, fake_process(new_game()))
+    assert load_game(games, KEY)["title"] == "내 제목"
+
+
 def test_nothing_to_analyze_is_an_error(tmp_path):
     games, library = seed(tmp_path, full=False)
 

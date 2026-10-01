@@ -13,6 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 from lumia_briefing_room.config import Config
+from lumia_briefing_room.pipeline.game_edit import carry_user_fields
 from lumia_briefing_room.pipeline.game_files import GameNotFound, has_full_video, load_game, update_game
 from lumia_briefing_room.pipeline.legacy_games import adopt_legacy_clips, saved_clip_ids
 from lumia_briefing_room.pipeline.orchestrator import process_match
@@ -117,5 +118,4 @@ def rebuild_full_video(
     except Exception:
         log.exception("옛 클립을 새 후보에 잇지 못했다: %s", key)
 
-    if game.get("pinned"):
-        update_game(games_dir, key, lambda d: d.update(pinned=True))
+    update_game(games_dir, key, lambda d: carry_user_fields(game, d))

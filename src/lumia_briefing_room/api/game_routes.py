@@ -37,6 +37,8 @@ from lumia_briefing_room.pipeline.label_archive import archive_dir_for
 from lumia_briefing_room.pipeline.proxy import proxy_file
 from lumia_briefing_room.pipeline.game_files import GameNotFound, game_dir, has_full_video, list_games, load_game, update_game
 from lumia_briefing_room.pipeline.game_store import FULL_VIDEO
+from lumia_briefing_room.pipeline.game_backfill import clip_metas
+from lumia_briefing_room.pipeline.game_edit import GameEditError, lock_result, normalize_title, sync_clip_results, validate_result_edit
 from lumia_briefing_room.pipeline.legacy_games import migrate_legacy_games
 from lumia_briefing_room.pipeline.legacy_vod_games import migrate_legacy_vod_games
 from lumia_briefing_room.pipeline.rebuild_full_video import RebuildError, can_rebuild, rebuild_full_video
@@ -50,6 +52,9 @@ _ASSETS = {"result.jpg", "portrait_me.jpg", "portrait_teammate1.jpg", "portrait_
 
 class GamePatch(BaseModel):
     pinned: bool | None = None
+    title: str | None = None
+    matchResult: dict | None = None
+    matchResultSource: str | None = None
 
 
 class CandidateCreate(BaseModel):
@@ -104,6 +109,8 @@ def _summary(game: dict, games_dir: Path, *, can_rebuild_full: bool = False) -> 
         "matchEndUtc": game.get("matchEndUtc"),
         "gameMode": game.get("gameMode"),
         "matchResult": game.get("matchResult"),
+        "matchResultSource": game.get("matchResultSource"),
+        "title": game.get("title"),
         "portraits": game.get("portraits") or {},
         "pinned": bool(game.get("pinned")),
         "sourceIncomplete": bool(game.get("sourceIncomplete")),
@@ -379,12 +386,46 @@ def register_game_routes(
             raise HTTPException(404, "파일을 찾을 수 없습니다")
         return FileResponse(path, media_type="image/jpeg")
 
+    def game_clip_paths(game: dict) -> list[Path]:
+        """이 게임에서 만든 클립 메타 파일: 후보에 연결된 클립 + 같은 경기의 옛 클립(스팀)."""
+        directory = clips_dir_for(game)
+        paths = {directory / f"{(c.get('user') or {}).get('savedClipId')}.json" for c in gcand.all_candidates(game) if (c.get("user") or {}).get("savedClipId")}
+        if game.get("source") != "vod":
+            paths.update(path for path, _ in clip_metas(directory, game))
+        return sorted(p for p in paths if p.is_file())
+
     @app.patch("/api/games/{key}")
     def patch_game(key: str, body: GamePatch):
         load_or_404(key)
-        if body.pinned is not None:
-            update_game(games_dir(key), key, lambda d: d.update(pinned=body.pinned))
-            cleanup_preview_registry.notify_clips_changed()
+        sent = body.model_fields_set
+        try:
+            title = normalize_title(body.title) if "title" in sent else None
+            result_edit = None
+            if body.matchResult is not None:
+                game = load_or_404(key)
+                result_edit = validate_result_edit(body.matchResult, cobalt=game.get("gameMode") == "cobalt")
+        except GameEditError as e:
+            raise HTTPException(400, str(e))
+        unlock = "matchResultSource" in sent and body.matchResultSource is None and result_edit is None
+        if "matchResultSource" in sent and body.matchResultSource is not None:
+            raise HTTPException(400, "잠금은 해제(null)만 직접 바꿀 수 있습니다. 값을 고치면 저절로 잠깁니다")
+
+        def change(data: dict) -> None:
+            if body.pinned is not None:
+                data["pinned"] = body.pinned
+            if "title" in sent:
+                data["title"] = title
+            if result_edit is not None:
+                lock_result(data, result_edit)
+            elif unlock:
+                data["matchResultSource"] = None
+
+        if body.pinned is not None or "title" in sent or result_edit is not None or unlock:
+            updated = update_game(games_dir(key), key, change)
+            if result_edit is not None or unlock:
+                sync_clip_results(game_clip_paths(updated), result_edit, locked=result_edit is not None)
+            if body.pinned is not None:
+                cleanup_preview_registry.notify_clips_changed()
         return _summary(load_or_404(key), games_dir(key))
 
     def _rename_saved_clip(game: dict, cand: dict) -> None:

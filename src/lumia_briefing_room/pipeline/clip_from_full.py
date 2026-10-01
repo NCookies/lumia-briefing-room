@@ -122,6 +122,7 @@ def _vod_clip_metadata(
         result_image_path=None, my_character_portrait_path=me_portrait, teammate_portrait_paths=mates,
     )
     meta["matchResult"] = result
+    meta["matchResultSource"] = game.get("matchResultSource")
     return meta
 
 
@@ -242,7 +243,7 @@ def save_candidate_clip(
         clip_uid=uid,
         my_character_portrait_path=me_portrait,
         teammate_portrait_paths=mates,
-        match_result_source=None,
+        match_result_source=game.get("matchResultSource"),
     )
     write_metadata(meta, json_path)
     return _merge_kept(json_path, old, clip_id)

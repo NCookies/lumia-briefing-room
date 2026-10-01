@@ -144,6 +144,8 @@ def test_rebuild_replaces_the_game_but_keeps_pinned_and_drops_stale_games(vod_fi
     folder = games_of(cfg)[0]
     data = read_game(folder)
     data["pinned"] = True
+    data["title"] = "내 제목"
+    data["matchResult"], data["matchResultSource"] = {"placement": 1}, "manual"
     (folder / "game.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     stale = cfg.paths.games / f"vod_{vod_id(vod_file)}_g09"
     stale.mkdir()
@@ -153,7 +155,9 @@ def test_rebuild_replaces_the_game_but_keeps_pinned_and_drops_stale_games(vod_fi
 
     analyze_vod(vod_file, cfg, ffmpeg_path=FFMPEG_PATH, read_frame=read_frame, find_result=no_result, rebuild=True)
 
-    assert read_game(folder)["pinned"] is True
+    kept = read_game(folder)
+    assert kept["pinned"] is True and kept["title"] == "내 제목"
+    assert kept["matchResult"] == {"placement": 1} and kept["matchResultSource"] == "manual"
     assert not stale.exists() and other.exists()
 
 

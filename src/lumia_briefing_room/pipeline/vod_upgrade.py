@@ -27,7 +27,7 @@ from lumia_briefing_room.pipeline.vod_analyze import (
     _default_find_portraits,
     _default_find_result,
     _default_reader,
-    _keep_pinned,
+    _keep_user_fields,
     _safe_portraits,
     _safe_result,
 )
@@ -219,7 +219,7 @@ def upgrade_vod_games(
             _keep_old_result(data, folder, root, g)
         old_portraits = _old_portraits(folder) if det.detection.game_mode != "cobalt" else {}
         data["portraits"] = {slot: name or old_portraits.get(slot) for slot, name in data["portraits"].items()}
-        write_vod_game(folder, _keep_pinned(folder, data))
+        write_vod_game(folder, _keep_user_fields(folder, data))
         g.update(gameKey=key, fullVideo=True, fullStartSec=full_start, fullEndSec=full_end)
         save_index(root, index)
         created.append(key)
