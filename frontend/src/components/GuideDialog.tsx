@@ -14,7 +14,7 @@ export function GuideDialog({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-label="사용 안내"
-        className="flex max-h-[85vh] w-full max-w-2xl flex-col gap-3 overflow-y-auto rounded-xl border border-zinc-600/70 bg-zinc-800 shadow-xl p-5 text-zinc-100"
+        className="flex h-[85vh] max-h-[760px] w-full max-w-3xl flex-col gap-3 rounded-xl border border-zinc-600/70 bg-zinc-800 shadow-xl p-5 text-zinc-100"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
@@ -23,7 +23,9 @@ export function GuideDialog({ onClose }: { onClose: () => void }) {
             닫기
           </button>
         </div>
-        <GuideContent />
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+          <GuideContent />
+        </div>
       </div>
     </div>
   )
