@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { candidateTitle, effectiveRange, formatClock, gameHeadline, isDismissed, isSaved, neighborCandidate, visibleCandidates, type Candidate, type GameDetail } from '../games'
+import { candidateTitle, effectiveRange, gameHeadline, isDismissed, isSaved, neighborCandidate, visibleCandidates, type Candidate, type GameDetail } from '../games'
 import {
   GameNotFoundError,
   addCandidate,
@@ -22,12 +22,12 @@ import { isPlaybackFailure } from '../playback'
 import { gameHeading } from '../gameEdit'
 import { LegacyGamePanel } from './LegacyGamePanel'
 import { ViewerBar, ViewerScroll } from './ViewerBar'
-import { ExitFullscreenIcon, FullscreenIcon, MuteIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon, SeekBackIcon, SeekForwardIcon, VolumeIcon, ZoomInIcon, ZoomOutIcon, UndoIcon, RedoIcon, KeyboardIcon, PlusIcon } from './ViewerIcons'
+import { BTN, CTRL, CTRL_ICON, ShortcutPanel, ViewerControlBar, VolumeToast } from './ViewerControls'
+import { ZoomInIcon, ZoomOutIcon, UndoIcon, RedoIcon, KeyboardIcon, PlusIcon } from './ViewerIcons'
 import { ArchivePopup } from './ArchivePopup'
 import { SavedClipPlayer } from './SavedClipPlayer'
 import { GameMenu, type GameMenuItem } from './GameMenu'
 import { ViewerCandidates } from './ViewerCandidates'
-import { ShortcutTable } from './ShortcutTable'
 import { HelpTip } from './HelpTip'
 import { fillHeight } from '../fillHeight'
 import { SEEK_STEP_SEC, decideKey, isTextEntry, loadHelpSeen, saveHelpSeen, type TargetInfo, type ViewerAction } from '../viewerShortcuts'
@@ -47,13 +47,6 @@ const LEGEND_HELP = [
   '다시 저장을 눌러야 새 범위가 반영됩니다.',
   '막대 눈금: 초록 킬 · 파랑 어시 · 빨강 사망 · 주황 팀원 사망',
 ].join('\n')
-
-const BTN =
-  'rounded-md border border-zinc-600/70 bg-zinc-800/60 px-2.5 py-1 text-sm text-zinc-200 transition hover:bg-zinc-700 hover:text-white active:scale-95 disabled:opacity-40 disabled:hover:bg-zinc-800/60'
-const CTRL =
-  'inline-flex h-8 items-center justify-center gap-1.5 rounded-md px-2.5 text-sm text-zinc-200 transition hover:bg-zinc-700/80 hover:text-white active:scale-95 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-zinc-200'
-const CTRL_ICON =
-  'inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-200 transition hover:bg-zinc-700/80 hover:text-white active:scale-95 disabled:opacity-40 disabled:hover:bg-transparent'
 
 export function GameViewer({
   gameKey,
@@ -596,81 +589,27 @@ export function GameViewer({
               }}
               onError={() => setVideoError(true)}
             />
-            {volumeToast !== null && (
-              <div role="status" className="pointer-events-none absolute left-3 top-3 z-10 rounded-md bg-black/70 px-3 py-1.5 text-sm font-medium tabular-nums text-white">
-                볼륨 {volumeToast}%
-              </div>
-            )}
-            {helpOpen && (
-              <div
-                data-testid="shortcut-help"
-                className="absolute right-2 top-2 z-10 max-h-[70%] w-[26rem] max-w-[calc(100%-1rem)] overflow-y-auto rounded border border-zinc-600 bg-zinc-900/95 p-3 shadow-lg"
-              >
-                <div className="mb-2 flex items-center justify-between text-sm font-medium text-zinc-100">
-                  단축키
-                  <button type="button" className="rounded px-1.5 text-xs text-zinc-400 hover:bg-zinc-700" title="닫기 (? 또는 Esc)" onClick={() => setHelpOpen(false)}>
-                    닫기
-                  </button>
-                </div>
-                <ShortcutTable />
-              </div>
-            )}
+            {volumeToast !== null && <VolumeToast percent={volumeToast} />}
+            {helpOpen && <ShortcutPanel onClose={() => setHelpOpen(false)} />}
             {videoError && (
               <p className="text-sm text-amber-300">
                 이 브라우저에서 풀영상을 재생하지 못했습니다. 스팀 녹화(HEVC)라면 설치된 Edge/Chrome 에서 열거나 HEVC 확장을 설치해 주세요.
               </p>
             )}
 
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-lg border border-zinc-700/60 bg-zinc-800/60 px-2 py-1.5 text-white">
-              <span className="inline-flex items-baseline gap-1 justify-self-start rounded-md bg-zinc-900/70 px-2.5 py-1 font-mono text-sm tabular-nums" aria-label="재생 위치">
-                <span className="font-semibold text-sky-300">{formatClock(time)}</span>
-                <span className="text-zinc-600">/</span>
-                <span className="text-zinc-400">{formatClock(duration)}</span>
-              </span>
-              <span className="flex items-center gap-1">
-                <button type="button" className={CTRL} title="이전 클립 (Ctrl+←)" onClick={() => jump('prev')}>
-                  <PrevIcon /> 이전 클립
-                </button>
-                <span className="mx-1 h-5 w-px bg-zinc-700" aria-hidden="true" />
-                <button type="button" className={CTRL_ICON} title={`${SEEK_STEP_SEC}초 뒤로 (←)`} aria-label={`${SEEK_STEP_SEC}초 뒤로`} onClick={() => seek(time - SEEK_STEP_SEC)}>
-                  <SeekBackIcon seconds={SEEK_STEP_SEC} />
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-sky-600 text-white shadow transition hover:bg-sky-500 active:scale-95"
-                  title="재생/일시정지 (Space)"
-                  aria-label="재생/일시정지"
-                  onClick={togglePlay}
-                >
-                  {playing ? <PauseIcon /> : <PlayIcon />}
-                </button>
-                <button type="button" className={CTRL_ICON} title={`${SEEK_STEP_SEC}초 앞으로 (→)`} aria-label={`${SEEK_STEP_SEC}초 앞으로`} onClick={() => seek(time + SEEK_STEP_SEC)}>
-                  <SeekForwardIcon seconds={SEEK_STEP_SEC} />
-                </button>
-                <span className="mx-1 h-5 w-px bg-zinc-700" aria-hidden="true" />
-                <button type="button" className={CTRL} title="다음 클립 (Ctrl+→)" onClick={() => jump('next')}>
-                  다음 클립 <NextIcon />
-                </button>
-              </span>
-              <span className="flex items-center gap-1 justify-self-end">
-                <button type="button" className={CTRL_ICON} title="음소거" aria-label="음소거" onClick={() => setVol({ ...vol, muted: !vol.muted })}>
-                  {vol.muted || vol.volume === 0 ? <MuteIcon /> : <VolumeIcon />}
-                </button>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  aria-label="볼륨"
-                  value={vol.muted ? 0 : vol.volume}
-                  className="w-24 accent-sky-400"
-                  onChange={(e) => setVol({ volume: Number(e.target.value), muted: false })}
-                />
-                <button type="button" className={CTRL_ICON} title="전체화면 (F)" aria-label="전체화면" onClick={toggleFullscreen}>
-                  {fullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
-                </button>
-              </span>
-            </div>
+            <ViewerControlBar
+              time={time}
+              duration={duration}
+              playing={playing}
+              vol={vol}
+              fullscreen={fullscreen}
+              onPrev={() => jump('prev')}
+              onNext={() => jump('next')}
+              onSeekBy={(delta) => seek(time + delta)}
+              onTogglePlay={togglePlay}
+              onVolume={setVol}
+              onToggleFullscreen={toggleFullscreen}
+            />
 
             <ViewerBar
               duration={duration}

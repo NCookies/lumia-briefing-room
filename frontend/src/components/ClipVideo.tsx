@@ -20,9 +20,16 @@ interface Props {
   version: number
   videoRef: (el: HTMLVideoElement | null) => void
   onVolumeChange: (el: HTMLVideoElement) => void
+  /** 주면 브라우저 기본 컨트롤 없이 영역을 채운다 - 컨트롤은 화면이 직접 그린다(클립 재생 화면). */
+  player?: {
+    onPlay: () => void
+    onPause: () => void
+    onTime: (el: HTMLVideoElement) => void
+    onToggle: () => void
+  }
 }
 
-export function ClipVideo({ clipId, nextClipId, version, videoRef, onVolumeChange }: Props) {
+export function ClipVideo({ clipId, nextClipId, version, videoRef, onVolumeChange, player }: Props) {
   const [mode, setMode] = useState<PlaybackMode>(() => initialMode(browserCanPlayHevc(), rememberedMode()))
   const [status, setStatus] = useState<ProxyStatus | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -122,15 +129,23 @@ export function ClipVideo({ clipId, nextClipId, version, videoRef, onVolumeChang
       key={`${clipId}-${version}-${mode}`}
       ref={videoRef}
       onVolumeChange={(e) => onVolumeChange(e.currentTarget)}
-      onLoadedMetadata={(e) => check(e.currentTarget)}
+      onLoadedMetadata={(e) => {
+        check(e.currentTarget)
+        player?.onTime(e.currentTarget)
+      }}
+      onPlay={player?.onPlay}
+      onPause={player?.onPause}
+      onEnded={player?.onPause}
+      onTimeUpdate={player ? (e) => player.onTime(e.currentTarget) : undefined}
+      onClick={player?.onToggle}
       onError={(e) => {
         errored.current = true
         check(e.currentTarget)
       }}
       src={mode === 'proxy' ? proxyVideoUrl(clipId, version) : videoUrl(clipId, version)}
-      controls
+      controls={!player}
       autoPlay
-      className="aspect-video w-full rounded-md bg-black object-contain"
+      className={player ? 'min-h-0 w-full flex-1 cursor-pointer rounded bg-black object-contain' : 'aspect-video w-full rounded-md bg-black object-contain'}
     />
   )
 }

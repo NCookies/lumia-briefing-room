@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { patchClip, splitClip, thumbnailUrl, trimClip } from '../api'
-import { cardHeadline, filterClips, sortedForCategory } from '../clipArchive'
+import { cardHeadline, filterClips, formatWhen, sortedForCategory } from '../clipArchive'
+import { idAfterRemoval } from '../clipViewer'
 import { createCategory, getCategories, moveClipsToCategory, type Category } from '../categoriesApi'
 import type { DeleteMode } from '../deleteConfirm'
 import { getExportDefault, pickFolder } from '../exportApi'
 import { deleteEntries, exportEntries, getLibrary, renameEntry, revealEntry, type LibraryClip } from '../libraryApi'
 import { formatBytes } from '../retention'
-import type { UserLabel } from '../types'
 import { ArchivePopup } from './ArchivePopup'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { ExportDialog } from './ExportDialog'
-import { PlayerModal } from './PlayerModal'
+import { ClipViewer } from './ClipViewer'
 import { PortraitRow } from './PortraitRow'
 import { PromptDialog } from './PromptDialog'
 
@@ -19,6 +19,12 @@ interface Props {
   /** 주소가 정한 카테고리(없으면 맨 위 카테고리). */
   category: string | null
   onCategoryChange: (name: string | null, replace?: boolean) => void
+  /** 주소가 정한 재생 화면의 클립(없으면 카테고리 목록). */
+  clipId: string | null
+  /** 재생 화면에서 보는 클립을 바꾼다(`null` 이면 카테고리 목록으로). 클립을 오가는 건 history 에 쌓지 않는다. */
+  onClipChange: (category: string | null, clipId: string | null, replace?: boolean) => void
+  /** `← 카테고리` 와 브라우저 뒤로 가기가 같은 동작. */
+  onCloseClip: () => void
   refreshTick: number
   confirmDelete: boolean
   onConfirmDeleteChange: (value: boolean) => void
@@ -26,21 +32,15 @@ interface Props {
   onDeleteModeChange: (value: DeleteMode) => void
 }
 
-type DeleteRequest = { label: string; items: string[] }
+type DeleteRequest = { label: string; items: string[]; after?: string | null }
 
 function formatDuration(sec: number): string {
   if (!sec) return ''
   return `${Math.floor(sec / 60)}:${Math.floor(sec % 60).toString().padStart(2, '0')}`
 }
 
-function formatWhen(iso: string | undefined): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
 /** "클립" 탭: 보관한 클립을 카테고리(= `clips\` 아래 폴더)별로 본다. 왼쪽 카테고리 목록, 오른쪽 그 카테고리의 클립 카드(게임 정보 중심). */
-export function ClipArchive({ active, category, onCategoryChange, refreshTick, confirmDelete, onConfirmDeleteChange, deleteMode, onDeleteModeChange }: Props) {
+export function ClipArchive({ active, category, onCategoryChange, clipId, onClipChange, onCloseClip, refreshTick, confirmDelete, onConfirmDeleteChange, deleteMode, onDeleteModeChange }: Props) {
   const [enabled, setEnabled] = useState(true)
   const [categories, setCategories] = useState<Category[] | null>(null)
   const [clips, setClips] = useState<LibraryClip[]>([])
@@ -49,7 +49,7 @@ export function ClipArchive({ active, category, onCategoryChange, refreshTick, c
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
-  const [playingId, setPlayingId] = useState<string | null>(null)
+  const [loadedFor, setLoadedFor] = useState<string | null>(null)
   const [exportTarget, setExportTarget] = useState<LibraryClip | null>(null)
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
@@ -78,6 +78,7 @@ export function ClipArchive({ active, category, onCategoryChange, refreshTick, c
     getLibrary(current)
       .then((listing) => {
         setClips(listing.clips)
+        setLoadedFor(current)
         setError(null)
         setSelected((prev) => new Set([...prev].filter((k) => listing.clips.some((c) => c.relPath === k))))
       })
@@ -94,15 +95,16 @@ export function ClipArchive({ active, category, onCategoryChange, refreshTick, c
   }, [active, loadCategories, refreshTick])
 
   useEffect(() => {
-    setPlayingId(null)
-  }, [active, current])
-
-  useEffect(() => {
     if (active) loadClips()
   }, [active, loadClips, refreshTick])
 
   const shown = useMemo(() => filterClips(sortedForCategory(clips), query), [clips, query])
-  const playingIndex = shown.findIndex((c) => c.id === playingId)
+  const playing = clipId && loadedFor === current ? (clips.find((c) => c.id === clipId) ?? null) : null
+  const viewerClips = useMemo(() => sortedForCategory(clips), [clips])
+
+  useEffect(() => {
+    if (active && clipId && loadedFor === current && !clips.some((c) => c.id === clipId)) onClipChange(current, null, true)
+  }, [active, clipId, loadedFor, current, clips, onClipChange])
   const selectedClips = shown.filter((c) => selected.has(c.relPath))
 
   const run = async (action: () => Promise<unknown>, done?: string) => {
@@ -128,6 +130,7 @@ export function ClipArchive({ active, category, onCategoryChange, refreshTick, c
     setDeleteRequest(null)
     if (skipNext) onConfirmDeleteChange(false)
     if (mode !== deleteMode) onDeleteModeChange(mode)
+    if (request?.after !== undefined) onClipChange(current, request.after, true)
     if (request) await run(() => deleteEntries(request.items))
   }
 
@@ -146,8 +149,49 @@ export function ClipArchive({ active, category, onCategoryChange, refreshTick, c
 
   const isUser = (c: Category) => !c.auto && !c.default
 
+  const viewerDelete = (clip: LibraryClip) => {
+    const next = idAfterRemoval(viewerClips.map((c) => c.id), clip.id)
+    const remove = async () => {
+      onClipChange(current, next, true)
+      await run(() => deleteEntries([clip.relPath]))
+    }
+    if (!confirmDelete) void remove()
+    else setDeleteRequest({ label: `"${clip.title}" 클립을 삭제합니다.`, items: [clip.relPath], after: next })
+  }
+
   return (
-    <div className="flex flex-1 gap-4 p-4" data-testid="clip-archive">
+    <>
+    {playing && current && (
+      <ClipViewer
+        clips={viewerClips}
+        clip={playing}
+        category={current}
+        active={active}
+        paused={deleteRequest !== null || exportTarget !== null}
+        onBack={onCloseClip}
+        onOpen={(id) => onClipChange(current, id, true)}
+        onRename={(clip, title) => void run(() => patchClip(clip.id, { title }))}
+        onMemo={(clip, memo) => void run(() => patchClip(clip.id, { memo }))}
+        onMove={(clip, to) => {
+          const next = idAfterRemoval(viewerClips.map((c) => c.id), clip.id)
+          onClipChange(current, next, true)
+          void run(() => moveClipsToCategory([clip.id], to), `"${clip.title}" 을(를) "${to}"로 옮겼습니다.`)
+        }}
+        onExport={setExportTarget}
+        onReveal={(clip) => void run(() => revealEntry(clip.relPath))}
+        onDelete={viewerDelete}
+        onTrim={async (clip, ranges) => {
+          if (ranges.length === 1) {
+            await trimClip(clip.id, ranges[0].start, ranges[0].end)
+          } else {
+            const pieces = await splitClip(clip.id, ranges)
+            onClipChange(current, pieces[0]?.id ?? null, true)
+          }
+          reload()
+        }}
+      />
+    )}
+    <div className={playing ? 'hidden' : 'flex flex-1 gap-4 p-4'} data-testid="clip-archive">
       <aside className="flex w-56 shrink-0 flex-col gap-1">
         <div className="flex items-center justify-between px-1 pb-1 text-xs text-zinc-400">
           <span>카테고리</span>
@@ -254,7 +298,7 @@ export function ClipArchive({ active, category, onCategoryChange, refreshTick, c
         <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3">
           {shown.map((c) => (
             <div key={c.relPath} className={`flex flex-col overflow-hidden rounded-md border bg-zinc-800/60 ${selected.has(c.relPath) ? 'border-sky-500' : 'border-zinc-700'}`}>
-              <div className="relative aspect-video cursor-pointer bg-zinc-900" onClick={() => (selectMode ? setSelected((s) => { const n = new Set(s); if (n.has(c.relPath)) n.delete(c.relPath); else n.add(c.relPath); return n }) : setPlayingId(c.id))}>
+              <div className="relative aspect-video cursor-pointer bg-zinc-900" onClick={() => (selectMode ? setSelected((s) => { const n = new Set(s); if (n.has(c.relPath)) n.delete(c.relPath); else n.add(c.relPath); return n }) : onClipChange(current, c.id))}>
                 <img src={thumbnailUrl(c.id)} alt="" className="h-full w-full object-cover" loading="lazy" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
                 {selectMode && <input type="checkbox" className="absolute left-2 top-2" aria-label={`${c.title} 선택`} checked={selected.has(c.relPath)} readOnly />}
                 {c.durationSec > 0 && <span className="absolute bottom-1 right-1 rounded-md bg-black/70 px-1.5 text-xs text-zinc-100">{formatDuration(c.durationSec)}</span>}
@@ -280,6 +324,7 @@ export function ClipArchive({ active, category, onCategoryChange, refreshTick, c
           ))}
         </div>
       </section>
+    </div>
 
       {creating && (
         <PromptDialog
@@ -328,40 +373,7 @@ export function ClipArchive({ active, category, onCategoryChange, refreshTick, c
         />
       )}
       {deleteRequest && <DeleteConfirmDialog label={deleteRequest.label} deleteMode={deleteMode} onCancel={() => setDeleteRequest(null)} onConfirm={confirmDeletion} />}
-      {playingIndex >= 0 && (
-        <PlayerModal
-          clips={shown}
-          index={playingIndex}
-          onIndexChange={(i) => setPlayingId(shown[i]?.id ?? null)}
-          onLabel={(clip, label: UserLabel) => void run(() => patchClip(clip.id, { userLabel: label }))}
-          onNote={(clip, note) => void run(() => patchClip(clip.id, { labelNote: note }))}
-          onMemo={(clip, memo) => void run(() => patchClip(clip.id, { memo }))}
-          onExport={(clip) => setExportTarget(clip as LibraryClip)}
-          onRename={(clip, title) => void run(() => patchClip(clip.id, { title }))}
-          onTrim={async (clip, ranges) => {
-            if (ranges.length === 1) {
-              await trimClip(clip.id, ranges[0].start, ranges[0].end)
-            } else {
-              const pieces = await splitClip(clip.id, ranges)
-              setPlayingId(pieces[0]?.id ?? null)
-            }
-            reload()
-          }}
-          paused={exportTarget !== null}
-          onDelete={(clip) => {
-            const next = shown[playingIndex + 1] ?? shown[playingIndex - 1]
-            const rel = (clip as LibraryClip).relPath
-            if (!confirmDelete) {
-              setPlayingId(next?.id ?? null)
-              void run(() => deleteEntries([rel]))
-            } else {
-              setDeleteRequest({ label: `"${clip.title}" 클립을 삭제합니다.`, items: [rel] })
-            }
-          }}
-          onClose={() => setPlayingId(null)}
-        />
-      )}
       {exportTarget && <ExportDialog clip={exportTarget} onClose={() => setExportTarget(null)} />}
-    </div>
+    </>
   )
 }

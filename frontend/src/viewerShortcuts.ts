@@ -68,9 +68,11 @@ export interface ShortcutGroup {
   rows: { keys: string; desc: string }[]
 }
 
-function buildGroups(): ShortcutGroup[] {
+/** 안내 표. `only` 를 주면 그 동작의 키만(클립 재생 화면은 범위 편집 키가 없다). */
+export function shortcutGroupsFor(only?: ViewerAction[]): ShortcutGroup[] {
   const groups: ShortcutGroup[] = []
   for (const s of VIEWER_SHORTCUTS) {
+    if (only && !only.includes(s.action)) continue
     let g = groups.find((x) => x.title === s.group)
     if (!g) groups.push((g = { title: s.group, rows: [] }))
     g.rows.push({ keys: s.combos.map(comboLabel).join(' / '), desc: s.desc })
@@ -79,7 +81,7 @@ function buildGroups(): ShortcutGroup[] {
 }
 
 /** 안내 표(풀영상 화면의 `⌨` 패널과 사용 안내 가이드가 같이 쓴다). */
-export const SHORTCUT_GROUPS: ShortcutGroup[] = buildGroups()
+export const SHORTCUT_GROUPS: ShortcutGroup[] = shortcutGroupsFor()
 
 export interface TargetInfo {
   tag: string

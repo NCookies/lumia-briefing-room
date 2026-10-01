@@ -29,3 +29,9 @@ export function filterClips<T extends CardClip>(clips: T[], query: string): T[] 
 export function sortedForCategory<T extends CardClip>(clips: T[]): T[] {
   return [...clips].sort((a, b) => (b.matchStartUtc ?? '').localeCompare(a.matchStartUtc ?? ''))
 }
+
+export function formatWhen(iso: string | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}

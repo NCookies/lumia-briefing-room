@@ -256,6 +256,9 @@ export default function App() {
           active={tab === 'library'}
           category={routeOf('library').category ?? null}
           onCategoryChange={(name, replace) => navigate({ tab: 'library', category: name ?? undefined }, replace)}
+          clipId={routeOf('library').clip ?? null}
+          onClipChange={(name, id, replace) => navigate({ tab: 'library', category: name ?? undefined, clip: id ?? undefined }, replace)}
+          onCloseClip={() => back(routeOf('library'))}
           refreshTick={refreshTick}
           confirmDelete={confirmDelete}
           onConfirmDeleteChange={changeConfirmDelete}

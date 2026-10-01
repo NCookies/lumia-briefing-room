@@ -11,7 +11,7 @@ export interface GameMenuItem {
 const MENU_WIDTH = 240
 
 /** 게임 행 오른쪽 `⋯` 메뉴. 행이 `overflow-hidden` 이라 메뉴는 화면 기준(`fixed`)으로 띄운다. */
-export function GameMenu({ items }: { items: GameMenuItem[] }) {
+export function GameMenu({ items, label = '게임 메뉴' }: { items: GameMenuItem[]; label?: string }) {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const button = useRef<HTMLButtonElement | null>(null)
 
@@ -43,7 +43,7 @@ export function GameMenu({ items }: { items: GameMenuItem[] }) {
       <button
         ref={button}
         type="button"
-        aria-label="게임 메뉴"
+        aria-label={label}
         aria-haspopup="menu"
         aria-expanded={pos !== null}
         className="inline-flex h-7 w-8 items-center justify-center rounded-md border border-zinc-600/70 bg-zinc-800/60 text-xs leading-none text-zinc-200 transition hover:bg-zinc-700 hover:text-white active:scale-95"

@@ -65,3 +65,29 @@ test('rememberRoute keeps the last route per tab', () => {
   assert.deepEqual(memo.library, { tab: 'library', category: 'c' })
   assert.equal(memo.vod, undefined)
 })
+
+test('a clip address is #/clips/<category>/clip/<clip> and reads back', () => {
+  const route = { tab: 'library' as const, category: '내 하이라이트', clip: 'clip 01' }
+  assert.equal(formatRoute(route), `#/clips/${encodeURIComponent('내 하이라이트')}/clip/${encodeURIComponent('clip 01')}`)
+  assert.deepEqual(parseRoute(formatRoute(route)), route)
+  assert.deepEqual(parseRoute('#/clips/a%2Fb/clip/c'), { tab: 'library', category: 'a/b', clip: 'c' })
+})
+
+test('a clip needs a category and an empty clip segment falls back to the category list', () => {
+  assert.equal(formatRoute({ tab: 'library', clip: 'x' }), '#/clips')
+  assert.deepEqual(parseRoute('#/clips/a/clip/'), { tab: 'library', category: 'a/clip/' })
+  assert.deepEqual(parseRoute('#/clips/clip/x'), { tab: 'library', category: 'clip/x' })
+})
+
+test('a game address can carry the selected candidate', () => {
+  const route = { tab: 'steam' as const, game: '20260930_231500', cand: '20260930_231500_02' }
+  assert.equal(formatRoute(route), '#/steam/game/20260930_231500/cand/20260930_231500_02')
+  assert.deepEqual(parseRoute(formatRoute(route)), route)
+  assert.deepEqual(parseRoute('#/vod/game/k/cand/'), { tab: 'vod', game: 'k' })
+  assert.equal(formatRoute({ tab: 'steam', cand: 'x' }), '#/steam')
+})
+
+test('listRoute of a clip goes back to its category, of a game to the tab list', () => {
+  assert.deepEqual(listRoute({ tab: 'library', category: 'c', clip: 'x' }), { tab: 'library', category: 'c' })
+  assert.deepEqual(listRoute({ tab: 'steam', game: 'g', cand: 'c' }), { tab: 'steam' })
+})
