@@ -211,3 +211,33 @@ def test_config_with_a_utf8_bom_still_loads(tmp_path):
 
 def test_clips_are_not_archived_automatically_by_default():
     assert Config().clip.save_mode == "manual"
+
+
+def test_a_reader_never_sees_a_half_written_config_while_it_is_being_saved(tmp_path):
+    """실사용(2026-10-01): 저장이 파일을 비운 순간 다른 요청이 읽어 JSONDecodeError 로 영상 삭제가 실패했다."""
+    import threading
+
+    path = tmp_path / "config.json"
+    save_config(Config(), path)
+    stop = threading.Event()
+    errors: list[Exception] = []
+
+    def writer():
+        while not stop.is_set():
+            save_config(Config(), path)
+
+    thread = threading.Thread(target=writer)
+    thread.start()
+    try:
+        for _ in range(300):
+            try:
+                load_config(path)
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
+                break
+    finally:
+        stop.set()
+        thread.join()
+
+    assert errors == []
+    assert [p.name for p in tmp_path.iterdir()] == ["config.json"]

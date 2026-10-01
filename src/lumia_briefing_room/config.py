@@ -2,6 +2,8 @@ import dataclasses
 import json
 import os
 import shutil
+import threading
+import time
 import types
 import typing
 from dataclasses import dataclass, field
@@ -418,7 +420,7 @@ def load_config(path: Path | None = None) -> Config:
     path = path or DEFAULT_CONFIG_PATH
     if not path.exists():
         return Config()
-    data = json.loads(path.read_text(encoding="utf-8-sig"))
+    data = json.loads(_read_retrying(path))
     return dataclass_from_camel_dict(Config, data)
 
 
@@ -426,4 +428,40 @@ def save_config(cfg: Config, path: Path | None = None) -> None:
     path = path or DEFAULT_CONFIG_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
     text = json.dumps(dataclass_to_camel_dict(cfg), ensure_ascii=False, indent=2)
-    path.write_text(text, encoding="utf-8")
+    _write_atomic(path, text)
+
+
+REPLACE_RETRIES = 50
+REPLACE_RETRY_SEC = 0.01
+
+
+def _read_retrying(path: Path) -> str:
+    """바꿔치기하는 순간 Windows 는 읽기도 거절한다 - 잠깐씩 다시 시도한다."""
+    for attempt in range(REPLACE_RETRIES):
+        try:
+            return path.read_text(encoding="utf-8-sig")
+        except PermissionError:
+            if attempt == REPLACE_RETRIES - 1:
+                raise
+            time.sleep(REPLACE_RETRY_SEC)
+    raise AssertionError("unreachable")
+
+
+def _write_atomic(path: Path, text: str) -> None:
+    """임시 파일에 다 쓴 뒤 바꿔치기한다. 그 자리에 바로 쓰면 비워진 순간 다른 요청이 읽어 JSON 오류가 났다(2026-10-01 영상 삭제 실패).
+
+    Windows 는 다른 쪽이 파일을 열고 있는 순간 바꿔치기를 거절하므로 잠깐씩 다시 시도한다.
+    """
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    tmp.write_text(text, encoding="utf-8")
+    try:
+        for attempt in range(REPLACE_RETRIES):
+            try:
+                os.replace(tmp, path)
+                return
+            except PermissionError:
+                if attempt == REPLACE_RETRIES - 1:
+                    raise
+                time.sleep(REPLACE_RETRY_SEC)
+    finally:
+        tmp.unlink(missing_ok=True)
