@@ -26,7 +26,7 @@ import {
 } from '../vodApi'
 import { groupVodsByDate } from '../vodDates'
 import { resolvedDeleteSource } from '../vodDeleteSource'
-import { buildableGameCount, groupGamesByVod, vodGameTime, vodTotals } from '../vodGames'
+import { analysisEnded, buildableGameCount, groupGamesByVod, vodGameTime, vodTotals } from '../vodGames'
 import { probeProgress, type Vod } from '../vodGrouping'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { DueOnlyToggle } from './DueOnlyToggle'
@@ -140,6 +140,12 @@ export function VodGameList({
 
   const runningVodId = vods.find((v) => v.status === 'analyzing')?.id ?? null
   const probe = probeProgress(vods)
+
+  const lastRunningVodId = useRef(runningVodId)
+  useEffect(() => {
+    if (analysisEnded(lastRunningVodId.current, runningVodId)) reloadGames()
+    lastRunningVodId.current = runningVodId
+  }, [runningVodId, reloadGames])
 
   useEffect(() => {
     if (!active || !probe.active) return

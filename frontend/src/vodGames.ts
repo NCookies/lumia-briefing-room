@@ -72,3 +72,9 @@ export function clipsOfVodGame(game: Pick<GameDetail, 'candidates' | 'userCandid
       durationSec: (c.user.end ?? c.end) - (c.user.start ?? c.start),
     }))
 }
+
+/** 분석 중이던 영상이 더 이상 분석 중이 아니게 된 순간. 서버는 영상 색인을 "완료"로 먼저 쓰고 작업 상태는 조금 뒤에 바꾼다 -
+ * 작업 상태만 보면 그 틈에 타이머가 꺼져 게임 목록을 다시 읽지 않았다(2026-10-01). */
+export function analysisEnded(previous: string | null, current: string | null): boolean {
+  return previous !== null && previous !== current
+}

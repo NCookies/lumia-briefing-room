@@ -79,3 +79,12 @@ test('saved clips of an old game come from its candidates, in time order', () =>
   } as never)
   assert.deepEqual(clips.map((c) => [c.id, c.title, c.durationSec]), [['c1', '첫번째', 30], ['c2', '두번째', 40]])
 })
+
+test('games are reloaded whenever a running analysis stops running, even if the job poll missed "done"', async () => {
+  const { analysisEnded } = await import('../src/vodGames.ts')
+  assert.equal(analysisEnded('abc', null), true)
+  assert.equal(analysisEnded('abc', 'def'), true)
+  assert.equal(analysisEnded(null, 'abc'), false)
+  assert.equal(analysisEnded('abc', 'abc'), false)
+  assert.equal(analysisEnded(null, null), false)
+})
