@@ -24,8 +24,9 @@ export function consentPatch(choices: ConsentChoices, pending: string[]): Record
   return patch
 }
 
-export function showLabelingUi(mode: AppMode, sendLabels: boolean): boolean {
-  return mode === 'dev' || sendLabels
+/** 라벨링 UI 는 개발 모드에서만 보인다(라벨링 재설계 전까지). 라벨 전송 동의는 이미 붙인 라벨의 전송에만 쓰인다. */
+export function showLabelingUi(mode: AppMode): boolean {
+  return mode === 'dev'
 }
 
 export const clampLabelNote = (text: string): string => text.slice(0, LABEL_NOTE_MAX)

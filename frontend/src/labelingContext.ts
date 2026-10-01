@@ -13,5 +13,5 @@ export const useLabelingState = (): LabelingState => useContext(LabelingContext)
 
 export function useLabelingUi(): boolean {
   const { mode } = useAppInfo()
-  return showLabelingUi(mode, useLabelingState().sendLabels)
+  return showLabelingUi(mode)
 }

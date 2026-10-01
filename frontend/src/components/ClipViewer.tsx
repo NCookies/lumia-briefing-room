@@ -11,7 +11,16 @@ import type { TrimRange } from '../trimming'
 import { SEEK_STEP_SEC, decideKey, isTextEntry, loadHelpSeen, saveHelpSeen, shortcutGroupsFor, type TargetInfo, type ViewerAction } from '../viewerShortcuts'
 import { loadVolume, saveVolume, stepVolume, type VolumeState } from '../volume'
 import { ArchivePopup } from './ArchivePopup'
+import { useLabelingUi } from '../labelingContext'
+import { SIGNAL_LABELS } from '../labels'
+import type { UserLabel } from '../types'
+import { ClipId } from './ClipId'
 import { ClipMemoInput } from './ClipMemoInput'
+import { LabelButtons } from './LabelButtons'
+import { LabelingHelp } from './LabelingHelp'
+import { LabelNoteInput } from './LabelNoteInput'
+import { ScoreChip } from './ScoreChip'
+import { TagBadge } from './TagBadge'
 import { ClipVideo } from './ClipVideo'
 import { GameMenu, type GameMenuItem } from './GameMenu'
 import { PortraitRow } from './PortraitRow'
@@ -43,6 +52,9 @@ interface Props {
   onOpen: (clipId: string) => void
   onRename: (clip: LibraryClip, title: string) => void
   onMemo: (clip: LibraryClip, memo: string | null) => void
+  /** 개발 모드에서만 쓰는 라벨링. */
+  onLabel: (clip: LibraryClip, label: UserLabel) => void
+  onNote: (clip: LibraryClip, note: string | null) => void
   onMove: (clip: LibraryClip, category: string) => void
   onExport: (clip: LibraryClip) => void
   onReveal: (clip: LibraryClip) => void
@@ -51,7 +63,8 @@ interface Props {
 }
 
 /** 클립 탭의 재생 화면. 풀영상 화면과 같은 컨트롤 줄·단축키로 클립 하나를 보고, 오른쪽에 같은 카테고리의 클립 목록을 둔다. */
-export function ClipViewer({ clips, clip, category, active, paused, onBack, onOpenGame, onOpen, onRename, onMemo, onMove, onExport, onReveal, onDelete, onTrim }: Props) {
+export function ClipViewer({ clips, clip, category, active, paused, onBack, onOpenGame, onOpen, onRename, onMemo, onLabel, onNote, onMove, onExport, onReveal, onDelete, onTrim }: Props) {
+  const labeling = useLabelingUi()
   const [time, setTime] = useState(0)
   const [duration, setDuration] = useState(clip.durationSec)
   const [playing, setPlaying] = useState(false)
@@ -415,6 +428,26 @@ export function ClipViewer({ clips, clip, category, active, paused, onBack, onOp
                   📁 {category}
                 </button>
               </div>
+              {labeling && (
+                <div className="flex flex-col gap-2 rounded-md border border-dashed border-zinc-600/70 p-2" data-testid="clip-dev-info">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-zinc-500">개발 모드</span>
+                    <ClipId id={clip.id} />
+                    <ScoreChip score={clip.pvpScore} signals={clip.pvpSignals ?? []} />
+                    {clip.tags.map((t) => (
+                      <TagBadge key={t} tag={t} />
+                    ))}
+                    <span className="text-xs text-zinc-500">
+                      근거: {(clip.pvpSignals ?? []).length ? clip.pvpSignals.map((s) => SIGNAL_LABELS[s] ?? s).join(' · ') : '없음'}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <LabelButtons value={clip.userLabel} onChange={(l) => onLabel(clip, l)} size="lg" />
+                    <LabelingHelp />
+                  </div>
+                  <LabelNoteInput clipId={clip.id} value={clip.labelNote} disabled={clip.userLabel === null} onSave={(note) => onNote(clip, note)} />
+                </div>
+              )}
               <ClipMemoInput clipId={clip.id} value={clip.memo} rows={2} compact onSave={(memo) => onMemo(clip, memo)} />
             </div>
             <button type="button" className={CTRL} title="단축키 표 보기·닫기 (?)" aria-pressed={helpOpen} onClick={() => setHelpOpen((open) => !open)}>
