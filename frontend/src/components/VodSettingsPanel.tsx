@@ -120,7 +120,7 @@ export function VodSettingsPanel({ onClipsDirChanged }: { onClipsDirChanged: () 
         <ul className="flex flex-col gap-1">
           {sources.length === 0 && <li className="text-sm text-zinc-500">추가한 경로가 없습니다</li>}
           {sources.map((path) => (
-            <li key={path} className="flex items-center justify-between rounded bg-zinc-900 px-3 py-1.5 text-sm">
+            <li key={path} className="flex items-center justify-between rounded-md bg-zinc-900 px-3 py-1.5 text-sm">
               <span className="truncate text-zinc-200" title={path}>
                 {path}
               </span>
@@ -137,7 +137,7 @@ export function VodSettingsPanel({ onClipsDirChanged }: { onClipsDirChanged: () 
         <div className="flex gap-2">
           <button
             type="button"
-            className="rounded border border-zinc-600 px-3 py-1 text-sm hover:bg-zinc-700 disabled:opacity-40"
+            className="rounded-md border border-zinc-600/70 px-3 py-1 text-sm transition hover:bg-zinc-700 disabled:opacity-40"
             disabled={picking}
             onClick={() => void browse(() => pickVideoFiles())}
           >
@@ -145,7 +145,7 @@ export function VodSettingsPanel({ onClipsDirChanged }: { onClipsDirChanged: () 
           </button>
           <button
             type="button"
-            className="rounded border border-zinc-600 px-3 py-1 text-sm hover:bg-zinc-700 disabled:opacity-40"
+            className="rounded-md border border-zinc-600/70 px-3 py-1 text-sm transition hover:bg-zinc-700 disabled:opacity-40"
             disabled={picking}
             onClick={() => void browse(pickFolders)}
           >
@@ -166,7 +166,7 @@ export function VodSettingsPanel({ onClipsDirChanged }: { onClipsDirChanged: () 
         </p>
         <label className="flex items-center gap-2 text-sm text-zinc-300">
           <select
-            className="rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm"
+            className="rounded-md border border-zinc-600/70 bg-zinc-900 px-2 py-1 text-sm"
             value={deleteSourceAfter}
             onChange={(e) => changeDeleteSourceAfter(e.target.value as DeleteSourceAfter)}
           >
@@ -178,7 +178,7 @@ export function VodSettingsPanel({ onClipsDirChanged }: { onClipsDirChanged: () 
         <label className="flex items-center gap-2 text-sm text-zinc-300">
           삭제 방식
           <select
-            className="rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm"
+            className="rounded-md border border-zinc-600/70 bg-zinc-900 px-2 py-1 text-sm"
             value={deleteSourceMode}
             onChange={(e) => changeDeleteSourceMode(e.target.value as DeleteSourceMode)}
           >

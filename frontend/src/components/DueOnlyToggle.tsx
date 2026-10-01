@@ -9,8 +9,8 @@ export function DueOnlyToggle({ checked, count, onChange }: Props) {
   return (
     <button
       type="button"
-      className={`rounded border px-2 py-0.5 text-xs disabled:opacity-40 ${
-        checked ? 'border-rose-500 bg-rose-500/20 text-rose-200' : 'border-zinc-600 hover:bg-zinc-700'
+      className={`rounded-md border px-2 py-0.5 text-xs disabled:opacity-40 ${
+        checked ? 'border-rose-500 bg-rose-500/20 text-rose-200' : 'border-zinc-600/70 transition hover:bg-zinc-700'
       }`}
       disabled={!checked && count === 0}
       title="자동 정리 때 풀영상이 지워질 게임만 봅니다"

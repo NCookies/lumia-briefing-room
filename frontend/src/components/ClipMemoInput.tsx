@@ -34,7 +34,7 @@ export function ClipMemoInput({ clipId, value, onSave, rows = 3, compact = false
       <textarea
         ref={area}
         aria-label="클립 메모"
-        className="w-full resize-y rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm"
+        className="w-full resize-y rounded-md border border-zinc-600/70 bg-zinc-900 px-2 py-1 text-sm"
         rows={rows}
         maxLength={CLIP_MEMO_MAX}
         placeholder={onClose ? '원하시는 내용을 작성해 주세요. Ctrl+Enter 로 저장할 수 있습니다' : '원하시는 내용을 작성해 주세요'}
@@ -53,7 +53,7 @@ export function ClipMemoInput({ clipId, value, onSave, rows = 3, compact = false
         <div className="flex justify-end">
           <button
             type="button"
-            className="rounded bg-sky-600 px-2 py-0.5 text-xs text-zinc-100 hover:bg-sky-500"
+            className="rounded-md bg-sky-600 px-2 py-0.5 text-xs text-zinc-100 transition hover:bg-sky-500"
             title="메모를 저장하고 닫습니다 (Ctrl+Enter)"
             onMouseDown={(e) => e.preventDefault()}
             onClick={saveAndClose}

@@ -346,7 +346,7 @@ export function VodGameList({
           <>
             <button
               type="button"
-              className="rounded border border-zinc-600 px-2 py-0.5 text-xs hover:bg-zinc-700 disabled:opacity-40"
+              className="rounded-md border border-zinc-600/70 px-2 py-0.5 text-xs transition hover:bg-zinc-700 disabled:opacity-40"
               disabled={fold.collapsed.size === 0}
               onClick={fold.expandAll}
             >
@@ -354,7 +354,7 @@ export function VodGameList({
             </button>
             <button
               type="button"
-              className="rounded border border-zinc-600 px-2 py-0.5 text-xs hover:bg-zinc-700 disabled:opacity-40"
+              className="rounded-md border border-zinc-600/70 px-2 py-0.5 text-xs transition hover:bg-zinc-700 disabled:opacity-40"
               disabled={fold.allCollapsed}
               onClick={fold.collapseAll}
             >
@@ -366,7 +366,7 @@ export function VodGameList({
         <VideoFormatHelp />
         <button
           type="button"
-          className="ml-auto rounded border border-zinc-600 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
+          className="ml-auto rounded-md border border-zinc-600/70 px-2 py-1 text-xs text-zinc-300 transition hover:bg-zinc-700"
           title="영상 파일 목록과 분석 결과를 다시 읽습니다"
           onClick={reload}
         >
@@ -376,7 +376,7 @@ export function VodGameList({
 
       {loading && <LoadingBar label="영상 파일 목록을 불러오는 중입니다…" />}
       {vodsLoaded && probe.active && (
-        <div className="rounded border border-zinc-700 bg-zinc-800/60 p-3">
+        <div className="rounded-lg border border-zinc-700/60 bg-zinc-800/60 p-3">
           <LoadingBar
             label={`영상 정보를 읽는 중입니다 (${probe.done}/${probe.total})`}
             detail="용량이 큰 영상은 길이를 읽는 데 1분 넘게 걸릴 수 있습니다. 그동안에도 다른 화면은 쓸 수 있고, 끝나면 목록이 자동으로 채워집니다."
@@ -395,7 +395,7 @@ export function VodGameList({
           <p className="text-base text-zinc-300">분석할 영상 파일이 없습니다. 영상 파일이나 폴더를 추가해 주세요</p>
           <button
             type="button"
-            className="rounded border border-sky-500/60 px-4 py-1.5 text-sm text-sky-300 hover:bg-sky-500/20"
+            className="rounded-md border border-sky-500/60 px-4 py-1.5 text-sm text-sky-300 transition hover:bg-sky-500/20"
             onClick={onAddVodSources}
           >
             영상 경로 추가

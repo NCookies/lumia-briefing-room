@@ -28,7 +28,7 @@ export function StorageUsageBar({ totals, tabBytes }: Props) {
       className="flex items-center gap-2"
       title="자동 정리 한도(스팀 녹화·영상 파일 풀영상 합산)에서 지금 쓰는 양입니다"
     >
-      <span className="h-1.5 w-24 overflow-hidden rounded bg-zinc-700">
+      <span className="h-1.5 w-24 overflow-hidden rounded-md bg-zinc-700">
         <span className={`block h-full ${FILL[usage.level]}`} style={{ width: `${usage.percent}%` }} />
       </span>
       <span className={`text-xs ${TEXT[usage.level]}`}>{usage.label}</span>

@@ -26,7 +26,7 @@ export function GameTitle({ value, onSave }: Props) {
     return (
       <input
         autoFocus
-        className="w-52 rounded border border-sky-500 bg-zinc-900 px-2 py-1 text-sm text-zinc-100"
+        className="w-52 rounded-md border border-sky-500 bg-zinc-900 px-2 py-1 text-sm text-zinc-100"
         value={text}
         maxLength={TITLE_MAX}
         placeholder="제목"
@@ -58,7 +58,7 @@ export function GameTitle({ value, onSave }: Props) {
       <button
         type="button"
         aria-label="제목 편집"
-        className="rounded px-1 text-sm text-zinc-500 hover:bg-zinc-700 hover:text-sky-300"
+        className="rounded-md px-1 text-sm text-zinc-500 transition hover:bg-zinc-700 hover:text-sky-300"
         title="제목 편집"
         onClick={(e) => {
           e.stopPropagation()

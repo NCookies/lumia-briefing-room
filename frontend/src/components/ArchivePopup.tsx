@@ -102,7 +102,7 @@ export function ArchivePopup({ anchor, current, archived, onPick, onClose, title
       <div
         role="dialog"
         aria-label={title}
-        className="absolute flex max-h-[22rem] flex-col overflow-hidden rounded border border-zinc-600 bg-zinc-800 text-sm shadow-lg"
+        className="absolute flex max-h-[22rem] flex-col overflow-hidden rounded-md border border-zinc-600/70 bg-zinc-800 text-sm shadow-lg"
         style={{ ...position, left, width: WIDTH }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -131,7 +131,7 @@ export function ArchivePopup({ anchor, current, archived, onPick, onClose, title
                 className={`flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-zinc-700 disabled:cursor-default disabled:hover:bg-transparent ${row.dim ? 'opacity-60' : ''} ${active === entryAt('row', row.name) ? 'bg-zinc-700' : ''}`}
                 onClick={() => row.name !== current && onPick(row.name)}
               >
-                <span className="h-9 w-14 shrink-0 overflow-hidden rounded bg-zinc-900">
+                <span className="h-9 w-14 shrink-0 overflow-hidden rounded-md bg-zinc-900">
                   {row.thumbnailClipId && (
                     <img className="h-full w-full object-cover" src={`/api/clips/${row.thumbnailClipId}/thumbnail`} alt="" />
                   )}
@@ -152,13 +152,13 @@ export function ArchivePopup({ anchor, current, archived, onPick, onClose, title
                   ref={input}
                   aria-label="새 카테고리 이름"
                   maxLength={60}
-                  className="min-w-0 flex-1 rounded border border-sky-500 bg-zinc-900 px-2 py-1 text-sm outline-none"
+                  className="min-w-0 flex-1 rounded-md border border-sky-500 bg-zinc-900 px-2 py-1 text-sm outline-none"
                   value={name}
                   placeholder="카테고리 이름"
                   onChange={(e) => setName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && void submitNew()}
                 />
-                <button type="button" className="rounded bg-sky-600 px-2 py-1 text-xs hover:bg-sky-500" onClick={() => void submitNew()}>
+                <button type="button" className="rounded-md bg-sky-600 px-2 py-1 text-xs transition hover:bg-sky-500" onClick={() => void submitNew()}>
                   {createLabel ?? (archived ? '만들고 옮기기' : '만들고 보관')}
                 </button>
               </div>
@@ -166,7 +166,7 @@ export function ArchivePopup({ anchor, current, archived, onPick, onClose, title
               <button
                 type="button"
                 data-entry={entryAt('new')}
-                className={`w-full rounded px-2 py-1 text-left text-sky-300 hover:bg-zinc-700 ${active === entryAt('new') ? 'bg-zinc-700' : ''}`}
+                className={`w-full rounded-md px-2 py-1 text-left text-sky-300 transition hover:bg-zinc-700 ${active === entryAt('new') ? 'bg-zinc-700' : ''}`}
                 onClick={() => setCreating(true)}
               >
                 + 새 카테고리

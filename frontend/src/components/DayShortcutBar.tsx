@@ -11,7 +11,7 @@ export function DayShortcutBar({ shortcuts, onGo }: { shortcuts: DayShortcut[]; 
           <button
             key={s.anchor}
             type="button"
-            className="shrink-0 rounded border border-zinc-600 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-400 hover:bg-zinc-700"
+            className="shrink-0 rounded-md border border-zinc-600/70 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-400 transition hover:bg-zinc-700"
             onClick={() => onGo(s)}
           >
             {s.label}

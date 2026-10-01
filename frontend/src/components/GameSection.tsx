@@ -52,7 +52,7 @@ function MatchResultForm({ placement, outcome, locked, onSave, onUnlock, onCance
 
   return (
     <div
-      className="flex flex-col gap-1 rounded border border-zinc-600 bg-zinc-900 p-2 text-xs"
+      className="flex flex-col gap-1 rounded-lg border border-zinc-600/70 bg-zinc-900 p-2 text-xs"
       onClick={(e) => e.stopPropagation()}
     >
       <label className="flex items-center gap-1">
@@ -60,7 +60,7 @@ function MatchResultForm({ placement, outcome, locked, onSave, onUnlock, onCance
         <input
           type="number"
           min={1}
-          className="w-14 rounded border border-zinc-600 bg-zinc-800 px-1 py-0.5 text-zinc-100"
+          className="w-14 rounded-md border border-zinc-600/70 bg-zinc-800 px-1 py-0.5 text-zinc-100"
           value={p}
           onChange={(e) => setP(e.target.value)}
         />
@@ -69,7 +69,7 @@ function MatchResultForm({ placement, outcome, locked, onSave, onUnlock, onCance
         결과 문구
         <input
           type="text"
-          className="w-32 rounded border border-zinc-600 bg-zinc-800 px-1 py-0.5 text-zinc-100"
+          className="w-32 rounded-md border border-zinc-600/70 bg-zinc-800 px-1 py-0.5 text-zinc-100"
           value={o}
           onChange={(e) => setO(e.target.value)}
         />
@@ -122,7 +122,7 @@ export function GameSection({
   return (
     <section
       className={`overflow-hidden rounded-lg border bg-zinc-800/60 ${
-        cleanupEntry ? 'border-rose-600/70' : reprocessing ? 'border-sky-500/60' : 'border-zinc-700'
+        cleanupEntry ? 'border-rose-600/70' : reprocessing ? 'border-sky-500/60' : 'border-zinc-700/60'
       }`}
     >
       <div className="flex items-stretch">
@@ -292,8 +292,8 @@ export function GameSection({
 
       {reprocessing && (
         <div className="border-t border-zinc-700 bg-sky-950/30 px-4 py-2">
-          <div className="h-1.5 overflow-hidden rounded bg-zinc-700">
-            <div className="indeterminate-bar h-full rounded bg-sky-500" />
+          <div className="h-1.5 overflow-hidden rounded-md bg-zinc-700">
+            <div className="indeterminate-bar h-full rounded-md bg-sky-500" />
           </div>
           <p className="mt-1 text-xs text-sky-300">다시 분석하는 중입니다. 원본 녹화에서 클립을 새로 만들고 있습니다.</p>
         </div>

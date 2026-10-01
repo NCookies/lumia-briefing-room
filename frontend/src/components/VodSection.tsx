@@ -118,14 +118,14 @@ function ReanalyzeMenu({
           <div
             ref={menuRef}
             role="menu"
-            className="fixed z-50 rounded border border-zinc-600 bg-zinc-800 p-3 text-left text-xs shadow-lg"
+            className="fixed z-50 rounded-lg border border-zinc-600/70 bg-zinc-800/60 p-3 text-left text-xs shadow-lg"
             style={{ top: pos.top, left: pos.left, width: MENU_WIDTH }}
           >
             <p className="mb-2 text-zinc-400">저장된 판독 결과가 있습니다. 어떻게 다시 만들까요?</p>
             <button
               type="button"
               role="menuitem"
-              className="mb-1.5 block w-full rounded border border-zinc-600 px-2 py-1.5 text-left hover:border-sky-500 hover:bg-zinc-700"
+              className="mb-1.5 block w-full rounded-md border border-zinc-600/70 px-2 py-1.5 text-left hover:border-sky-500 transition hover:bg-zinc-700"
               onClick={() => choose({ rebuild: true })}
             >
               <span className="block font-semibold text-sky-300">캐시 재사용 (빠름)</span>
@@ -136,7 +136,7 @@ function ReanalyzeMenu({
             <button
               type="button"
               role="menuitem"
-              className="mb-1.5 block w-full rounded border border-zinc-600 px-2 py-1.5 text-left hover:border-sky-500 hover:bg-zinc-700"
+              className="mb-1.5 block w-full rounded-md border border-zinc-600/70 px-2 py-1.5 text-left hover:border-sky-500 transition hover:bg-zinc-700"
               onClick={() => choose({ force: true })}
             >
               <span className="block font-semibold text-amber-300">처음부터 다시 (느림)</span>
@@ -170,7 +170,7 @@ function StreamerName({ value, onSave }: { value: string | null; onSave: (name: 
       >
         <input
           autoFocus
-          className="w-32 rounded border border-zinc-600 bg-zinc-900 px-2 py-0.5 text-sm"
+          className="w-32 rounded-md border border-zinc-600/70 bg-zinc-900 px-2 py-0.5 text-sm"
           value={draft}
           placeholder="이름"
           onChange={(e) => setDraft(e.target.value)}
@@ -214,7 +214,7 @@ function VideoDate({ value, onSave }: { value: string | null; onSave: (date: str
         <input
           autoFocus
           type="date"
-          className="rounded border border-zinc-600 bg-zinc-900 px-2 py-0.5 text-sm"
+          className="rounded-md border border-zinc-600/70 bg-zinc-900 px-2 py-0.5 text-sm"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === 'Escape' && setEditing(false)}
@@ -272,7 +272,7 @@ export function VodSection({
   const blockedReason = analysisBlockedReason(vod)
 
   return (
-    <section className="overflow-hidden rounded-xl border-2 border-zinc-600 bg-zinc-900/60">
+    <section className="overflow-hidden rounded-xl border-2 border-zinc-600/70 bg-zinc-900/60">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 bg-zinc-800 px-4 py-3">
         <button
           type="button"
@@ -303,7 +303,7 @@ export function VodSection({
         {vod && <StreamerName value={vod.streamer} onSave={onRenameStreamer} />}
 
         {vod && (
-          <span className={`rounded px-2 py-0.5 text-xs ${STATUS_STYLES[vod.status]}`}>
+          <span className={`rounded-md px-2 py-0.5 text-xs ${STATUS_STYLES[vod.status]}`}>
             {vod.status === 'error' && vod.errorKind === 'disk_full'
               ? '저장 공간 부족으로 중단됨'
               : queued
@@ -348,7 +348,7 @@ export function VodSection({
           ) : vod ? (
             <button
               type="button"
-              className="rounded border border-sky-500/60 px-3 py-1 text-sky-300 hover:bg-sky-500/20 disabled:opacity-50"
+              className="rounded-md border border-sky-500/60 px-3 py-1 text-sky-300 transition hover:bg-sky-500/20 disabled:opacity-50"
               disabled={!canStart}
               title={blockedReason}
               onClick={() => onAnalyze({})}
@@ -359,7 +359,7 @@ export function VodSection({
           {!running && !queued && onBuildFullVideos && buildableCount > 0 && vod?.canBuildFullVideos && (
             <button
               type="button"
-              className="rounded border border-sky-500/60 px-3 py-1 text-sky-300 hover:bg-sky-500/20 disabled:opacity-50"
+              className="rounded-md border border-sky-500/60 px-3 py-1 text-sky-300 transition hover:bg-sky-500/20 disabled:opacity-50"
               title="이전 버전에서 분석한 게임의 풀영상을 원본에서 잘라 만듭니다. 보관한 클립은 그대로 둡니다. 다른 분석이 돌고 있으면 줄을 서서 차례로 합니다"
 
               onClick={onBuildFullVideos}
@@ -387,7 +387,7 @@ export function VodSection({
 
       {running && (
         <div className="px-4 pb-3">
-          <div className="h-2 overflow-hidden rounded bg-zinc-700">
+          <div className="h-2 overflow-hidden rounded-md bg-zinc-700">
             <div className="h-full bg-sky-500 transition-all" style={{ width: `${percent}%` }} />
           </div>
           <p className="mt-1 text-xs text-sky-300">

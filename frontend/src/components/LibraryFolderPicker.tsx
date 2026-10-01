@@ -40,7 +40,7 @@ export function LibraryFolderPicker({ items, startPath, onPick, onCancel }: Prop
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4" role="presentation">
-      <div role="dialog" aria-modal="true" className="flex max-h-[80vh] w-full max-w-md flex-col gap-3 rounded-lg border border-zinc-600 bg-zinc-800 p-5">
+      <div role="dialog" aria-modal="true" className="flex max-h-[80vh] w-full max-w-md flex-col gap-3 rounded-lg border border-zinc-600/70 bg-zinc-800 p-5">
         <h3 className="text-sm font-medium text-zinc-100">옮길 폴더 고르기</h3>
         <nav className="flex flex-wrap items-center gap-1 text-xs text-zinc-400">
           {listing?.crumbs.map((c, i) => (
@@ -52,7 +52,7 @@ export function LibraryFolderPicker({ items, startPath, onPick, onCancel }: Prop
             </span>
           ))}
         </nav>
-        <ul className="min-h-[8rem] flex-1 overflow-y-auto rounded border border-zinc-700 bg-zinc-900/60 text-sm">
+        <ul className="min-h-[8rem] flex-1 overflow-y-auto rounded-md border border-zinc-700 bg-zinc-900/60 text-sm">
           {listing?.folders.length === 0 && <li className="px-3 py-2 text-xs text-zinc-500">하위 폴더가 없습니다</li>}
           {listing?.folders.map((f) => {
             const blocked = items.some((it) => f.rel === it || f.rel.startsWith(`${it}/`))
@@ -82,7 +82,7 @@ export function LibraryFolderPicker({ items, startPath, onPick, onCancel }: Prop
           </button>
           <button
             type="button"
-            className="rounded bg-sky-600 px-4 py-1.5 text-sm hover:bg-sky-500 disabled:opacity-40"
+            className="rounded-md bg-sky-600 px-4 py-1.5 text-sm transition hover:bg-sky-500 disabled:opacity-40"
             disabled={!movable || busy}
             onClick={() => void pick()}
           >

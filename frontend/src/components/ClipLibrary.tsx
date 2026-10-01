@@ -173,7 +173,7 @@ export function ClipLibrary({ active, refreshTick, confirmDelete, onConfirmDelet
               {i > 0 && <span className="text-zinc-600">/</span>}
               <button
                 type="button"
-                className={`rounded px-1.5 py-0.5 hover:bg-zinc-700 ${dropTarget === c.rel ? 'bg-sky-700' : ''} ${
+                className={`rounded-md px-1.5 py-0.5 transition hover:bg-zinc-700 ${dropTarget === c.rel ? 'bg-sky-700' : ''} ${
                   i === listing.crumbs.length - 1 ? 'font-semibold text-zinc-100' : 'text-zinc-400'
                 }`}
                 onClick={() => open(c.rel)}
@@ -184,27 +184,27 @@ export function ClipLibrary({ active, refreshTick, confirmDelete, onConfirmDelet
             </span>
           ))}
         </nav>
-        <button type="button" className="rounded border border-zinc-600 px-3 py-1 text-sm hover:bg-zinc-700 disabled:opacity-40" disabled={!canEditHere} onClick={() => setPrompt({ kind: 'newFolder' })}>
+        <button type="button" className="rounded-md border border-zinc-600/70 px-3 py-1 text-sm transition hover:bg-zinc-700 disabled:opacity-40" disabled={!canEditHere} onClick={() => setPrompt({ kind: 'newFolder' })}>
           새 폴더
         </button>
-        <button type="button" className="rounded border border-zinc-600 px-3 py-1 text-sm hover:bg-zinc-700 disabled:opacity-40" disabled={!canEditHere} onClick={() => void run(() => revealEntry(path))}>
+        <button type="button" className="rounded-md border border-zinc-600/70 px-3 py-1 text-sm transition hover:bg-zinc-700 disabled:opacity-40" disabled={!canEditHere} onClick={() => void run(() => revealEntry(path))}>
           탐색기에서 열기
         </button>
-        <button type="button" className="rounded border border-zinc-600 px-3 py-1 text-sm hover:bg-zinc-700" onClick={load}>
+        <button type="button" className="rounded-md border border-zinc-600/70 px-3 py-1 text-sm transition hover:bg-zinc-700" onClick={load}>
           새로고침
         </button>
       </div>
 
       {selected.size > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded border border-sky-600/60 bg-sky-500/10 px-3 py-2 text-sm" role="toolbar" aria-label="선택한 항목">
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-sky-600/60 bg-sky-500/10 px-3 py-2 text-sm" role="toolbar" aria-label="선택한 항목">
           <span className="text-sky-200">{summary} 선택</span>
-          <button type="button" className="rounded border border-zinc-600 px-3 py-1 hover:bg-zinc-700" onClick={() => setMoveItems(selectedItems)}>
+          <button type="button" className="rounded-md border border-zinc-600/70 px-3 py-1 transition hover:bg-zinc-700" onClick={() => setMoveItems(selectedItems)}>
             이동…
           </button>
-          <button type="button" className="rounded border border-zinc-600 px-3 py-1 hover:bg-zinc-700" onClick={() => void exportSelected(selectedItems)}>
+          <button type="button" className="rounded-md border border-zinc-600/70 px-3 py-1 transition hover:bg-zinc-700" onClick={() => void exportSelected(selectedItems)}>
             내보내기…
           </button>
-          <button type="button" className="rounded border border-rose-500/60 px-3 py-1 text-rose-200 hover:bg-rose-500/20" onClick={() => requestDelete(selectedItems)}>
+          <button type="button" className="rounded-md border border-rose-500/60 px-3 py-1 text-rose-200 transition hover:bg-rose-500/20" onClick={() => requestDelete(selectedItems)}>
             삭제
           </button>
           <button type="button" className="ml-auto text-zinc-400 hover:text-zinc-100" onClick={() => setSelected(new Set())}>
@@ -213,7 +213,7 @@ export function ClipLibrary({ active, refreshTick, confirmDelete, onConfirmDelet
         </div>
       )}
 
-      {error && <p className="rounded border border-rose-500/60 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{error}</p>}
+      {error && <p className="rounded-md border border-rose-500/60 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{error}</p>}
       {info && <p className="text-sm text-zinc-400">{info}</p>}
 
       {listing && folders.length === 0 && clips.length === 0 && (
@@ -229,8 +229,8 @@ export function ClipLibrary({ active, refreshTick, confirmDelete, onConfirmDelet
             draggable={!(listing?.virtualTop ?? false)}
             onDragStart={(e) => startDrag(e, f.rel)}
             {...droppable(f.rel)}
-            className={`group flex cursor-pointer items-center gap-3 rounded border px-3 py-3 ${
-              dropTarget === f.rel ? 'border-sky-400 bg-sky-500/20' : selected.has(f.rel) ? 'border-sky-500 bg-zinc-800' : 'border-zinc-700 bg-zinc-800/60 hover:bg-zinc-800'
+            className={`group flex cursor-pointer items-center gap-3 rounded-md border px-3 py-3 ${
+              dropTarget === f.rel ? 'border-sky-400 bg-sky-500/20' : selected.has(f.rel) ? 'border-sky-500 bg-zinc-800' : 'border-zinc-700 bg-zinc-800/60 transition hover:bg-zinc-800'
             }`}
             onClick={() => open(f.rel)}
           >
@@ -253,7 +253,7 @@ export function ClipLibrary({ active, refreshTick, confirmDelete, onConfirmDelet
             {!listing?.virtualTop && (
               <button
                 type="button"
-                className="rounded p-1 text-zinc-400 opacity-0 hover:bg-zinc-700 hover:text-zinc-100 group-hover:opacity-100 focus:opacity-100"
+                className="rounded-md p-1 text-zinc-400 opacity-0 transition hover:bg-zinc-700 hover:text-zinc-100 group-hover:opacity-100 focus:opacity-100"
                 aria-label={`${f.name} 이름 바꾸기`}
                 onClick={(e) => {
                   e.stopPropagation()
@@ -271,7 +271,7 @@ export function ClipLibrary({ active, refreshTick, confirmDelete, onConfirmDelet
             key={c.relPath}
             draggable
             onDragStart={(e) => startDrag(e, c.relPath)}
-            className={`group flex flex-col overflow-hidden rounded border ${selected.has(c.relPath) ? 'border-sky-500' : 'border-zinc-700'} bg-zinc-800/60`}
+            className={`group flex flex-col overflow-hidden rounded-md border ${selected.has(c.relPath) ? 'border-sky-500' : 'border-zinc-700'} bg-zinc-800/60`}
           >
             <div className="relative aspect-video cursor-pointer bg-zinc-900" onClick={() => setPlayingId(c.id)}>
               <img src={thumbnailUrl(c.id)} alt="" className="h-full w-full object-cover" loading="lazy" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
@@ -284,9 +284,9 @@ export function ClipLibrary({ active, refreshTick, confirmDelete, onConfirmDelet
                 onChange={() => setSelected((s) => toggle(s, c.relPath))}
               />
               {c.durationSec > 0 && (
-                <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1.5 text-xs text-zinc-100">{formatDuration(c.durationSec)}</span>
+                <span className="absolute bottom-1 right-1 rounded-md bg-black/70 px-1.5 text-xs text-zinc-100">{formatDuration(c.durationSec)}</span>
               )}
-              {c.unknownVideo && <span className="absolute right-1 top-1 rounded bg-zinc-700/90 px-1.5 text-xs text-zinc-200">앱 밖 영상</span>}
+              {c.unknownVideo && <span className="absolute right-1 top-1 rounded-md bg-zinc-700/90 px-1.5 text-xs text-zinc-200">앱 밖 영상</span>}
             </div>
             <div className="flex items-start gap-1 px-2 py-1.5">
               <div className="min-w-0 flex-1">
@@ -300,7 +300,7 @@ export function ClipLibrary({ active, refreshTick, confirmDelete, onConfirmDelet
               </div>
               <button
                 type="button"
-                className="rounded p-1 text-zinc-400 opacity-0 hover:bg-zinc-700 hover:text-zinc-100 group-hover:opacity-100 focus:opacity-100"
+                className="rounded-md p-1 text-zinc-400 opacity-0 transition hover:bg-zinc-700 hover:text-zinc-100 group-hover:opacity-100 focus:opacity-100"
                 aria-label={`${c.fileName} 파일 이름 바꾸기`}
                 onClick={() => setPrompt({ kind: 'rename', rel: c.relPath, initial: stemOf(c.fileName), isFile: true })}
               >

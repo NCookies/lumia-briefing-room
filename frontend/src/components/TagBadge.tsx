@@ -13,7 +13,7 @@ const STYLES: Record<ClipTag, string> = {
 export function TagBadge({ tag }: { tag: ClipTag }) {
   return (
     <span
-      className={`rounded border px-1.5 py-0.5 text-xs font-medium ${STYLES[tag] ?? STYLES.no_result}`}
+      className={`rounded-md border px-1.5 py-0.5 text-xs font-medium ${STYLES[tag] ?? STYLES.no_result}`}
     >
       {TAG_LABELS[tag] ?? tag}
     </span>

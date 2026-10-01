@@ -11,11 +11,11 @@ export function LoadingBar({ label, detail, percent }: Props) {
         <span>{label}</span>
         {percent !== undefined && <span className="tabular-nums text-zinc-400">{percent}%</span>}
       </div>
-      <div className="h-1.5 overflow-hidden rounded bg-zinc-700">
+      <div className="h-1.5 overflow-hidden rounded-md bg-zinc-700">
         {percent === undefined ? (
-          <div className="indeterminate-bar h-full rounded bg-sky-500" />
+          <div className="indeterminate-bar h-full rounded-md bg-sky-500" />
         ) : (
-          <div className="h-full rounded bg-sky-500 transition-[width]" style={{ width: `${percent}%` }} />
+          <div className="h-full rounded-md bg-sky-500 transition-[width]" style={{ width: `${percent}%` }} />
         )}
       </div>
       {detail && <p className="text-xs text-zinc-500">{detail}</p>}

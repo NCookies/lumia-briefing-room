@@ -600,7 +600,7 @@ export function ClipBrowser({
         {loading && <LoadingBar label={source === 'vod' ? '클립 목록을 불러오는 중입니다…' : '클립 목록을 불러오는 중입니다…'} />}
         {source === 'vod' && !loading && !vodsLoaded && <LoadingBar label="영상 파일 목록을 불러오는 중입니다…" />}
         {source === 'vod' && vodsLoaded && probe.active && (
-          <div className="mb-3 rounded border border-zinc-700 bg-zinc-800/60 p-3">
+          <div className="mb-3 rounded-lg border border-zinc-700/60 bg-zinc-800/60 p-3">
             <LoadingBar
               label={`영상 정보를 읽는 중입니다 (${probe.done}/${probe.total})`}
               detail="용량이 큰 영상은 길이를 읽는 데 1분 넘게 걸릴 수 있습니다. 그동안에도 다른 화면은 쓸 수 있고, 끝나면 목록이 자동으로 채워집니다."
@@ -621,7 +621,7 @@ export function ClipBrowser({
             {emptyKind === 'steam' && (
               <button
                 type="button"
-                className="rounded border border-sky-500/60 px-4 py-1.5 text-sm text-sky-300 hover:bg-sky-500/20"
+                className="rounded-md border border-sky-500/60 px-4 py-1.5 text-sm text-sky-300 transition hover:bg-sky-500/20"
                 onClick={onBackfill}
               >
                 {backfillLabel}
@@ -631,7 +631,7 @@ export function ClipBrowser({
               <>
                 <button
                   type="button"
-                  className="rounded border border-sky-500/60 px-4 py-1.5 text-sm text-sky-300 hover:bg-sky-500/20"
+                  className="rounded-md border border-sky-500/60 px-4 py-1.5 text-sm text-sky-300 transition hover:bg-sky-500/20"
                   onClick={onAddVodSources}
                 >
                   영상 경로 추가
@@ -650,14 +650,14 @@ export function ClipBrowser({
             <span>게임 {groups.length}개</span>
             <button
               type="button"
-              className="rounded border border-zinc-600 px-2 py-0.5 hover:bg-zinc-700"
+              className="rounded-md border border-zinc-600/70 px-2 py-0.5 transition hover:bg-zinc-700"
               onClick={() => setExpandedKeys(new Set(groups.map((g) => g.key)))}
             >
               모두 펼치기
             </button>
             <button
               type="button"
-              className="rounded border border-zinc-600 px-2 py-0.5 hover:bg-zinc-700"
+              className="rounded-md border border-zinc-600/70 px-2 py-0.5 transition hover:bg-zinc-700"
               onClick={() => setExpandedKeys(new Set())}
             >
               모두 접기
@@ -671,7 +671,7 @@ export function ClipBrowser({
               <>
                 <button
                   type="button"
-                  className="rounded border border-zinc-600 px-2 py-0.5 hover:bg-zinc-700 disabled:opacity-40"
+                  className="rounded-md border border-zinc-600/70 px-2 py-0.5 transition hover:bg-zinc-700 disabled:opacity-40"
                   disabled={dayFold.collapsed.size === 0}
                   onClick={dayFold.expandAll}
                 >
@@ -679,7 +679,7 @@ export function ClipBrowser({
                 </button>
                 <button
                   type="button"
-                  className="rounded border border-zinc-600 px-2 py-0.5 hover:bg-zinc-700 disabled:opacity-40"
+                  className="rounded-md border border-zinc-600/70 px-2 py-0.5 transition hover:bg-zinc-700 disabled:opacity-40"
                   disabled={dayFold.allCollapsed}
                   onClick={dayFold.collapseAll}
                 >

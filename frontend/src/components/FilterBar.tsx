@@ -39,7 +39,7 @@ interface Props {
   onRefresh?: () => void
 }
 
-const SELECT = 'rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm'
+const SELECT = 'rounded-md border border-zinc-600/70 bg-zinc-900 px-2 py-1 text-sm'
 
 export function FilterBar({
   value,
@@ -57,10 +57,10 @@ export function FilterBar({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-zinc-700 bg-zinc-800/40 px-4 py-3">
+    <div className="flex flex-wrap items-center gap-3 border-b border-zinc-800 bg-zinc-900/40 px-4 py-3">
       <div className="flex items-center gap-2 text-sm text-zinc-400">
         보기
-      <div className="flex overflow-hidden rounded border border-zinc-600 text-sm" role="group" aria-label="보기 모드">
+      <div className="flex overflow-hidden rounded-md border border-zinc-600/70 text-sm" role="group" aria-label="보기 모드">
         {(['cards', 'timeline'] as const).map((mode) => (
           <button
             key={mode}
@@ -79,7 +79,7 @@ export function FilterBar({
         type="search"
         placeholder="제목 검색"
         aria-label="제목 검색"
-        className="rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm text-zinc-100 placeholder:text-zinc-500"
+        className="rounded-md border border-zinc-600/70 bg-zinc-900 px-2 py-1 text-sm text-zinc-100 placeholder:text-zinc-500"
         value={value.q}
         onChange={(e) => onChange({ ...value, q: e.target.value })}
       />
@@ -87,7 +87,7 @@ export function FilterBar({
       {onRefresh && (
         <button
           type="button"
-          className="rounded border border-zinc-600 px-3 py-1 text-sm text-zinc-300 hover:bg-zinc-700"
+          className="rounded-md border border-zinc-600/70 px-3 py-1 text-sm text-zinc-300 transition hover:bg-zinc-700"
           onClick={onRefresh}
           title="목록을 다시 읽습니다"
         >
@@ -147,10 +147,10 @@ export function FilterBar({
             key={tag}
             type="button"
             onClick={() => toggleTag(tag)}
-            className={`rounded border px-2 py-1 text-xs ${
+            className={`rounded-md border px-2 py-1 text-xs ${
               value.tags.includes(tag)
                 ? 'border-sky-500 bg-sky-500/20 text-sky-200'
-                : 'border-zinc-600 text-zinc-400 hover:border-zinc-400'
+                : 'border-zinc-600/70 text-zinc-400 hover:border-zinc-400'
             }`}
           >
             {TAG_LABELS[tag]}

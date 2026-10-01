@@ -163,7 +163,7 @@ export function GameList({
           <>
             <button
               type="button"
-              className="rounded border border-zinc-600 px-2 py-0.5 text-xs hover:bg-zinc-700 disabled:opacity-40"
+              className="rounded-md border border-zinc-600/70 px-2 py-0.5 text-xs transition hover:bg-zinc-700 disabled:opacity-40"
               disabled={fold.collapsed.size === 0}
               onClick={fold.expandAll}
             >
@@ -171,7 +171,7 @@ export function GameList({
             </button>
             <button
               type="button"
-              className="rounded border border-zinc-600 px-2 py-0.5 text-xs hover:bg-zinc-700 disabled:opacity-40"
+              className="rounded-md border border-zinc-600/70 px-2 py-0.5 text-xs transition hover:bg-zinc-700 disabled:opacity-40"
               disabled={fold.allCollapsed}
               onClick={fold.collapseAll}
             >
@@ -182,7 +182,7 @@ export function GameList({
         <DueOnlyToggle checked={dueOnly} count={dueCount} onChange={setDueOnly} />
         <button
           type="button"
-          className="ml-auto rounded border border-zinc-600 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700"
+          className="ml-auto rounded-md border border-zinc-600/70 px-2 py-1 text-xs text-zinc-300 transition hover:bg-zinc-700"
           title="게임 로그에 남지 않은 과거 녹화에서 게임을 찾아 만듭니다"
           onClick={onBackfill}
         >

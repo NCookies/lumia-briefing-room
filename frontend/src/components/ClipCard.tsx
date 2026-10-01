@@ -56,7 +56,7 @@ export function ClipCard({
   return (
     <div
       className={`flex flex-col overflow-hidden rounded-lg border bg-zinc-800/60 ${
-        cleanupEntry ? 'border-rose-600/70' : (labeling && clip.userLabel && BORDER[clip.userLabel]) || 'border-zinc-700'
+        cleanupEntry ? 'border-rose-600/70' : (labeling && clip.userLabel && BORDER[clip.userLabel]) || 'border-zinc-700/60'
       }`}
     >
       <button
@@ -73,7 +73,7 @@ export function ClipCard({
         ) : (
           <div className="flex h-full items-center justify-center text-zinc-500">썸네일 없음</div>
         )}
-        <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-xs">
+        <span className="absolute bottom-1 right-1 rounded-md bg-black/70 px-1 text-xs">
           {formatDuration(clip.durationSec)}
         </span>
         <span className="absolute left-1 top-1">
@@ -81,26 +81,26 @@ export function ClipCard({
         </span>
         {labeling && clip.labelConflict && (
           <span
-            className="absolute bottom-6 left-1 rounded bg-sky-600/90 px-1 text-xs"
+            className="absolute bottom-6 left-1 rounded-md bg-sky-600/90 px-1 text-xs"
             title="다시 분석하기 전 클립의 라벨을 옮겨 왔는데 교전과 그 외가 섞여 있어 확인이 필요합니다. 맞다면 같은 버튼을 한 번 더 눌러 확정하세요."
           >
             옮겨 온 라벨 · 확인 필요
           </span>
         )}
         {clip.audioStatus && clip.audioStatus !== 'full' && (
-          <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 text-xs text-amber-300">
+          <span className="absolute bottom-1 left-1 rounded-md bg-black/70 px-1 text-xs text-amber-300">
             {clip.audioStatus === 'none' ? '소리 없음' : '소리 일부 없음'}
           </span>
         )}
         {clip.sourceIncomplete && (
-          <span className="absolute right-1 top-1 rounded bg-amber-600/90 px-1 text-xs">원본 일부 손실</span>
+          <span className="absolute right-1 top-1 rounded-md bg-amber-600/90 px-1 text-xs">원본 일부 손실</span>
         )}
       </button>
 
       <div className="flex flex-1 flex-col gap-2 p-2">
         {editing ? (
           <input
-            className="rounded border border-zinc-600 bg-zinc-900 px-1 py-0.5 text-sm text-zinc-100"
+            className="rounded-md border border-zinc-600/70 bg-zinc-900 px-1 py-0.5 text-sm text-zinc-100"
             value={draftTitle}
             autoFocus
             onChange={(e) => setDraftTitle(e.target.value)}
@@ -127,7 +127,7 @@ export function ClipCard({
               type="button"
               aria-label="이름 수정"
               title="이름 수정"
-              className="shrink-0 rounded px-1 text-zinc-500 hover:bg-zinc-700 hover:text-zinc-100"
+              className="shrink-0 rounded-md px-1 text-zinc-500 transition hover:bg-zinc-700 hover:text-zinc-100"
               onClick={() => setEditing(true)}
             >
               ✎
@@ -140,7 +140,7 @@ export function ClipCard({
         <div className="flex flex-wrap gap-1">
           {cleanupEntry && (
             <span
-              className="rounded bg-rose-900/60 px-1.5 py-0.5 text-xs text-rose-300"
+              className="rounded-md bg-rose-900/60 px-1.5 py-0.5 text-xs text-rose-300"
               title={cleanupReasonTooltip(cleanupEntry)}
             >
               삭제 예정 · {cleanupReasonLabel(cleanupEntry)}
