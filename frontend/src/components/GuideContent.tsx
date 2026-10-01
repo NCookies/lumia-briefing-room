@@ -13,7 +13,7 @@ export function GuideContent() {
             </p>
           ))}
           {section.title === '폴더 구조' && (
-            <pre className="overflow-x-auto rounded border border-zinc-700 bg-zinc-900 p-3 font-mono text-xs leading-relaxed text-zinc-300">{GUIDE_FOLDER_TREE}</pre>
+            <pre className="overflow-x-auto rounded-lg border border-zinc-700/60 bg-zinc-900 p-3 font-mono text-xs leading-relaxed text-zinc-300">{GUIDE_FOLDER_TREE}</pre>
           )}
         </section>
       ))}

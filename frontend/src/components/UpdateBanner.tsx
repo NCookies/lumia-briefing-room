@@ -18,7 +18,7 @@ export function UpdateBanner() {
       <span>{releaseSummary(release)}이 나왔습니다.</span>
       <button
         type="button"
-        className="rounded bg-sky-600 px-3 py-0.5 text-xs text-white hover:bg-sky-500 disabled:opacity-50"
+        className="rounded-md bg-sky-600 px-3 py-0.5 text-xs text-white transition hover:bg-sky-500 disabled:opacity-50"
         disabled={busy}
         onClick={start}
       >

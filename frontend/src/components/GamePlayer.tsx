@@ -174,7 +174,7 @@ export function GamePlayer({ gameKey, onBack, onChanged }: { gameKey: string; on
   return (
     <div className="flex flex-1 flex-col gap-3 p-4">
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className="rounded border border-zinc-600 px-3 py-1 text-sm hover:bg-zinc-700" onClick={onBack}>
+        <button type="button" className="rounded-md border border-zinc-600/70 px-3 py-1 text-sm transition hover:bg-zinc-700" onClick={onBack}>
           ← 게임 목록
         </button>
         <h2 className="text-lg font-semibold">{gameHeadline(game.matchResult, game.recordingStopped)}</h2>
@@ -193,7 +193,7 @@ export function GamePlayer({ gameKey, onBack, onChanged }: { gameKey: string; on
       {notice && <p className="text-sm text-emerald-300">{notice}</p>}
 
       {!game.hasFullVideo ? (
-        <p className="rounded border border-amber-500/60 bg-amber-500/10 p-3 text-sm text-amber-200">
+        <p className="rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-sm text-amber-200">
           {game.fullVideoError ?? '풀영상이 없습니다(자동 정리로 지워졌거나 저장하지 못했습니다).'} 후보 목록은 남아 있지만
           영상을 볼 수 없어 클립을 새로 저장할 수 없습니다.
         </p>
@@ -201,7 +201,7 @@ export function GamePlayer({ gameKey, onBack, onChanged }: { gameKey: string; on
         <>
           <video
             ref={video}
-            className="max-h-[55vh] w-full rounded bg-black"
+            className="max-h-[55vh] w-full rounded-md bg-black"
             src={gameVideoUrl(gameKey)}
             controls
             preload="metadata"
@@ -215,16 +215,16 @@ export function GamePlayer({ gameKey, onBack, onChanged }: { gameKey: string; on
           )}
 
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <button type="button" className="rounded border border-zinc-600 px-2 py-1 hover:bg-zinc-700" onClick={() => jump('prev', false)}>
+            <button type="button" className="rounded-md border border-zinc-600/70 px-2 py-1 transition hover:bg-zinc-700" onClick={() => jump('prev', false)}>
               ◀ 이전 후보
             </button>
-            <button type="button" className="rounded border border-zinc-600 px-2 py-1 hover:bg-zinc-700" onClick={() => jump('next', false)}>
+            <button type="button" className="rounded-md border border-zinc-600/70 px-2 py-1 transition hover:bg-zinc-700" onClick={() => jump('next', false)}>
               다음 후보 ▶
             </button>
-            <button type="button" className="rounded border border-yellow-600/60 px-2 py-1 hover:bg-zinc-700" onClick={() => jump('prev', true)}>
+            <button type="button" className="rounded-md border border-yellow-600/60 px-2 py-1 transition hover:bg-zinc-700" onClick={() => jump('prev', true)}>
               ◀ 이전 확실한 후보
             </button>
-            <button type="button" className="rounded border border-yellow-600/60 px-2 py-1 hover:bg-zinc-700" onClick={() => jump('next', true)}>
+            <button type="button" className="rounded-md border border-yellow-600/60 px-2 py-1 transition hover:bg-zinc-700" onClick={() => jump('next', true)}>
               다음 확실한 후보 ▶
             </button>
             <span className="ml-auto text-zinc-400">
@@ -235,7 +235,7 @@ export function GamePlayer({ gameKey, onBack, onChanged }: { gameKey: string; on
           <div
             ref={bar}
             data-testid="timeline"
-            className="relative h-14 cursor-crosshair select-none rounded bg-zinc-800"
+            className="relative h-14 cursor-crosshair select-none rounded-md bg-zinc-800"
             onPointerDown={startCreate}
           >
             {cands.map((c) => {
@@ -265,11 +265,11 @@ export function GamePlayer({ gameKey, onBack, onChanged }: { gameKey: string; on
                   {active && (
                     <>
                       <span
-                        className="absolute inset-y-0 -left-1 w-2 cursor-ew-resize rounded bg-white"
+                        className="absolute inset-y-0 -left-1 w-2 cursor-ew-resize rounded-md bg-white"
                         onPointerDown={(ev) => startDrag(ev, 'start', c)}
                       />
                       <span
-                        className="absolute inset-y-0 -right-1 w-2 cursor-ew-resize rounded bg-white"
+                        className="absolute inset-y-0 -right-1 w-2 cursor-ew-resize rounded-md bg-white"
                         onPointerDown={(ev) => startDrag(ev, 'end', c)}
                       />
                     </>
@@ -314,13 +314,13 @@ export function GamePlayer({ gameKey, onBack, onChanged }: { gameKey: string; on
           무시한 후보도 보기
         </label>
         <div className="ml-auto flex flex-wrap gap-2 text-sm">
-          <button type="button" disabled={busy || !game.hasFullVideo} className="rounded bg-sky-600 px-3 py-1 hover:bg-sky-500 disabled:opacity-40" onClick={() => void batch('all')}>
+          <button type="button" disabled={busy || !game.hasFullVideo} className="rounded-md bg-sky-600 px-3 py-1 transition hover:bg-sky-500 disabled:opacity-40" onClick={() => void batch('all')}>
             전부 저장
           </button>
-          <button type="button" disabled={busy || !game.hasFullVideo} className="rounded bg-sky-700 px-3 py-1 hover:bg-sky-600 disabled:opacity-40" onClick={() => void batch('certain')}>
+          <button type="button" disabled={busy || !game.hasFullVideo} className="rounded-md bg-sky-700 px-3 py-1 transition hover:bg-sky-600 disabled:opacity-40" onClick={() => void batch('certain')}>
             확실한 것만 저장
           </button>
-          <button type="button" disabled={busy || !game.hasFullVideo || checked.size === 0} className="rounded border border-sky-600 px-3 py-1 hover:bg-zinc-700 disabled:opacity-40" onClick={() => void batch('ids')}>
+          <button type="button" disabled={busy || !game.hasFullVideo || checked.size === 0} className="rounded-md border border-sky-600 px-3 py-1 transition hover:bg-zinc-700 disabled:opacity-40" onClick={() => void batch('ids')}>
             선택한 {checked.size}개 저장
           </button>
         </div>
@@ -335,7 +335,7 @@ export function GamePlayer({ gameKey, onBack, onChanged }: { gameKey: string; on
           return (
             <li
               key={c.id}
-              className={`flex flex-wrap items-center gap-2 rounded border px-3 py-1.5 text-sm ${
+              className={`flex flex-wrap items-center gap-2 rounded-md border px-3 py-1.5 text-sm ${
                 selected === c.id ? 'border-white bg-zinc-800' : 'border-zinc-700'
               } ${dismissed ? 'opacity-50' : ''}`}
             >
@@ -358,34 +358,34 @@ export function GamePlayer({ gameKey, onBack, onChanged }: { gameKey: string; on
               <span className="text-xs text-zinc-400">
                 {formatClock(s)}~{formatClock(e)} ({Math.round(e - s)}초)
               </span>
-              {c.certain && <span className="rounded bg-yellow-500/20 px-1.5 text-xs text-yellow-300">확실</span>}
+              {c.certain && <span className="rounded-md bg-yellow-500/20 px-1.5 text-xs text-yellow-300">확실</span>}
               {c.tags.map((t) => (
-                <span key={t} className="rounded bg-zinc-700 px-1.5 text-xs text-zinc-300">
+                <span key={t} className="rounded-md bg-zinc-700 px-1.5 text-xs text-zinc-300">
                   {t}
                 </span>
               ))}
               <span className="ml-auto flex gap-1">
                 {saved ? (
-                  <span className="rounded bg-emerald-600/30 px-2 py-0.5 text-xs text-emerald-200">저장됨</span>
+                  <span className="rounded-md bg-emerald-600/30 px-2 py-0.5 text-xs text-emerald-200">저장됨</span>
                 ) : (
                   <button
                     type="button"
                     disabled={busy || !game.hasFullVideo || dismissed}
-                    className="rounded bg-sky-600 px-2 py-0.5 text-xs hover:bg-sky-500 disabled:opacity-40"
+                    className="rounded-md bg-sky-600 px-2 py-0.5 text-xs transition hover:bg-sky-500 disabled:opacity-40"
                     onClick={() => void run(() => saveCandidate(gameKey, c.id), '클립으로 저장했습니다')}
                   >
                     저장
                   </button>
                 )}
                 {c.id.includes('_u') ? (
-                  <button type="button" disabled={busy} className="rounded border border-zinc-600 px-2 py-0.5 text-xs hover:bg-zinc-700" onClick={() => void run(() => deleteCandidate(gameKey, c.id))}>
+                  <button type="button" disabled={busy} className="rounded-md border border-zinc-600/70 px-2 py-0.5 text-xs transition hover:bg-zinc-700" onClick={() => void run(() => deleteCandidate(gameKey, c.id))}>
                     삭제
                   </button>
                 ) : (
                   <button
                     type="button"
                     disabled={busy || saved}
-                    className="rounded border border-zinc-600 px-2 py-0.5 text-xs hover:bg-zinc-700 disabled:opacity-40"
+                    className="rounded-md border border-zinc-600/70 px-2 py-0.5 text-xs transition hover:bg-zinc-700 disabled:opacity-40"
                     onClick={() => void run(() => patchCandidate(gameKey, c.id, { dismissed: !dismissed }))}
                   >
                     {dismissed ? '되살리기' : '무시'}

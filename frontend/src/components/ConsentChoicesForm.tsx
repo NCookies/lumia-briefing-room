@@ -36,7 +36,7 @@ export function ConsentChoicesForm({
   return (
     <div className="flex flex-col gap-3">
       {ITEMS.filter((item) => isPending(pending, item.id)).map((item) => (
-        <label key={item.key} className="flex cursor-pointer items-start gap-3 rounded border border-zinc-700 bg-zinc-800 p-3">
+        <label key={item.key} className="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-700/60 bg-zinc-800/60 p-3">
           <input
             type="checkbox"
             className="mt-1 h-4 w-4"

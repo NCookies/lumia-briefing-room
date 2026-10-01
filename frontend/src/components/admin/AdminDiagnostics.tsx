@@ -15,7 +15,7 @@ const buttonClass = 'rounded border border-zinc-600 px-2 py-1 text-sm hover:bg-z
 function Detail({ mode, receiptId, onClose }: { mode: AdminMode; receiptId: string; onClose: () => void }) {
   const { data, error } = useAdminData<DiagnosticDetail>(() => getDiagnostic(mode, receiptId), [mode, receiptId], true, 0)
   return (
-    <div className="rounded border border-sky-700 bg-zinc-800 p-3">
+    <div className="rounded-lg border border-sky-700 bg-zinc-800/60 p-3">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-sm font-semibold">
           {receiptId} {data?.displayId && <span className="ml-2 font-normal text-zinc-400">{data.displayId}</span>}
@@ -30,7 +30,7 @@ function Detail({ mode, receiptId, onClose }: { mode: AdminMode; receiptId: stri
           <p className="mb-2 text-xs text-zinc-400">
             installId <span className="font-mono">{data.installId}</span> · 수신 {data.receivedAt}
           </p>
-          <pre className="mb-2 max-h-48 overflow-auto rounded bg-zinc-900 p-2 text-xs">{JSON.stringify(data.env, null, 2)}</pre>
+          <pre className="mb-2 max-h-48 overflow-auto rounded-lg bg-zinc-900 p-2 text-xs">{JSON.stringify(data.env, null, 2)}</pre>
           <div className="max-h-96 overflow-auto">
             {data.entries.map((entry, i) => (
               <div key={i} className="border-t border-zinc-700 py-1 text-xs">
@@ -39,7 +39,7 @@ function Detail({ mode, receiptId, onClose }: { mode: AdminMode; receiptId: stri
                 </span>{' '}
                 <span className="text-zinc-500">{entry.ts}</span> {entry.exceptionType && <b>{entry.exceptionType} </b>}
                 {entry.message}
-                {entry.stack && <pre className="mt-1 overflow-auto rounded bg-zinc-900 p-2 text-[11px]">{entry.stack}</pre>}
+                {entry.stack && <pre className="mt-1 overflow-auto rounded-lg bg-zinc-900 p-2 text-[11px]">{entry.stack}</pre>}
               </div>
             ))}
           </div>
@@ -76,9 +76,9 @@ export function AdminDiagnostics({ mode, active, tick }: { mode: AdminMode; acti
         </button>
         <span className="text-xs text-zinc-400">{loading ? '불러오는 중…' : pageRange(offset, total)}</span>
       </div>
-      {error && <p className="rounded border border-red-800 bg-red-950 p-2 text-sm text-red-300">{error}</p>}
+      {error && <p className="rounded-lg border border-red-800 bg-red-950 p-2 text-sm text-red-300">{error}</p>}
       {open && <Detail mode={mode} receiptId={open} onClose={() => setOpen(null)} />}
-      <div className="overflow-x-auto rounded border border-zinc-700 bg-zinc-800 p-3">
+      <div className="overflow-x-auto rounded-lg border border-zinc-700/60 bg-zinc-800/60 p-3">
         <table className="w-full text-left text-xs">
           <thead className="text-zinc-400">
             <tr>

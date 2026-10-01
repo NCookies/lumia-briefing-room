@@ -72,14 +72,14 @@ export function RecordingRootSection() {
       </p>
       <div className="flex items-center gap-2">
         <div
-          className="flex-1 truncate rounded bg-zinc-900 px-3 py-1.5 text-sm text-zinc-200"
+          className="flex-1 truncate rounded-md bg-zinc-900 px-3 py-1.5 text-sm text-zinc-200"
           title={recording?.root ?? ''}
         >
           {recording?.root ?? '찾지 못했습니다'}
         </div>
         <button
           type="button"
-          className="rounded border border-zinc-600 px-3 py-1 text-sm hover:bg-zinc-700 disabled:opacity-40"
+          className="rounded-md border border-zinc-600/70 px-3 py-1 text-sm transition hover:bg-zinc-700 disabled:opacity-40"
           disabled={busy || !info}
           onClick={() => void change()}
         >

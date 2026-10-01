@@ -41,7 +41,7 @@ function ConfirmDialog({ pending, onDone }: { pending: Pending; onDone: (result:
       <div
         role="dialog"
         aria-modal="true"
-        className="flex w-full max-w-md flex-col gap-4 rounded-lg border border-zinc-600 bg-zinc-800 p-5 text-zinc-100"
+        className="flex w-full max-w-md flex-col gap-4 rounded-xl border border-zinc-600/70 bg-zinc-800 shadow-xl p-5 text-zinc-100"
         onClick={(e) => e.stopPropagation()}
       >
         <p className="whitespace-pre-line text-sm leading-relaxed">{options.message}</p>
@@ -55,7 +55,7 @@ function ConfirmDialog({ pending, onDone }: { pending: Pending; onDone: (result:
           <button
             ref={cancelButton}
             type="button"
-            className="rounded px-4 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700"
+            className="rounded-md px-4 py-1.5 text-sm text-zinc-300 transition hover:bg-zinc-700"
             onClick={() => onDone({ ok: false, skipNext: false })}
           >
             {options.cancelLabel ?? '취소'}
@@ -64,8 +64,8 @@ function ConfirmDialog({ pending, onDone }: { pending: Pending; onDone: (result:
             ref={confirmButton}
             type="button"
             autoFocus
-            className={`rounded px-4 py-1.5 text-sm ${
-              options.danger ? 'bg-rose-600 hover:bg-rose-500' : 'bg-sky-600 hover:bg-sky-500'
+            className={`rounded-md px-4 py-1.5 text-sm ${
+              options.danger ? 'bg-rose-600 transition hover:bg-rose-500' : 'bg-sky-600 hover:bg-sky-500'
             }`}
             onClick={() => onDone({ ok: true, skipNext: skip })}
           >

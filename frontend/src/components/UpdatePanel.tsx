@@ -30,7 +30,7 @@ export function UpdatePanel() {
       <div className="flex items-center gap-2">
         <button
           type="button"
-          className="w-fit rounded border border-zinc-600 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-700 disabled:opacity-50"
+          className="w-fit rounded-md border border-zinc-600/70 px-2 py-1 text-xs text-zinc-200 transition hover:bg-zinc-700 disabled:opacity-50"
           disabled={checking || busy}
           title={busy ? '업데이트를 진행하는 중입니다' : undefined}
           onClick={check}
@@ -53,14 +53,14 @@ export function UpdatePanel() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                className="rounded border border-sky-600/60 px-3 py-1 text-xs text-sky-200 hover:bg-sky-500/20"
+                className="rounded-md border border-sky-600/60 px-3 py-1 text-xs text-sky-200 transition hover:bg-sky-500/20"
                 onClick={() => openNotes(release)}
               >
                 변경 내용 보기
               </button>
               <button
                 type="button"
-                className="rounded bg-sky-600 px-3 py-1 text-xs text-white hover:bg-sky-500 disabled:opacity-50"
+                className="rounded-md bg-sky-600 px-3 py-1 text-xs text-white transition hover:bg-sky-500 disabled:opacity-50"
                 disabled={busy}
                 onClick={start}
               >
@@ -69,16 +69,16 @@ export function UpdatePanel() {
             </div>
           </div>
           {busy && install.state === 'downloading' && install.total > 0 && (
-            <div className="h-1.5 overflow-hidden rounded bg-sky-900/60">
+            <div className="h-1.5 overflow-hidden rounded-md bg-sky-900/60">
               <div
-                className="h-full rounded bg-sky-400 transition-[width]"
+                className="h-full rounded-md bg-sky-400 transition-[width]"
                 style={{ width: `${Math.min(100, Math.floor((install.downloaded / install.total) * 100))}%` }}
               />
             </div>
           )}
           {busy && install.state === 'downloading' && install.total === 0 && (
-            <div className="h-1.5 overflow-hidden rounded bg-sky-900/60">
-              <div className="indeterminate-bar h-full rounded bg-sky-400" />
+            <div className="h-1.5 overflow-hidden rounded-md bg-sky-900/60">
+              <div className="indeterminate-bar h-full rounded-md bg-sky-400" />
             </div>
           )}
           {progress && (

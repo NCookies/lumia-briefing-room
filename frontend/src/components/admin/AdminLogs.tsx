@@ -17,8 +17,8 @@ export function AdminLogs({ mode, active, tick }: { mode: AdminMode; active: boo
 
   return (
     <div className="flex flex-col gap-3">
-      {error && <p className="rounded border border-red-800 bg-red-950 p-2 text-sm text-red-300">{error}</p>}
-      <div className="overflow-x-auto rounded border border-zinc-700 bg-zinc-800 p-3">
+      {error && <p className="rounded-lg border border-red-800 bg-red-950 p-2 text-sm text-red-300">{error}</p>}
+      <div className="overflow-x-auto rounded-lg border border-zinc-700/60 bg-zinc-800/60 p-3">
         <h3 className="mb-2 text-sm font-semibold">같은 오류 묶음 (많은 순)</h3>
         <table className="w-full text-left text-xs">
           <thead className="text-zinc-400">
@@ -49,7 +49,7 @@ export function AdminLogs({ mode, active, tick }: { mode: AdminMode; active: boo
         {groups.data && groups.data.length === 0 && <p className="py-2 text-xs text-zinc-500">받은 오류 로그가 없습니다.</p>}
       </div>
 
-      <div className="rounded border border-zinc-700 bg-zinc-800 p-3">
+      <div className="rounded-lg border border-zinc-700/60 bg-zinc-800/60 p-3">
         <h3 className="mb-2 text-sm font-semibold">오류 로그 (최신순)</h3>
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <input
@@ -89,7 +89,7 @@ export function AdminLogs({ mode, active, tick }: { mode: AdminMode; active: boo
               <span className="font-mono text-zinc-500">{e.installId.slice(0, 8)}</span> <span className="text-zinc-500">v{e.appVersion}</span>{' '}
               {e.exceptionType && <b>{e.exceptionType} </b>}
               {e.message}
-              {e.stack && <pre className="mt-1 overflow-auto rounded bg-zinc-900 p-2 text-[11px]">{e.stack}</pre>}
+              {e.stack && <pre className="mt-1 overflow-auto rounded-lg bg-zinc-900 p-2 text-[11px]">{e.stack}</pre>}
             </div>
           ))}
         </div>

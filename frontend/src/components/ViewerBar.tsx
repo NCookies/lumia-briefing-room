@@ -134,7 +134,7 @@ export function ViewerBar({ duration, view, time, cands, selectedId, markers, ov
         </span>
       ))}
       <div className="absolute inset-x-0 top-5 h-8">
-        <div className="absolute inset-x-0 top-3 h-2 rounded bg-sky-600" />
+        <div className="absolute inset-x-0 top-3 h-2 rounded-md bg-sky-600" />
         {cands.map((c) => {
           const [s, e] = rangeOf(c)
           if (e < view[0] || s > view[1]) return null
@@ -198,7 +198,7 @@ export function ViewerBar({ duration, view, time, cands, selectedId, markers, ov
       )}
       {hover !== null && !drag && (
         <span
-          className="pointer-events-none absolute -top-8 z-20 -translate-x-1/2 whitespace-nowrap rounded bg-black/85 px-2 py-0.5 text-xs text-zinc-100"
+          className="pointer-events-none absolute -top-8 z-20 -translate-x-1/2 whitespace-nowrap rounded-md bg-black/85 px-2 py-0.5 text-xs text-zinc-100"
           style={{ left: `${barPct(hover, view)}%` }}
         >
           {formatClock(hover)}
@@ -244,13 +244,13 @@ export function ViewerScroll({ duration, view, onPan }: { duration: number; view
     <div
       ref={strip}
       data-testid="viewer-scroll"
-      className="relative h-3 cursor-pointer touch-none rounded bg-zinc-700"
+      className="relative h-3 cursor-pointer touch-none rounded-md bg-zinc-700"
       onPointerDown={jumpTo}
       onWheel={(e) => onPan(panView(view, (e.deltaY / 100) * (span / 5), duration))}
     >
       <div
         data-testid="viewer-scroll-thumb"
-        className="absolute inset-y-0 cursor-grab rounded bg-zinc-400 hover:bg-zinc-300"
+        className="absolute inset-y-0 cursor-grab rounded-md bg-zinc-400 transition hover:bg-zinc-300"
         style={{ left: `${(view[0] / duration) * 100}%`, width: `${(span / duration) * 100}%` }}
         onPointerDown={(e) => {
           e.stopPropagation()

@@ -189,7 +189,7 @@ function GeneralPanel({
       <label className="flex items-center gap-2 text-sm text-zinc-300">
         삭제 방식
         <select
-          className="rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm"
+          className="rounded-md border border-zinc-600/70 bg-zinc-900 px-2 py-1 text-sm"
           value={deleteMode}
           onChange={(e) => {
             const next = e.target.value as DeleteMode
@@ -232,13 +232,13 @@ function GeneralPanel({
       </p>
       <div className="flex items-center gap-2">
         <input
-          className="flex-1 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm"
+          className="flex-1 rounded-md border border-zinc-600/70 bg-zinc-900 px-2 py-1 text-sm"
           placeholder="아직 인식된 닉네임이 없습니다"
           value={nickname}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && save()}
         />
-        <button type="button" className="rounded bg-sky-600 px-4 py-1.5 text-sm hover:bg-sky-500" onClick={save}>
+        <button type="button" className="rounded-md bg-sky-600 px-4 py-1.5 text-sm transition hover:bg-sky-500" onClick={save}>
           저장
         </button>
       </div>
@@ -280,7 +280,7 @@ function ExportPanel() {
         {status && <span className="text-xs text-zinc-400">{status}</span>}
         <button
           type="button"
-          className="rounded bg-sky-600 px-4 py-1.5 text-sm hover:bg-sky-500 disabled:opacity-40"
+          className="rounded-md bg-sky-600 px-4 py-1.5 text-sm transition hover:bg-sky-500 disabled:opacity-40"
           disabled={dir === ''}
           onClick={save}
         >
@@ -313,7 +313,7 @@ export function SettingsModal({
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div
-        className="flex h-[min(40rem,90vh)] w-full max-w-3xl flex-col rounded-lg border border-zinc-600 bg-zinc-800 text-zinc-100"
+        className="flex h-[min(40rem,90vh)] w-full max-w-3xl flex-col rounded-lg border border-zinc-600/70 bg-zinc-800 text-zinc-100"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-zinc-700 px-4 py-3">
@@ -329,8 +329,8 @@ export function SettingsModal({
                 key={t.id}
                 type="button"
                 onClick={() => setTab(t.id)}
-                className={`rounded px-3 py-2 text-left text-sm ${
-                  tab === t.id ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-400 hover:bg-zinc-700/50'
+                className={`rounded-md px-3 py-2 text-left text-sm ${
+                  tab === t.id ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-400 transition hover:bg-zinc-700/50'
                 }`}
               >
                 {t.label}

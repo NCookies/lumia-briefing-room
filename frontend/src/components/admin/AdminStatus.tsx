@@ -9,7 +9,7 @@ const KIND_LABELS: [keyof ModeStatus['lastReceived'], string][] = [
 
 function ModeCard({ title, status }: { title: string; status: ModeStatus }) {
   return (
-    <div className="rounded border border-zinc-700 bg-zinc-800 p-3">
+    <div className="rounded-lg border border-zinc-700/60 bg-zinc-800/60 p-3">
       <h3 className="mb-2 text-sm font-semibold">{title}</h3>
       <div className="mb-2 flex gap-4 text-xs text-zinc-300">
         <span>설치 {status.installs}</span>
@@ -35,7 +35,7 @@ function ModeCard({ title, status }: { title: string; status: ModeStatus }) {
 function Counts({ title, counts }: { title: string; counts: Record<string, number> }) {
   const entries = Object.entries(counts)
   return (
-    <div className="rounded border border-zinc-700 bg-zinc-800 p-3">
+    <div className="rounded-lg border border-zinc-700/60 bg-zinc-800/60 p-3">
       <h3 className="mb-2 text-sm font-semibold">{title}</h3>
       {entries.length === 0 && <p className="text-xs text-zinc-500">없음</p>}
       {entries.map(([key, value]) => (
@@ -52,7 +52,7 @@ export function AdminStatus({ active, tick }: { active: boolean; tick: number })
   const { data, error, loading } = useAdminData(getServerStatus, [], active, tick)
   return (
     <div className="flex flex-col gap-3">
-      {error && <p className="rounded border border-red-800 bg-red-950 p-2 text-sm text-red-300">{error}</p>}
+      {error && <p className="rounded-lg border border-red-800 bg-red-950 p-2 text-sm text-red-300">{error}</p>}
       {loading && !data && <p className="text-xs text-zinc-500">불러오는 중…</p>}
       {data && (
         <>
@@ -63,7 +63,7 @@ export function AdminStatus({ active, tick }: { active: boolean; tick: number })
           <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
             <Counts title="오늘 받은 요청" counts={data.today.requests} />
             <Counts title="오늘 거부한 요청" counts={data.today.rejected} />
-            <div className="rounded border border-zinc-700 bg-zinc-800 p-3 text-xs">
+            <div className="rounded-lg border border-zinc-700/60 bg-zinc-800/60 p-3 text-xs">
               <h3 className="mb-2 text-sm font-semibold">서버</h3>
               <div className="flex justify-between">
                 <span>디스크 사용률</span>

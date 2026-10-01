@@ -14,7 +14,7 @@ export function SavedClipPlayer({ notice, clipId, title }: Props) {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2" data-testid="saved-clip-player">
-      <p className="rounded border border-amber-500/60 bg-amber-500/10 p-3 text-sm text-amber-200">{notice}</p>
+      <p className="rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-sm text-amber-200">{notice}</p>
       {clipId ? (
         <div className="flex min-h-0 flex-1 flex-col gap-1">
           <div className="min-h-0 flex-1 [&_video]:max-h-full">

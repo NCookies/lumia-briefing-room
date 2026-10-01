@@ -78,7 +78,7 @@ export function BackfillDialog({ status, onStatusChange, onClose }: Props) {
       <div
         role="dialog"
         aria-modal="true"
-        className="flex w-full max-w-lg flex-col gap-4 rounded-lg border border-zinc-600 bg-zinc-800 p-5 text-zinc-100"
+        className="flex w-full max-w-lg flex-col gap-4 rounded-xl border border-zinc-600/70 bg-zinc-800 shadow-xl p-5 text-zinc-100"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-medium">과거 녹화 전체 분석</h2>
@@ -96,7 +96,7 @@ export function BackfillDialog({ status, onStatusChange, onClose }: Props) {
               />
             )}
             {preview && preview.canStart && (
-              <dl className="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-1 rounded bg-zinc-900 p-3 text-sm">
+              <dl className="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-1 rounded-lg bg-zinc-900 p-3 text-sm">
                 <dt className="text-zinc-500">대상</dt>
                 <dd>
                   이터널 리턴 녹화 {preview.sessions}개 · {formatDuration(preview.videoSeconds ?? 0)} ·{' '}
@@ -107,7 +107,7 @@ export function BackfillDialog({ status, onStatusChange, onClose }: Props) {
               </dl>
             )}
             {preview && !preview.canStart && (
-              <p className="rounded border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+              <p className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
                 {preview.reason}
               </p>
             )}
@@ -131,7 +131,7 @@ export function BackfillDialog({ status, onStatusChange, onClose }: Props) {
               <span>{describeProgress(status)}</span>
               <span className="tabular-nums text-zinc-400">{progressPercent(status)}%</span>
             </div>
-            <div className="h-2 overflow-hidden rounded bg-zinc-700">
+            <div className="h-2 overflow-hidden rounded-md bg-zinc-700">
               <div className="h-full bg-sky-500 transition-[width]" style={{ width: `${progressPercent(status)}%` }} />
             </div>
             <p className="text-xs text-zinc-500">
@@ -149,7 +149,7 @@ export function BackfillDialog({ status, onStatusChange, onClose }: Props) {
         )}
 
         {status.state === 'error' && (
-          <p className="rounded border border-rose-500/50 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+          <p className="rounded-md border border-rose-500/50 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
             분석하지 못했습니다: {status.error}
           </p>
         )}
@@ -159,7 +159,7 @@ export function BackfillDialog({ status, onStatusChange, onClose }: Props) {
           {active ? (
             <button
               type="button"
-              className="rounded border border-rose-500/60 px-4 py-1.5 text-sm text-rose-200 hover:bg-rose-500/10 disabled:opacity-40"
+              className="rounded-md border border-rose-500/60 px-4 py-1.5 text-sm text-rose-200 transition hover:bg-rose-500/10 disabled:opacity-40"
               disabled={busy}
               onClick={() => void cancel()}
             >
@@ -168,7 +168,7 @@ export function BackfillDialog({ status, onStatusChange, onClose }: Props) {
           ) : showPreview ? (
             <button
               type="button"
-              className="rounded bg-sky-600 px-4 py-1.5 text-sm hover:bg-sky-500 disabled:opacity-40"
+              className="rounded-md bg-sky-600 px-4 py-1.5 text-sm transition hover:bg-sky-500 disabled:opacity-40"
               disabled={busy || !preview?.canStart}
               title={startBlockedReason(preview, busy)}
               onClick={() => void start()}
@@ -189,7 +189,7 @@ export function BackfillDialog({ status, onStatusChange, onClose }: Props) {
               {status.state === 'cancelled' ? '이어서 하기' : '확인'}
             </button>
           )}
-          <button type="button" className="rounded px-4 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700" onClick={onClose}>
+          <button type="button" className="rounded-md px-4 py-1.5 text-sm text-zinc-300 transition hover:bg-zinc-700" onClick={onClose}>
             닫기
           </button>
         </div>

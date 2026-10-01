@@ -80,14 +80,14 @@ export function TelemetryPanel({ refreshKey, onChanged }: { refreshKey: unknown;
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          className="rounded bg-zinc-700 px-3 py-1.5 text-sm hover:bg-zinc-600"
+          className="rounded-md bg-zinc-700 px-3 py-1.5 text-sm transition hover:bg-zinc-600"
           onClick={() => setPreviewOpen(true)}
         >
           보낼 내용 미리보기
         </button>
         <button
           type="button"
-          className="rounded bg-rose-700 px-3 py-1.5 text-sm hover:bg-rose-600 disabled:opacity-40"
+          className="rounded-md bg-rose-700 px-3 py-1.5 text-sm transition hover:bg-rose-600 disabled:opacity-40"
           disabled={busy}
           onClick={() => void requestDeletion()}
         >

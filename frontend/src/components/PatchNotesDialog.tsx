@@ -26,7 +26,7 @@ export function PatchNotesDialog({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div
-        className="flex h-[min(36rem,90vh)] w-full max-w-xl flex-col rounded-lg border border-zinc-600 bg-zinc-800 text-zinc-100"
+        className="flex h-[min(36rem,90vh)] w-full max-w-xl flex-col rounded-lg border border-zinc-600/70 bg-zinc-800 text-zinc-100"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-zinc-700 px-4 py-3">
@@ -44,7 +44,7 @@ export function PatchNotesDialog({ onClose }: { onClose: () => void }) {
               <h3 className="flex items-baseline gap-2 text-sm font-medium text-zinc-100">
                 v{release.version}
                 {isCurrentRelease(release, info.version) && (
-                  <span className="rounded bg-sky-500/20 px-1.5 py-0.5 text-[11px] text-sky-300">현재 버전</span>
+                  <span className="rounded-md bg-sky-500/20 px-1.5 py-0.5 text-[11px] text-sky-300">현재 버전</span>
                 )}
                 <span className="text-xs font-normal text-zinc-500">{formatReleaseDate(release.date)}</span>
               </h3>

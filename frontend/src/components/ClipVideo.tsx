@@ -78,13 +78,13 @@ export function ClipVideo({ clipId, nextClipId, version, videoRef, onVolumeChang
 
   if (mode === 'proxy' && status?.state !== 'ready') {
     return (
-      <div className="flex aspect-video w-full flex-col items-center justify-center gap-2 rounded bg-black text-sm text-zinc-300">
+      <div className="flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-md bg-black text-sm text-zinc-300">
         {status?.state === 'failed' ? (
           <>
             <p className="text-rose-300">재생용 영상을 만들지 못했습니다{status.message ? `: ${status.message}` : ''}</p>
             <button
               type="button"
-              className="rounded border border-zinc-500 px-3 py-1 hover:bg-zinc-700"
+              className="rounded-md border border-zinc-500 px-3 py-1 transition hover:bg-zinc-700"
               onClick={() => setAttempt((n) => n + 1)}
             >
               다시 시도
@@ -130,7 +130,7 @@ export function ClipVideo({ clipId, nextClipId, version, videoRef, onVolumeChang
       src={mode === 'proxy' ? proxyVideoUrl(clipId, version) : videoUrl(clipId, version)}
       controls
       autoPlay
-      className="aspect-video w-full rounded bg-black object-contain"
+      className="aspect-video w-full rounded-md bg-black object-contain"
     />
   )
 }

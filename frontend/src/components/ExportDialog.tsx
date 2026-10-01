@@ -53,7 +53,7 @@ export function ExportDialog({ clip, onClose }: Props) {
       }}
     >
       <div
-        className="flex w-full max-w-lg flex-col gap-3 rounded-lg border border-zinc-600 bg-zinc-800 p-4 text-zinc-100"
+        className="flex w-full max-w-lg flex-col gap-3 rounded-xl border border-zinc-600/70 bg-zinc-800 shadow-xl p-4 text-zinc-100"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-medium">클립 내보내기</h2>
@@ -61,7 +61,7 @@ export function ExportDialog({ clip, onClose }: Props) {
         <label className="flex flex-col gap-1 text-sm text-zinc-300">
           파일 이름
           <input
-            className="rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-zinc-100"
+            className="rounded-md border border-zinc-600/70 bg-zinc-900 px-2 py-1 text-zinc-100"
             value={filename}
             onChange={(e) => setFilename(e.target.value)}
           />
@@ -74,12 +74,12 @@ export function ExportDialog({ clip, onClose }: Props) {
         {savedPath && <p className="break-all text-sm text-emerald-400">저장했습니다: {savedPath}</p>}
 
         <div className="flex justify-end gap-2">
-          <button type="button" className="rounded px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700" onClick={onClose}>
+          <button type="button" className="rounded-md px-3 py-1.5 text-sm text-zinc-300 transition hover:bg-zinc-700" onClick={onClose}>
             {savedPath ? '닫기' : '취소'}
           </button>
           <button
             type="button"
-            className="rounded bg-sky-600 px-4 py-1.5 text-sm hover:bg-sky-500 disabled:opacity-40"
+            className="rounded-md bg-sky-600 px-4 py-1.5 text-sm transition hover:bg-sky-500 disabled:opacity-40"
             disabled={busy || dir === ''}
             onClick={save}
           >

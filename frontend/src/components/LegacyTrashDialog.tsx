@@ -28,7 +28,7 @@ export function LegacyTrashDialog({ count, onDone, onLater }: Props) {
       <div
         role="dialog"
         aria-modal="true"
-        className="flex w-full max-w-md flex-col gap-4 rounded-lg border border-zinc-600 bg-zinc-800 p-5 text-zinc-100"
+        className="flex w-full max-w-md flex-col gap-4 rounded-xl border border-zinc-600/70 bg-zinc-800 shadow-xl p-5 text-zinc-100"
       >
         <h2 className="text-base font-medium">이전 버전의 휴지통에 클립 {count}개가 있습니다</h2>
         <p className="text-sm text-zinc-300">
@@ -39,7 +39,7 @@ export function LegacyTrashDialog({ count, onDone, onLater }: Props) {
         <div className="flex flex-wrap justify-end gap-2">
           <button
             type="button"
-            className="rounded px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700 disabled:opacity-50"
+            className="rounded-md px-3 py-1.5 text-sm text-zinc-300 transition hover:bg-zinc-700 disabled:opacity-50"
             disabled={busy}
             onClick={onLater}
           >
@@ -47,7 +47,7 @@ export function LegacyTrashDialog({ count, onDone, onLater }: Props) {
           </button>
           <button
             type="button"
-            className="rounded border border-zinc-600 px-3 py-1.5 text-sm hover:bg-zinc-700 disabled:opacity-50"
+            className="rounded-md border border-zinc-600/70 px-3 py-1.5 text-sm transition hover:bg-zinc-700 disabled:opacity-50"
             disabled={busy}
             onClick={() => run('recycle')}
           >
@@ -55,7 +55,7 @@ export function LegacyTrashDialog({ count, onDone, onLater }: Props) {
           </button>
           <button
             type="button"
-            className="rounded bg-sky-600 px-3 py-1.5 text-sm hover:bg-sky-500 disabled:opacity-50"
+            className="rounded-md bg-sky-600 px-3 py-1.5 text-sm transition hover:bg-sky-500 disabled:opacity-50"
             disabled={busy}
             onClick={() => run('restore')}
           >

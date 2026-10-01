@@ -60,16 +60,16 @@ export function LegacyGamePanel({ game, onRebuilt }: { game: GameDetail; onRebui
   return (
     <div className="flex min-h-0 flex-1 gap-3" data-testid="legacy-panel">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
-        <p className="rounded border border-amber-500/60 bg-amber-500/10 p-3 text-sm text-amber-200">
+        <p className="rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-sm text-amber-200">
           이전 버전에서 분석한 게임이라 풀영상이 없습니다. 보관한 클립으로 볼 수 있습니다.
         </p>
         {game.canRebuildFullVideo && (
-          <div className="flex flex-wrap items-center gap-3 rounded border border-sky-500/50 bg-sky-500/10 p-3 text-sm text-sky-100">
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-sky-500/50 bg-sky-500/10 p-3 text-sm text-sky-100">
             <span>원본이 남아 있습니다 — 풀영상을 만들면 이 게임도 새 게임처럼 볼 수 있습니다. 보관한 클립은 그대로 둡니다.</span>
             <button
               type="button"
               disabled={running}
-              className="rounded border border-sky-400 px-3 py-1 hover:bg-sky-700/40 disabled:opacity-40"
+              className="rounded-md border border-sky-400 px-3 py-1 transition hover:bg-sky-700/40 disabled:opacity-40"
               onClick={start}
             >
               풀영상 만들기
@@ -111,10 +111,10 @@ export function LegacyGamePanel({ game, onRebuilt }: { game: GameDetail; onRebui
             <li key={c.id}>
               <button
                 type="button"
-                className={`flex w-full items-center gap-2 rounded border p-1 text-left hover:border-zinc-400 ${c.id === playingId ? 'border-yellow-500 bg-zinc-800' : 'border-zinc-700'}`}
+                className={`flex w-full items-center gap-2 rounded-md border p-1 text-left hover:border-zinc-400 ${c.id === playingId ? 'border-yellow-500 bg-zinc-800' : 'border-zinc-700'}`}
                 onClick={() => setPlayingId(c.id)}
               >
-                <img className="h-12 w-20 shrink-0 rounded object-cover" src={thumbnailUrl(c.id, c.durationSec)} alt="" />
+                <img className="h-12 w-20 shrink-0 rounded-md object-cover" src={thumbnailUrl(c.id, c.durationSec)} alt="" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm text-zinc-100">{c.title}</span>
                   <span className="text-xs text-zinc-500">{formatClock(c.durationSec)}</span>

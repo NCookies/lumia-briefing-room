@@ -23,7 +23,7 @@ export function UpdatedDialog({ from, to, onClose, onShowNotes }: Props) {
       <div
         role="dialog"
         aria-modal="true"
-        className="flex w-full max-w-sm flex-col items-center gap-4 rounded-lg border border-zinc-600 bg-zinc-800 p-6 text-center text-zinc-100"
+        className="flex w-full max-w-sm flex-col items-center gap-4 rounded-xl border border-zinc-600/70 bg-zinc-800 shadow-xl p-6 text-center text-zinc-100"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/20 text-2xl text-emerald-300">✓</div>
@@ -34,12 +34,12 @@ export function UpdatedDialog({ from, to, onClose, onShowNotes }: Props) {
         <div className="flex gap-2">
           <button
             type="button"
-            className="rounded border border-zinc-600 px-4 py-1.5 text-sm text-zinc-200 hover:bg-zinc-700"
+            className="rounded-md border border-zinc-600/70 px-4 py-1.5 text-sm text-zinc-200 transition hover:bg-zinc-700"
             onClick={onShowNotes}
           >
             패치노트 보기
           </button>
-          <button type="button" className="rounded bg-sky-600 px-4 py-1.5 text-sm text-white hover:bg-sky-500" onClick={onClose}>
+          <button type="button" className="rounded-md bg-sky-600 px-4 py-1.5 text-sm text-white transition hover:bg-sky-500" onClick={onClose}>
             확인
           </button>
         </div>

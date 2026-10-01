@@ -26,7 +26,7 @@ function Block({ block }: { block: PrivacyBlock }) {
       return <h3 className="mt-2 text-sm font-medium text-zinc-100">{block.text}</h3>
     case 'note':
       return (
-        <p className="rounded border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-200">
+        <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-200">
           <Inline text={block.text} />
         </p>
       )
@@ -97,7 +97,7 @@ export function PrivacyDialog({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div
-        className="flex h-[min(40rem,90vh)] w-full max-w-2xl flex-col rounded-lg border border-zinc-600 bg-zinc-800 text-zinc-100"
+        className="flex h-[min(40rem,90vh)] w-full max-w-2xl flex-col rounded-lg border border-zinc-600/70 bg-zinc-800 text-zinc-100"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-zinc-700 px-4 py-3">

@@ -10,8 +10,8 @@ interface Props {
 
 type Mode = 'view' | 'pickRoot' | 'confirmRoot' | 'pickFull' | 'confirmFull' | 'confirmUndo'
 
-const BTN = 'rounded border border-zinc-600 px-3 py-1 text-sm hover:bg-zinc-700 disabled:opacity-40'
-const PRIMARY = 'rounded bg-sky-600 px-4 py-1.5 text-sm hover:bg-sky-500 disabled:opacity-40'
+const BTN = 'rounded-md border border-zinc-600/70 px-3 py-1 text-sm transition hover:bg-zinc-700 disabled:opacity-40'
+const PRIMARY = 'rounded-md bg-sky-600 px-4 py-1.5 text-sm transition hover:bg-sky-500 disabled:opacity-40'
 
 export function StorageSection({ variant = 'options', onChanged }: Props) {
   const [info, setInfo] = useState<StorageInfo | null>(null)
@@ -71,7 +71,7 @@ export function StorageSection({ variant = 'options', onChanged }: Props) {
   }
 
   const progress = busy && (
-    <div className="h-2 overflow-hidden rounded bg-zinc-700" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
+    <div className="h-2 overflow-hidden rounded-md bg-zinc-700" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
       <div className="h-full bg-sky-500 transition-[width]" style={{ width: `${percent}%` }} />
     </div>
   )
@@ -98,7 +98,7 @@ export function StorageSection({ variant = 'options', onChanged }: Props) {
             폴더 하나만 고르면 그 안에 클립과 풀영상이 나뉘어 저장됩니다. 클립 정보(제목·태그 등)는 앱 데이터 폴더에 따로 있습니다.
           </p>
           <div className="flex items-center gap-2">
-            <div className="flex-1 truncate rounded bg-zinc-900 px-3 py-1.5 text-sm text-zinc-200" title={root}>
+            <div className="flex-1 truncate rounded-md bg-zinc-900 px-3 py-1.5 text-sm text-zinc-200" title={root}>
               {root}
             </div>
             {mode === 'view' && (
@@ -107,7 +107,7 @@ export function StorageSection({ variant = 'options', onChanged }: Props) {
               </button>
             )}
           </div>
-          <ul className="flex flex-col gap-1 rounded border border-zinc-700 bg-zinc-900/60 p-2 text-xs text-zinc-400">
+          <ul className="flex flex-col gap-1 rounded-lg border border-zinc-700/60 bg-zinc-900/60 p-2 text-xs text-zinc-400">
             {structureLines(root, info.fullVideos).map((line) => (
               <li key={line.path}>
                 <span className="font-mono text-zinc-300">{line.path}</span>
@@ -122,7 +122,7 @@ export function StorageSection({ variant = 'options', onChanged }: Props) {
             이전 버전에서 쓰던 폴더를 그대로 쓰는 중입니다. 저장 폴더 하나로 정리하면 클립과 풀영상이 그 안의 폴더로 나뉩니다. 옮기기는 원할 때만
             하면 되고, 옮기지 않아도 모든 기능이 그대로 동작합니다.
           </p>
-          <ul className="flex flex-col gap-1 rounded border border-zinc-700 bg-zinc-900/60 p-2 text-xs text-zinc-400">
+          <ul className="flex flex-col gap-1 rounded-lg border border-zinc-700/60 bg-zinc-900/60 p-2 text-xs text-zinc-400">
             <li>스팀 녹화 클립: <span className="font-mono text-zinc-300">{info.legacy.clips}</span></li>
             <li>영상 파일 클립: <span className="font-mono text-zinc-300">{info.legacy.vodClips}</span></li>
             <li>풀영상: <span className="font-mono text-zinc-300">{info.legacy.games}</span></li>
@@ -138,13 +138,13 @@ export function StorageSection({ variant = 'options', onChanged }: Props) {
       )}
 
       {diskWarning && mode === 'view' && (
-        <p className="rounded border border-amber-600/60 bg-amber-950/30 px-3 py-2 text-xs text-amber-300" data-testid="recording-disk-warning">
+        <p className="rounded-md border border-amber-600/60 bg-amber-950/30 px-3 py-2 text-xs text-amber-300" data-testid="recording-disk-warning">
           {diskWarning}
         </p>
       )}
 
       {mode === 'pickRoot' && (
-        <div className="flex flex-col gap-2 rounded border border-zinc-600 bg-zinc-900/60 p-3">
+        <div className="flex flex-col gap-2 rounded-lg border border-zinc-600/70 bg-zinc-900/60 p-3">
           <p className="text-xs text-zinc-400">
             {isNew ? '새 저장 폴더를 고르세요.' : '클립과 풀영상을 모아 둘 폴더를 고르세요. 이 폴더 안에 clips·full_video 폴더가 만들어집니다.'}
           </p>
@@ -166,7 +166,7 @@ export function StorageSection({ variant = 'options', onChanged }: Props) {
       )}
 
       {mode === 'confirmRoot' && (
-        <div className="flex flex-col gap-2 rounded border border-amber-600/60 bg-zinc-900/60 p-3">
+        <div className="flex flex-col gap-2 rounded-lg border border-amber-600/60 bg-zinc-900/60 p-3">
           <p className="truncate text-xs text-zinc-400" title={draft}>
             새 저장 폴더: {draft}
           </p>
@@ -193,14 +193,14 @@ export function StorageSection({ variant = 'options', onChanged }: Props) {
       )}
 
       {isNew && mode !== 'pickRoot' && mode !== 'confirmRoot' && (
-        <details className="rounded border border-zinc-700 bg-zinc-900/40 px-3 py-2 text-sm" open={info.fullVideos !== null}>
+        <details className="rounded-md border border-zinc-700 bg-zinc-900/40 px-3 py-2 text-sm" open={info.fullVideos !== null}>
           <summary className="cursor-pointer text-zinc-300">고급: 풀영상 위치만 따로 두기</summary>
           <p className="mt-2 text-xs text-zinc-500">
             풀영상은 한 판에 수 GB 라 큰 하드디스크로 빼고 싶을 때만 쓰세요. 기본은 저장 폴더 아래 full_video 폴더입니다. 저장 공간 경고는 풀영상이 있는
             드라이브 기준입니다.
           </p>
           <div className="mt-2 flex items-center gap-2">
-            <div className="flex-1 truncate rounded bg-zinc-900 px-3 py-1.5 text-xs text-zinc-200" title={info.resolved.fullVideos}>
+            <div className="flex-1 truncate rounded-md bg-zinc-900 px-3 py-1.5 text-xs text-zinc-200" title={info.resolved.fullVideos}>
               {info.resolved.fullVideos}
             </div>
             {mode === 'view' && (
@@ -257,7 +257,7 @@ export function StorageSection({ variant = 'options', onChanged }: Props) {
         </div>
       )}
       {mode === 'confirmUndo' && (
-        <div className="flex flex-col gap-2 rounded border border-amber-600/60 bg-zinc-900/60 p-3">
+        <div className="flex flex-col gap-2 rounded-lg border border-amber-600/60 bg-zinc-900/60 p-3">
           <p className="text-sm text-zinc-100">직전에 옮긴 영상을 원래 위치로 되돌리고 이전 설정으로 돌아갑니다.</p>
           <p className="text-xs text-amber-300">그 뒤 원래 위치에 같은 이름의 파일이 새로 생겼다면 아무것도 옮기지 않고 멈춥니다.</p>
           <div className="flex justify-end gap-2">

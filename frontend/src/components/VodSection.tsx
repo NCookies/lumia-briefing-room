@@ -118,7 +118,7 @@ function ReanalyzeMenu({
           <div
             ref={menuRef}
             role="menu"
-            className="fixed z-50 rounded-lg border border-zinc-600/70 bg-zinc-800/60 p-3 text-left text-xs shadow-lg"
+            className="fixed z-50 rounded-lg border border-zinc-600/70 bg-zinc-800 p-3 text-left text-xs shadow-lg"
             style={{ top: pos.top, left: pos.left, width: MENU_WIDTH }}
           >
             <p className="mb-2 text-zinc-400">저장된 판독 결과가 있습니다. 어떻게 다시 만들까요?</p>

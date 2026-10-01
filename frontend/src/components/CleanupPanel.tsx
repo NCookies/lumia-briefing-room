@@ -6,7 +6,7 @@ import { describeCleanup, parseLimit, type CleanupResult, type RetentionSettings
 import type { ClipTag } from '../types'
 
 const PROTECTABLE: ClipTag[] = ['kill', 'assist', 'death', 'teammate_death', 'no_result']
-const INPUT = 'w-24 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm'
+const INPUT = 'w-24 rounded-md border border-zinc-600/70 bg-zinc-900 px-2 py-1 text-sm'
 
 interface Draft {
   autoCleanEnabled: boolean
@@ -133,7 +133,7 @@ export function CleanupPanel() {
           켜면 1시간마다 아래 기준을 넘은 게임의 풀영상을 자동으로 정리합니다. 보관한 클립은 정리 대상이 아니고, 게임 기록(후보·결과표)도 남습니다. 끄면 풀영상이 계속 쌓입니다.
         </p>
         {!on && (
-          <p className="rounded border border-zinc-600 bg-zinc-800/60 px-3 py-1.5 text-xs text-zinc-300">
+          <p className="rounded-md border border-zinc-600/70 bg-zinc-800/60 px-3 py-1.5 text-xs text-zinc-300">
             자동 정리가 꺼져 있어 아래 정리 기준·삭제 방식·보호 설정은 적용되지 않습니다(회색으로 표시됩니다).
           </p>
         )}
@@ -201,7 +201,7 @@ export function CleanupPanel() {
       <section className="flex flex-col gap-2">
         <h3 className="text-sm font-medium text-zinc-200">삭제 방식</h3>
         <select
-          className="w-64 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm"
+          className="w-64 rounded-md border border-zinc-600/70 bg-zinc-900 px-2 py-1 text-sm"
           value={draft.deleteMode}
           onChange={(e) => patch({ deleteMode: e.target.value as Draft['deleteMode'] })}
         >
@@ -229,10 +229,10 @@ export function CleanupPanel() {
               key={tag}
               type="button"
               onClick={() => toggleTag(tag)}
-              className={`rounded border px-2 py-1 text-xs ${
+              className={`rounded-md border px-2 py-1 text-xs ${
                 draft.protectTags.includes(tag)
                   ? 'border-sky-500 bg-sky-500/20 text-sky-200'
-                  : 'border-zinc-600 text-zinc-400 hover:border-zinc-400'
+                  : 'border-zinc-600/70 text-zinc-400 hover:border-zinc-400'
               }`}
             >
               {TAG_LABELS[tag]}
@@ -276,21 +276,21 @@ export function CleanupPanel() {
       <section className="flex flex-wrap items-center gap-3 border-t border-zinc-700 pt-3">
         <button
           type="button"
-          className="rounded bg-sky-600 px-4 py-1.5 text-sm hover:bg-sky-500"
+          className="rounded-md bg-sky-600 px-4 py-1.5 text-sm transition hover:bg-sky-500"
           onClick={() => save().catch((e: Error) => setStatus(e.message))}
         >
           저장
         </button>
         <button
           type="button"
-          className="rounded border border-zinc-600 px-3 py-1.5 text-sm hover:bg-zinc-700"
+          className="rounded-md border border-zinc-600/70 px-3 py-1.5 text-sm transition hover:bg-zinc-700"
           onClick={check}
         >
           저장 후 정리 대상 확인
         </button>
         <button
           type="button"
-          className="rounded border border-rose-500/60 px-3 py-1.5 text-sm text-rose-300 hover:bg-rose-500/20 disabled:opacity-40"
+          className="rounded-md border border-rose-500/60 px-3 py-1.5 text-sm text-rose-300 transition hover:bg-rose-500/20 disabled:opacity-40"
           disabled={!draft.autoCleanEnabled}
           onClick={runNow}
         >

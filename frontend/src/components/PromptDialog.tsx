@@ -35,11 +35,11 @@ export function PromptDialog({ title, initial = '', confirmLabel, hint, onSubmit
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4" role="presentation">
-      <div role="dialog" aria-modal="true" className="flex w-full max-w-sm flex-col gap-3 rounded-lg border border-zinc-600 bg-zinc-800 p-5">
+      <div role="dialog" aria-modal="true" className="flex w-full max-w-sm flex-col gap-3 rounded-xl border border-zinc-600/70 bg-zinc-800 shadow-xl p-5">
         <h3 className="text-sm font-medium text-zinc-100">{title}</h3>
         <input
           ref={input}
-          className="rounded border border-zinc-600 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100"
+          className="rounded-md border border-zinc-600/70 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100"
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
@@ -56,7 +56,7 @@ export function PromptDialog({ title, initial = '', confirmLabel, hint, onSubmit
           </button>
           <button
             type="button"
-            className="rounded bg-sky-600 px-4 py-1.5 text-sm hover:bg-sky-500 disabled:opacity-40"
+            className="rounded-md bg-sky-600 px-4 py-1.5 text-sm transition hover:bg-sky-500 disabled:opacity-40"
             disabled={value.trim() === '' || busy}
             onClick={() => void submit()}
           >

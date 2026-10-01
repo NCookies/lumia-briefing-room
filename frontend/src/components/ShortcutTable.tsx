@@ -10,7 +10,7 @@ export function ShortcutTable() {
           <ul className="flex flex-col gap-0.5">
             {group.rows.map((row) => (
               <li key={row.keys}>
-                <kbd className="rounded border border-zinc-600 bg-zinc-900 px-1.5 py-0.5 font-mono text-[11px] text-zinc-100">{row.keys}</kbd>
+                <kbd className="rounded-md border border-zinc-600/70 bg-zinc-900 px-1.5 py-0.5 font-mono text-[11px] text-zinc-100">{row.keys}</kbd>
                 <span className="text-zinc-300"> : {row.desc}</span>
               </li>
             ))}

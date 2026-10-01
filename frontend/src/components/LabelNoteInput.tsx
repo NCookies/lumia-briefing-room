@@ -24,7 +24,7 @@ export function LabelNoteInput({
   return (
     <div className="flex flex-col gap-1">
       <textarea
-        className="w-full resize-none rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+        className="w-full resize-none rounded-md border border-zinc-600/70 bg-zinc-900 px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
         rows={2}
         disabled={disabled}
         placeholder={

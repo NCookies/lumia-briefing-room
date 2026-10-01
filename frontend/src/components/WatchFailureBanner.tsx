@@ -50,7 +50,7 @@ export function WatchFailureBanner() {
           <span className="text-xs text-rose-400/70">{formatAgo(f.occurredAt)}</span>
           <button
             type="button"
-            className="ml-auto rounded bg-rose-600 px-3 py-0.5 text-xs text-white hover:bg-rose-500 disabled:opacity-50"
+            className="ml-auto rounded-md bg-rose-600 px-3 py-0.5 text-xs text-white transition hover:bg-rose-500 disabled:opacity-50"
             disabled={retrying.has(f.key)}
             onClick={() => retry(f.key)}
           >

@@ -27,7 +27,7 @@ export function ReleaseNotesDialog({ release, currentVersion, busy, onUpdate, on
       <div
         role="dialog"
         aria-modal="true"
-        className="flex max-h-[85vh] w-full max-w-xl flex-col rounded-lg border border-zinc-600 bg-zinc-800 text-zinc-100"
+        className="flex max-h-[85vh] w-full max-w-xl flex-col rounded-lg border border-zinc-600/70 bg-zinc-800 text-zinc-100"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 border-b border-zinc-700 px-5 py-4">
@@ -49,12 +49,12 @@ export function ReleaseNotesDialog({ release, currentVersion, busy, onUpdate, on
           )}
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-zinc-700 px-5 py-3">
-          <button type="button" className="rounded px-4 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700" onClick={onClose}>
+          <button type="button" className="rounded-md px-4 py-1.5 text-sm text-zinc-300 transition hover:bg-zinc-700" onClick={onClose}>
             나중에
           </button>
           <button
             type="button"
-            className="rounded bg-sky-600 px-4 py-1.5 text-sm text-white hover:bg-sky-500 disabled:opacity-50"
+            className="rounded-md bg-sky-600 px-4 py-1.5 text-sm text-white transition hover:bg-sky-500 disabled:opacity-50"
             disabled={busy}
             onClick={() => {
               onUpdate()

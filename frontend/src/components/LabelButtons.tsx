@@ -26,12 +26,12 @@ export function LabelButtons({ value, onChange, showKeys = false, size = 'sm', o
             e.stopPropagation()
             onChange(value === o.label ? null : o.label)
           }}
-          className={`rounded border font-medium ${pad} ${
-            value === o.label ? o.active : 'border-zinc-600 text-zinc-400 hover:border-zinc-400'
+          className={`rounded-md border font-medium ${pad} ${
+            value === o.label ? o.active : 'border-zinc-600/70 text-zinc-400 hover:border-zinc-400'
           }`}
         >
           {o.text}
-          {showKeys && <kbd className="ml-2 rounded bg-black/40 px-1 text-xs opacity-70">{o.key}</kbd>}
+          {showKeys && <kbd className="ml-2 rounded-md bg-black/40 px-1 text-xs opacity-70">{o.key}</kbd>}
         </button>
       ))}
     </div>

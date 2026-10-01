@@ -19,7 +19,7 @@ export function ScoreChip({ score, signals }: Props) {
   const reason = signals.length ? signals.map((s) => SIGNAL_LABELS[s] ?? s).join(' · ') : '근거 없음'
   return (
     <span
-      className={`rounded border px-1.5 py-0.5 text-xs font-semibold tabular-nums ${TONES[scoreTone(score)]}`}
+      className={`rounded-md border px-1.5 py-0.5 text-xs font-semibold tabular-nums ${TONES[scoreTone(score)]}`}
       title={`교전 가능성 근거: ${reason}`}
     >
       교전 {scorePercent(score)}

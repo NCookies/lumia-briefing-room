@@ -5,7 +5,7 @@ import { getDiagnosticsPreview, sendDiagnostics } from '../telemetryApi'
 
 function Raw({ value }: { value: unknown }) {
   return (
-    <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-zinc-900 p-2 text-[11px] text-zinc-300">
+    <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-zinc-900 p-2 text-[11px] text-zinc-300">
       {JSON.stringify(value, null, 2)}
     </pre>
   )
@@ -56,7 +56,7 @@ export function DiagnosticsSendDialog({ onClose, onSent }: { onClose: () => void
   return (
     <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div
-        className="flex h-[min(40rem,90vh)] w-full max-w-3xl flex-col rounded-lg border border-zinc-600 bg-zinc-800 text-zinc-100"
+        className="flex h-[min(40rem,90vh)] w-full max-w-3xl flex-col rounded-lg border border-zinc-600/70 bg-zinc-800 text-zinc-100"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-zinc-700 px-4 py-3">
@@ -69,7 +69,7 @@ export function DiagnosticsSendDialog({ onClose, onSent }: { onClose: () => void
           {result ? (
             <div className="space-y-3">
               <p className="text-sm text-emerald-300">진단 정보를 보냈습니다. 아래 번호를 개발자에게 알려 주세요.</p>
-              <p className="rounded border border-emerald-500/50 bg-emerald-500/10 p-3 text-center text-2xl font-semibold tracking-wider">
+              <p className="rounded-lg border border-emerald-500/50 bg-emerald-500/10 p-3 text-center text-2xl font-semibold tracking-wider">
                 {result.receiptId ?? '(접수 번호를 받지 못했습니다)'}
               </p>
               {preview && (
@@ -79,7 +79,7 @@ export function DiagnosticsSendDialog({ onClose, onSent }: { onClose: () => void
               )}
               <button
                 type="button"
-                className="rounded bg-zinc-700 px-3 py-1.5 text-sm hover:bg-zinc-600"
+                className="rounded-md bg-zinc-700 px-3 py-1.5 text-sm transition hover:bg-zinc-600"
                 onClick={copy}
               >
                 {copied ? '복사했습니다' : '접수 번호와 ID 복사'}
@@ -106,7 +106,7 @@ export function DiagnosticsSendDialog({ onClose, onSent }: { onClose: () => void
                     </h3>
                     {preview.items.length === 0 && <p className="text-xs text-zinc-500">보낼 오류 기록이 없습니다.</p>}
                     {preview.items.map((item, i) => (
-                      <details key={i} className="rounded border border-zinc-700 bg-zinc-900/50 p-2 text-sm">
+                      <details key={i} className="rounded-lg border border-zinc-700/60 bg-zinc-900/50 p-2 text-sm">
                         <summary className="cursor-pointer break-all">
                           {String(item.level)} · {String(item.message).slice(0, 80)}
                         </summary>
@@ -127,7 +127,7 @@ export function DiagnosticsSendDialog({ onClose, onSent }: { onClose: () => void
             </>
           )}
           {error && (
-            <div className="space-y-1 rounded border border-rose-500/50 bg-rose-500/10 p-3 text-sm text-rose-200">
+            <div className="space-y-1 rounded-lg border border-rose-500/50 bg-rose-500/10 p-3 text-sm text-rose-200">
               <p>{error}</p>
               <a href={DIAGNOSTICS_URL} download className="inline-block text-sky-300 underline hover:text-sky-200">
                 파일로 저장 (진단 정보 zip)
@@ -140,16 +140,16 @@ export function DiagnosticsSendDialog({ onClose, onSent }: { onClose: () => void
             <a
               href={DIAGNOSTICS_URL}
               download
-              className="rounded px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700"
+              className="rounded-md px-3 py-1.5 text-sm text-zinc-300 transition hover:bg-zinc-700"
             >
               파일로 저장
             </a>
-            <button type="button" className="rounded px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700" onClick={onClose}>
+            <button type="button" className="rounded-md px-3 py-1.5 text-sm text-zinc-300 transition hover:bg-zinc-700" onClick={onClose}>
               취소
             </button>
             <button
               type="button"
-              className="rounded bg-sky-600 px-4 py-1.5 text-sm hover:bg-sky-500 disabled:opacity-40"
+              className="rounded-md bg-sky-600 px-4 py-1.5 text-sm transition hover:bg-sky-500 disabled:opacity-40"
               disabled={!preview || !preview.canSend || sending}
               onClick={() => void send()}
             >

@@ -28,7 +28,7 @@ export function DeleteConfirmDialog({ label, deleteMode, onCancel, onConfirm }: 
         <div
           role="dialog"
           aria-modal="true"
-          className="flex w-full max-w-md flex-col gap-4 rounded-lg border border-rose-500/60 bg-zinc-800 p-5 text-zinc-100"
+          className="flex w-full max-w-md flex-col gap-4 rounded-xl border border-rose-500/60 bg-zinc-800 shadow-xl p-5 text-zinc-100"
         >
           <p className="text-sm leading-relaxed">
             영구 삭제 + 다시 묻지 않기를 함께 선택하면, 앞으로 삭제할 때 확인도 복구도 없이 즉시 완전히
@@ -37,7 +37,7 @@ export function DeleteConfirmDialog({ label, deleteMode, onCancel, onConfirm }: 
           <div className="flex justify-end gap-2">
             <button
               type="button"
-              className="rounded px-4 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700"
+              className="rounded-md px-4 py-1.5 text-sm text-zinc-300 transition hover:bg-zinc-700"
               onClick={() => setConfirmingPermanentSkip(false)}
             >
               취소
@@ -45,7 +45,7 @@ export function DeleteConfirmDialog({ label, deleteMode, onCancel, onConfirm }: 
             <button
               type="button"
               autoFocus
-              className="rounded bg-rose-600 px-4 py-1.5 text-sm hover:bg-rose-500"
+              className="rounded-md bg-rose-600 px-4 py-1.5 text-sm transition hover:bg-rose-500"
               onClick={() => onConfirm(resolveDeleteChoice({ skipNext, permanent }))}
             >
               계속
@@ -61,7 +61,7 @@ export function DeleteConfirmDialog({ label, deleteMode, onCancel, onConfirm }: 
       <div
         role="dialog"
         aria-modal="true"
-        className="flex w-full max-w-md flex-col gap-4 rounded-lg border border-zinc-600 bg-zinc-800 p-5 text-zinc-100"
+        className="flex w-full max-w-md flex-col gap-4 rounded-xl border border-zinc-600/70 bg-zinc-800 shadow-xl p-5 text-zinc-100"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-base font-medium">정말 삭제하시겠습니까?</h2>
@@ -79,13 +79,13 @@ export function DeleteConfirmDialog({ label, deleteMode, onCancel, onConfirm }: 
           휴지통으로 보내지 않고 영구 삭제하기
         </label>
         <div className="flex justify-end gap-2">
-          <button type="button" className="rounded px-4 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700" onClick={onCancel}>
+          <button type="button" className="rounded-md px-4 py-1.5 text-sm text-zinc-300 transition hover:bg-zinc-700" onClick={onCancel}>
             취소
           </button>
           <button
             type="button"
             autoFocus
-            className="rounded bg-rose-600 px-4 py-1.5 text-sm hover:bg-rose-500"
+            className="rounded-md bg-rose-600 px-4 py-1.5 text-sm transition hover:bg-rose-500"
             onClick={proceed}
           >
             삭제

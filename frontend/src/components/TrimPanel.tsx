@@ -85,13 +85,13 @@ export function TrimPanel({ duration, getVideo, busy, onApply, onCancel }: Props
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded border border-sky-500/40 bg-zinc-800/80 p-3 text-sm text-zinc-200">
+    <div className="flex flex-col gap-2 rounded-lg border border-sky-500/40 bg-zinc-800/80 p-3 text-sm text-zinc-200">
       <div className="relative h-8">
-        <div className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded bg-zinc-700" />
+        <div className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-md bg-zinc-700" />
         {ranges.map((r, i) => (
           <div
             key={i}
-            className={`absolute top-1/2 h-4 -translate-y-1/2 cursor-pointer rounded ${i === active ? 'bg-sky-500/80' : 'bg-sky-500/35 hover:bg-sky-500/50'}`}
+            className={`absolute top-1/2 h-4 -translate-y-1/2 cursor-pointer rounded-md ${i === active ? 'bg-sky-500/80' : 'bg-sky-500/35 transition hover:bg-sky-500/50'}`}
             style={{ left: pct(r.start), width: pct(r.end - r.start) }}
             onClick={() => setActive(i)}
           />
@@ -125,30 +125,30 @@ export function TrimPanel({ duration, getVideo, busy, onApply, onCancel }: Props
         <span className="text-zinc-400">
           {count > 1 && `구간 ${active + 1}/${count} · `}남는 길이 {kept.toFixed(1)}초 · 삭제 {removed.toFixed(1)}초 (구간은 최소 {MIN_LENGTH}초 이상이며 서로 겹칠 수 없습니다)
         </span>
-        <button type="button" className="rounded border border-zinc-600 px-2 py-1 hover:bg-zinc-700" onClick={() => fromPlayhead('start')}>
+        <button type="button" className="rounded-md border border-zinc-600/70 px-2 py-1 transition hover:bg-zinc-700" onClick={() => fromPlayhead('start')}>
           현재 위치를 시작으로
         </button>
-        <button type="button" className="rounded border border-zinc-600 px-2 py-1 hover:bg-zinc-700" onClick={() => fromPlayhead('end')}>
+        <button type="button" className="rounded-md border border-zinc-600/70 px-2 py-1 transition hover:bg-zinc-700" onClick={() => fromPlayhead('end')}>
           현재 위치를 끝으로
         </button>
-        <button type="button" className="rounded border border-zinc-600 px-2 py-1 hover:bg-zinc-700" onClick={preview}>
+        <button type="button" className="rounded-md border border-zinc-600/70 px-2 py-1 transition hover:bg-zinc-700" onClick={preview}>
           ▶ 구간 미리보기
         </button>
-        <button type="button" className="rounded border border-zinc-600 px-2 py-1 hover:bg-zinc-700 disabled:opacity-40" disabled={!canAdd} onClick={add}>
+        <button type="button" className="rounded-md border border-zinc-600/70 px-2 py-1 transition hover:bg-zinc-700 disabled:opacity-40" disabled={!canAdd} onClick={add}>
           + 구간 추가
         </button>
         {count > 1 && (
-          <button type="button" className="rounded border border-zinc-600 px-2 py-1 hover:bg-zinc-700" onClick={() => remove(active)}>
+          <button type="button" className="rounded-md border border-zinc-600/70 px-2 py-1 transition hover:bg-zinc-700" onClick={() => remove(active)}>
             이 구간 빼기
           </button>
         )}
         <div className="ml-auto flex gap-2">
-          <button type="button" className="rounded px-3 py-1 text-zinc-300 hover:bg-zinc-700" onClick={onCancel}>
+          <button type="button" className="rounded-md px-3 py-1 text-zinc-300 transition hover:bg-zinc-700" onClick={onCancel}>
             취소
           </button>
           <button
             type="button"
-            className="rounded bg-rose-600 px-3 py-1 hover:bg-rose-500 disabled:opacity-40"
+            className="rounded-md bg-rose-600 px-3 py-1 transition hover:bg-rose-500 disabled:opacity-40"
             disabled={busy || (count === 1 && removed < 0.05)}
             onClick={apply}
           >

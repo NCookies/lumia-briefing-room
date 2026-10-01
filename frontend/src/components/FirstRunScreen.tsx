@@ -50,18 +50,18 @@ function FolderEditor({
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded border border-zinc-600 bg-zinc-900/60 p-3">
+    <div className="flex flex-col gap-2 rounded-lg border border-zinc-600/70 bg-zinc-900/60 p-3">
       <h4 className="text-sm font-medium">{title}</h4>
       <p className="text-xs text-zinc-400">{hint}</p>
       <FolderPicker value={dir} onChange={pick} />
       <div className="flex items-center justify-end gap-2">
         {error && <span className="text-xs text-rose-300">{error}</span>}
-        <button type="button" className="rounded px-3 py-1 text-sm text-zinc-300 hover:bg-zinc-700" onClick={onCancel}>
+        <button type="button" className="rounded-md px-3 py-1 text-sm text-zinc-300 transition hover:bg-zinc-700" onClick={onCancel}>
           취소
         </button>
         <button
           type="button"
-          className="rounded bg-sky-600 px-3 py-1 text-sm hover:bg-sky-500 disabled:opacity-40"
+          className="rounded-md bg-sky-600 px-3 py-1 text-sm transition hover:bg-sky-500 disabled:opacity-40"
           disabled={dir === ''}
           onClick={save}
         >
@@ -142,7 +142,7 @@ export function FirstRunScreen({ onDone }: { onDone: (backfillStarted: boolean) 
         <section className="flex flex-col gap-2">
           <h3 className="text-base font-medium">1. 스팀 녹화 폴더</h3>
           <div
-            className={`rounded border px-3 py-2 text-sm ${
+            className={`rounded-md border px-3 py-2 text-sm ${
               state === 'ok' ? TONE_CLASS.ok : state === 'no-session' ? TONE_CLASS.info : TONE_CLASS.warn
             }`}
           >
@@ -176,7 +176,7 @@ export function FirstRunScreen({ onDone }: { onDone: (backfillStarted: boolean) 
             <div>
               <button
                 type="button"
-                className="rounded border border-zinc-600 px-3 py-1 text-sm hover:bg-zinc-700"
+                className="rounded-md border border-zinc-600/70 px-3 py-1 text-sm transition hover:bg-zinc-700"
                 onClick={() => setEditing('recording')}
               >
                 녹화 폴더 직접 고르기
@@ -184,7 +184,7 @@ export function FirstRunScreen({ onDone }: { onDone: (backfillStarted: boolean) 
             </div>
           )}
           {!info.ffmpegFound && (
-            <p className="rounded border border-amber-500/60 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+            <p className="rounded-md border border-amber-500/60 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
               ffmpeg를 찾지 못했습니다. 클립을 만들 수 없습니다.
             </p>
           )}
@@ -195,7 +195,7 @@ export function FirstRunScreen({ onDone }: { onDone: (backfillStarted: boolean) 
         <section className="flex flex-col gap-2" data-testid="disk-notice">
           <h3 className="text-base font-medium">저장 공간</h3>
           <div
-            className={`rounded border-2 px-4 py-3 ${
+            className={`rounded-md border-2 px-4 py-3 ${
               diskTone(info.disk) === 'warn'
                 ? 'border-rose-500 bg-rose-500/10 text-rose-100'
                 : 'border-amber-500/70 bg-amber-500/10 text-amber-100'
@@ -213,7 +213,7 @@ export function FirstRunScreen({ onDone }: { onDone: (backfillStarted: boolean) 
               게임 전체 영상을 저장하기 때문입니다. 오래된 영상은 옵션의 자동 정리 한도(기본 40GB)로 지울 수 있습니다.
             </p>
           </div>
-          <label className="flex cursor-pointer items-center gap-2 rounded border border-zinc-600 bg-zinc-900/60 p-3 text-sm">
+          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-600/70 bg-zinc-900/60 p-3 text-sm">
             <input type="checkbox" checked={diskAcknowledged} onChange={(e) => setDiskAcknowledged(e.target.checked)} />
             <b>확인했습니다</b>
           </label>
@@ -222,14 +222,14 @@ export function FirstRunScreen({ onDone }: { onDone: (backfillStarted: boolean) 
         <section className="flex flex-col gap-2">
           <h3 className="text-base font-medium">2. 녹화 해상도</h3>
           {resolution && info.recording.session ? (
-            <div className={`rounded border px-3 py-2 text-sm ${TONE_CLASS[RESOLUTION_TONE[resolution.kind]]}`}>
+            <div className={`rounded-md border px-3 py-2 text-sm ${TONE_CLASS[RESOLUTION_TONE[resolution.kind]]}`}>
               <p>{resolution.message}</p>
               <p className="mt-1 text-xs text-zinc-400">
                 가장 최근 녹화 기준 · 코덱 {info.recording.session.codec ?? '알 수 없음'}
               </p>
             </div>
           ) : (
-            <p className="rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-300">
+            <p className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-300">
               아직 확인할 녹화가 없습니다. 첫 게임을 녹화한 뒤 옵션 → 정보·진단에서 확인할 수 있습니다.
             </p>
           )}
@@ -241,7 +241,7 @@ export function FirstRunScreen({ onDone }: { onDone: (backfillStarted: boolean) 
         {canOfferFirstBackfill(info) && (
           <section className="flex flex-col gap-2">
             <h3 className="text-base font-medium">3. 과거 녹화 분석</h3>
-            <label className="flex cursor-pointer items-start gap-2 rounded border border-zinc-600 bg-zinc-900/60 p-3 text-sm">
+            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-zinc-600/70 bg-zinc-900/60 p-3 text-sm">
               <input
                 type="checkbox"
                 className="mt-1"
@@ -274,7 +274,7 @@ export function FirstRunScreen({ onDone }: { onDone: (backfillStarted: boolean) 
           </section>
         )}
 
-        <details className="rounded border border-zinc-700 p-3">
+        <details className="rounded-lg border border-zinc-700/60 p-3">
           <summary className="cursor-pointer text-sm text-zinc-300">사용 방법 미리 보기 (건너뛰어도 됩니다)</summary>
           <div className="mt-3">
             <GuideContent />
@@ -285,7 +285,7 @@ export function FirstRunScreen({ onDone }: { onDone: (backfillStarted: boolean) 
         <div className="flex justify-end">
           <button
             type="button"
-            className="rounded bg-sky-600 px-6 py-2 text-sm font-medium hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-md bg-sky-600 px-6 py-2 text-sm font-medium transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!canStartFirstRun(info.pendingItems, diskAcknowledged)}
             onClick={finish}
           >

@@ -8,7 +8,7 @@ interface Props {
   onCancel: () => void
 }
 
-const INPUT = 'w-20 rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm text-zinc-100'
+const INPUT = 'w-20 rounded-md border border-zinc-600/70 bg-zinc-900 px-2 py-1 text-sm text-zinc-100'
 
 /** `게임 정보 수정하기`: 제목과, 판독이 틀린 순위·일반/랭크·TK/K/A(코발트는 승리/패배)를 고친다. 저장하면 잠긴다. */
 export function GameInfoDialog({ game, onSave, onCancel }: Props) {
@@ -42,7 +42,7 @@ export function GameInfoDialog({ game, onSave, onCancel }: Props) {
       <div
         role="dialog"
         aria-modal="true"
-        className="flex w-full max-w-sm flex-col gap-3 rounded-lg border border-zinc-600 bg-zinc-800 p-5 text-zinc-100"
+        className="flex w-full max-w-sm flex-col gap-3 rounded-xl border border-zinc-600/70 bg-zinc-800 shadow-xl p-5 text-zinc-100"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
           if (e.key === 'Escape') onCancel()
@@ -53,7 +53,7 @@ export function GameInfoDialog({ game, onSave, onCancel }: Props) {
         <label className="flex flex-col gap-1 text-sm">
           제목
           <input
-            className="rounded border border-zinc-600 bg-zinc-900 px-2 py-1 text-sm text-zinc-100"
+            className="rounded-md border border-zinc-600/70 bg-zinc-900 px-2 py-1 text-sm text-zinc-100"
             value={title}
             maxLength={TITLE_MAX}
             placeholder="제목 없음"
@@ -94,10 +94,10 @@ export function GameInfoDialog({ game, onSave, onCancel }: Props) {
         </p>
         {error && <p className="text-sm text-rose-300">{error}</p>}
         <div className="flex items-center justify-end gap-2">
-          <button type="button" className="rounded px-4 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700" onClick={onCancel}>
+          <button type="button" className="rounded-md px-4 py-1.5 text-sm text-zinc-300 transition hover:bg-zinc-700" onClick={onCancel}>
             취소
           </button>
-          <button type="button" autoFocus className="rounded bg-sky-600 px-4 py-1.5 text-sm hover:bg-sky-500" onClick={submit}>
+          <button type="button" autoFocus className="rounded-md bg-sky-600 px-4 py-1.5 text-sm transition hover:bg-sky-500" onClick={submit}>
             저장
           </button>
         </div>

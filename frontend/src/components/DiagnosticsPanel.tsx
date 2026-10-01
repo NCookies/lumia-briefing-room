@@ -51,10 +51,10 @@ export function DiagnosticsPanel() {
         </>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className="rounded bg-sky-600 px-4 py-1.5 text-sm hover:bg-sky-500" onClick={() => setOpen(true)}>
+        <button type="button" className="rounded-md bg-sky-600 px-4 py-1.5 text-sm transition hover:bg-sky-500" onClick={() => setOpen(true)}>
           진단 정보 보내기
         </button>
-        <a href={DIAGNOSTICS_URL} download className="rounded bg-zinc-700 px-3 py-1.5 text-sm hover:bg-zinc-600">
+        <a href={DIAGNOSTICS_URL} download className="rounded-md bg-zinc-700 px-3 py-1.5 text-sm transition hover:bg-zinc-600">
           진단 정보 zip 받기 (파일로 저장)
         </a>
       </div>

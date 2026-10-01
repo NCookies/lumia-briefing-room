@@ -27,12 +27,12 @@ export function FolderPicker({ value, onChange, title }: Props) {
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-2">
-        <div className="flex-1 truncate rounded bg-zinc-900 px-3 py-1.5 text-sm text-zinc-200" title={value}>
+        <div className="flex-1 truncate rounded-md bg-zinc-900 px-3 py-1.5 text-sm text-zinc-200" title={value}>
           {value || <span className="text-zinc-500">선택한 폴더가 없습니다</span>}
         </div>
         <button
           type="button"
-          className="shrink-0 rounded border border-zinc-600 px-3 py-1 text-sm hover:bg-zinc-700 disabled:opacity-40"
+          className="shrink-0 rounded-md border border-zinc-600/70 px-3 py-1 text-sm transition hover:bg-zinc-700 disabled:opacity-40"
           disabled={busy}
           onClick={() => void browse()}
         >

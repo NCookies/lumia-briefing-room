@@ -41,7 +41,7 @@ export function AdminPanel({ active }: { active: boolean }) {
               type="button"
               role="tab"
               aria-selected={section === s.id}
-              className={`rounded border px-3 py-1 text-sm ${
+              className={`rounded-md border px-3 py-1 text-sm ${
                 section === s.id ? 'border-sky-500 bg-zinc-800 font-semibold' : 'border-zinc-700 text-zinc-400 hover:text-zinc-200'
               }`}
               onClick={() => setSection(s.id)}
@@ -65,7 +65,7 @@ export function AdminPanel({ active }: { active: boolean }) {
           )}
           <button
             type="button"
-            className="rounded border border-zinc-600 px-2 py-1 text-sm text-zinc-300 hover:bg-zinc-700"
+            className="rounded-md border border-zinc-600/70 px-2 py-1 text-sm text-zinc-300 transition hover:bg-zinc-700"
             onClick={() => setManualTick((n) => n + 1)}
           >
             새로고침

@@ -39,7 +39,7 @@ export function NoticeBanner() {
           <span>{n.message}</span>
           <button
             type="button"
-            className="ml-auto rounded bg-amber-700 px-3 py-0.5 text-xs text-white hover:bg-amber-600"
+            className="ml-auto rounded-md bg-amber-700 px-3 py-0.5 text-xs text-white transition hover:bg-amber-600"
             onClick={() => close(n.kind)}
           >
             닫기

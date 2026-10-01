@@ -8,7 +8,7 @@ const wireLabel = (value: unknown): string =>
 
 function Raw({ value }: { value: unknown }) {
   return (
-    <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-zinc-900 p-2 text-[11px] text-zinc-300">
+    <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-zinc-900 p-2 text-[11px] text-zinc-300">
       {JSON.stringify(value, null, 2)}
     </pre>
   )
@@ -35,7 +35,7 @@ export function TelemetryPreviewDialog({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div
-        className="flex h-[min(40rem,90vh)] w-full max-w-3xl flex-col rounded-lg border border-zinc-600 bg-zinc-800 text-zinc-100"
+        className="flex h-[min(40rem,90vh)] w-full max-w-3xl flex-col rounded-lg border border-zinc-600/70 bg-zinc-800 text-zinc-100"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-zinc-700 px-4 py-3">
@@ -61,7 +61,7 @@ export function TelemetryPreviewDialog({ onClose }: { onClose: () => void }) {
                 </h3>
                 {preview.labels.items.length === 0 && <p className="text-xs text-zinc-500">보낼 라벨이 없습니다.</p>}
                 {preview.labels.items.map((item, i) => (
-                  <details key={i} className="rounded border border-zinc-700 bg-zinc-900/50 p-2 text-sm">
+                  <details key={i} className="rounded-lg border border-zinc-700/60 bg-zinc-900/50 p-2 text-sm">
                     <summary className="cursor-pointer">
                       {wireLabel(item.userLabel)}
                       {item.source === 'vod' && ' · 영상 파일'}
@@ -85,7 +85,7 @@ export function TelemetryPreviewDialog({ onClose }: { onClose: () => void }) {
                   <p className="text-xs text-zinc-500">보낼 오류 로그가 없습니다.</p>
                 )}
                 {preview.logs.items.map((item, i) => (
-                  <details key={i} className="rounded border border-zinc-700 bg-zinc-900/50 p-2 text-sm">
+                  <details key={i} className="rounded-lg border border-zinc-700/60 bg-zinc-900/50 p-2 text-sm">
                     <summary className="cursor-pointer break-all">
                       {String(item.level)} · {String(item.message).slice(0, 80)}
                     </summary>

@@ -34,7 +34,7 @@ export function HelpTip({ text, label, centered = false, wide = false, hover = f
       <button
         ref={button}
         type="button"
-        className="rounded-full border border-zinc-600 px-1.5 text-xs leading-4 text-zinc-400 hover:border-sky-500 hover:text-sky-300"
+        className="rounded-full border border-zinc-600/70 px-1.5 text-xs leading-4 text-zinc-400 hover:border-sky-500 hover:text-sky-300"
         aria-label={label}
         aria-expanded={open}
         title={hover ? undefined : text}
@@ -50,7 +50,7 @@ export function HelpTip({ text, label, centered = false, wide = false, hover = f
       {open && (
         <span
           role="tooltip"
-          className={`absolute z-20 max-h-[60vh] overflow-y-auto whitespace-pre-line rounded border border-zinc-600 bg-zinc-800 p-2 text-left text-xs leading-relaxed text-zinc-200 shadow-lg ${
+          className={`absolute z-20 max-h-[60vh] overflow-y-auto whitespace-pre-line rounded-lg border border-zinc-600/70 bg-zinc-800 p-2 text-left text-xs leading-relaxed text-zinc-200 shadow-lg ${
             placement === 'below' ? 'top-full mt-1' : 'bottom-full mb-1'
           } ${wide ? 'w-96' : 'w-72'} ${centered ? 'left-1/2 -translate-x-1/2' : alignRight ? 'right-0' : 'left-0'}`}
         >
