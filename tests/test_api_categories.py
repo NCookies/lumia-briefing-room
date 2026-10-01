@@ -189,6 +189,14 @@ def test_moving_an_auto_clip_into_a_category_archives_it_and_moving_back_unarchi
     assert _user(client, "01")["archived"] is False
 
 
+def test_game_list_counts_only_archived_clips_not_auto_archive_ones(client):
+    save(client, "01")
+    save(client, "02", category="자동 보관")
+    save(client, "03", category="자동 보관")
+    (game,) = client.get("/api/games").json()["games"]
+    assert game["savedClipCount"] == 1
+
+
 def test_unsaved_candidates_have_no_archive_flag(client):
     assert "archived" not in _user(client, "01")
 

@@ -123,7 +123,7 @@ def _summary(game: dict, games_dir: Path, *, can_rebuild_full: bool = False) -> 
         "fullVideoDeletedAt": game.get("fullVideoDeletedAt"),
         "candidateCount": len(active),
         "certainCount": sum(1 for c in active if c.get("certain")),
-        "savedClipCount": sum(1 for c in cands if (c.get("user") or {}).get("savedClipId")),
+        "savedClipCount": sum(1 for c in cands if (c.get("user") or {}).get("archived")),
         "unsavedEditCount": sum(1 for c in active if (c.get("user") or {}).get("savedClipId") and gcand.range_changed(c, float(video.get("durationSec") or 0.0))),
     }
 
@@ -217,6 +217,8 @@ def register_game_routes(
                 and can_rebuild(g, games_dir(g["gameKey"]), recording_root)
             )
 
+        for g in games:
+            self_saved_category(g)
         return {"games": [_summary(g, games_dir(g["gameKey"]), can_rebuild_full=rebuildable(g)) for g in games]}
 
     @app.get("/api/games/{key}")
@@ -419,7 +421,9 @@ def register_game_routes(
                 sync_clip_results(game_clip_paths(updated), result_edit)
             if body.pinned is not None:
                 cleanup_preview_registry.notify_clips_changed()
-        return _summary(load_or_404(key), games_dir(key))
+        game = load_or_404(key)
+        self_saved_category(game)
+        return _summary(game, games_dir(key))
 
     def _rename_saved_clip(game: dict, cand: dict) -> None:
         clip_id = (cand.get("user") or {}).get("savedClipId")
