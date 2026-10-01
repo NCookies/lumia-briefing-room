@@ -304,59 +304,51 @@ def test_analyze_runs_in_the_background_and_reports_progress(env, monkeypatch):
     assert fake.calls == [("a.mp4", False, False)]
 
 
-def test_only_one_analysis_runs_at_a_time_and_unknown_vod_is_404(env, monkeypatch):
-    client, a, *_ = env
+def test_a_second_analysis_waits_in_the_queue_instead_of_being_rejected(env, monkeypatch):
+    client, a, b, *_ = env
+    client.put("/api/config", json={"vod": {"recursive": True}})
     fake = FakeAnalyze()
     monkeypatch.setattr(vods_module, "analyze_vod", fake)
-    vid = vod_id(a)
-    client.post(f"/api/vods/{vid}/analyze", json={})
+    va, vb = vod_id(a), vod_id(b)
+    assert client.post(f"/api/vods/{va}/analyze", json={}).status_code == 202
     assert fake.started.wait(2)
 
-    assert client.post(f"/api/vods/{vid}/analyze", json={}).status_code == 409
+    assert client.post(f"/api/vods/{vb}/analyze", json={}).status_code == 202
+    entry = by_id(client.get("/api/vods"))[vb]
+    assert entry["status"] == "queued" and entry["queuePosition"] == 1
+    assert by_id(client.get("/api/vods"))[va]["queuePosition"] is None
+    waiting = client.get(f"/api/vods/{vb}/analyze").json()
+    assert waiting["state"] == "queued" and waiting["position"] == 1
+    assert client.post(f"/api/vods/{vb}/analyze", json={"rebuild": True}).status_code == 202, "같은 영상을 또 눌러도 한 번만 줄 선다"
+    assert client.get(f"/api/vods/{vb}/analyze").json()["position"] == 1
+    assert client.post(f"/api/vods/{va}/analyze", json={}).status_code == 202, "실행 중인 영상을 또 눌러도 거부하지 않는다"
     assert client.post("/api/vods/nope/analyze", json={}).status_code == 404
+
     fake.release.set()
-    wait_for(client, vid, "done")
+    wait_for(client, va, "done")
+    wait_for(client, vb, "done")
+    assert fake.calls == [("a.mp4", False, False), ("b.mkv", False, True)], "나중 요청(다시 만들기)이 대기 중이던 요청을 대체했다"
 
 
-def test_force_and_rebuild_flags_are_passed_through(env, monkeypatch):
-    client, a, *_ = env
+def test_cancelling_a_waiting_analysis_removes_it_from_the_queue(env, monkeypatch):
+    client, a, b, *_ = env
+    client.put("/api/config", json={"vod": {"recursive": True}})
     fake = FakeAnalyze()
-    fake.release.set()
     monkeypatch.setattr(vods_module, "analyze_vod", fake)
-    vid = vod_id(a)
+    va, vb = vod_id(a), vod_id(b)
+    client.post(f"/api/vods/{va}/analyze", json={})
+    assert fake.started.wait(2)
+    client.post(f"/api/vods/{vb}/analyze", json={})
 
-    client.post(f"/api/vods/{vid}/analyze", json={"force": True})
-    wait_for(client, vid, "done")
-    client.post(f"/api/vods/{vid}/analyze", json={"rebuild": True})
-    time.sleep(0.2)
+    assert client.delete(f"/api/vods/{vb}").status_code == 409, "대기 중인 영상은 지울 수 없다"
+    assert client.post(f"/api/vods/{vb}/analyze/cancel").status_code == 200
+    assert client.get(f"/api/vods/{vb}/analyze").json()["state"] == "cancelled"
+    assert by_id(client.get("/api/vods"))[vb]["status"] == "new"
+    assert client.post(f"/api/vods/{vb}/analyze/cancel").status_code == 409
 
-    assert fake.calls[0] == ("a.mp4", True, False) and fake.calls[1] == ("a.mp4", False, True)
-
-
-def test_delete_source_flag_is_passed_through_to_analyze_vod(env, monkeypatch):
-    client, a, *_ = env
-    vid = vod_id(a)
-    captured = []
-
-    def spy(path, cfg, **kw):
-        captured.append(kw.get("delete_source"))
-        return {"status": "done", "games": [], "clips": []}
-
-    monkeypatch.setattr(vods_module, "analyze_vod", spy)
-
-    client.post(f"/api/vods/{vid}/analyze", json={"deleteSource": True})
-    wait_for(client, vid, "done")
-
-    assert captured == [True]
-
-
-def test_delete_source_must_be_a_boolean(env):
-    client, a, *_ = env
-    vid = vod_id(a)
-
-    resp = client.post(f"/api/vods/{vid}/analyze", json={"deleteSource": "yes"})
-
-    assert resp.status_code == 400
+    fake.release.set()
+    wait_for(client, va, "done")
+    assert fake.calls == [("a.mp4", False, False)], "취소한 영상은 돌지 않는다"
 
 
 def test_cancel_stops_the_running_analysis(env, monkeypatch):

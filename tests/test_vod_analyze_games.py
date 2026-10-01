@@ -193,3 +193,31 @@ def test_cancelled_analysis_leaves_no_half_made_game_folder(vod_file, tmp_path):
         )
 
     assert not cfg.paths.games.exists() or not any(cfg.paths.games.iterdir())
+
+
+@requires_ffmpeg
+def test_auto_mode_rebuild_also_deletes_clips_the_user_moved_into_a_category(vod_file, tmp_path):
+    """`다시 분석` 확인 창 문구의 근거: 저장 방식이 auto 면 그 영상의 클립은 보관 카테고리에 있어도 모두 지우고 새로 만든다."""
+    first, cfg = run(tmp_path, vod_file)
+    kept = first["clips"][0]
+    category = cfg.paths.vod_clips / "보관함"
+    category.mkdir()
+    (cfg.paths.vod_clips / f"{kept}.mp4").replace(category / f"{kept}.mp4")
+
+    analyze_vod(vod_file, cfg, ffmpeg_path=FFMPEG_PATH, read_frame=read_frame, find_result=no_result, rebuild=True)
+
+    assert not (category / f"{kept}.mp4").exists()
+
+
+@requires_ffmpeg
+def test_manual_mode_rebuild_keeps_clips_the_user_moved_into_a_category(vod_file, tmp_path):
+    first, cfg = run(tmp_path, vod_file)
+    kept = first["clips"][0]
+    category = cfg.paths.vod_clips / "보관함"
+    category.mkdir()
+    (cfg.paths.vod_clips / f"{kept}.mp4").replace(category / f"{kept}.mp4")
+    cfg.clip.save_mode = "manual"
+
+    analyze_vod(vod_file, cfg, ffmpeg_path=FFMPEG_PATH, read_frame=read_frame, find_result=no_result, rebuild=True)
+
+    assert (category / f"{kept}.mp4").is_file()

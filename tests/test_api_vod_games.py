@@ -192,12 +192,11 @@ def test_full_videos_of_a_vod_are_built_in_the_background_with_the_analysis_job(
     assert fake.started.wait(2)
     job = wait_state(env, env.vid, "running")
     assert job["kind"] == "fullVideos" and job["fraction"] == 0.5 and job["message"] == "게임 1 풀영상"
-    assert env.post(f"/api/vods/{env.vid}/full-videos").status_code == 409
-    assert env.post(f"/api/vods/{env.vid}/analyze", json={}).status_code == 409
+    assert env.post(f"/api/vods/{env.vid}/full-videos").status_code == 202, "실행 중인 같은 작업을 또 눌러도 거부하지 않는다"
 
     fake.release.set()
     wait_state(env, env.vid, "done")
-    assert fake.calls == [("a.mp4", None)]
+    assert fake.calls == [("a.mp4", None)], "같은 요청이라 한 번만 돈다"
 
 
 def test_full_videos_cannot_be_built_without_source_or_read_cache(env):

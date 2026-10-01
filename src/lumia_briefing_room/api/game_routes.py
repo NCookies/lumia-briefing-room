@@ -23,6 +23,7 @@ from lumia_briefing_room.api.clips import find_clip
 from lumia_briefing_room.pipeline.recording_stop import error_of_record, stopped_of_record
 from lumia_briefing_room.pipeline import categories as cats
 from lumia_briefing_room.pipeline.library_fs import LibraryError
+from lumia_briefing_room.api.analysis_queue import enqueue, with_position
 from lumia_briefing_room.config import AUTO_ARCHIVE_FOLDER, Config, discover_ffmpeg, resolve_paths
 from lumia_briefing_room.pipeline import game_candidates as gcand
 from lumia_briefing_room.pipeline.clip_from_full import FullVideoMissing
@@ -269,6 +270,7 @@ def register_game_routes(
                 cand["user"] = {**user, **extra}
 
     rebuild_jobs: dict[str, dict] = {}
+    queue = app.state.analysis_queue
 
     def vod_control():
         """영상 분석 작업을 관리하는 vods 라우트가 `app.state.vod_full_videos` 로 내놓는 조작(같은 작업 슬롯을 쓴다)."""
@@ -283,18 +285,15 @@ def register_game_routes(
             if game.get("fullVideoDeletedAt") or has_full_video(games_dir(key), key):
                 raise HTTPException(409, "이미 풀영상이 있거나 자동 정리로 지운 게임입니다")
             vod_control().start(game["vodId"], {int(game["vodGameIndex"])})
-            return {"state": "running", "message": "", "fraction": 0.0}
+            return vod_control().status(game["vodId"], int(game["vodGameIndex"]))
         root = resolve_recording_root(cfg.paths.steam_recording)
         if not can_rebuild(game, games_dir(key), root):
             raise HTTPException(409, "원본 녹화가 남아 있지 않거나 이미 풀영상이 있는 게임입니다")
-        if any(j["state"] == "running" for j in rebuild_jobs.values()):
-            raise HTTPException(409, "다른 게임의 풀영상을 만드는 중입니다. 끝난 뒤 다시 시도하세요")
         ffmpeg = _ffmpeg()
-        job = {"state": "running", "message": "", "fraction": 0.0}
-        rebuild_jobs[key] = job
         gdir, cdir = games_dir(key), clips_dir()
 
-        def run() -> None:
+        def run(job: dict) -> None:
+            job.update(state="running")
             try:
                 with activity.registry.track("rebuild-full-video", f"풀영상 만드는 중 ({key})"):
                     rebuild_full_video(
@@ -308,15 +307,16 @@ def register_game_routes(
                 log.exception("풀영상 만들기 실패: %s", key)
                 job.update(state="error", message=f"풀영상을 만들지 못했습니다: {exc}")
 
-        threading.Thread(target=run, daemon=True).start()
-        return job
+        job = enqueue(queue, rebuild_jobs, key, f"풀영상 만들기 ({key})", run, {"message": "", "fraction": 0.0}, queue_key=f"rebuild:{key}")
+        return with_position(queue, f"rebuild:{key}", job)
 
     @app.get("/api/games/{key}/full-video/status")
     def rebuild_status(key: str):
         game = load_or_404(key)
         if game.get("source") == "vod":
             return vod_control().status(game["vodId"], int(game["vodGameIndex"]))
-        return rebuild_jobs.get(key) or {"state": "idle", "message": "", "fraction": 0.0}
+        job = rebuild_jobs.get(key)
+        return with_position(queue, f"rebuild:{key}", job) if job else {"state": "idle", "message": "", "fraction": 0.0}
 
     reanalyze_jobs: dict[str, dict] = {}
 
@@ -335,17 +335,17 @@ def register_game_routes(
         game = load_or_404(key)
         if game.get("source") == "vod":
             raise HTTPException(409, "영상 파일 게임은 영상 묶음에서 다시 분석합니다")
-        if any(j["state"] == "running" for j in [*rebuild_jobs.values(), *reanalyze_jobs.values()]):
-            raise HTTPException(409, "다른 게임을 처리하는 중입니다. 끝난 뒤 다시 시도하세요")
         cfg = current_config()
         ffmpeg = _ffmpeg()
         resolved = resolve_paths(cfg.paths)
         root = resolve_recording_root(cfg.paths.steam_recording)
-        job = {"state": "running", "message": "", "fraction": 0.0, "mode": reanalyze_mode(game, games_dir(key), root)}
-        reanalyze_jobs[key] = job
+        mode = reanalyze_mode(game, games_dir(key), root)
+        if mode is None:
+            raise HTTPException(409, "원본 녹화도 풀영상도 남아 있지 않아 다시 분석할 수 없습니다")
         gdir, cdir, staging = games_dir(key), clips_dir(), resolved.staging_games
 
-        def run() -> None:
+        def run(job: dict) -> None:
+            job.update(state="running")
             try:
                 with activity.registry.track("reanalyze-game", f"게임 다시 분석 중 ({key})"):
                     job["mode"] = reanalyze_game(
@@ -361,13 +361,31 @@ def register_game_routes(
             finally:
                 cleanup_preview_registry.notify_clips_changed()
 
-        threading.Thread(target=run, daemon=True).start()
-        return job
+        job = enqueue(
+            queue, reanalyze_jobs, key, f"게임 다시 분석 ({key})", run, {"message": "", "fraction": 0.0, "mode": mode},
+            queue_key=f"reanalyze:{key}",
+        )
+        return with_position(queue, f"reanalyze:{key}", job)
 
     @app.get("/api/games/{key}/reanalyze/status")
     def reanalyze_status(key: str):
         load_or_404(key)
-        return reanalyze_jobs.get(key) or {"state": "idle", "message": "", "fraction": 0.0, "mode": None}
+        job = reanalyze_jobs.get(key)
+        return with_position(queue, f"reanalyze:{key}", job) if job else {"state": "idle", "message": "", "fraction": 0.0, "mode": None}
+
+    @app.delete("/api/games/{key}/queue")
+    def cancel_queued(key: str):
+        """대기 중인 풀영상 만들기·다시 분석 요청을 취소한다(실행 중인 것은 멈추지 않는다)."""
+        load_or_404(key)
+        cancelled = False
+        for kind, table in (("rebuild", rebuild_jobs), ("reanalyze", reanalyze_jobs)):
+            job = table.get(key)
+            if job is not None and job["state"] == "queued" and queue.cancel(f"{kind}:{key}"):
+                job.update(state="idle", message="")
+                cancelled = True
+        if not cancelled:
+            raise HTTPException(409, "대기 중인 분석 요청이 없습니다")
+        return {"key": key, "cancelled": True}
 
     @app.get("/api/games/{key}/video")
     def get_game_video(key: str):

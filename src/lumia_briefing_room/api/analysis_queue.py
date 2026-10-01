@@ -110,3 +110,26 @@ class AnalysisQueue:
                     self._current = None
                     self._promote()
                     self._cond.notify_all()
+
+
+def enqueue(
+    queue: AnalysisQueue, jobs: dict[str, dict], key: str, label: str, run: Callable[[dict], None], initial: dict,
+    *, queue_key: str | None = None,
+) -> dict:
+    """`jobs[key]` 를 `queued` 로 만들어 줄 세운다. 이미 대기·실행 중인 같은 대상은 그 job 을 그대로 쓴다(실행 중이면 다시 줄 세우지 않는다).
+
+    `run(job)` 은 시작할 때 `job["state"]` 를 `running` 으로 바꾸고 끝나면 `done`/`error` 로 바꾸는 쪽의 몫이다."""
+    job = jobs.get(key)
+    if job is None or job["state"] not in ("queued", "running"):
+        job = {**initial, "state": "queued"}
+        jobs[key] = job
+    try:
+        queue.submit(queue_key or key, label, lambda: run(job))
+    except AlreadyRunning:
+        pass
+    return job
+
+
+def with_position(queue: AnalysisQueue, queue_key: str, job: dict) -> dict:
+    """화면에 내보내는 job: 대기 중이면 `position`(1 = 다음 차례)을 덧붙인다."""
+    return {**job, "position": queue.position(queue_key) if job["state"] == "queued" else None}

@@ -1,11 +1,12 @@
 """다시보기(VOD) API. (docs/plan-vod.md V4)
 
-영상 목록은 설정의 vod.sources(파일 또는 폴더)를 훑어 만들고, 분석 작업은 한 번에 하나만 백그라운드 스레드로 돈다.
+영상 목록은 설정의 vod.sources(파일 또는 폴더)를 훑어 만들고, 분석 작업은 분석 대기열(`analysis_queue.py`)에서 한 번에 하나씩 돈다.
 클립 자체(영상·썸네일·라벨·휴지통 등)는 기존 /api/clips 라우트가 클립 ID 로 처리한다(api/app.py).
 """
 
 from __future__ import annotations
 
+import itertools
 import threading
 from types import SimpleNamespace
 from concurrent.futures import ThreadPoolExecutor
@@ -15,6 +16,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 
+from lumia_briefing_room.api.analysis_queue import AlreadyRunning, AnalysisQueue
 from lumia_briefing_room.api.clips import scan_clips
 from lumia_briefing_room.api.export import list_roots, list_subdirs, parent_of
 from lumia_briefing_room.config import Config, discover_ffmpeg, resolve_paths
@@ -81,7 +83,9 @@ def register_vod_routes(
 ) -> None:
     id_cache: dict[tuple[str, int, int], str] = {}
     info_cache: dict[tuple[str, int, int], VideoInfo | None] = {}
-    job: dict = {}
+    queue: AnalysisQueue = app.state.analysis_queue
+    jobs: dict[str, dict] = {}
+    seq = itertools.count(1)
 
     def root() -> Path:
         return resolve_paths(current_config().paths).library_vod
@@ -137,12 +141,34 @@ def register_vod_routes(
                 entry["bytes"] += clip.size_bytes
         return stats
 
+    def jobs_of(vid: str) -> list[dict]:
+        return [j for j in jobs.values() if j["id"] == vid]
+
     def running_for(vid: str) -> bool:
-        return job.get("state") == "running" and job.get("id") == vid
+        return any(j["state"] == "running" for j in jobs_of(vid))
+
+    def queued_for(vid: str) -> list[dict]:
+        return sorted((j for j in jobs_of(vid) if j["state"] == "queued"), key=lambda j: j["seq"])
+
+    def position_of(job: dict) -> int | None:
+        return queue.position(job["queueKey"]) if job["state"] == "queued" else None
+
+    def job_of(vid: str) -> dict | None:
+        """영상의 대표 작업: 실행 중 > 대기 중(먼저 요청한 것) > 가장 최근에 끝난 것."""
+        mine = jobs_of(vid)
+        running = [j for j in mine if j["state"] == "running"]
+        if running:
+            return running[0]
+        queued = queued_for(vid)
+        if queued:
+            return queued[0]
+        return max(mine, key=lambda j: j["seq"]) if mine else None
 
     def status_of(vid: str, index: dict | None) -> str:
         if running_for(vid):
             return "analyzing"
+        if any(j["kind"] == "analyze" for j in queued_for(vid)):
+            return "queued"
         if index is None:
             return "new"
         status = index.get("status", "new")
@@ -175,6 +201,7 @@ def register_vod_routes(
             "width": (index or {}).get("width"),
             "height": (index or {}).get("height"),
             "status": status_of(vid, index),
+            "queuePosition": next((position_of(j) for j in queued_for(vid) if j["kind"] == "analyze"), None),
             "analyzedSec": (index or {}).get("analyzedSec"),
             "error": (index or {}).get("error"),
             "errorKind": (index or {}).get("errorKind"),
@@ -251,37 +278,52 @@ def register_vod_routes(
             "date": current_config().vod.video_dates.get(vid) or None,
         }
 
+    def submit(vid: str, kind: str, name: str, label: str, initial: dict, run) -> dict:
+        """같은 대상(`name`)이 이미 대기 중이면 그 요청을 최신 것으로 바꾸고, 실행 중이면 줄 세우지 않고 그대로 둔다."""
+        queue_key = f"vod:{name}"
+        job = jobs.get(name)
+        if job is None or job["state"] not in ("queued", "running"):
+            job = {
+                "id": vid, "kind": kind, "state": "queued", "phase": "decode", "fraction": 0.0, "games": 0, "clips": 0,
+                "message": "", "cancel": threading.Event(), "seq": next(seq), "queueKey": queue_key, **initial,
+            }
+            jobs[name] = job
+
+        def go() -> None:
+            if job["state"] != "queued":
+                return
+            job.update(state="running", message="시작하는 중")
+            run(job)
+
+        try:
+            queue.submit(queue_key, label, go)
+        except AlreadyRunning:
+            pass
+        return job
+
     @app.post("/api/vods/{vid}/analyze", status_code=202)
     def start_analysis(vid: str, body: dict | None = None):
         body = body or {}
         path, _ = require(vid)
-        if job.get("state") == "running":
-            raise HTTPException(409, "다른 영상을 분석하는 중입니다. 끝난 뒤 다시 시도하세요")
         if not path.exists():
             raise HTTPException(404, "영상 파일이 없습니다. 파일을 옮겼다면 옵션에서 경로를 다시 지정하세요")
         ffmpeg = discover_ffmpeg()
         if ffmpeg is None:
             raise HTTPException(503, "ffmpeg를 찾을 수 없습니다")
         cfg = current_config()
-        cancel = threading.Event()
-        job.clear()
-        job.update(
-            id=vid, kind="analyze", state="running", phase="decode", fraction=0.0, games=0, clips=0,
-            message="시작하는 중", cancel=cancel,
-        )
         force, rebuild = bool(body.get("force")), bool(body.get("rebuild"))
         delete_source = body.get("deleteSource")
         if delete_source is not None and not isinstance(delete_source, bool):
             raise HTTPException(400, "deleteSource 는 true/false 여야 합니다")
 
-        def on_progress(p: VodProgress) -> None:
-            job.update(phase=p.phase, fraction=p.fraction, games=p.games, clips=p.clips, message=p.message)
+        def run(job: dict) -> None:
+            def on_progress(p: VodProgress) -> None:
+                job.update(phase=p.phase, fraction=p.fraction, games=p.games, clips=p.clips, message=p.message)
 
-        def run() -> None:
             try:
                 analyze_vod(
                     path, cfg, ffmpeg_path=ffmpeg, force=force, rebuild=rebuild,
-                    on_progress=on_progress, cancel=cancel, delete_source=delete_source,
+                    on_progress=on_progress, cancel=job["cancel"], delete_source=delete_source,
                 )
                 job.update(state="done", fraction=1.0, message="")
             except VodCancelled:
@@ -289,14 +331,12 @@ def register_vod_routes(
             except Exception as exc:
                 job.update(state="error", message=describe_clip_error(exc))
 
-        threading.Thread(target=run, daemon=True).start()
+        submit(vid, "analyze", f"analyze:{vid}", f"영상 분석 ({path.name})", {}, run)
         return {"id": vid}
 
     def start_full_videos(vid: str, only: set[int] | None = None) -> None:
-        """이미 분석한 영상의 게임을 풀영상으로 만든다(분석 작업과 같은 슬롯: 한 번에 하나, 진행률·취소 공용)."""
+        """이미 분석한 영상의 게임을 풀영상으로 만든다(분석 작업과 같은 대기열: 한 번에 하나, 진행률·취소 공용)."""
         path, index = require(vid)
-        if job.get("state") == "running":
-            raise HTTPException(409, "다른 영상 작업 중입니다. 끝난 뒤 다시 시도하세요")
         if not path.exists() or not can_upgrade(index, path, root()):
             raise HTTPException(409, "원본 영상이나 이전 분석 기록이 없어 풀영상을 만들 수 없습니다")
         ffmpeg = discover_ffmpeg()
@@ -304,18 +344,12 @@ def register_vod_routes(
             raise HTTPException(503, "ffmpeg를 찾을 수 없습니다")
         cfg = current_config()
         base, gdir = root(), games_root()
-        cancel = threading.Event()
-        job.clear()
-        job.update(
-            id=vid, kind="fullVideos", state="running", phase="full", fraction=0.0, games=len(index["games"]), clips=0,
-            message="시작하는 중", cancel=cancel, only=sorted(only) if only else None,
-        )
 
-        def run() -> None:
+        def run(job: dict) -> None:
             try:
                 upgrade_vod_games(
                     path, cfg, ffmpeg_path=ffmpeg, root=base, games_dir=gdir, index=load_index(base, vid), only=only,
-                    cancel=cancel, on_progress=lambda f, m: job.update(fraction=f, message=m),
+                    cancel=job["cancel"], on_progress=lambda f, m: job.update(fraction=f, message=m),
                 )
                 job.update(state="done", fraction=1.0, message="")
                 cleanup_preview_registry.notify_clips_changed()
@@ -326,17 +360,23 @@ def register_vod_routes(
             except Exception as exc:
                 job.update(state="error", message=describe_clip_error(exc))
 
-        threading.Thread(target=run, daemon=True).start()
+        name = f"full:{vid}:{','.join(str(i) for i in sorted(only)) if only else 'all'}"
+        submit(
+            vid, "fullVideos", name, f"풀영상 만들기 ({path.name})",
+            {"phase": "full", "games": len(index["games"]), "only": sorted(only) if only else None}, run,
+        )
 
     def full_video_status(vid: str, index: int) -> dict:
-        """게임 화면의 "풀영상 만들기" 버튼이 읽는 모양(스팀 쪽과 같다): state/message/fraction."""
-        if job.get("id") == vid and job.get("kind") == "fullVideos" and (not job.get("only") or index in job["only"]):
-            state = job.get("state")
-            return {
-                "state": "error" if state in ("error", "cancelled") else state,
-                "message": job.get("message", ""), "fraction": job.get("fraction", 0.0),
-            }
-        return {"state": "idle", "message": "", "fraction": 0.0}
+        """게임 화면의 "풀영상 만들기" 버튼이 읽는 모양(스팀 쪽과 같다): state/message/fraction(+대기 중이면 position)."""
+        mine = [j for j in jobs_of(vid) if j["kind"] == "fullVideos" and (not j.get("only") or index in j["only"])]
+        if not mine:
+            return {"state": "idle", "message": "", "fraction": 0.0}
+        job = max(mine, key=lambda j: ({"running": 2, "queued": 1}.get(j["state"], 0), j["seq"]))
+        state = job["state"]
+        return {
+            "state": "error" if state in ("error", "cancelled") else state,
+            "message": "" if state == "queued" else job["message"], "fraction": job["fraction"], "position": position_of(job),
+        }
 
     def can_build(vid: str) -> bool:
         found = collect().get(vid)
@@ -349,22 +389,29 @@ def register_vod_routes(
         start_full_videos(vid)
         return {"id": vid}
 
-    def public_job() -> dict:
-        return {k: v for k, v in job.items() if k != "cancel"}
+    def public_job(job: dict) -> dict:
+        return {**{k: v for k, v in job.items() if k not in ("cancel", "seq", "queueKey")}, "position": position_of(job)}
 
     @app.get("/api/vods/{vid}/analyze")
     def analysis_status(vid: str):
-        if job.get("id") == vid:
-            return public_job()
-        return {"id": vid, "state": "idle"}
+        job = job_of(vid)
+        return public_job(job) if job is not None else {"id": vid, "state": "idle"}
 
     @app.post("/api/vods/{vid}/analyze/cancel")
     def cancel_analysis(vid: str):
-        if not running_for(vid):
+        """실행 중이면 멈추고, 대기 중이면 줄에서 뺀다(대기 중인 것이 여럿이면 모두)."""
+        running = next((j for j in jobs_of(vid) if j["state"] == "running"), None)
+        if running is not None:
+            running["cancel"].set()
+            running["message"] = "멈추는 중"
+            return {"id": vid, "cancelling": True}
+        waiting = queued_for(vid)
+        if not waiting:
             raise HTTPException(409, "분석 중이 아닙니다")
-        job["cancel"].set()
-        job["message"] = "멈추는 중"
-        return {"id": vid, "cancelling": True}
+        for job in waiting:
+            if queue.cancel(job["queueKey"]):
+                job.update(state="cancelled", message="대기를 취소했습니다")
+        return {"id": vid, "cancelling": False, "cancelledQueued": len(waiting)}
 
     def vod_clip_paths(directory: Path, vid: str) -> list:
         return [c for c in scan_clips(directory, video_roots()) if c.meta.get("vodId") == vid]
@@ -404,8 +451,8 @@ def register_vod_routes(
         게임·클립만 비워 "분석 안 함"으로 되돌리는 것과 달리, 이건 색인 자체를 지운다.
         """
         require(vid)
-        if running_for(vid):
-            raise HTTPException(409, "분석 중인 영상은 지울 수 없습니다. 먼저 분석을 취소하세요")
+        if running_for(vid) or queued_for(vid):
+            raise HTTPException(409, "분석 중이거나 분석을 기다리는 영상은 지울 수 없습니다. 먼저 분석을 취소하세요")
         with lock:
             base = root()
             clips = vod_clip_paths(base, vid)

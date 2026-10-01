@@ -88,7 +88,7 @@ def register_storage_routes(
         raw_full = str(body.get("fullVideos") or "").strip()
         if not raw_root:
             raise HTTPException(400, "저장 폴더를 지정해야 합니다")
-        if move_job["state"] == "running" or activity.registry.snapshot():
+        if move_job["state"] == "running" or activity.registry.snapshot() or app.state.analysis_queue.busy():
             raise HTTPException(409, "다른 작업을 하는 중에는 저장 위치를 바꿀 수 없습니다. 끝난 뒤 다시 시도하세요")
         cfg = current_config()
         old = resolve_paths(cfg.paths)
@@ -130,7 +130,7 @@ def register_storage_routes(
 
     @app.post("/api/storage/undo")
     def undo():
-        if move_job["state"] == "running" or activity.registry.snapshot():
+        if move_job["state"] == "running" or activity.registry.snapshot() or app.state.analysis_queue.busy():
             raise HTTPException(409, "다른 작업을 하는 중에는 되돌릴 수 없습니다")
         with lock:
             try:

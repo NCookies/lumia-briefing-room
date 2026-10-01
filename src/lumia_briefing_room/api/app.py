@@ -28,6 +28,7 @@ from lumia_briefing_room.api.export import (
     parent_of,
 )
 from lumia_briefing_room.api.admin_routes import register_admin_routes
+from lumia_briefing_room.api.analysis_queue import AnalysisQueue, enqueue, with_position
 from lumia_briefing_room.api.backfill_routes import register_backfill_routes
 from lumia_briefing_room.api.disk_routes import register_disk_routes
 from lumia_briefing_room.api.category_routes import register_category_routes
@@ -172,6 +173,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     app.state.log_dir = None
     app.state.on_recording_root_changed = None
     app.state.watch_failures = None
+    app.state.analysis_queue = AnalysisQueue(gate=lambda: not any(t["kind"] == "watch" for t in activity.registry.snapshot()))
     lock = threading.RLock()
     app.state.lock = lock
     app.state.request_count = 0
@@ -618,8 +620,6 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         clip = find_clip(_clips_dir(app), clip_id, _video_roots(app))
         if clip is None:
             raise HTTPException(404, "클립을 찾을 수 없습니다")
-        if any(j["state"] == "running" for j in jobs.values()):
-            raise HTTPException(409, "다른 게임을 분석하는 중입니다. 끝난 뒤 다시 시도하세요")
         ffmpeg = discover_ffmpeg()
         if ffmpeg is None:
             raise HTTPException(503, "ffmpeg를 찾을 수 없습니다")
@@ -630,8 +630,6 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
 
         ref = GameRef(session_name=clip.meta["sessionDir"], match_start=clip.meta["matchStartUtc"])
         key = f"{ref.session_name}|{ref.match_start}"
-        job = {"state": "running", "message": "", "clips": 0}
-        jobs[key] = job
         clips_dir = _clips_dir(app)
         resolved_paths = resolve_paths(cfg.paths)
         try:
@@ -640,7 +638,8 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         except ValueError:
             label = "게임 다시 분석 중"
 
-        def run() -> None:
+        def run(job: dict) -> None:
+            job.update(state="running")
             try:
                 with activity.registry.track("reprocess", label):
                     written = reprocess_game(
@@ -655,14 +654,14 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             except Exception as e:
                 job.update(state="error", message=f"다시 분석에 실패했습니다: {e}")
 
-        threading.Thread(target=run, daemon=True).start()
-        return {"key": key}
+        job = enqueue(app.state.analysis_queue, jobs, key, label, run, {"message": "", "clips": 0}, queue_key=f"reprocess:{key}")
+        return {"key": key, "position": with_position(app.state.analysis_queue, f"reprocess:{key}", job)["position"]}
 
     @app.get("/api/games/reprocess/{key:path}")
     def reprocess_status(key: str):
         if key not in jobs:
             raise HTTPException(404, "분석 작업을 찾을 수 없습니다")
-        return jobs[key]
+        return with_position(app.state.analysis_queue, f"reprocess:{key}", jobs[key])
 
     @app.post("/api/cleanup")
     @locked
@@ -761,7 +760,7 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
             raise HTTPException(400, "새 폴더를 지정해야 합니다")
         if move_job["state"] == "running":
             raise HTTPException(409, "이미 클립을 옮기는 중입니다")
-        if any(j["state"] == "running" for j in jobs.values()):
+        if app.state.analysis_queue.busy():
             raise HTTPException(409, "게임을 분석하는 중에는 클립을 옮길 수 없습니다. 끝난 뒤 다시 시도하세요")
         resolved = resolve_paths(current_config().paths)
         old = resolved.clips_steam if source == "steam" else resolved.clips_vod

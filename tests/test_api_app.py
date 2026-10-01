@@ -633,7 +633,7 @@ def _wait_for_job(client, key, *, tries=100):
 
     for _ in range(tries):
         body = client.get(f"/api/games/reprocess/{key}").json()
-        if body["state"] != "running":
+        if body["state"] not in ("running", "queued"):
             return body
         time.sleep(0.02)
     raise AssertionError("작업이 끝나지 않았다")
@@ -666,7 +666,7 @@ def test_reprocess_runs_in_the_background_and_reports_the_new_clip_count(client,
 
     assert resp.status_code == 202
     status = _wait_for_job(client, resp.json()["key"])
-    assert status == {"state": "done", "message": "", "clips": 2}
+    assert status == {"state": "done", "message": "", "clips": 2, "position": None}
     assert seen["ref"].session_name == "bg_1_20260921_105357"
     assert seen["ref"].match_start == "2026-09-21T10:58:21Z"
 
@@ -682,22 +682,35 @@ def test_reprocess_shows_the_reason_when_the_original_recording_is_gone(client, 
     key = client.post("/api/games/reprocess", json={"clipId": "a"}).json()["key"]
 
     assert _wait_for_job(client, key) == {
-        "state": "error", "message": "원본 녹화가 이미 삭제되어 다시 분석할 수 없습니다", "clips": 0,
+        "state": "error", "message": "원본 녹화가 이미 삭제되어 다시 분석할 수 없습니다", "clips": 0, "position": None,
     }
 
 
-def test_reprocess_allows_only_one_running_job_at_a_time(client, reprocess_env, monkeypatch):
+def test_reprocess_queues_other_games_behind_the_running_one_instead_of_rejecting(client, reprocess_env, monkeypatch):
     import threading
 
+    _write_clip(client.app.state.clips_dir_for_test, "b", sessionDir="bg_1_20260921_120000", matchStartUtc="2026-09-21T12:10:00Z")
     release = threading.Event()
-    monkeypatch.setattr(reprocess_env, "reprocess_game", lambda **kw: release.wait(5) and [])
+    order = []
+
+    def fake(**kw):
+        order.append(kw["ref"].session_name)
+        release.wait(5)
+        return []
+
+    monkeypatch.setattr(reprocess_env, "reprocess_game", fake)
     first = client.post("/api/games/reprocess", json={"clipId": "a"})
+    second = client.post("/api/games/reprocess", json={"clipId": "b"})
 
-    second = client.post("/api/games/reprocess", json={"clipId": "a"})
-
-    assert first.status_code == 202 and second.status_code == 409
+    assert first.status_code == 202 and second.status_code == 202
+    assert first.json()["position"] == 0 and second.json()["position"] == 1
+    waiting = client.get(f"/api/games/reprocess/{second.json()['key']}").json()
+    assert waiting["state"] == "queued" and waiting["position"] == 1
+    assert client.post("/api/games/reprocess", json={"clipId": "b"}).json()["position"] == 1, "같은 게임을 또 눌러도 한 번만 줄 선다"
     release.set()
     _wait_for_job(client, first.json()["key"])
+    assert _wait_for_job(client, second.json()["key"])["state"] == "done"
+    assert order == ["bg_1_20260921_105357", "bg_1_20260921_120000"]
 
 
 def test_reprocess_rejects_unknown_clip_and_missing_setup(client, reprocess_env, monkeypatch):
