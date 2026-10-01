@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { popupRows, rowState } from '../src/archive.ts'
+import { initialHighlight, popupEntries, popupRows, rowState, stepHighlight } from '../src/archive.ts'
 import type { Category } from '../src/categoriesApi.ts'
 
 const cat = (name: string, extra: Partial<Category> = {}): Category => ({
@@ -38,4 +38,24 @@ test('범위를 고친 클립은 보관됨 여부와 상관없이 다시 저장�
   assert.equal(rowState(true, true, true).resave, true)
   assert.equal(rowState(true, false, true).resave, true)
   assert.equal(rowState(false, false, true).resave, false)
+})
+
+test('보관 위치 창의 키보드 칸: 카테고리 줄 + 새 카테고리, 보관 방식이 꺼졌으면 `보관하기` 한 칸이 맨 앞', () => {
+  const rows = popupRows(cats, null)
+  assert.deepEqual(popupEntries(rows, true), [{ kind: 'row', name: rows[0].name }, { kind: 'row', name: rows[1].name }, { kind: 'row', name: rows[2].name }, { kind: 'new' }])
+  assert.deepEqual(popupEntries(rows, false), [{ kind: 'plain' }, ...rows.map((r) => ({ kind: 'row', name: r.name }))])
+})
+
+test('↑/↓ 는 끝에서 반대편으로 이어진다', () => {
+  assert.equal(stepHighlight(0, 4, 1), 1)
+  assert.equal(stepHighlight(3, 4, 1), 0)
+  assert.equal(stepHighlight(0, 4, -1), 3)
+  assert.equal(stepHighlight(0, 0, 1), 0)
+})
+
+test('처음 강조는 지금 보관된 카테고리, 없으면 첫 칸', () => {
+  const entries = popupEntries(popupRows(cats, null), true)
+  assert.equal(initialHighlight(entries, cats[1].name), 1)
+  assert.equal(initialHighlight(entries, null), 0)
+  assert.equal(initialHighlight(entries, '없는 이름'), 0)
 })

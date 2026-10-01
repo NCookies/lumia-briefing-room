@@ -36,3 +36,21 @@ export interface RowState {
 export function rowState(hasClip: boolean, archived: boolean, modified: boolean): RowState {
   return { bookmark: hasClip && archived ? 'archived' : 'none', resave: hasClip && modified, deletable: hasClip }
 }
+
+export type PopupEntry = { kind: 'plain' } | { kind: 'row'; name: string } | { kind: 'new' }
+
+/** 키보드로 오갈 수 있는 칸들(화면 위에서 아래 순서). 카테고리를 쓰지 않는 방식이면 `보관하기` 한 칸이 앞에 오고 `+ 새 카테고리` 는 없다. */
+export function popupEntries(rows: PopupRow[], categoriesEnabled: boolean): PopupEntry[] {
+  const list: PopupEntry[] = rows.map((r) => ({ kind: 'row', name: r.name }))
+  return categoriesEnabled ? [...list, { kind: 'new' }] : [{ kind: 'plain' }, ...list]
+}
+
+export function stepHighlight(index: number, count: number, direction: 1 | -1): number {
+  if (count <= 0) return 0
+  return (index + direction + count) % count
+}
+
+export function initialHighlight(entries: PopupEntry[], current: string | null): number {
+  const at = entries.findIndex((e) => e.kind === 'row' && e.name === current)
+  return at < 0 ? 0 : at
+}
