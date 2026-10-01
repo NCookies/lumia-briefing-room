@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { dayAnchorId, dayId } from '../dayFold'
 import { groupByDay } from '../gameDays'
 import type { GameSummary } from '../games'
@@ -9,6 +9,7 @@ import { formatBytes } from '../retention'
 import { useCleanupPreview } from '../useCleanupPreview'
 import { useStorageUsage } from '../useStorageUsage'
 import { useListScroll } from '../useListScroll'
+import { returnedToList } from '../listLoad'
 import type { GameNav } from '../useRoute'
 import { useDayFold } from '../useDayFold'
 import { useGameDelete } from '../useGameDelete'
@@ -128,6 +129,12 @@ export function GameList({
   useEffect(() => {
     if (active) load()
   }, [active, load, refreshTick])
+
+  const prevOpen = useRef(open)
+  useEffect(() => {
+    if (returnedToList(prevOpen.current, open)) load()
+    prevOpen.current = open
+  }, [open, load])
 
   if (open) {
     const summary = games?.find((g) => g.key === open)

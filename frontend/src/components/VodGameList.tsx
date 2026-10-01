@@ -11,6 +11,7 @@ import { formatBytes } from '../retention'
 import { useCleanupPreview } from '../useCleanupPreview'
 import { useStorageUsage } from '../useStorageUsage'
 import { useListScroll } from '../useListScroll'
+import { gameCountLabel, listLoading, returnedToList } from '../listLoad'
 import type { GameNav } from '../useRoute'
 import { useDayFold } from '../useDayFold'
 import {
@@ -88,9 +89,10 @@ export function VodGameList({
   const dueCount = useMemo(() => onlyDueGames(games ?? [], cleanup, true).length, [games, cleanup])
 
   const groups = useMemo(() => {
+    if (games === null) return []
     const all = groupGamesByVod(vods, shown)
     return dueOnly ? all.filter((g) => g.games.length > 0) : all
-  }, [vods, shown, dueOnly])
+  }, [vods, games, shown, dueOnly])
   const dateGroups = useMemo(() => groupVodsByDate(groups, 'desc'), [groups])
   const days = useMemo(() => dateGroups.map((d) => d.day), [dateGroups])
   const fold = useDayFold('vod', days)
@@ -117,6 +119,12 @@ export function VodGameList({
   useEffect(() => {
     if (active) reload()
   }, [active, reload])
+
+  const prevOpen = useRef(open)
+  useEffect(() => {
+    if (returnedToList(prevOpen.current, open)) reloadGames()
+    prevOpen.current = open
+  }, [open, reloadGames])
 
   const handledTick = useRef(refreshTick)
   useEffect(() => {
@@ -323,14 +331,15 @@ export function VodGameList({
 
   const allGames = games ?? []
   const total = vodTotals(allGames)
-  const empty = vodsLoaded && games !== null && groups.length === 0 && !dueOnly
+  const loading = listLoading({ vodsLoaded, gamesLoaded: games !== null, failed: error !== null })
+  const empty = !loading && games !== null && groups.length === 0 && !dueOnly
 
   return (
     <div className="flex flex-1 flex-col gap-2 p-4">
       <div className="flex flex-wrap items-baseline gap-3 text-sm text-zinc-300">
-        <span>게임 {dueOnly ? `${shown.length} / ${allGames.length}` : total.games}개</span>
-        <StorageUsageBar totals={storage} tabBytes={total.bytes} />
-        {!(storage && storage.autoCleanEnabled && storage.limitGb) && (
+        <span>{gameCountLabel({ loaded: games !== null, total: total.games, shown: shown.length, dueOnly })}</span>
+        {games !== null && <StorageUsageBar totals={storage} tabBytes={total.bytes} />}
+        {games !== null && !(storage && storage.autoCleanEnabled && storage.limitGb) && (
           <span className="text-xs text-zinc-500">풀영상 {formatBytes(total.bytes)}</span>
         )}
         {days.length > 0 && (
@@ -365,7 +374,7 @@ export function VodGameList({
         </button>
       </div>
 
-      {(!vodsLoaded || games === null) && !error && <LoadingBar label="영상 파일 목록을 불러오는 중입니다…" />}
+      {loading && <LoadingBar label="영상 파일 목록을 불러오는 중입니다…" />}
       {vodsLoaded && probe.active && (
         <div className="rounded border border-zinc-700 bg-zinc-800/60 p-3">
           <LoadingBar
