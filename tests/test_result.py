@@ -61,6 +61,11 @@ def test_parse_panel_rejects_placement_larger_than_total():
     assert parse_panel([line("9/7", 40), line("실험 종료", 220)]) is None
 
 
+def test_parse_panel_rejects_a_lone_fraction_from_another_screen():
+    assert parse_panel([line("크루스더킨글린트", 10), line("+", 30), line("4/9", 40)]) is None
+    assert parse_panel([line("6/9", 40), line("슈", 60, 0.99)]) is None
+
+
 def test_clean_nickname_strips_bar_prefix_but_keeps_cjk_and_latin():
     assert clean_nickname("|내테스트닉") == "내테스트닉"
     assert clean_nickname("{ TeamMateB ") == "TeamMateB"

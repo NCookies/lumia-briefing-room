@@ -102,11 +102,14 @@ def _parse_after(placement: int | None, total: int | None, rest: list[TextLine],
     )
 
 
+def _read_stats(parsed: PanelParse) -> int:
+    return sum(v is not None for v in (parsed.stats or {}).values())
+
+
 def _parse_without_placement(ordered: list[TextLine]) -> PanelParse | None:
     """순위(`N/M`)가 안 읽힌 결과 화면. 닉네임 줄과 스탯이 함께 읽힐 때만 결과 화면으로 본다(순위 없이 넓게 받으면 오탐이 는다)."""
     parsed = _parse_after(None, None, ordered, ordered)
-    read_stats = sum(v is not None for v in (parsed.stats or {}).values())
-    if parsed.nickname_line is None or read_stats < MIN_STATS_WITHOUT_PLACEMENT:
+    if parsed.nickname_line is None or _read_stats(parsed) < MIN_STATS_WITHOUT_PLACEMENT:
         return None
     return parsed
 
@@ -115,6 +118,7 @@ def parse_panel(lines: list[TextLine]) -> PanelParse | None:
     """결과 화면 좌측 패널의 OCR 줄들에서 순위·결과 문구·닉네임 줄을 골라낸다.
 
     글자 위치가 아니라 순서로 찾는다: 순위(`N/M`) 뒤 막대(`|`)로 시작하는 줄이 닉네임이고, 그 바로 위 한글 줄이 결과 문구다.
+    `N/M` 하나만으로는 결과 화면으로 보지 않는다 - 방송 화면의 다른 게임 글자(`4/9` 등)가 결과로 저장됐다(2026-10-01 치지직).
     모드 칩(`랭크 대전`)이 패널 OCR 에 읽히는 프레임이 있어 문구는 닉네임에 가장 가까운 줄로 잡는다.
     순위가 안 읽히면(글꼴의 일부 숫자를 OCR 이 못 읽는다) 순위만 비우고 나머지를 돌려준다.
     """
@@ -126,7 +130,10 @@ def parse_panel(lines: list[TextLine]) -> PanelParse | None:
         placement, total = int(m.group(1)), int(m.group(2))
         if not 1 <= placement <= total:
             break
-        return _parse_after(placement, total, ordered[i + 1 :], ordered)
+        parsed = _parse_after(placement, total, ordered[i + 1 :], ordered)
+        if parsed.outcome is None and parsed.nickname_line is None and _read_stats(parsed) < MIN_STATS_WITHOUT_PLACEMENT:
+            break
+        return parsed
     return _parse_without_placement(ordered)
 
 
