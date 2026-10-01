@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from lumia_briefing_room import activity
-from lumia_briefing_room.api.clips import find_clip
+from lumia_briefing_room.api.clips import find_clip, find_clips
 from lumia_briefing_room.pipeline.recording_stop import error_of_record, stopped_of_record
 from lumia_briefing_room.pipeline import categories as cats
 from lumia_briefing_room.pipeline import deleted_games
@@ -222,8 +222,7 @@ def register_game_routes(
                 and can_rebuild(g, games_dir(g["gameKey"]), recording_root)
             )
 
-        for g in games:
-            self_saved_category(g)
+        self_saved_categories(games)
         return {"games": [_summary(g, games_dir(g["gameKey"]), can_rebuild_full=rebuildable(g)) for g in games]}
 
     @app.get("/api/games/{key}")
@@ -250,28 +249,39 @@ def register_game_routes(
         clip = find_clip(clips_dir_for(game), clip_id, resolve_paths(cfg.paths).clip_roots)
         return cats.category_of(cfg, clip.video) if clip is not None else None
 
-    def self_saved_category(game: dict) -> None:
+    def self_saved_categories(games: list[dict]) -> None:
         """클립이 있는 후보마다 지금 어느 카테고리에 있는지(`user.savedCategory`), **보관됨 여부(`user.archived`)**, 클립 메모(`user.savedMemo`)를 붙인다(저장하지 않는 계산 값).
 
-        보관됨 = 자동 보관이 아닌 카테고리에 있는 클립. `자동 보관` 의 클립은 클립 파일은 있어도 어디에도 속하지 않은 것으로 본다(옛 경로 모드는 카테고리가 없어 클립이 있으면 보관됨)."""
+        보관됨 = 자동 보관이 아닌 카테고리에 있는 클립. `자동 보관` 의 클립은 클립 파일은 있어도 어디에도 속하지 않은 것으로 본다(옛 경로 모드는 카테고리가 없어 클립이 있으면 보관됨).
+        클립 영상 찾기는 폴더 전체를 훑으므로 클립마다 하지 않고 요청 하나에 한 번만 한다(게임 27개·클립 261개에서 8초 → 1초 미만)."""
         cfg = current_config()
         roots = resolve_paths(cfg.paths).clip_roots
-        for cand in gcand.all_candidates(game):
-            user = cand.get("user") or {}
-            if not user.get("savedClipId"):
-                continue
-            clip = find_clip(clips_dir_for(game), user["savedClipId"], roots)
-            if clip is None:
-                continue
-            extra: dict = {}
-            name = cats.category_of(cfg, clip.video) if cats.enabled(cfg) else None
-            if name:
-                extra["savedCategory"] = name
-            extra["archived"] = cats.is_user_archived(cfg, clip.video)
-            if isinstance(clip.meta.get("memo"), str) and clip.meta["memo"]:
-                extra["savedMemo"] = clip.meta["memo"]
-            if extra:
-                cand["user"] = {**user, **extra}
+        wanted: dict[Path, list[str]] = {}
+        for game in games:
+            for cand in gcand.all_candidates(game):
+                clip_id = (cand.get("user") or {}).get("savedClipId")
+                if clip_id:
+                    wanted.setdefault(clips_dir_for(game), []).append(clip_id)
+        found = {meta_dir: find_clips(meta_dir, ids, roots) for meta_dir, ids in wanted.items()}
+        for game in games:
+            clips = found.get(clips_dir_for(game), {})
+            for cand in gcand.all_candidates(game):
+                user = cand.get("user") or {}
+                clip = clips.get(user.get("savedClipId") or "")
+                if clip is None:
+                    continue
+                extra: dict = {}
+                name = cats.category_of(cfg, clip.video) if cats.enabled(cfg) else None
+                if name:
+                    extra["savedCategory"] = name
+                extra["archived"] = cats.is_user_archived(cfg, clip.video)
+                if isinstance(clip.meta.get("memo"), str) and clip.meta["memo"]:
+                    extra["savedMemo"] = clip.meta["memo"]
+                if extra:
+                    cand["user"] = {**user, **extra}
+
+    def self_saved_category(game: dict) -> None:
+        self_saved_categories([game])
 
     rebuild_jobs: dict[str, dict] = {}
     queue = app.state.analysis_queue

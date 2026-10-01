@@ -305,3 +305,19 @@ def test_a_game_recorded_before_the_steam_recording_stopped_is_flagged_with_the_
 def test_a_normal_game_is_not_flagged(client):
     (row,) = client.get("/api/games").json()["games"]
     assert row["recordingStopped"] is None
+
+
+def test_list_resolves_saved_clip_videos_in_one_pass(client, monkeypatch):
+    from lumia_briefing_room.api import clips as clips_api
+
+    for cid in (f"{KEY}_01", f"{KEY}_02"):
+        client.post(f"/api/games/{KEY}/candidates/{cid}/save")
+    calls = []
+    real = clips_api.link_all
+    monkeypatch.setattr(clips_api, "link_all", lambda *a, **kw: (calls.append(1), real(*a, **kw))[1])
+    (game,) = client.get("/api/games").json()["games"]
+    assert game["savedClipCount"] == 2
+    assert len(calls) == 1, "클립마다 클립 폴더를 다시 훑으면 게임·클립이 늘수록 목록이 느려진다"
+    detail = client.get(f"/api/games/{KEY}").json()
+    assert all(c["user"].get("savedClipId") for c in detail["candidates"])
+    assert len(calls) == 2

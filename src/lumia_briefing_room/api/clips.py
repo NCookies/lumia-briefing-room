@@ -101,6 +101,40 @@ def find_clip(meta_dir: Path, clip_id: str, video_roots: Iterable[Path] = ()) ->
     return replace(clip, id=clip_id)
 
 
+def find_clips(meta_dir: Path, clip_ids: Iterable[str], video_roots: Iterable[Path] = ()) -> dict[str, ClipSummary]:
+    """`find_clip` 을 여러 ID 에 한 번에: 영상 잇기(`link_all`, 영상 폴더 전체를 훑는다)를 ID 마다 되풀이하지 않고 한 번만 한다. 못 찾은 ID 는 빠진다."""
+    metas: dict[str, tuple[Path, dict]] = {}
+    for clip_id in dict.fromkeys(clip_ids):
+        base_id = clip_id.partition("~")[0]
+        if base_id in metas:
+            continue
+        meta_path = meta_dir / f"{base_id}.json"
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(meta, dict):
+            metas[base_id] = (meta_path, meta)
+    if not metas:
+        return {}
+    links = link_all([(meta_dir, [(base, meta) for base, (_, meta) in metas.items()])], tuple(video_roots))
+    extras = {extra_id: video for _, extra_id, _, video in links.extras}
+    found: dict[str, ClipSummary] = {}
+    for clip_id in dict.fromkeys(clip_ids):
+        base_id = clip_id.partition("~")[0]
+        if base_id not in metas:
+            continue
+        meta_path, meta = metas[base_id]
+        video = extras.get(clip_id) if "~" in clip_id else links.primary.get((meta_dir, base_id))
+        if video is None and "~" in clip_id:
+            continue
+        try:
+            found[clip_id] = replace(_summary(meta_path, meta, video), id=clip_id)
+        except OSError:
+            continue
+    return found
+
+
 def to_summary_dict(clip: ClipSummary) -> dict:
     """pipeline/retention.py::select_for_auto_clean() 이 요구하는 _created_at/_size_bytes 를 채운다."""
     return {**clip.meta, "_created_at": clip.created_at, "_size_bytes": clip.size_bytes}
