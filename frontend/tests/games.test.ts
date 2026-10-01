@@ -116,3 +116,10 @@ test('a game without a recording because steam recording stopped says so', () =>
   assert.equal(recordingStopLabel(null), null)
   assert.equal(recordingStopLabel(undefined), null)
 })
+
+test('game row shows candidates and archived clips separately so a manual-mode game is not "0 clips"', async () => {
+  const { clipCountsLabel } = await import('../src/games.ts')
+  assert.equal(clipCountsLabel({ candidateCount: 7, savedClipCount: 0 }), '후보 7 · 보관 0')
+  assert.equal(clipCountsLabel({ candidateCount: 13, savedClipCount: 13 }), '후보 13 · 보관 13')
+  assert.equal(clipCountsLabel({ candidateCount: 0, savedClipCount: 2 }), '후보 0 · 보관 2')
+})

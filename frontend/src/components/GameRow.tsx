@@ -1,5 +1,5 @@
 import { cleanupReasonLabel, cleanupReasonTooltip, preserveLabel, type CleanupPreviewEntry } from '../cleanupPreview'
-import { gameHeadline, matchTypeLabel, recordingStopLabel, type GameSummary } from '../games'
+import { clipCountsLabel, gameHeadline, matchTypeLabel, recordingStopLabel, type GameSummary } from '../games'
 import { gameAssetUrl } from '../gamesApi'
 import { formatBytes } from '../retention'
 import { GameMenu, type GameMenuItem } from './GameMenu'
@@ -115,7 +115,9 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, menu }: Pr
             {rebuild.label}
           </button>
         )}
-        <span className="text-xs text-zinc-300">클립 {g.savedClipCount}개</span>
+        <span className="text-xs text-zinc-300" title="후보: 앱이 찾은 교전 후보(무시한 것 제외) · 보관: 클립으로 만든 것(자동 보관 포함)">
+          {clipCountsLabel(g)}
+        </span>
         <span className="text-xs text-zinc-500">
           {g.legacy && !g.hasFullVideo
             ? ''

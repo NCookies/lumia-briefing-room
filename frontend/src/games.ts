@@ -168,6 +168,11 @@ export function dragRange(
   return [moved, moved + length]
 }
 
+/** 게임 행의 개수 표시. "클립 N개"만 두면 직접 보관 모드에서 후보가 잔뜩 있어도 0개로 보여 헷갈렸다(2026-10-01). */
+export function clipCountsLabel(g: Pick<GameSummary, 'candidateCount' | 'savedClipCount'>): string {
+  return `후보 ${g.candidateCount} · 보관 ${g.savedClipCount}`
+}
+
 export function formatClock(sec: number): string {
   const total = Math.max(0, Math.floor(sec))
   const h = Math.floor(total / 3600)
