@@ -8,6 +8,7 @@ import { FolderPicker } from './FolderPicker'
 interface Props {
   variant?: 'options' | 'firstRun'
   onChanged?: () => void
+  forced?: boolean
 }
 
 type Mode = 'view' | 'pickRoot' | 'confirmRoot' | 'pickFull' | 'confirmFull' | 'confirmUndo'
@@ -15,9 +16,9 @@ type Mode = 'view' | 'pickRoot' | 'confirmRoot' | 'pickFull' | 'confirmFull' | '
 const BTN = 'rounded-md border border-zinc-600/70 px-3 py-1 text-sm transition hover:bg-zinc-700 disabled:opacity-40'
 const PRIMARY = 'rounded-md bg-sky-600 px-4 py-1.5 text-sm transition hover:bg-sky-500 disabled:opacity-40'
 
-export function StorageSection({ variant = 'options', onChanged }: Props) {
+export function StorageSection({ variant = 'options', onChanged, forced = false }: Props) {
   const [info, setInfo] = useState<StorageInfo | null>(null)
-  const [mode, setMode] = useState<Mode>('view')
+  const [mode, setMode] = useState<Mode>(forced ? 'pickRoot' : 'view')
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [fraction, setFraction] = useState(0)
@@ -30,6 +31,12 @@ export function StorageSection({ variant = 'options', onChanged }: Props) {
   }, [])
 
   useEffect(load, [load])
+
+  useEffect(() => {
+    if (forced && info?.layout === 'legacy') {
+      setDraft((d) => d || (info.suggestedRoot ?? suggestedRootFromLegacy(info.legacy.clips)))
+    }
+  }, [forced, info])
 
   if (!info) return <p className="text-sm text-zinc-500">{status ?? '저장 위치를 불러오는 중…'}</p>
 
@@ -121,8 +128,7 @@ export function StorageSection({ variant = 'options', onChanged }: Props) {
       ) : (
         <>
           <p className="text-xs text-zinc-500">
-            이전 버전에서 쓰던 폴더를 그대로 쓰는 중입니다. 저장 폴더 하나로 정리하면 클립과 풀영상이 그 안의 폴더로 나뉩니다. 옮기기는 원할 때만
-            하면 되고, 옮기지 않아도 모든 기능이 그대로 동작합니다.
+            이전 버전에서 쓰던 폴더입니다. 저장 폴더 하나로 정리하면 클립과 풀영상이 그 안의 폴더로 나뉩니다.
           </p>
           <ul className="flex flex-col gap-1 rounded-lg border border-zinc-700/60 bg-zinc-900/60 p-2 text-xs text-zinc-400">
             <li>스팀 녹화 클립: <span className="font-mono text-zinc-300">{info.legacy.clips}</span></li>
@@ -132,7 +138,7 @@ export function StorageSection({ variant = 'options', onChanged }: Props) {
           {mode === 'view' && (
             <div>
               <button type="button" className={BTN} onClick={startPickRoot}>
-                새 구조로 옮기기…
+                {forced ? '다시 고르기' : '새 구조로 옮기기…'}
               </button>
             </div>
           )}

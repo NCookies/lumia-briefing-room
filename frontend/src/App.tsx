@@ -5,6 +5,7 @@ import { BackfillDialog } from './components/BackfillDialog'
 import { ClipArchive } from './components/ClipArchive'
 import { GuideDialog } from './components/GuideDialog'
 import { FirstRunScreen } from './components/FirstRunScreen'
+import { LegacyStorageGate } from './components/LegacyStorageGate'
 import { GameList } from './components/GameList'
 import { SettingsModal } from './components/SettingsModal'
 import { VodGameList } from './components/VodGameList'
@@ -159,6 +160,7 @@ export default function App() {
           }}
         />
       )}
+      {!firstRun && <LegacyStorageGate key={browserKey} onMoved={() => setBrowserKey((k) => k + 1)} />}
       <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900/60 px-4 py-2.5">
         <div className="flex items-center gap-6">
           <h1 className="text-xl font-semibold">
