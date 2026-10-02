@@ -95,7 +95,7 @@ export function VodGameList({
   const queryRef = useRef('')
   const reloadGames = useCallback(() => {
     const seq = ++loadSeq.current
-    getGames('vod', queryRef.current)
+    return getGames('vod', queryRef.current)
       .then((list) => seq === loadSeq.current && setGames(list))
       .catch((e: Error) => setError(e.message))
   }, [])
@@ -118,7 +118,7 @@ export function VodGameList({
   const collapsedDays = visibleCollapsed(fold.collapsed, searching)
 
   const reloadVods = useCallback(() => {
-    listVods()
+    return listVods()
       .then(setVods)
       .catch((e: Error) => setError(e.message))
       .finally(() => setVodsLoaded(true))
@@ -126,9 +126,14 @@ export function VodGameList({
 
   const reload = useCallback(() => {
     setError(null)
-    reloadVods()
-    reloadGames()
+    return Promise.all([reloadVods(), reloadGames()])
   }, [reloadVods, reloadGames])
+
+  const [refreshing, setRefreshing] = useState(false)
+  const refresh = useCallback(() => {
+    setRefreshing(true)
+    reload().finally(() => setRefreshing(false))
+  }, [reload])
 
   useEffect(() => {
     if (active) reload()
@@ -379,11 +384,12 @@ export function VodGameList({
         <DueOnlyToggle checked={dueOnly} count={dueCount} onChange={setDueOnly} />
         <button
           type="button"
-          className="rounded-md border border-zinc-600/70 px-3 py-1.5 text-sm text-zinc-200 transition hover:bg-zinc-700"
+          className="rounded-md border border-zinc-600/70 px-3 py-1.5 text-sm text-zinc-200 transition hover:bg-zinc-700 disabled:opacity-40"
           title="영상 파일 목록과 분석 결과를 다시 읽습니다"
-          onClick={reload}
+          disabled={refreshing}
+          onClick={refresh}
         >
-          새로고침
+          {refreshing ? '읽는 중…' : '새로고침'}
         </button>
         <div className="ml-auto"><SearchBox value={search.query} onChange={search.setQuery} label="게임 검색" placeholder="게임·후보·메모·영상 검색" /></div>
       </div>

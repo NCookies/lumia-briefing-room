@@ -9,7 +9,7 @@ export function DueOnlyToggle({ checked, count, onChange }: Props) {
   return (
     <button
       type="button"
-      className={`rounded-md border px-2 py-0.5 text-xs disabled:opacity-40 ${
+      className={`rounded-md border px-3 py-1.5 text-sm disabled:opacity-40 ${
         checked ? 'border-rose-500 bg-rose-500/20 text-rose-200' : 'border-zinc-600/70 transition hover:bg-zinc-700'
       }`}
       disabled={!checked && count === 0}
