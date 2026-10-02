@@ -375,9 +375,9 @@ def test_search_by_clip_title_that_differs_from_the_candidate(client):
     assert game["match"] == {"where": "클립", "text": "역전극"}
 
 
-def test_search_by_streamer_and_video_name_for_vod_games(client):
+def test_search_by_video_name_for_vod_games(client):
     path = client.tmp / "games" / KEY / "game.json"
     data = json.loads(path.read_text(encoding="utf-8"))
     path.write_text(json.dumps({**data, "streamer": "홍길동", "vodFile": "D:/방송/Day3 Stream.mp4"}), encoding="utf-8")
-    assert _titles(client, "홍길")[0]["match"] == {"where": "스트리머", "text": "홍길동"}
+    assert _titles(client, "홍길") == []  # 스트리머 이름은 검색 대상이 아니다
     assert _titles(client, "day3stream")[0]["match"] == {"where": "영상 이름", "text": "Day3 Stream.mp4"}

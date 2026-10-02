@@ -85,6 +85,10 @@ export function GameList({
   }, [])
   const search = useSearch(active, load)
   queryRef.current = search.applied
+  const [fullBytes, setFullBytes] = useState(0)
+  useEffect(() => {
+    if (games && !search.applied) setFullBytes(games.reduce((sum, g) => sum + (g.fullVideoSizeBytes ?? 0), 0))
+  }, [games, search.applied])
   const collapsedDays = visibleCollapsed(fold.collapsed, search.searching)
   const [viewerTick, setViewerTick] = useState(0)
   const jobs = useGameJobs(
@@ -159,22 +163,19 @@ export function GameList({
 
   if (!games) return <p className="p-4 text-sm text-zinc-400">{error ?? '불러오는 중…'}</p>
 
-  const total = games.reduce((sum, g) => sum + (g.fullVideoSizeBytes ?? 0), 0)
-
   return (
     <div className="flex flex-1 flex-col gap-2 p-4">
-      <div className="flex items-baseline gap-3 text-sm text-zinc-300">
+      <div className="flex items-center gap-3 text-base text-zinc-200">
         <span>{gameCountLabel({ loaded: true, total: games.length, shown: shown.length, dueOnly, searching: search.searching })}</span>
-        <SearchBox value={search.query} onChange={search.setQuery} label="게임 검색" placeholder="게임·후보·클립·메모 검색" />
-        {!search.searching && <StorageUsageBar totals={storage} tabBytes={total} />}
-        {!search.searching && !(storage && storage.autoCleanEnabled && storage.limitGb) && (
-          <span className="text-xs text-zinc-500">풀영상 {formatBytes(total)}</span>
+        <StorageUsageBar totals={storage} tabBytes={fullBytes} />
+        {!(storage && storage.autoCleanEnabled && storage.limitGb) && (
+          <span className="text-sm text-zinc-400">풀영상 {formatBytes(fullBytes)}</span>
         )}
         {games.length > 0 && (
           <>
             <button
               type="button"
-              className="rounded-md border border-zinc-600/70 px-2 py-0.5 text-xs transition hover:bg-zinc-700 disabled:opacity-40"
+              className="rounded-md border border-zinc-600/70 px-3 py-1.5 text-sm transition hover:bg-zinc-700 disabled:opacity-40"
               disabled={search.searching || fold.collapsed.size === 0}
               onClick={fold.expandAll}
             >
@@ -182,7 +183,7 @@ export function GameList({
             </button>
             <button
               type="button"
-              className="rounded-md border border-zinc-600/70 px-2 py-0.5 text-xs transition hover:bg-zinc-700 disabled:opacity-40"
+              className="rounded-md border border-zinc-600/70 px-3 py-1.5 text-sm transition hover:bg-zinc-700 disabled:opacity-40"
               disabled={search.searching || fold.allCollapsed}
               onClick={fold.collapseAll}
             >
@@ -193,12 +194,13 @@ export function GameList({
         <DueOnlyToggle checked={dueOnly} count={dueCount} onChange={setDueOnly} />
         <button
           type="button"
-          className="ml-auto rounded-md border border-zinc-600/70 px-2 py-1 text-xs text-zinc-300 transition hover:bg-zinc-700"
+          className="rounded-md border border-zinc-600/70 px-3 py-1.5 text-sm text-zinc-200 transition hover:bg-zinc-700"
           title="게임 로그에 남지 않은 과거 녹화에서 게임을 찾아 만듭니다"
           onClick={onBackfill}
         >
           {backfillLabel}
         </button>
+        <div className="ml-auto"><SearchBox value={search.query} onChange={search.setQuery} label="게임 검색" placeholder="게임·후보·클립·메모 검색" /></div>
       </div>
       {dueOnly && shown.length === 0 && <p className="text-sm text-zinc-500">삭제 예정인 게임이 없습니다.</p>}
       {games.length === 0 && search.searching && <p className="text-sm text-zinc-500">검색에 맞는 게임이 없습니다.</p>}

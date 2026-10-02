@@ -111,6 +111,10 @@ export function VodGameList({
   const dateGroups = useMemo(() => groupVodsByDate(groups, 'desc'), [groups])
   const days = useMemo(() => dateGroups.map((d) => d.day), [dateGroups])
   const fold = useDayFold('vod', days)
+  const [fullBytes, setFullBytes] = useState(0)
+  useEffect(() => {
+    if (games && !search.applied) setFullBytes(vodTotals(games).bytes)
+  }, [games, search.applied])
   const collapsedDays = visibleCollapsed(fold.collapsed, searching)
 
   const reloadVods = useCallback(() => {
@@ -346,18 +350,17 @@ export function VodGameList({
 
   return (
     <div className="flex flex-1 flex-col gap-2 p-4">
-      <div className="flex flex-wrap items-baseline gap-3 text-sm text-zinc-300">
+      <div className="flex flex-wrap items-center gap-3 text-base text-zinc-200">
         <span>{gameCountLabel({ loaded: games !== null, total: total.games, shown: shown.length, dueOnly, searching })}</span>
-        <SearchBox value={search.query} onChange={search.setQuery} label="게임 검색" placeholder="게임·후보·메모·영상·스트리머 검색" />
-        {games !== null && !searching && <StorageUsageBar totals={storage} tabBytes={total.bytes} />}
-        {games !== null && !searching && !(storage && storage.autoCleanEnabled && storage.limitGb) && (
-          <span className="text-xs text-zinc-500">풀영상 {formatBytes(total.bytes)}</span>
+        {games !== null && <StorageUsageBar totals={storage} tabBytes={fullBytes} />}
+        {games !== null && !(storage && storage.autoCleanEnabled && storage.limitGb) && (
+          <span className="text-sm text-zinc-400">풀영상 {formatBytes(fullBytes)}</span>
         )}
         {days.length > 0 && (
           <>
             <button
               type="button"
-              className="rounded-md border border-zinc-600/70 px-2 py-0.5 text-xs transition hover:bg-zinc-700 disabled:opacity-40"
+              className="rounded-md border border-zinc-600/70 px-3 py-1.5 text-sm transition hover:bg-zinc-700 disabled:opacity-40"
               disabled={searching || fold.collapsed.size === 0}
               onClick={fold.expandAll}
             >
@@ -365,7 +368,7 @@ export function VodGameList({
             </button>
             <button
               type="button"
-              className="rounded-md border border-zinc-600/70 px-2 py-0.5 text-xs transition hover:bg-zinc-700 disabled:opacity-40"
+              className="rounded-md border border-zinc-600/70 px-3 py-1.5 text-sm transition hover:bg-zinc-700 disabled:opacity-40"
               disabled={searching || fold.allCollapsed}
               onClick={fold.collapseAll}
             >
@@ -376,12 +379,13 @@ export function VodGameList({
         <DueOnlyToggle checked={dueOnly} count={dueCount} onChange={setDueOnly} />
         <button
           type="button"
-          className="ml-auto rounded-md border border-zinc-600/70 px-2 py-1 text-xs text-zinc-300 transition hover:bg-zinc-700"
+          className="rounded-md border border-zinc-600/70 px-3 py-1.5 text-sm text-zinc-200 transition hover:bg-zinc-700"
           title="영상 파일 목록과 분석 결과를 다시 읽습니다"
           onClick={reload}
         >
           새로고침
         </button>
+        <div className="ml-auto"><SearchBox value={search.query} onChange={search.setQuery} label="게임 검색" placeholder="게임·후보·메모·영상 검색" /></div>
       </div>
 
       {loading && <LoadingBar label="영상 파일 목록을 불러오는 중입니다…" />}

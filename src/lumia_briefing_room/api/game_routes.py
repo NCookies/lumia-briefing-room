@@ -135,7 +135,7 @@ def _summary(game: dict, games_dir: Path, *, can_rebuild_full: bool = False) -> 
 
 
 def game_match(game: dict, needle: str) -> dict | None:
-    """게임이 검색어에 맞는 첫 칸. 순서 = 게임 제목, 후보(고친 제목 우선, 지운 후보 제외), 클립 제목(후보 제목과 다를 때), 클립 메모, 영상 이름, 스트리머."""
+    """게임이 검색어에 맞는 첫 칸. 순서 = 게임 제목, 후보(고친 제목 우선, 지운 후보 제외), 클립 제목(후보 제목과 다를 때), 클립 메모, 영상 이름."""
     fields: list[tuple[str, str | None]] = [("게임 제목", game.get("title"))]
     cands = [c for c in gcand.all_candidates(game) if not (c.get("user") or {}).get("dismissed")]
     fields += [("후보", gcand.effective_title(c)) for c in cands]
@@ -145,7 +145,6 @@ def game_match(game: dict, needle: str) -> dict | None:
             fields.append(("클립", user["savedTitle"]))
     fields += [("메모", (c.get("user") or {}).get("savedMemo")) for c in cands]
     fields.append(("영상 이름", Path(game["vodFile"]).name if game.get("vodFile") else None))
-    fields.append(("스트리머", game.get("streamer")))
     return first_match(needle, fields)
 
 
