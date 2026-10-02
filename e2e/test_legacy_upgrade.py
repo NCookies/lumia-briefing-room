@@ -96,3 +96,89 @@ def test_U05_old_video_without_the_original_still_lists_games_and_plays_clips(le
     expect(page.get_by_text("방송B 옛 클립 1").first).to_be_visible()
     page.get_by_text("방송B 옛 클립 2").first.click()
     page.wait_for_function(PLAYING, timeout=SLOW)
+
+
+def open_storage_settings(page, server):
+    page.goto(server.url + "/#/clips")
+    page.get_by_test_id("legacy-layout-notice").get_by_role("button", name="저장 폴더 설정 열기").click()
+
+
+def pick_folder_as(page, path):
+    """윈도우 폴더 선택 창 대신 정해 둔 폴더를 돌려준다(서버의 /api/fs/pick-folder 응답만 바꾼다)."""
+    page.route("**/api/fs/pick-folder", lambda route: route.fulfill(json={"path": str(path)}))
+
+
+def test_U06_move_to_the_new_structure_keeps_games_and_clips_and_can_be_undone(legacy_world, launch, page, tmp_path, shot):
+    world = legacy_world
+    world.add_legacy_steam_clips(STEAM_KEY, count=2)
+    server = launch()
+    target = tmp_path / "new_storage"
+    open_storage_settings(page, server)
+    pick_folder_as(page, target)
+    page.get_by_role("button", name=re.compile("새 구조로 옮기기")).click()
+    page.get_by_role("button", name="폴더 선택…").click()
+    page.get_by_role("button", name="이 폴더로 지정").click()
+    shot("move_confirm")
+    page.get_by_role("button", name="옮기기", exact=True).click()
+    expect(page.get_by_text("새 저장 폴더로 옮겼습니다.")).to_be_visible(timeout=60000)
+    shot("move_done")
+    moved = sorted(p.name for p in (target / "clips" / "자동 보관").glob("*.mp4"))
+    assert moved == [f"{STEAM_KEY}_01.mp4", f"{STEAM_KEY}_02.mp4"], "옛 클립이 clips\자동 보관 으로 옮겨져야 한다"
+    assert not list(world.old_clips.glob("*.mp4")), "옛 클립 폴더에는 영상이 남지 않아야 한다"
+    page.keyboard.press("Escape")
+    page.goto(server.url + "/#/steam")
+    page.reload()
+    row = page.locator(f'[data-game="{STEAM_KEY}"]')
+    expect(row).to_be_visible()
+    page.get_by_role("tab", name="클립").click()
+    expect(page.get_by_test_id("legacy-layout-notice")).to_have_count(0)
+    expect(page.get_by_text("자동 보관").first).to_be_visible()
+    page.get_by_text("자동 보관").first.click()
+    expect(page.get_by_text("옛 교전 1").locator("visible=true").first).to_be_visible()
+    shot("clip_tab_after_move")
+    page.get_by_test_id("clip-open").locator("visible=true").first.click()
+    page.wait_for_function(PLAYING, timeout=SLOW)
+
+
+def test_U07_undo_brings_the_old_folders_back(legacy_world, launch, page, tmp_path):
+    world = legacy_world
+    world.add_legacy_steam_clips(STEAM_KEY, count=2)
+    server = launch()
+    target = tmp_path / "new_storage"
+    open_storage_settings(page, server)
+    pick_folder_as(page, target)
+    page.get_by_role("button", name=re.compile("새 구조로 옮기기")).click()
+    page.get_by_role("button", name="폴더 선택…").click()
+    page.get_by_role("button", name="이 폴더로 지정").click()
+    page.get_by_role("button", name="옮기기", exact=True).click()
+    expect(page.get_by_text("새 저장 폴더로 옮겼습니다.")).to_be_visible(timeout=60000)
+    page.get_by_role("button", name=re.compile("이전 위치로 되돌리기")).click()
+    page.get_by_role("button", name="되돌리기", exact=True).click()
+    expect(page.get_by_text("이전 위치로 되돌렸습니다.")).to_be_visible(timeout=60000)
+    assert len(list(world.old_clips.glob("*.mp4"))) == 2
+    assert not list((target / "clips" / "자동 보관").glob("*.mp4"))
+    page.keyboard.press("Escape")
+    page.goto(server.url + "/#/clips")
+    page.reload()
+    expect(page.get_by_test_id("legacy-layout-notice")).to_be_visible()
+
+
+def test_U08_a_name_clash_in_the_new_folder_refuses_and_moves_nothing(legacy_world, launch, page, tmp_path, shot):
+    world = legacy_world
+    world.add_legacy_steam_clips(STEAM_KEY, count=2)
+    server = launch()
+    target = tmp_path / "new_storage"
+    clash = target / "clips" / "자동 보관"
+    clash.mkdir(parents=True)
+    (clash / f"{STEAM_KEY}_01.mp4").write_bytes(b"different")
+    open_storage_settings(page, server)
+    pick_folder_as(page, target)
+    page.get_by_role("button", name=re.compile("새 구조로 옮기기")).click()
+    page.get_by_role("button", name="폴더 선택…").click()
+    page.get_by_role("button", name="이 폴더로 지정").click()
+    page.get_by_role("button", name="옮기기", exact=True).click()
+    page.wait_for_timeout(2500)
+    shot("move_refused")
+    assert len(list(world.old_clips.glob("*.mp4"))) == 2, "충돌하면 아무것도 옮기지 않는다"
+    assert (clash / f"{STEAM_KEY}_01.mp4").read_bytes() == b"different"
+    expect(page.get_by_text("새 저장 폴더로 옮겼습니다.")).to_have_count(0)

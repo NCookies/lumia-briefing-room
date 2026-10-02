@@ -46,7 +46,7 @@ $env:LUMIA_FFMPEG = "C:\path\to\ffmpeg.exe"   # PowerShell
 
 브라우저(Playwright Chromium)로 앱을 실제로 눌러 보는 테스트. 눌러 보면 아는 것(화면에 뜨는가·문구·메뉴·확인 창·단축키·뒤로 가기·삭제/보관 흐름)을
 사람 대신 확인한다. 시나리오 목록은 [e2e-scenarios.md](e2e-scenarios.md), 계획은 [plan-release-automation.md](plan-release-automation.md).
-기본 `pytest` 에는 **안 돌아간다**(느리다 - 44개에 약 2분 20초).
+기본 `pytest` 에는 **안 돌아간다**(느리다 - 47개에 약 2분 30초).
 
 ```bash
 pip install -e ".[dev]"                  # pytest-playwright 포함
@@ -61,8 +61,10 @@ pytest e2e -m e2e --tracing retain-on-failure   # 실패하면 trace.zip 을 남
 libx264 가 있는 ffmpeg 가 PATH 에 있거나 `LUMIA_FFMPEG` 로 지정돼 있어야 한다(합성 영상을 만든다. 배포용 `vendor/ffmpeg` 에는 libx264 가 없다 - 없으면 전부 skip).
 
 **어떻게 도는가** — 테스트마다 임시 폴더에 새 세계를 만든다(`e2e/world.py`): 임시 `LOCALAPPDATA`·`APPDATA`·`USERPROFILE`·config, 저장 폴더 `root`,
-시드 게임(`game.json` + 320x180 H.264 합성 영상). `e2e/run_server.py` 로 서버를 **별도 프로세스**로 띄우고 Playwright 가 그 주소를 연다
+시드 게임(`game.json` + 320x180 H.264 합성 영상; `add_vod`·`add_legacy_steam_clips`·`add_legacy_vod`). `e2e/run_server.py` 로 서버를 **별도 프로세스**로 띄우고 Playwright 가 그 주소를 연다
 (브라우저·pywebview 는 안 열린다). 실제 사용자 폴더·설정은 건드리지 않는다. "앱 재시작 후"는 `server.restart()`.
+
+**눈으로 확인용 데모**: `python e2e/demo_legacy.py` 가 0.1.x 사용자가 업데이트한 직후(옛 폴더 구조의 합성 클립·영상 분석 결과)를 임시 환경에 만들어 브라우저로 열어 준다 — 클립 탭 안내 → 옵션 "새 구조로 옮기기…" → 폴더 선택 → 옮기기 → 되돌리기를 직접 눌러 본다(Ctrl+C 로 끝내면 임시 폴더를 지운다).
 
 **fixture**(`e2e/conftest.py`): `world`(시드 추가 - `world.add_game(...)`), `launch(consented=…, extra_config=…)`(서버 띄우기, 시드를 채운 뒤 호출),
 `server`(기본 세계 4게임으로 띄움, `server.api("POST", "/api/...")` 로 앱 API 호출), `go("/#/steam")`(주소 열기), `page`, `shot("이름")`(스크린샷).
