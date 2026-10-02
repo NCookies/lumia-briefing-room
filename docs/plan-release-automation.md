@@ -6,7 +6,7 @@
 
 ## 0. 진행 상태 (세션이 끊겨도 여기부터 이어간다)
 
-- [ ] R1 — 검증 묶음 실행기 `tools/release_check.py` (§3.1) — 화면 E2E 기반(`e2e/` pytest-playwright 러너·서버·시드·스크린샷 보고서)과 시나리오 39개는 만들었다([DEVELOPMENT.md "화면 E2E"](DEVELOPMENT.md), [e2e-scenarios.md](e2e-scenarios.md)). 남은 것: 실행기, 시드 시나리오(§3.2 의 `legacy`·`edge`), 시나리오 확대
+- [ ] R1 — 검증 묶음 실행기 `tools/release_check.py` (§3.1) — 화면 E2E 기반(`e2e/` pytest-playwright 러너·서버·시드·스크린샷 보고서)과 시나리오 44개는 만들었다([DEVELOPMENT.md "화면 E2E"](DEVELOPMENT.md), [e2e-scenarios.md](e2e-scenarios.md)). 남은 것: 실행기, 시드 시나리오(§3.2 의 `edge`), 시나리오 확대
 - [ ] R2 — 테스트 전용 가짜 환경(디스크 여유·물리 디스크·스팀 녹화 상태·폴더 선택 창·실패 주입) + 그걸 쓰는 화면 시나리오 (§3.4)
 - [ ] R3 — 파이프라인 E2E: 합성 녹화 + 가짜 검출기로 분석 → 풀영상·클립·game.json 끝까지 (§3.5)
 - [ ] R4 — 실녹화 골든 셋(개발 PC 전용): 검출·판독 결과를 기대값과 비교 (§3.6)
@@ -66,9 +66,9 @@ R1 이 끝나면 R5 의 규칙 전환을 바로 해서, 그 뒤 새로 생기는
 
 단계별로 `--only e2e` 처럼 골라 돌릴 수 있게 한다. 개발 중에는 해당 시나리오만, 릴리스 전에는 전부.
 
-### 3.2 시드 라이브러리 (`e2e/world.py` — 지금은 `default`·`vod` 세트)
+### 3.2 시드 라이브러리 (`e2e/world.py` — 지금은 `default`·`vod`·`legacy` 세트)
 
-지금 있는 것: 스팀 게임 4판(두 날짜, 랭크·코발트, 풀영상 없는 게임 1개)과 `add_vod`(영상 파일 N편 + 게임·색인, 원본 삭제 옵션)를 `game.json` 으로 직접 써서 만든다(`tests/test_api_games.py` 와 같은 방식). 클립은 앱 API(`/candidates/<id>/save`)로 저장해 만든다. 아래 표의 나머지 시나리오와, `game.json` 도 앱의 저장 함수로 만드는 것은 남았다.
+지금 있는 것: 스팀 게임 4판(두 날짜, 랭크·코발트, 풀영상 없는 게임 1개)과 `add_vod`(영상 파일 N편 + 게임·색인, 원본 삭제 옵션), `add_legacy_steam_clips`·`add_legacy_vod`(0.1.x 가 만들던 옛 클립 폴더·영상 색인 - 실제 0.1.x 백업의 json 모양)를 `game.json` 으로 직접 써서 만든다(`tests/test_api_games.py` 와 같은 방식). 클립은 앱 API(`/candidates/<id>/save`)로 저장해 만든다. 아래 표의 나머지 시나리오와, `game.json` 도 앱의 저장 함수로 만드는 것은 남았다.
 
 화면 테스트가 쓸 앱 상태를 임시 폴더에 만든다. 영상은 ffmpeg `testsrc`(320x180, 몇 초~1분, 시각이 박힌 화면)로 작게 만든다. 실제 앱 형식 그대로(`full.mp4`·`game.json`·`clipUid` 태그 클립·library json·config.json)여야 한다 — 형식을 손으로 흉내 내지 말고 앱의 저장 함수를 불러 만든다(형식이 바뀌면 시드도 따라 바뀌게).
 

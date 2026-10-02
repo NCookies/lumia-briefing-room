@@ -74,6 +74,7 @@ class World:
     root: Path
     sample_video: Path
     ffmpeg: str
+    legacy: bool = False
 
     @property
     def env(self) -> dict[str, str]:
@@ -94,6 +95,14 @@ class World:
         return self.root / "full_video" / "steam_replay"
 
     @property
+    def old_clips(self) -> Path:
+        return self.home / "old" / "clips"
+
+    @property
+    def old_vod_clips(self) -> Path:
+        return self.home / "old" / "vod"
+
+    @property
     def vod_videos(self) -> Path:
         return self.home / "vods"
 
@@ -107,6 +116,8 @@ class World:
 
     def write_config(self, *, consented: bool = True, extra: dict | None = None) -> None:
         cfg: dict = {"paths": {"root": str(self.root)}}
+        if self.legacy:
+            cfg["paths"] = {"clips": str(self.old_clips), "vodClips": str(self.old_vod_clips)}
         if self.vod_videos.exists():
             cfg["vod"] = {"sources": [str(self.vod_videos)]}
         if consented:
@@ -167,6 +178,86 @@ class World:
         save_index(self.library_vod, {"id": vid, "path": str(video), "status": "done", "width": 1920, "height": 1080,
                                       "durationSec": 400.0, "games": index_games, "clips": [], "streamer": streamer})
         if not original:
+            video.unlink()
+        return vid
+
+
+    def _sample_jpg(self, out: Path) -> Path:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run([self.ffmpeg, "-y", "-loglevel", "error", "-ss", "2", "-i", str(self.sample_video),
+                        "-frames:v", "1", str(out)], check=True)
+        return out
+
+    def add_legacy_steam_clips(self, key: str = "20260928_160025", count: int = 2) -> list[str]:
+        """0.1.x 가 만들던 클립 폴더: mp4 + json + .thumbs 가 한 폴더에 섞여 있다."""
+        clips = self.old_clips
+        clips.mkdir(parents=True, exist_ok=True)
+        day = f"{key[:4]}-{key[4:6]}-{key[6:8]}"
+        clock = f"{key[9:11]}:{key[11:13]}:{key[13:15]}"
+        names = []
+        self._sample_jpg(clips / ".thumbs" / f"{key}_result.jpg")
+        for n in range(1, count + 1):
+            name = f"{key}_{n:02d}"
+            self._sample_jpg(clips / ".thumbs" / f"{name}.jpg")
+            meta = {
+                "title": f"옛 교전 {n}", "sessionDir": "bg_1_20260928_144503", "sessionStartUtc": f"{day}T15:45:00Z",
+                "matchStartUtc": f"{day}T{clock}Z", "matchEndUtc": f"{day}T16:18:00Z", "gameMode": "battle_royale",
+                "sourceWidth": 2560, "sourceHeight": 1440, "videoOffsetSec": 1000.0 * n, "durationSec": 24.0,
+                "combatStartOffsetSec": 1000.0 * n + 5, "combatEndOffsetSec": 1000.0 * n + 15, "prerollSource": "combat",
+                "thumbnailPath": f".thumbs/{name}.jpg", "tags": ["kill"], "killDelta": 1, "assistDelta": 0, "died": False,
+                "pvpScore": 3.0, "pvpSignals": [], "region": "바지선", "gameDay": 1, "dayNight": "day",
+                "detectorConfidence": 0.6, "matchKills": 2, "matchAssists": 1,
+                "matchResult": {"matchType": "rank", "matchLabel": "랭크", "placement": 3, "total": 8,
+                                "imagePath": f".thumbs/{key}_result.jpg"},
+                "sourceIncomplete": False, "pinned": n == 1,
+            }
+            (clips / f"{name}.json").write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+            shutil.copyfile(self.sample_video, clips / f"{name}.mp4")
+            names.append(name)
+        return names
+
+    def add_legacy_vod(self, name: str, *, original: bool, tail: int, clips: int = 2) -> str:
+        """0.1.x 가 만든 영상 파일 분석 결과: `.vods/<id>.json` 색인 + 영상 클립 mp4/json. 원본이 있으면 판독 캐시도 있다."""
+        from lumia_briefing_room.pipeline.vod_store import cache_path
+
+        self.vod_videos.mkdir(parents=True, exist_ok=True)
+        video = self.vod_videos / f"{name}.mp4"
+        shutil.copyfile(self.sample_video, video)
+        with open(video, "ab") as f:
+            f.write(b"x" * tail)
+        vid = vod_id(video)
+        out = self.old_vod_clips
+        out.mkdir(parents=True, exist_ok=True)
+        ids = []
+        for n in range(1, clips + 1):
+            cid = f"vod_{vid}_g01_{n:06d}"
+            self._sample_jpg(out / ".thumbs" / f"{cid}.jpg")
+            meta = {
+                "title": f"{name} 옛 클립 {n}", "source": "vod", "vodId": vid, "vodFile": str(video), "streamer": None,
+                "vodGameIndex": 1, "gameStartOffsetSec": 100.0, "gameEndOffsetSec": 400.0, "sourceWidth": 1920,
+                "sourceHeight": 1080, "videoOffsetSec": 100.0 + 30 * n, "durationSec": 24.0,
+                "thumbnailPath": f".thumbs/{cid}.jpg", "sourceIncomplete": False, "audioStatus": "full",
+                "combatStartOffsetSec": 105.0 + 30 * n, "combatEndOffsetSec": 115.0 + 30 * n, "prerollSource": "combat",
+                "tags": ["kill"], "killDelta": 1, "assistDelta": 0, "died": False, "pvpScore": 3.0, "pvpSignals": [],
+                "gameDay": 1, "dayNight": "day", "pinned": False, "matchKills": 2, "matchAssists": 1,
+                "matchResult": {"matchType": "rank", "matchLabel": "랭크", "placement": 4, "total": 8},
+            }
+            (out / f"{cid}.json").write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+            shutil.copyfile(self.sample_video, out / f"{cid}.mp4")
+            ids.append(cid)
+        result = {"matchType": "rank", "matchLabel": "랭크", "placement": 4, "total": 8}
+        index = {"id": vid, "path": str(video), "size": video.stat().st_size, "durationSec": 400.0, "width": 1920,
+                 "height": 1080, "fps": 30.0, "streamer": None, "status": "done", "error": None, "decodeDone": True,
+                 "analyzedSec": 400.0, "analysisVersion": 2,
+                 "games": [{"index": 1, "startSec": 100.0, "endSec": 400.0, "kFinal": 2, "aFinal": 1,
+                            "result": result, "clipIds": ids}],
+                 "clips": ids}
+        save_index(out, index)
+        if original:
+            cache = cache_path(out, vid)
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            cache.write_bytes(b"x")
+        else:
             video.unlink()
         return vid
 

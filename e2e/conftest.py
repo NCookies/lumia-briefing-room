@@ -56,6 +56,13 @@ def world(tmp_path, sample_video, ffmpeg_path) -> World:
 
 
 @pytest.fixture
+def legacy_world(world) -> World:
+    """0.1.x 사용자의 옛 경로 설정(paths.clips·vodClips, 저장 폴더 `root` 없음)."""
+    world.legacy = True
+    return world
+
+
+@pytest.fixture
 def launch(world):
     """`launch()` 로 서버를 띄운다. 시드를 넣고 싶으면 띄우기 전에 world 를 채운다."""
     servers: list[Server] = []
