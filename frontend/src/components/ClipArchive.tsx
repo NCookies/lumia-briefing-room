@@ -192,7 +192,7 @@ export function ClipArchive({ active, category, onCategoryChange, clipId, onClip
 
   const card = (c: LibraryClip & { match?: SearchedClip['match'] }, inCategory: string | null) => (
     <div key={c.relPath} className={`flex flex-col overflow-hidden rounded-md border bg-zinc-800/60 ${selected.has(c.relPath) ? 'border-sky-500' : 'border-zinc-700'}`}>
-      <div className="relative aspect-video cursor-pointer bg-zinc-900" onClick={() => (selectMode ? setSelected((s) => { const n = new Set(s); if (n.has(c.relPath)) n.delete(c.relPath); else n.add(c.relPath); return n }) : onClipChange(inCategory, c.id))}>
+      <div data-testid="clip-open" className="relative aspect-video cursor-pointer bg-zinc-900" onClick={() => (selectMode ? setSelected((s) => { const n = new Set(s); if (n.has(c.relPath)) n.delete(c.relPath); else n.add(c.relPath); return n }) : onClipChange(inCategory, c.id))}>
         <img src={thumbnailUrl(c.id)} alt="" className="h-full w-full object-cover" loading="lazy" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
         {selectMode && <input type="checkbox" className="absolute left-2 top-2" aria-label={`${c.title} 선택`} checked={selected.has(c.relPath)} readOnly />}
         {c.durationSec > 0 && <span className="absolute bottom-1 right-1 rounded-md bg-black/70 px-1.5 text-xs text-zinc-100">{formatDuration(c.durationSec)}</span>}

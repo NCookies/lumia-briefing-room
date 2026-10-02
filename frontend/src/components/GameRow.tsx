@@ -38,6 +38,7 @@ interface Props {
 export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, job, menu, onRename, matchText }: Props) {
   return (
     <li
+      data-game={g.key}
       className="flex cursor-pointer items-stretch rounded-lg border border-zinc-700/60 bg-zinc-800/60 transition-colors hover:border-zinc-500 hover:bg-zinc-800"
       onClick={onOpen}
     >
