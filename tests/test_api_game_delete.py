@@ -223,3 +223,43 @@ def test_a_deleted_game_does_not_come_back_after_a_restart_even_with_kept_clips(
     assert migrate_legacy_games(resolved.library_steam, resolved.games_steam) == []
     assert cat_client.get("/api/games").json()["games"] == []
     assert {c["id"] for c in cat_client.get("/api/clips").json()} == {f"{CKEY}_02", f"{CKEY}_03"}
+
+
+def _lock_full_video(monkeypatch, failures):
+    """다른 프로세스가 full.mp4 를 잡고 있는 것처럼 unlink 가 `failures` 번 PermissionError(WinError 32)를 낸다. failures=None 이면 계속."""
+    import pathlib
+
+    from lumia_briefing_room.pipeline import delete_helper
+
+    monkeypatch.setattr(delete_helper, "LOCK_RETRY_DELAY_SEC", 0)
+    real = pathlib.Path.unlink
+    state = {"left": failures}
+
+    def unlink(self, *args, **kwargs):
+        if self.name == "full.mp4" and (state["left"] is None or state["left"] > 0):
+            if state["left"] is not None:
+                state["left"] -= 1
+            raise PermissionError(32, "다른 프로세스가 파일을 사용 중입니다")
+        return real(self, *args, **kwargs)
+
+    monkeypatch.setattr(pathlib.Path, "unlink", unlink)
+
+
+def test_whole_game_delete_waits_out_a_briefly_locked_full_video(client, monkeypatch):
+    _lock_full_video(monkeypatch, failures=2)
+    resp = client.post(f"/api/games/{KEY}/delete", json={"target": "all"})
+    assert resp.status_code == 200
+    assert client.get(f"/api/games/{KEY}").status_code == 404
+    assert not (client.tmp / "games" / KEY).exists()
+
+
+def test_whole_game_delete_with_a_locked_video_is_a_409_and_the_game_stays_deletable(client, monkeypatch):
+    _lock_full_video(monkeypatch, failures=None)
+    resp = client.post(f"/api/games/{KEY}/delete", json={"target": "all"})
+    assert resp.status_code == 409 and "사용 중" in resp.json()["detail"]
+    assert (client.tmp / "games" / KEY / "game.json").exists(), "게임 기록이 먼저 지워지면 다시 지울 수 없다"
+    assert client.get(f"/api/games/{KEY}").status_code == 200
+    monkeypatch.undo()
+    client.put("/api/config", json={"ui": {"deleteMode": "permanent"}})
+    assert client.post(f"/api/games/{KEY}/delete", json={"target": "all"}).status_code == 200
+    assert client.get(f"/api/games/{KEY}").status_code == 404

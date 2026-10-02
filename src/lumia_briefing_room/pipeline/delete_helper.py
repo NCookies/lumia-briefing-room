@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import time
 from collections.abc import Iterable
 from pathlib import Path
@@ -22,6 +23,10 @@ from lumia_briefing_room.pipeline.label_archive import archive_if_labeled
 
 RECYCLE = "recycle"
 PERMANENT = "permanent"
+GAME_JSON = "game.json"
+# 브라우저가 영상을 읽는 연결이 닫히기까지 기다릴 수 있도록 5초(0.25초 x 20번)
+LOCK_RETRY_ATTEMPTS = 20
+LOCK_RETRY_DELAY_SEC = 0.25
 
 
 def clip_files(meta_path: Path, meta: dict, *, proxy: Path | None = None, video: Path | None = None) -> list[Path]:
@@ -40,21 +45,29 @@ def send_to_recycle_bin(paths: Iterable[Path]) -> None:
         _send2trash(str(path))
 
 
-def _unlink_with_retry(path: Path, *, attempts: int = 5) -> None:
-    """Windows 는 다른 요청이 그 파일을 읽는 중이면 지우기가 PermissionError 로 실패한다 — 잠깐 기다려 다시 시도한다."""
-    for attempt in range(attempts):
+def _unlink_with_retry(path: Path) -> None:
+    """Windows 는 다른 요청이 그 파일을 읽는 중이면 지우기가 PermissionError(WinError 32)로 실패한다 — 잠깐 기다려 다시 시도한다."""
+    for attempt in range(LOCK_RETRY_ATTEMPTS):
         try:
             path.unlink(missing_ok=True)
             return
         except PermissionError:
-            if attempt == attempts - 1:
+            if attempt == LOCK_RETRY_ATTEMPTS - 1:
                 raise
-            time.sleep(0.05)
+            time.sleep(LOCK_RETRY_DELAY_SEC)
 
 
 def permanently_delete(paths: Iterable[Path]) -> None:
     for path in paths:
         _unlink_with_retry(path)
+
+
+def remove_game_folder(folder: Path) -> None:
+    """게임 폴더를 영구 삭제한다. `game.json` 은 맨 나중에 지워서, 중간에 잠긴 파일 때문에 멈춰도 목록에 남아 다시 지울 수 있다."""
+    files = sorted((p for p in folder.rglob("*") if p.is_file()), key=lambda p: p.name == GAME_JSON)
+    for path in files:
+        _unlink_with_retry(path)
+    shutil.rmtree(folder)
 
 
 def delete_clip(

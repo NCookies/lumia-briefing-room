@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import logging
-import shutil
 import subprocess
 import threading
 from types import SimpleNamespace
@@ -34,7 +33,7 @@ from lumia_briefing_room.pipeline.clip_from_full import FullVideoMissing
 from lumia_briefing_room.pipeline.game_clip_save import save_and_mark
 from lumia_briefing_room.pipeline.cleanup_registry import registry as cleanup_preview_registry
 from lumia_briefing_room.pipeline.cleanup import remove_orphan_result_images
-from lumia_briefing_room.pipeline.delete_helper import PERMANENT, delete_clip, send_to_recycle_bin
+from lumia_briefing_room.pipeline.delete_helper import PERMANENT, delete_clip, remove_game_folder, send_to_recycle_bin
 from lumia_briefing_room.pipeline.ffmpeg_errors import describe_clip_error
 from lumia_briefing_room.pipeline.game_cleanup import delete_full_video
 from lumia_briefing_room.pipeline.game_records import delete_record, game_key, records_dir_for
@@ -682,7 +681,7 @@ def register_game_routes(
         """게임 폴더(풀영상·게임 기록·결과표·초상화)와 `.games` 기록을 지워 목록에서 사라지게 한다."""
         cfg = current_config()
         if cfg.ui.delete_mode == PERMANENT:
-            shutil.rmtree(folder)
+            remove_game_folder(folder)
         else:
             send_to_recycle_bin([folder])
         if game.get("source") != "vod":
@@ -690,6 +689,12 @@ def register_game_routes(
 
     @app.post("/api/games/{key}/delete")
     def delete_game_files(key: str, body: GameDelete):
+        try:
+            return _delete_game_files(key, body)
+        except PermissionError as exc:
+            raise HTTPException(409, "다른 프로그램이 파일을 사용 중이라 지우지 못했습니다(영상을 재생 중인 창이나 백신일 수 있습니다). 잠시 뒤 다시 시도해 주세요.") from exc
+
+    def _delete_game_files(key: str, body: GameDelete):
         """풀영상·자동 보관 클립을 지운다(사용자가 보관한 클립은 남긴다). `all` 은 게임 기록까지 지워 목록에서 없앤다. 휴지통/영구는 `ui.deleteMode`."""
         if body.target not in ("fullVideo", "clips", "both", "all"):
             raise HTTPException(400, "target 은 fullVideo, clips, both, all 중 하나여야 합니다")
