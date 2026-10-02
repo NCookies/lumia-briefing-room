@@ -29,6 +29,7 @@ from lumia_briefing_room.detect.region import load_region_templates  # noqa: E40
 from lumia_briefing_room.pipeline.metadata import phase_index, revive_cost  # noqa: E402
 from lumia_briefing_room.pipeline.orchestrator import default_title  # noqa: E402
 from lumia_briefing_room.profiles.models import ResolutionProfile  # noqa: E402
+from lumia_briefing_room.tool_paths import app_paths, clip_meta_files, clip_videos  # noqa: E402
 
 
 def most_common_day(days: list[int | None]) -> int | None:
@@ -79,26 +80,35 @@ def read_clip_day(clip_mp4: Path, profile: ResolutionProfile, templates, ffmpeg:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("clips_dir", nargs="?", type=Path, default=Path.home() / "Videos/LumiaBriefingRoom/clips")
+    parser.add_argument("clips_dir", nargs="?", type=Path, default=None, help="클립 정보 폴더(기본: 앱 데이터 library\steam)")
     parser.add_argument("--ffmpeg", type=Path, default=None)
     parser.add_argument("--force", action="store_true", help="일차가 이미 채워진 클립도 다시 읽는다")
     args = parser.parse_args()
+    paths = app_paths()
+    clips_dir = args.clips_dir or paths.library_steam
 
     ffmpeg = args.ffmpeg or discover_ffmpeg()
     if ffmpeg is None:
         raise SystemExit("ffmpeg를 찾을 수 없다")
 
     updated = unchanged = unread = 0
-    for meta_path in sorted(args.clips_dir.glob("*.json")):
+    todo = []
+    for meta_path in clip_meta_files(clips_dir):
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
-        if meta.get("gameDay") is not None and not args.force:
+        if meta.get("gameDay") is None or args.force:
+            todo.append((meta_path, meta))
+    videos = clip_videos(clips_dir, [p.stem for p, _ in todo], paths.clip_roots)
+    for meta_path, meta in todo:
+        video = videos.get(meta_path.stem)
+        if video is None:
+            unread += 1
             continue
         profile = ResolutionProfile.for_resolution(meta["sourceWidth"], meta["sourceHeight"])
         if profile.day_templates is None:
             unread += 1
             continue
         day = read_clip_day(
-            meta_path.with_suffix(".mp4"), profile, load_region_templates(profile.day_templates), ffmpeg
+            video, profile, load_region_templates(profile.day_templates), ffmpeg
         )
         fresh = json.loads(meta_path.read_text(encoding="utf-8"))
         new = apply_game_day(fresh, day)

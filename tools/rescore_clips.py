@@ -24,7 +24,8 @@ from lumia_briefing_room.config import FilterConfig  # noqa: E402
 from lumia_briefing_room.detect.pvp import score_interval  # noqa: E402
 from lumia_briefing_room.detect.types import CombatInterval  # noqa: E402
 
-from eval_pvp import DEFAULT_STEAM_CLIPS_DIR, DEFAULT_VOD_CLIPS_DIR, resolve_clip_dirs  # noqa: E402
+from eval_pvp import resolve_clip_dirs  # noqa: E402
+from lumia_briefing_room.tool_paths import app_paths, clip_meta_files  # noqa: E402
 
 
 def rescore_meta(meta: dict, weights: dict[str, float]) -> dict:
@@ -46,7 +47,7 @@ def rescore_meta(meta: dict, weights: dict[str, float]) -> dict:
 
 def rescore_folder(clips_dir: Path, weights: dict[str, float]) -> int:
     changed = 0
-    for path in sorted(clips_dir.glob("*.json")):
+    for path in clip_meta_files(clips_dir):
         old = json.loads(path.read_text(encoding="utf-8"))
         new = rescore_meta(old, weights)
         if new != old:
@@ -65,11 +66,14 @@ def rescore_folders_for_source(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("clips_dir", nargs="?", type=Path, default=DEFAULT_STEAM_CLIPS_DIR, help="스팀 클립 폴더")
-    parser.add_argument("--vod-dir", type=Path, default=DEFAULT_VOD_CLIPS_DIR, help="다시보기 클립 폴더")
+    parser.add_argument("clips_dir", nargs="?", type=Path, default=None, help="스팀 클립 정보 폴더(기본: 앱 데이터 library\steam)")
+    parser.add_argument("--vod-dir", type=Path, default=None, help="다시보기 클립 정보 폴더(기본: 앱 데이터 library\vod)")
     parser.add_argument("--source", choices=("steam", "vod", "all"), default="steam", help="다시 계산할 클립 출처")
     args = parser.parse_args()
-    changed = rescore_folders_for_source(args.source, args.clips_dir, args.vod_dir, FilterConfig().pvp_weights)
+    paths = app_paths()
+    changed = rescore_folders_for_source(
+        args.source, args.clips_dir or paths.library_steam, args.vod_dir or paths.library_vod, FilterConfig().pvp_weights
+    )
     print(f"출처: {args.source}")
     print(f"{changed}개 클립의 점수를 다시 계산했다")
 

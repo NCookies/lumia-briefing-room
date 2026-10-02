@@ -34,6 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from lumia_briefing_room.config import FilterConfig, discover_ffmpeg  # noqa: E402
 from lumia_briefing_room.detect.ultimate import blue_tint_ratio, is_locked, max_rise  # noqa: E402
 from lumia_briefing_room.profiles.models import ResolutionProfile  # noqa: E402
+from lumia_briefing_room.tool_paths import app_paths, clip_meta_files, clip_videos  # noqa: E402
 
 from backfill_day import padded_crop  # noqa: E402
 from rescore_clips import rescore_meta  # noqa: E402
@@ -63,10 +64,12 @@ def read_clip_ultimate_delta(clip_mp4: Path, profile: ResolutionProfile, ffmpeg:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("clips_dir", nargs="?", type=Path, default=Path.home() / "Videos/LumiaBriefingRoom/clips")
+    parser.add_argument("clips_dir", nargs="?", type=Path, default=None, help="클립 정보 폴더(기본: 앱 데이터 library\steam)")
     parser.add_argument("--ffmpeg", type=Path, default=None)
     parser.add_argument("--force", action="store_true", help="ultimateDelta 가 이미 채워진 클립도 다시 읽는다")
     args = parser.parse_args()
+    paths = app_paths()
+    clips_dir = args.clips_dir or paths.library_steam
 
     ffmpeg = args.ffmpeg or discover_ffmpeg()
     if ffmpeg is None:
@@ -74,15 +77,22 @@ def main() -> None:
 
     weights = FilterConfig().pvp_weights
     updated = unchanged = unread = 0
-    for meta_path in sorted(args.clips_dir.glob("*.json")):
+    todo = []
+    for meta_path in clip_meta_files(clips_dir):
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
-        if meta.get("ultimateDelta") is not None and not args.force:
+        if meta.get("ultimateDelta") is None or args.force:
+            todo.append((meta_path, meta))
+    videos = clip_videos(clips_dir, [p.stem for p, _ in todo], paths.clip_roots)
+    for meta_path, meta in todo:
+        video = videos.get(meta_path.stem)
+        if video is None:
+            unread += 1
             continue
         profile = ResolutionProfile.for_resolution(meta["sourceWidth"], meta["sourceHeight"])
         if "ultimate_r" not in profile.rois:
             unread += 1
             continue
-        delta = read_clip_ultimate_delta(meta_path.with_suffix(".mp4"), profile, ffmpeg)
+        delta = read_clip_ultimate_delta(video, profile, ffmpeg)
         if delta is None:
             unread += 1
             continue

@@ -14,13 +14,14 @@ from __future__ import annotations
 import argparse
 import json
 import statistics
+import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from lumia_briefing_room.tool_paths import app_paths, clip_meta_files  # noqa: E402
 
 CONFIRMED_SIGNALS = {"kill_delta", "assist_delta", "death", "teammate_death"}
-
-DEFAULT_STEAM_CLIPS_DIR = Path.home() / "Videos/LumiaBriefingRoom/clips"
-DEFAULT_VOD_CLIPS_DIR = Path.home() / "Videos/LumiaBriefingRoom/vod"
 
 
 def clip_source(clip: dict) -> str:
@@ -54,7 +55,7 @@ def auc(positive: list[float], negative: list[float]) -> float | None:
 
 def load_clips(clips_dir: Path) -> list[dict]:
     """지금 있는 클립 + 영상을 지운 뒤 남긴 라벨 보관소(`.labels`). 같은 ID 는 지금 있는 클립이 이긴다."""
-    live = {p.stem: json.loads(p.read_text(encoding="utf-8")) for p in sorted(clips_dir.glob("*.json"))}
+    live = {p.stem: json.loads(p.read_text(encoding="utf-8")) for p in clip_meta_files(clips_dir)}
     archive = clips_dir / ".labels"
     kept = {
         p.stem: json.loads(p.read_text(encoding="utf-8"))
@@ -119,11 +120,12 @@ def evaluate_labels(clips: list[dict]) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("clips_dir", nargs="?", type=Path, default=DEFAULT_STEAM_CLIPS_DIR, help="스팀 클립 폴더")
-    parser.add_argument("--vod-dir", type=Path, default=DEFAULT_VOD_CLIPS_DIR, help="다시보기 클립 폴더")
+    parser.add_argument("clips_dir", nargs="?", type=Path, default=None, help="스팀 클립 정보 폴더(기본: 앱 데이터 library\steam)")
+    parser.add_argument("--vod-dir", type=Path, default=None, help="다시보기 클립 정보 폴더(기본: 앱 데이터 library\vod)")
     parser.add_argument("--source", choices=("steam", "vod", "all"), default="steam", help="평가할 클립 출처")
     args = parser.parse_args()
-    clips = load_clips_for_source(args.source, args.clips_dir, args.vod_dir)
+    paths = app_paths()
+    clips = load_clips_for_source(args.source, args.clips_dir or paths.library_steam, args.vod_dir or paths.library_vod)
     report = evaluate_labels(clips)
 
     print(f"출처: {args.source}")

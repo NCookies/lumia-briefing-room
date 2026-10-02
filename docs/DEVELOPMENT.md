@@ -464,6 +464,11 @@ git push origin v0.1.4
 
 `scripts/probe/` 와 달리 실사용하며 계속 돌리는 도구다.
 
+**경로를 생략하면 앱 설정(`config.json`)을 따라 앱과 같은 위치를 쓴다** — 게임 기록은 스팀 풀영상 폴더(`<저장 폴더>\full_video\steam_replay`),
+클립 정보는 앱 데이터 `%LOCALAPPDATA%\LumiaBriefingRoom\library\steam`(다시보기는 `...\vod`), 클립 영상은 저장 폴더 `clips` 아래에서 이름으로
+찾는다. 기본 경로는 [tool_paths.py](../src/lumia_briefing_room/tool_paths.py) 한 곳에서만 정하고 도구에 경로를 박지 않는다
+(`tests/test_tool_paths.py` 가 검사). 클립 정보 폴더에 json 이 하나도 없으면 경고를 낸다.
+
 | 도구 | 용도 |
 |---|---|
 | `tools/collect_frames.py` | 라벨링용 프레임 수집 |

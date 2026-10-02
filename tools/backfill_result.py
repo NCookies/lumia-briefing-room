@@ -28,6 +28,7 @@ from lumia_briefing_room.pipeline.result_scan import (  # noqa: E402
     save_result_image,
 )
 from lumia_briefing_room.steam_paths import discover_recording_root  # noqa: E402
+from lumia_briefing_room.tool_paths import app_paths, clip_meta_files  # noqa: E402
 from lumia_briefing_room.video.segments import segment_number_at  # noqa: E402
 from lumia_briefing_room.video.session import RecordingSession, SessionParseError  # noqa: E402
 
@@ -69,11 +70,12 @@ def next_game_segment(session, session_name: str, match_start: str, groups: dict
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("clips_dir", nargs="?", type=Path, default=Path.home() / "Videos/LumiaBriefingRoom/clips")
+    parser.add_argument("clips_dir", nargs="?", type=Path, default=None, help="클립 정보 폴더(기본: 앱 데이터 library\steam)")
     parser.add_argument("--recording-root", type=Path, default=None)
     parser.add_argument("--ffmpeg", type=Path, default=None)
     parser.add_argument("--force", action="store_true", help="결과가 이미 채워진 게임도 다시 읽는다")
     args = parser.parse_args()
+    args.clips_dir = args.clips_dir or app_paths().library_steam
 
     ffmpeg = args.ffmpeg or discover_ffmpeg()
     if ffmpeg is None:
@@ -82,7 +84,7 @@ def main() -> None:
     if root is None:
         raise SystemExit("녹화 폴더를 찾을 수 없다 - --recording-root 로 지정할 것")
 
-    metas = {p.stem: json.loads(p.read_text(encoding="utf-8")) for p in sorted(args.clips_dir.glob("*.json"))}
+    metas = {p.stem: json.loads(p.read_text(encoding="utf-8")) for p in clip_meta_files(args.clips_dir)}
     filled = missing_raw = not_found = skipped = locked = 0
     groups = group_by_match(metas)
     for (session_name, match_start), group in sorted(groups.items()):

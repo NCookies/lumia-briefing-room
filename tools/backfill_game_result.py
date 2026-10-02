@@ -20,25 +20,28 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from lumia_briefing_room.config import discover_ffmpeg  # noqa: E402
 from lumia_briefing_room.pipeline.game_backfill import backfill_game_results  # noqa: E402
 from lumia_briefing_room.pipeline.result_tail import find_result_in_video  # noqa: E402
-
-DEFAULT_ROOT = Path.home() / "Videos" / "LumiaBriefingRoom"
+from lumia_briefing_room.tool_paths import app_paths, clip_meta_files  # noqa: E402
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("keys", nargs="*", help="읽을 게임키(생략하면 대상 전부)")
-    parser.add_argument("--games-dir", type=Path, default=DEFAULT_ROOT / "games")
-    parser.add_argument("--clips-dir", type=Path, default=DEFAULT_ROOT / "clips")
+    parser.add_argument("--games-dir", type=Path, default=None, help="게임 기록 폴더(기본: 앱 설정의 스팀 풀영상 폴더)")
+    parser.add_argument("--clips-dir", type=Path, default=None, help="클립 정보 폴더(기본: 앱 데이터 library\steam)")
     parser.add_argument("--ffmpeg", type=Path, default=None)
     parser.add_argument("--force", action="store_true", help="결과가 이미 채워진 게임도 다시 읽는다")
     args = parser.parse_args()
+    paths = app_paths()
+    games_dir = args.games_dir or paths.games_steam
+    clips_dir = args.clips_dir or paths.library_steam
+    clip_meta_files(clips_dir)
 
     ffmpeg = args.ffmpeg or discover_ffmpeg()
     if ffmpeg is None:
         raise SystemExit("ffmpeg를 찾을 수 없다")
 
     report = backfill_game_results(
-        args.games_dir, args.clips_dir,
+        games_dir, clips_dir,
         find=lambda video: find_result_in_video(video, ffmpeg_path=ffmpeg),
         keys=args.keys or None, force=args.force,
         on_game=lambda key, text: print(f"{key}: {text}", flush=True),
