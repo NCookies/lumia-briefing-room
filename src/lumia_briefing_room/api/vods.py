@@ -31,6 +31,7 @@ from lumia_briefing_room.pipeline.reanalyze_game import ReanalyzeError
 from lumia_briefing_room.pipeline.vod_full_games import delete_vod_games
 from lumia_briefing_room.pipeline.vod_upgrade import UpgradeError, can_upgrade, upgrade_vod_games
 from lumia_briefing_room.pipeline.vod_dates import is_valid_iso_date, resolve_video_date
+from lumia_briefing_room.pipeline.cleanup_registry import registry as cleanup_registry
 from lumia_briefing_room.pipeline.vod_store import cache_path, index_path, load_index, save_index, vod_id
 from lumia_briefing_room.video.vod import VideoInfo, find_ffprobe, probe_video
 from lumia_briefing_room.video_formats import VIDEO_EXTENSIONS
@@ -299,6 +300,7 @@ def register_vod_routes(
             if date and not is_valid_iso_date(date):
                 raise HTTPException(400, "날짜는 YYYY-MM-DD 형식이어야 합니다")
             put_config({"vod": {"videoDates": {vid: date}}})
+            cleanup_registry.notify_clips_changed()
         return {
             "id": vid,
             "streamer": current_config().vod.streamers.get(vid) or None,

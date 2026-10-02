@@ -135,7 +135,9 @@ def make_cleanup_runner(config_path: Path | None) -> Callable[[], object]:
         cfg = load_config(config_path)
         resolved = resolve_paths(cfg.paths)
         preserve = make_preserver(cfg, discover_ffmpeg()) if cfg.retention.preserve_before_delete else None
-        return run_game_cleanup(resolved.games_dirs, cfg.retention, preserve=preserve)
+        from lumia_briefing_room.pipeline.vod_dates import make_vod_day_lookup
+
+        return run_game_cleanup(resolved.games_dirs, cfg.retention, preserve=preserve, vod_day=make_vod_day_lookup(cfg))
 
     return run
 

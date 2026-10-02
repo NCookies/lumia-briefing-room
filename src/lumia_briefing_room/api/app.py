@@ -60,6 +60,7 @@ from lumia_briefing_room.pipeline.label_archive import archive_dir_for
 from lumia_briefing_room.pipeline.label_note import normalize_label_note, normalize_memo
 from lumia_briefing_room.pipeline.cleanup import remove_orphan_result_images
 from lumia_briefing_room.pipeline.preserve_before_delete import make_preserver
+from lumia_briefing_room.pipeline.vod_dates import make_vod_day_lookup
 from lumia_briefing_room.pipeline.game_cleanup import game_cleanup_preview, plan_game_cleanup, run_game_cleanup
 from lumia_briefing_room.pipeline.cleanup_registry import registry as cleanup_preview_registry
 from lumia_briefing_room.pipeline.clip_assets import (
@@ -681,10 +682,10 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
         resolved = resolve_paths(cfg.paths)
         dry_run = bool(body.get("dryRun"))
         if dry_run:
-            plan = plan_game_cleanup(resolved.games_dirs, cfg.retention)
+            plan = plan_game_cleanup(resolved.games_dirs, cfg.retention, vod_day=make_vod_day_lookup(cfg))
         else:
             preserve = make_preserver(cfg, discover_ffmpeg()) if cfg.retention.preserve_before_delete else None
-            plan = run_game_cleanup(resolved.games_dirs, cfg.retention, preserve=preserve)
+            plan = run_game_cleanup(resolved.games_dirs, cfg.retention, preserve=preserve, vod_day=make_vod_day_lookup(cfg))
         return {
             "toDelete": len(plan.to_delete),
             "bytesToFree": plan.bytes_to_free,
@@ -830,7 +831,8 @@ def create_app(cfg: Config, *, config_path: Path | None = None) -> FastAPI:
     register_backfill_routes(app, current_config=current_config)
 
     cleanup_preview_registry.configure(
-        lambda: (resolve_paths(current_config().paths).games_dirs, current_config().retention), game_cleanup_preview
+        lambda: (resolve_paths(current_config().paths).games_dirs, current_config().retention),
+        lambda dirs, retention: game_cleanup_preview(dirs, retention, vod_day=make_vod_day_lookup(current_config())),
     )
     cleanup_preview_registry.recompute_now()
     return app

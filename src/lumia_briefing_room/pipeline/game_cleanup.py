@@ -42,13 +42,21 @@ def _parse_utc(text) -> datetime | None:
 
 
 GamesDirs = Path | Sequence[Path]
+VodDay = Callable[[str], str | None]  # 영상 id -> 영상 날짜(YYYY-MM-DD, 화면에 보이는 그 날짜)
 
 
 def _as_dirs(games_dirs: GamesDirs) -> list[Path]:
     return [games_dirs] if isinstance(games_dirs, Path) else list(games_dirs)
 
 
-def _entries(games_dirs: GamesDirs) -> list[dict]:
+def _local_midnight_utc(day: str | None) -> datetime | None:
+    try:
+        return datetime.fromisoformat(day).astimezone(timezone.utc) if day else None
+    except ValueError:
+        return None
+
+
+def _entries(games_dirs: GamesDirs, vod_day: VodDay | None = None) -> list[dict]:
     folders: list[Path] = []
     for games_dir in _as_dirs(games_dirs):
         try:
@@ -65,7 +73,12 @@ def _entries(games_dirs: GamesDirs) -> list[dict]:
             continue
         if not isinstance(data, dict):
             continue
-        created = _parse_utc(data.get("matchStartUtc")) or datetime.fromtimestamp(video.stat().st_mtime, timezone.utc)
+        created = _parse_utc(data.get("matchStartUtc"))
+        tiebreak: tuple = ()
+        if created is None and data.get("source") == "vod" and vod_day is not None:
+            created = _local_midnight_utc(vod_day(str(data.get("vodId") or "")))
+            tiebreak = (Path(str(data.get("vodFile") or "")).name.casefold(), int(data.get("vodGameIndex") or 0))
+        created = created or datetime.fromtimestamp(video.stat().st_mtime, timezone.utc)
         tags: set[str] = set()
         for cand in data.get("candidates") or []:
             tags.update(cand.get("tags") or [])
@@ -74,6 +87,7 @@ def _entries(games_dirs: GamesDirs) -> list[dict]:
                 "pinned": bool(data.get("pinned")),
                 "tags": sorted(tags),
                 "_created_at": created,
+                "_tiebreak": tiebreak,
                 "_size_bytes": size,
                 "_path": folder,
                 "_key": folder.name,
@@ -83,21 +97,25 @@ def _entries(games_dirs: GamesDirs) -> list[dict]:
     return entries
 
 
-def plan_game_cleanup(games_dir: GamesDirs, cfg: RetentionConfig, *, now: datetime | None = None) -> GameCleanupPlan:
+def plan_game_cleanup(
+    games_dir: GamesDirs, cfg: RetentionConfig, *, now: datetime | None = None, vod_day: VodDay | None = None
+) -> GameCleanupPlan:
     now = now or datetime.now(timezone.utc)
     if not cfg.auto_clean_enabled:
         return GameCleanupPlan([], 0)
-    selected = select_for_auto_clean(_entries(games_dir), cfg, now=lambda: now)
+    selected = select_for_auto_clean(_entries(games_dir, vod_day), cfg, now=lambda: now)
     preserve = sum(e["_preserve"] for e in selected) if cfg.preserve_before_delete else 0
     return GameCleanupPlan([e["_path"] for e in selected], sum(e["_size_bytes"] for e in selected), preserve)
 
 
-def game_cleanup_preview(games_dir: GamesDirs, cfg: RetentionConfig, *, now: datetime | None = None) -> dict[str, dict]:
+def game_cleanup_preview(
+    games_dir: GamesDirs, cfg: RetentionConfig, *, now: datetime | None = None, vod_day: VodDay | None = None
+) -> dict[str, dict]:
     """다음 자동 정리 때 풀영상이 지워질 게임의 이유·예정 시각(경기 키 기준). 실제 정리와 같은 선정 함수를 쓴다."""
     now = now or datetime.now(timezone.utc)
     if not cfg.auto_clean_enabled:
         return {}
-    selected = select_for_auto_clean(_entries(games_dir), cfg, now=lambda: now)
+    selected = select_for_auto_clean(_entries(games_dir, vod_day), cfg, now=lambda: now)
     preview: dict[str, dict] = {}
     for e in selected:
         due_at = None
@@ -132,11 +150,16 @@ def delete_full_video(folder: Path, *, mode: str) -> None:
 
 
 def run_game_cleanup(
-    games_dir: GamesDirs, cfg: RetentionConfig, *, now: datetime | None = None, preserve: Callable[[Path], bool] | None = None
+    games_dir: GamesDirs,
+    cfg: RetentionConfig,
+    *,
+    now: datetime | None = None,
+    preserve: Callable[[Path], bool] | None = None,
+    vod_day: VodDay | None = None,
 ) -> GameCleanupPlan:
     """`preserve(폴더)` 는 지우기 직전 남길 클립을 저장하고 성공 여부를 돌려준다. 보존이 켜졌는데 `preserve` 가
     없거나 실패하면 그 풀영상은 지우지 않는다."""
-    plan = plan_game_cleanup(games_dir, cfg, now=now)
+    plan = plan_game_cleanup(games_dir, cfg, now=now, vod_day=vod_day)
     deleted: list[Path] = []
     held: list[Path] = []
     freed = 0

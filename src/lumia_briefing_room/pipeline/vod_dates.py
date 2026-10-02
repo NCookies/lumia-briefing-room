@@ -50,3 +50,29 @@ def is_valid_iso_date(text: str) -> bool:
     except ValueError:
         return False
     return True
+
+
+def make_vod_day_lookup(cfg):
+    """영상 id -> 화면에 보이는 영상 날짜. 목록(`api/vods.py::entry_for`)과 같은 우선순위로 구한다."""
+    from pathlib import Path
+
+    from lumia_briefing_room.config import resolve_paths
+    from lumia_briefing_room.pipeline.vod_store import load_index
+
+    base = resolve_paths(cfg.paths).library_vod
+
+    def day_of(vod_id: str) -> str | None:
+        index = load_index(base, vod_id) if vod_id else None
+        mtime = None
+        if index and index.get("path"):
+            try:
+                mtime = Path(index["path"]).stat().st_mtime
+            except OSError:
+                mtime = None
+        return resolve_video_date(
+            override=cfg.vod.video_dates.get(vod_id),
+            creation_time=(index or {}).get("creationTime"),
+            mtime=mtime,
+        )
+
+    return day_of

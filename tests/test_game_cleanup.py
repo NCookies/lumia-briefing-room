@@ -280,3 +280,47 @@ def test_relink_probes_duration_when_no_backup_and_ignores_missing_file(tmp_path
     (folder / "full.mp4").write_bytes(b"x" * 10)
     assert relink_restored_full_video(games, folder.name, probe=lambda p: 99.0) is True
     assert load_game(games, folder.name)["fullVideo"] == {"path": "full.mp4", "sizeBytes": 10, "durationSec": 99.0}
+
+
+def _make_vod_game(games: Path, vod_id: str, index: int, size: int, *, vod_file="a.mp4") -> Path:
+    key = f"vod_{vod_id}_g{index:02d}"
+    folder = games / key
+    folder.mkdir(parents=True)
+    (folder / "full.mp4").write_bytes(b"x" * size)
+    data = {
+        "gameKey": key, "source": "vod", "vodId": vod_id, "vodFile": vod_file, "vodGameIndex": index,
+        "matchStartUtc": None, "fullVideo": {"path": "full.mp4", "sizeBytes": size},
+        "candidates": [{"id": f"{key}_01", "tags": ["kill"], "user": {}}],
+    }
+    (folder / "game.json").write_text(json.dumps(data), encoding="utf-8")
+    return folder
+
+
+def test_vod_game_age_follows_video_date_not_when_it_was_analyzed(tmp_path):
+    games = tmp_path / "games"
+    old_vod = _make_vod_game(games, "aaaaaaaaaaaa", 1, 1000)
+    make_game(games, 5, 1000)
+    make_game(games, 1, 1000)
+
+    plan = gc.plan_game_cleanup(
+        games, cfg(max_total_gb=2500 / 1024**3), now=NOW, vod_day=lambda vod_id: "2026-09-01"
+    )
+    assert plan.to_delete == [old_vod]
+
+
+def test_same_video_date_deletes_from_the_bottom_of_the_list_first(tmp_path):
+    games = tmp_path / "games"
+    first = _make_vod_game(games, "aaaaaaaaaaaa", 1, 1000, vod_file="a.mp4")
+    last_of_a = _make_vod_game(games, "aaaaaaaaaaaa", 2, 1000, vod_file="a.mp4")
+    b = _make_vod_game(games, "bbbbbbbbbbbb", 1, 1000, vod_file="b.mp4")
+
+    plan = gc.plan_game_cleanup(games, cfg(max_total_gb=1500 / 1024**3), now=NOW, vod_day=lambda vod_id: "2026-09-20")
+    assert plan.to_delete == [b, last_of_a] or set(plan.to_delete) == {b, last_of_a}
+    assert first not in plan.to_delete
+
+
+def test_vod_game_without_video_date_falls_back_to_file_time(tmp_path):
+    games = tmp_path / "games"
+    vod = _make_vod_game(games, "aaaaaaaaaaaa", 1, 1000)
+    plan = gc.plan_game_cleanup(games, cfg(max_age_days=1), now=datetime.now(timezone.utc) + timedelta(days=3), vod_day=lambda v: None)
+    assert plan.to_delete == [vod]

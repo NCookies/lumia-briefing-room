@@ -54,7 +54,7 @@ def select_for_auto_clean(
         for m in metas
         if not is_protected(m, cfg)
     ]
-    candidates.sort(key=lambda c: c.age_days, reverse=True)  # 오래된 것부터
+    candidates.sort(key=lambda c: (c.age_days, c.meta.get("_tiebreak", ())), reverse=True)  # 오래된 것부터, 같으면 `_tiebreak` 가 큰 것부터
 
     selected: list[_Candidate] = []
     remaining = list(candidates)
