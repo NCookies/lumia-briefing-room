@@ -1,3 +1,4 @@
+import shutil
 import json
 from pathlib import Path
 
@@ -262,3 +263,14 @@ def test_in_place_reorganization_can_be_undone(tmp_path):
     assert previous["clips"] == str(root / "clips")
     assert (root / "clips" / "a.mp4").read_bytes() == b"A" and (root / "clips" / "sub" / "b.mp4").exists()
     assert (root / "vod" / "vod_x.mp4").exists() and not (root / "clips" / "자동 보관" / "a.mp4").exists()
+
+
+def test_in_place_reorganization_works_when_a_legacy_folder_does_not_exist(tmp_path):
+    """영상 파일 분석만 쓴 사용자는 스팀 클립 폴더(`clips`)와 풀영상 폴더가 아예 없다."""
+    cfg = legacy(tmp_path)
+    root = tmp_path / "old"
+    shutil.rmtree(root / "clips")
+    shutil.rmtree(root / "games")
+    p = plan_storage_move(resolve_paths(cfg), resolve_paths(PathsConfig(root=root)))
+    execute_storage_move(p, tmp_path / "local" / "ledger.jsonl", previous=previous_paths(cfg))
+    assert (root / "clips" / "자동 보관" / "vod_x.mp4").read_bytes() == b"V"

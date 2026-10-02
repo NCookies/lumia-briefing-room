@@ -67,7 +67,7 @@ def plan_storage_move(old: ResolvedPaths, new: ResolvedPaths) -> StoragePlan:
     dirs: list[tuple[Path, Path]] = []
 
     def add_tree(src_base: Path, dst_base: Path, files, *, with_dirs: bool = False) -> None:
-        if src_base.resolve() == dst_base.resolve():
+        if src_base.resolve() == dst_base.resolve() or not src_base.is_dir():
             return
         in_place = with_dirs and dst_base.parent.resolve() == src_base.resolve()
         if _is_inside(dst_base, src_base) and not in_place:
