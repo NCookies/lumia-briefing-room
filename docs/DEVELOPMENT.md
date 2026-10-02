@@ -471,7 +471,7 @@ git push origin v0.1.4
 | `tools/build_templates.py` | 라벨셋 → 숫자 본보기(npz) |
 | `tools/build_regions.py` | 라벨셋 → 지역명 본보기(npz) |
 | `tools/migrate_labels.py` | 클립을 새 경계로 다시 만들 때 옛 클립의 교전/사냥 라벨을 시간이 겹치는 새 클립으로 이관 |
-| `tools/backfill_game_result.py` | 결과가 없거나 일반/랭크 `unknown`·순위 빈 게임의 결과를 풀영상 끝 30초로 다시 읽어 `game.json`·클립 메타를 채움 (`[게임키 ...] [--games-dir] [--clips-dir] [--force]`, 수동 고친 게임은 건너뜀) |
+| `tools/backfill_game_result.py` | 결과가 없거나 일반/랭크 `unknown`·순위 빈 게임의 결과를 풀영상 끝 30초로 다시 읽어 `game.json`·클립 메타를 채움(승패 없는 코발트 게임 포함) (`[게임키 ...] [--games-dir] [--clips-dir] [--force]`, 수동 고친 게임은 건너뜀) |
 | `tools/build_rank_templates.py` | 결과 화면 순위 숫자 본보기(npz) — `숫자=결과화면.png` 표본을 주면 만든다 |
 | `tools/backfill_day.py` | 이미 만든 클립의 일차·제목을 재처리 없이 채움 (클립 영상의 HUD 에서 읽음) |
 | `tools/rescore_clips.py` | 저장된 클립 메타데이터의 교전 점수를 재검출 없이 다시 계산 (`--source steam\|vod\|all`, 기본 `steam`) |

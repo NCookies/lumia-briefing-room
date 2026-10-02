@@ -149,7 +149,7 @@
 - 닉네임: 줄만 3배 확대해 두 모델 중 점수 높은 쪽. 한글·영문 정확, 일본어·한자 미실측.
 - 훑기는 **끊김 없이 이어진 세그먼트만, 다음 경기 시작 전까지만**(`contiguous_segments`). 원본이 지워진 경기를 다시 돌렸다가 뒤쪽 다른 경기 결과가 붙은 사고가 있었다.
 - 화면 기반 경계(과거 녹화 분석)는 끝이 마지막 인게임 프레임이라 `find_result_after`(끝 뒤에서 앞으로)를 쓴다. 영상 파일(VOD)은 [vod.md](vod.md) 3.
-- 소급: 결과 없는·`unknown`·순위 빈 게임은 `tools/backfill_game_result.py`(`pipeline/game_backfill.py`)가 풀영상 끝 30초로 다시 읽어 `game.json` 과 그 게임의 클립 메타를 채운다. 사용자가 고친 게임(`matchResultSource="manual"`)은 `--force` 여도 건드리지 않고, 새 값이 비면 예전 값을 남긴다.
+- 소급: 결과 없는·`unknown`·순위 빈 게임(승패 없는 코발트 게임 포함)은 `tools/backfill_game_result.py`(`pipeline/game_backfill.py`)가 풀영상 끝 30초로 다시 읽어 `game.json` 과 그 게임의 클립 메타를 채운다. 사용자가 고친 게임(`matchResultSource="manual"`)은 `--force` 여도 건드리지 않고, 새 값이 비면 예전 값을 남긴다.
 - 결과 프레임은 경기당 1장 1280px JPEG 로 저장(`matchResult.imagePath`).
 - **캐릭터 이름 OCR(세로 영문 이름·순위표 탭)은 폐기**(2026-09-28, 실사용 실패율 높음). `detect/character.py`·`scoreboard.py`·`characters.json` 삭제. 결과 OCR 은 모드·순위·문구·스탯·닉네임만.
 - 탈출·일반 게임 결과 화면은 샘플이 없어 미실측.

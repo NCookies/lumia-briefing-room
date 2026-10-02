@@ -94,15 +94,27 @@ def test_never_touches_a_game_the_user_corrected_by_hand(tmp_path):
     assert read_game(games)["matchResult"] is None
 
 
-def test_skips_games_without_full_video_and_cobalt_games(tmp_path):
+def test_skips_games_without_full_video(tmp_path):
     games, clips = tmp_path / "games", tmp_path / "clips"
     make_game(games, "20260929_100000", video=False)
-    make_game(games, "20260929_110000", mode="cobalt")
     calls = []
 
     report = backfill_game_results(games, clips, find=lambda p: calls.append(1) or screen())
 
-    assert calls == [] and report.no_video == 1 and report.skipped == 1
+    assert calls == [] and report.no_video == 1
+
+
+def test_fills_a_cobalt_game_without_a_result_and_skips_one_that_already_has_its_outcome(tmp_path):
+    games, clips = tmp_path / "games", tmp_path / "clips"
+    make_game(games, "20260929_100000", mode="cobalt")
+    make_game(games, "20260929_110000", mode="cobalt", result={"matchType": "unknown", "placement": 2, "outcome": "패배"})
+    cobalt = screen(placement=1, total=2, match_type="unknown", match_label="", outcome="승리")
+    calls = []
+
+    report = backfill_game_results(games, clips, find=lambda p: calls.append(p) or cobalt)
+
+    assert report.filled == 1 and report.skipped == 1 and len(calls) == 1
+    assert read_game(games, "20260929_100000")["matchResult"]["outcome"] == "승리"
 
 
 def test_leaves_the_game_alone_when_no_result_screen_is_found_or_reading_fails(tmp_path):

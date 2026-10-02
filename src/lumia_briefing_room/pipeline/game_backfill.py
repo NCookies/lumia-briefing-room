@@ -99,7 +99,7 @@ def backfill_game_results(
             report.locked += 1
             note(key, "수동으로 고친 게임이라 건너뜀")
             continue
-        if game.get("gameMode") == "cobalt" or (not force and not needs_result(game)):
+        if not force and not needs_result(game):
             report.skipped += 1
             continue
         video = games_dir / key / FULL_VIDEO
