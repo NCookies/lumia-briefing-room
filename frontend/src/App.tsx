@@ -263,6 +263,10 @@ export default function App() {
           onClipChange={(name, id, replace) => navigate({ tab: 'library', category: name ?? undefined, clip: id ?? undefined }, replace)}
           onCloseClip={() => back(routeOf('library'))}
           onOpenGame={(tab, gameKey, candidateId) => navigate({ tab, game: gameKey, cand: candidateId })}
+          onOpenStorage={() => {
+            setSettingsTab('general')
+            setShowSettings(true)
+          }}
           refreshTick={refreshTick}
           confirmDelete={confirmDelete}
           onConfirmDeleteChange={changeConfirmDelete}

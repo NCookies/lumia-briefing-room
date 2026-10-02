@@ -30,6 +30,8 @@ interface Props {
   onCloseClip: () => void
   /** 클립을 만든 게임의 풀영상 화면을 그 후보가 선택된 채로 연다. */
   onOpenGame: (tab: 'steam' | 'vod', gameKey: string, candidateId: string) => void
+  /** 옵션의 저장 폴더 화면을 연다(옛 폴더 구조 사용자가 새 구조로 옮길 때). */
+  onOpenStorage?: () => void
   refreshTick: number
   confirmDelete: boolean
   onConfirmDeleteChange: (value: boolean) => void
@@ -45,7 +47,7 @@ function formatDuration(sec: number): string {
 }
 
 /** "클립" 탭: 보관한 클립을 카테고리(= `clips\` 아래 폴더)별로 본다. 왼쪽 카테고리 목록, 오른쪽 그 카테고리의 클립 카드(게임 정보 중심). */
-export function ClipArchive({ active, category, onCategoryChange, clipId, onClipChange, onCloseClip, onOpenGame, refreshTick, confirmDelete, onConfirmDeleteChange, deleteMode, onDeleteModeChange }: Props) {
+export function ClipArchive({ active, category, onCategoryChange, clipId, onClipChange, onCloseClip, onOpenGame, onOpenStorage, refreshTick, confirmDelete, onConfirmDeleteChange, deleteMode, onDeleteModeChange }: Props) {
   const [enabled, setEnabled] = useState(true)
   const [categories, setCategories] = useState<Category[] | null>(null)
   const [clips, setClips] = useState<LibraryClip[]>([])
@@ -340,7 +342,20 @@ export function ClipArchive({ active, category, onCategoryChange, clipId, onClip
         {error && <p className="rounded-md border border-rose-500/60 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{error}</p>}
         {info && <p className="text-sm text-zinc-400">{info}</p>}
 
-        {categories && shown.length === 0 && (
+        {categories && !enabled && !searching && (
+          <div className="mx-auto mt-10 flex max-w-xl flex-col items-center gap-3 rounded-lg border border-amber-500/50 bg-amber-500/10 px-5 py-5 text-center text-sm text-amber-100" data-testid="legacy-layout-notice">
+            <p>이전 버전에서 쓰던 폴더 구조를 그대로 쓰고 있어서 이 탭에는 카테고리가 없습니다.</p>
+            <p>클립은 사라지지 않았습니다. 스팀 녹화·영상 파일 탭에서 게임을 열면 "보관한 클립"으로 볼 수 있습니다.</p>
+            <p>이 탭에서 카테고리별로 보려면 저장 폴더를 새 구조로 옮기세요. 게임 목록과 클립은 그대로 이어지고, 옮긴 직후에는 되돌릴 수도 있습니다.</p>
+            {onOpenStorage && (
+              <button type="button" className="rounded-md border border-amber-400/60 bg-amber-500/20 px-4 py-1.5 text-amber-50 transition hover:bg-amber-500/30" onClick={onOpenStorage}>
+                저장 폴더 설정 열기
+              </button>
+            )}
+          </div>
+        )}
+
+        {categories && enabled && shown.length === 0 && (
           <p className="py-12 text-center text-sm text-zinc-500">
             {searching
               ? '검색에 맞는 클립이 없습니다.'

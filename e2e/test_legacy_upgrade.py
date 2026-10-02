@@ -33,14 +33,21 @@ def test_U01_old_steam_game_shows_in_the_list_and_its_clips_play(legacy_world, l
     page.wait_for_function(PLAYING, timeout=SLOW)
 
 
-def test_U02_old_layout_clip_tab_explains_itself_and_clips_stay_reachable_from_the_game(legacy_world, launch, page, shot):
-    """옛 경로 모드는 카테고리가 없어 클립 탭은 안내만 나온다(spec/ui.md). 클립은 게임의 "보관한 클립"으로 본다."""
+def test_U02_old_layout_clip_tab_explains_and_leads_to_the_move_screen(legacy_world, launch, page, shot):
+    """옛 경로 모드는 카테고리가 없다(spec/ui.md). 클립 탭은 클립이 사라지지 않았다는 안내와 저장 폴더 설정으로 가는 버튼을 보인다."""
     legacy_world.add_legacy_steam_clips(STEAM_KEY, count=2)
     server = launch()
     page.goto(server.url + "/#/clips")
-    expect(page.get_by_text("이전 버전 폴더 구조에서는 카테고리를 쓸 수 없습니다")).to_be_visible()
+    notice = page.get_by_test_id("legacy-layout-notice")
+    expect(notice).to_be_visible()
+    expect(notice).to_contain_text("클립은 사라지지 않았습니다")
+    expect(notice).to_contain_text("새 구조로 옮기세요")
     expect(page.get_by_text("옛 교전 1")).to_have_count(0)
     shot("legacy_clips_tab")
+    notice.get_by_role("button", name="저장 폴더 설정 열기").click()
+    expect(page.get_by_role("button", name=re.compile("새 구조로 옮기기"))).to_be_visible()
+    shot("legacy_storage_settings")
+    page.keyboard.press("Escape")
     page.get_by_role("tab", name="스팀 녹화").click()
     expect(page.locator(f'[data-game="{STEAM_KEY}"]')).to_be_visible()
 
