@@ -6,7 +6,7 @@
 
 ## 0. 진행 상태 (세션이 끊겨도 여기부터 이어간다)
 
-- [ ] R1 — 검증 묶음 실행기 `tools/release_check.py` + 화면 E2E 기반(시드 라이브러리·Playwright 러너) + 스크린샷 모음 + 첫 시나리오 (§3.1~3.3)
+- [ ] R1 — 검증 묶음 실행기 `tools/release_check.py` (§3.1) — 화면 E2E 기반(`e2e/` pytest-playwright 러너·서버·시드·스크린샷 보고서)과 첫 시나리오 23개는 만들었다([DEVELOPMENT.md "화면 E2E"](DEVELOPMENT.md), [e2e-scenarios.md](e2e-scenarios.md)). 남은 것: 실행기, 시드 시나리오(§3.2 의 `vod`·`legacy`·`edge`), 시나리오 확대
 - [ ] R2 — 테스트 전용 가짜 환경(디스크 여유·물리 디스크·스팀 녹화 상태·폴더 선택 창·실패 주입) + 그걸 쓰는 화면 시나리오 (§3.4)
 - [ ] R3 — 파이프라인 E2E: 합성 녹화 + 가짜 검출기로 분석 → 풀영상·클립·game.json 끝까지 (§3.5)
 - [ ] R4 — 실녹화 골든 셋(개발 PC 전용): 검출·판독 결과를 기대값과 비교 (§3.6)
@@ -66,7 +66,9 @@ R1 이 끝나면 R5 의 규칙 전환을 바로 해서, 그 뒤 새로 생기는
 
 단계별로 `--only e2e` 처럼 골라 돌릴 수 있게 한다. 개발 중에는 해당 시나리오만, 릴리스 전에는 전부.
 
-### 3.2 시드 라이브러리 `tools/e2e_seed.py`
+### 3.2 시드 라이브러리 (`e2e/world.py` — 지금은 `default` 한 세트만)
+
+지금 있는 것: 스팀 게임 4판(두 날짜, 랭크·코발트, 풀영상 없는 게임 1개)을 `game.json` 으로 직접 써서 만든다(`tests/test_api_games.py` 와 같은 방식). 클립은 앱 API(`/candidates/<id>/save`)로 저장해 만든다. 아래 표의 나머지 시나리오와, `game.json` 도 앱의 저장 함수로 만드는 것은 남았다.
 
 화면 테스트가 쓸 앱 상태를 임시 폴더에 만든다. 영상은 ffmpeg `testsrc`(320x180, 몇 초~1분, 시각이 박힌 화면)로 작게 만든다. 실제 앱 형식 그대로(`full.mp4`·`game.json`·`clipUid` 태그 클립·library json·config.json)여야 한다 — 형식을 손으로 흉내 내지 말고 앱의 저장 함수를 불러 만든다(형식이 바뀌면 시드도 따라 바뀌게).
 
@@ -81,8 +83,8 @@ R1 이 끝나면 R5 의 규칙 전환을 바로 해서, 그 뒤 새로 생기는
 
 ### 3.3 화면 E2E
 
-- 러너: `@playwright/test`(이미 `playwright` 가 devDependency). 위치 `frontend/e2e/*.spec.ts`. 브라우저는 시스템 Chrome(재생 코덱 때문에 — HEVC 가 아닌 시드 영상은 H.264 로 만든다).
-- 매 spec 파일 = 시드 1개 + `cli.serve`(임시 `LOCALAPPDATA`·임시 config, 빈 포트) 기동. "앱 재시작 후"는 서버를 껐다 켜는 도우미로 쓴다.
+- 러너: 파이썬 `pytest-playwright`(`.venv`, 기존 pytest 와 한 도구). 위치 `e2e/`. 브라우저는 Playwright Chromium(시드 영상은 H.264 라 재생된다).
+- 테스트마다 시드 + 서버 프로세스(`e2e/run_server.py`, 임시 `LOCALAPPDATA`·임시 config, 빈 포트) 기동. "앱 재시작 후"는 서버를 껐다 켜는 도우미로 쓴다.
 - 영상 확인은 `video.videoWidth > 0`·`currentTime` 으로, 클립 범위 확인은 ffprobe 길이로 한다([plan.md](plan.md) §4 의 "Playwright 로 실제 클립 videoWidth>0" 도 여기서 끝난다).
 - 스크린샷: spec 안에서 `shot("이름")` 으로 찍은 것만 보고서 모음에 넣는다(H4). 픽셀 비교는 하지 않는다 — 폰트·렌더링 차이로 깨지기만 하고 사람이 보는 게 더 낫다.
 

@@ -42,6 +42,57 @@ export LUMIA_FFMPEG=/path/to/ffmpeg.exe   # git bash
 $env:LUMIA_FFMPEG = "C:\path\to\ffmpeg.exe"   # PowerShell
 ```
 
+## 화면 E2E
+
+브라우저(Playwright Chromium)로 앱을 실제로 눌러 보는 테스트. 눌러 보면 아는 것(화면에 뜨는가·문구·메뉴·확인 창·단축키·뒤로 가기·삭제/보관 흐름)을
+사람 대신 확인한다. 시나리오 목록은 [e2e-scenarios.md](e2e-scenarios.md), 계획은 [plan-release-automation.md](plan-release-automation.md).
+기본 `pytest` 에는 **안 돌아간다**(느리다 - 23개에 약 1분 15초).
+
+```bash
+pip install -e ".[dev]"                  # pytest-playwright 포함
+python -m playwright install chromium    # 브라우저는 한 번만 받는다
+cd frontend && npm run build             # e2e 는 frontend/dist 를 띄운다 - 프론트를 고쳤으면 먼저 빌드
+cd .. && pytest e2e -m e2e               # 전부
+pytest e2e -m e2e -k V06                 # 시나리오 하나
+pytest e2e -m e2e --headed --slowmo 300  # 브라우저를 눈으로 보며
+pytest e2e -m e2e --tracing retain-on-failure   # 실패하면 trace.zip 을 남긴다(playwright show-trace)
+```
+
+libx264 가 있는 ffmpeg 가 PATH 에 있거나 `LUMIA_FFMPEG` 로 지정돼 있어야 한다(합성 영상을 만든다. 배포용 `vendor/ffmpeg` 에는 libx264 가 없다 - 없으면 전부 skip).
+
+**어떻게 도는가** — 테스트마다 임시 폴더에 새 세계를 만든다(`e2e/world.py`): 임시 `LOCALAPPDATA`·`APPDATA`·`USERPROFILE`·config, 저장 폴더 `root`,
+시드 게임(`game.json` + 320x180 H.264 합성 영상). `e2e/run_server.py` 로 서버를 **별도 프로세스**로 띄우고 Playwright 가 그 주소를 연다
+(브라우저·pywebview 는 안 열린다). 실제 사용자 폴더·설정은 건드리지 않는다. "앱 재시작 후"는 `server.restart()`.
+
+**fixture**(`e2e/conftest.py`): `world`(시드 추가 - `world.add_game(...)`), `launch(consented=…, extra_config=…)`(서버 띄우기, 시드를 채운 뒤 호출),
+`server`(기본 세계 4게임으로 띄움, `server.api("POST", "/api/...")` 로 앱 API 호출), `go("/#/steam")`(주소 열기), `page`, `shot("이름")`(스크린샷).
+세 탭이 한꺼번에 마운트돼 있어 같은 문구가 여러 곳에 있을 수 있다 - 선택자는 `:visible`·`data-testid`·`aria-label` 로 좁힌다
+(`data-game="<경기키>"` 게임 행, `viewer-candidates`, `clip-open`). 처리되지 않은 JS 예외가 나면 그 테스트는 실패한다.
+
+### 결과 보기·기록하기
+
+- 실행이 끝나면 `build/e2e-report/` 에 `index.html`(시나리오별 통과/실패 + 스크린샷 모음 — 릴리스 체크 **H4** 로 훑는다), `report.json`(결과·오류·스크린샷 이름),
+  `shots/*.png` 가 생긴다. 실패한 시나리오는 마지막 화면이 `…__FAIL.png` 로 자동 저장된다. 이 폴더는 git 에 안 넣는다(`build/`).
+- 릴리스 때는 **HEAD 커밋에서 전부 통과**한 결과여야 한다. 결과를 남길 곳: 릴리스 준비 커밋 메시지에 `pytest e2e: N 통과` 를 적고,
+  [release-checklist.md](release-checklist.md) H4 항목은 스크린샷을 훑은 사람이 `[x]` 한다. 서버 로그는 시나리오 임시 폴더의 `home/server.log` 다(pytest 가 `--basetemp` 로 알려 주는 경로).
+
+### 실패했을 때 고치는 순서
+
+1. `index.html` 의 `FAIL.png` 와 `report.json` 의 오류 문구를 본다. 재현은 `-k <ID> --headed --slowmo 300`, 더 자세히는 `--tracing on` → `playwright show-trace`.
+2. 어느 쪽이 틀렸는지 가른다.
+   - **앱이 틀림**(진짜 버그): 앱을 고치고 같은 시나리오가 통과하는지 본다. 고친 버그는 시나리오로 남겨 둔다(`e2e-scenarios.md` 한 줄 추가).
+   - **화면이 일부러 바뀜**(문구·버튼 이름·구조): 시나리오의 기대값을 바꾸고 [e2e-scenarios.md](e2e-scenarios.md) 의 설명도 맞춘다. 문구에 기대는 테스트가 많으니 UI 문구를 고칠 때 `pytest e2e -m e2e` 를 돌린다.
+   - **선택자가 흔들림**(같은 문구가 여러 곳, 아직 안 떠서): `expect(...)` 자동 대기를 쓰고(고정 `wait_for_timeout` 은 피한다), 그래도 모호하면 프론트에 `data-testid` 를 달고 `npm run build`.
+   - **환경 탓**(포트·ffmpeg·느린 디스크): 한 번 더 돌려 같은 곳에서 다시 깨지는지 본다. 같은 곳에서 깨지면 환경 탓이 아니다.
+3. 프론트를 고쳤으면 `cd frontend && npm run build` 한 뒤 다시 돌린다(e2e 는 `frontend/dist` 를 본다).
+4. 통과하면 앱 수정·시나리오 수정·문서를 **같은 커밋**에 담는다.
+
+### 시나리오 추가하기
+
+새 사용자 가시 기능·버그 수정 커밋에는 사람 체크리스트에 한 줄 적는 대신 **시나리오를 먼저 쓴다**(TDD). `e2e/test_*.py` 에 `test_<영역><번호>_<확인하는 것>` 으로 쓰고
+`e2e-scenarios.md` 표에 한 줄 더한다. 시드가 모자라면 `world.py` 에 `add_*` 를 더한다 — 클립처럼 앱이 만드는 것은 직접 쓰지 말고 앱 API 로 만든다.
+실제 게임·스팀·큰 파일·실데이터가 있어야만 보이는 것만 [release-checklist.md](release-checklist.md) 에 올린다.
+
 ## 실행 방법
 
 > 코드가 바뀌어 아래 내용이 실제와 달라지면 그때그때 이 섹션을 같이 고친다

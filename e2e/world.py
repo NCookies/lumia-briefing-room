@@ -1,0 +1,177 @@
+"""E2E 가 쓰는 임시 세계(저장 폴더·설정·시드 게임)와 서버 프로세스. 실제 사용자 폴더는 건드리지 않는다."""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import socket
+import subprocess
+import sys
+import time
+import urllib.request
+from dataclasses import dataclass
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from lumia_briefing_room.consent import CONSENT_VERSION  # noqa: E402
+
+KEY_BR = "20260930_002400"
+KEY_BR2 = "20260930_013000"
+KEY_OLD = "20260928_030000"
+KEY_COBALT = "20260928_050000"
+
+
+def make_sample_video(ffmpeg: str, out: Path, seconds: int = 24) -> Path:
+    out.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        ffmpeg, "-y", "-loglevel", "error",
+        "-f", "lavfi", "-i", f"testsrc=size=320x180:rate=15:duration={seconds}",
+        "-f", "lavfi", "-i", f"sine=frequency=440:duration={seconds}",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "15", "-c:a", "aac", "-shortest", str(out),
+    ]
+    subprocess.run(cmd, check=True)
+    return out
+
+
+def candidate(cid: str, start: float, end: float, *, certain: bool = False, title: str | None = None) -> dict:
+    return {
+        "id": cid, "start": start, "end": end, "combatStart": start + 2, "combatEnd": end - 2,
+        "title": title or cid, "tags": ["kill"] if certain else ["no_result"], "certain": certain, "user": {},
+    }
+
+
+def game_json(key: str, *, mode: str = "battle_royale", placement: int | None = 3, with_video: bool = True,
+              duration: float = 24.0, size: int = 1000, candidates: list[dict] | None = None) -> dict:
+    day = f"{key[:4]}-{key[4:6]}-{key[6:8]}"
+    clock = f"{key[9:11]}:{key[11:13]}:{key[13:15]}"
+    result = None
+    if placement:
+        result = {"matchType": "rank", "matchLabel": "랭크", "placement": placement, "total": 8, "outcome": None,
+                  "nickname": None, "tk": 5, "kills": 3, "deaths": 1, "assists": 2}
+    elif mode == "cobalt":
+        result = {"matchType": "unknown", "matchLabel": "", "placement": None, "total": None, "outcome": "승리",
+                  "nickname": None, "tk": None, "kills": 4, "deaths": 0, "assists": 1}
+    video = None
+    if with_video:
+        video = {"path": "full.mp4", "sizeBytes": size, "durationSec": duration, "offsetSec": 0.0,
+                 "segmentDurationSec": 3.0, "sourceIncomplete": False, "audioStatus": "full"}
+    return {
+        "gameKey": key, "matchStartUtc": f"{day}T{clock}Z", "matchEndUtc": f"{day}T{clock}Z",
+        "sessionDir": "bg_1", "sessionStartUtc": f"{day}T00:00:00Z", "gameMode": mode,
+        "sourceWidth": 2560, "sourceHeight": 1440, "matchResult": result,
+        "portraits": {}, "pinned": False, "fullVideo": video,
+        "candidates": candidates or [], "userCandidates": [], "markers": [],
+    }
+
+
+@dataclass
+class World:
+    home: Path
+    root: Path
+    sample_video: Path
+    ffmpeg: str
+
+    @property
+    def env(self) -> dict[str, str]:
+        env = dict(os.environ)
+        env.update(
+            LOCALAPPDATA=str(self.home / "Local"), APPDATA=str(self.home / "Roaming"),
+            USERPROFILE=str(self.home), LUMIA_FFMPEG=self.ffmpeg, PYTHONIOENCODING="utf-8",
+        )
+        env.pop("LUMIA_PROFILE", None)
+        return env
+
+    @property
+    def config_path(self) -> Path:
+        return self.home / "config.json"
+
+    @property
+    def steam_games(self) -> Path:
+        return self.root / "full_video" / "steam_replay"
+
+    def write_config(self, *, consented: bool = True, extra: dict | None = None) -> None:
+        cfg: dict = {"paths": {"root": str(self.root)}}
+        if consented:
+            cfg["consent"] = {"version": CONSENT_VERSION}
+        for key, value in (extra or {}).items():
+            cfg.setdefault(key, {}).update(value)
+        self.config_path.parent.mkdir(parents=True, exist_ok=True)
+        self.config_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def add_game(self, key: str, **kwargs) -> Path:
+        folder = self.steam_games / key
+        folder.mkdir(parents=True, exist_ok=True)
+        if kwargs.get("with_video", True):
+            shutil.copyfile(self.sample_video, folder / "full.mp4")
+            kwargs.setdefault("size", (folder / "full.mp4").stat().st_size)
+        (folder / "game.json").write_text(json.dumps(game_json(key, **kwargs), ensure_ascii=False), encoding="utf-8")
+        return folder
+
+    def seed_default_games(self) -> None:
+        """두 날짜·두 모드·풀영상 없는 게임까지 — 대부분의 화면 시나리오가 쓰는 기본 세계."""
+        self.add_game(KEY_BR, placement=1, candidates=[
+            candidate(f"{KEY_BR}_01", 3, 9, certain=True, title="첫 교전"),
+            candidate(f"{KEY_BR}_02", 10, 16),
+            candidate(f"{KEY_BR}_03", 17, 23, certain=True, title="마지막 교전"),
+        ])
+        self.add_game(KEY_BR2, placement=5, candidates=[candidate(f"{KEY_BR2}_01", 4, 12, certain=True)])
+        self.add_game(KEY_OLD, placement=2, with_video=False,
+                      candidates=[candidate(f"{KEY_OLD}_01", 4, 12, certain=True)])
+        self.add_game(KEY_COBALT, mode="cobalt", placement=None,
+                      candidates=[candidate(f"{KEY_COBALT}_01", 2, 10, certain=True)])
+
+
+def free_port() -> int:
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
+
+
+class Server:
+    def __init__(self, world: World):
+        self.world = world
+        self.port = free_port()
+        self.url = f"http://127.0.0.1:{self.port}"
+        self.log_path = world.home / "server.log"
+        self.proc: subprocess.Popen | None = None
+
+    def start(self, timeout: float = 40.0) -> "Server":
+        log = open(self.log_path, "wb")
+        self.proc = subprocess.Popen(
+            [sys.executable, str(ROOT / "e2e" / "run_server.py"), "--config", str(self.world.config_path),
+             "--port", str(self.port)],
+            cwd=ROOT, env=self.world.env, stdout=log, stderr=subprocess.STDOUT,
+        )
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if self.proc.poll() is not None:
+                text = self.log_path.read_text(encoding="utf-8", errors="replace")
+                raise RuntimeError(f"서버가 바로 죽었다:\n{text}")
+            try:
+                urllib.request.urlopen(f"{self.url}/api/first-run", timeout=1).read()
+                return self
+            except Exception:
+                time.sleep(0.2)
+        self.stop()
+        raise RuntimeError("서버가 제한 시간 안에 시작되지 않았다")
+
+    def stop(self) -> None:
+        if self.proc is None or self.proc.poll() is not None:
+            return
+        subprocess.run(["taskkill", "/PID", str(self.proc.pid), "/T", "/F"], capture_output=True)
+        self.proc.wait(timeout=10)
+
+    def restart(self) -> None:
+        self.stop()
+        self.start()
+
+    def api(self, method: str, path: str, body: dict | None = None):
+        data = json.dumps(body).encode() if body is not None else None
+        headers = {"Content-Type": "application/json"} if data else {}
+        req = urllib.request.Request(f"{self.url}{path}", data=data, method=method, headers=headers)
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            raw = resp.read()
+        return json.loads(raw) if raw else None
