@@ -67,7 +67,9 @@ def test_find_result_in_video_reads_the_tail_of_a_real_file(tmp_path, monkeypatc
         check=True,
     )
     seen = []
-    monkeypatch.setattr(result_tail, "read_result_screen", lambda f, p, r: seen.append(f.shape) or result(2))
+    monkeypatch.setattr(
+        result_tail, "make_result_reader", lambda profile, reader: lambda f: seen.append(f.shape) or result(2)
+    )
     monkeypatch.setattr(result_tail, "make_is_ingame", lambda *a, **k: (lambda f: False))
     profile = ResolutionProfile.for_resolution(2560, 1440)
 

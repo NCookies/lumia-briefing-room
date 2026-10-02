@@ -6,14 +6,14 @@ from pathlib import Path
 
 import numpy as np
 
-from lumia_briefing_room.detect.cobalt_result import read_cobalt_result_screen, to_result_screen
 from lumia_briefing_room.detect.ocr import TextReader
 from lumia_briefing_room.detect.region import load_region_templates
-from lumia_briefing_room.detect.result import ResultScreen, read_result_screen
+from lumia_briefing_room.detect.result import ResultScreen
 from lumia_briefing_room.pipeline.result_scan import (
     FORWARD_BATCH,
     get_reader,
     make_is_ingame,
+    make_result_reader,
     scan_forward_for_result,
 )
 from lumia_briefing_room.pipeline.result_tail import end_screens_from_frames
@@ -103,9 +103,6 @@ def find_vod_result(
     ffprobe_path = find_ffprobe(ffmpeg_path)
     day_templates = load_region_templates(profile.day_templates) if profile.day_templates else None
     phase_templates = load_region_templates(profile.phase_templates) if profile.phase_templates else None
-    outcome_templates = (
-        load_region_templates(profile.cobalt_outcome_templates) if profile.cobalt_outcome_templates else None
-    )
 
     def factory(start: float, end: float) -> FrameSource:
         return VodFileSource(
@@ -119,21 +116,10 @@ def find_vod_result(
             start_sec=start, end_sec=end, hwaccel=hwaccel, fps=DENSE_FPS,
         )
 
-    def read(frame: np.ndarray) -> ResultScreen | None:
-        """plan.md §10 C3: 배틀로얄 결과 화면을 먼저 찾고, 없으면 코발트 승패 화면을 본다.
-
-        둘 다 못 찾으면(로비·로딩 등) None - 어느 모드인지 미리 알 필요 없다.
-        """
-        result = read_result_screen(frame, profile, reader)
-        if result is not None:
-            return result
-        cobalt = read_cobalt_result_screen(frame, profile, reader, outcome_templates)
-        return to_result_screen(cobalt) if cobalt is not None else None
-
     is_ingame = make_is_ingame(profile, day_templates, phase_templates)
     return scan_game_end(
         factory, span, next_start,
-        read=read,
+        read=make_result_reader(profile, reader),
         is_ingame=is_ingame,
         dense_factory=dense_factory,
     )

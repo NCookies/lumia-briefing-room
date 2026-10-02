@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from lumia_briefing_room.detect.cobalt_result import read_cobalt_result_screen, to_result_screen
 from lumia_briefing_room.detect.day import read_game_day
 from lumia_briefing_room.detect.ocr import OcrReader, TextReader
 from lumia_briefing_room.detect.phase import read_cobalt_phase
@@ -162,6 +163,26 @@ def make_is_ingame(
     return is_ingame
 
 
+def make_result_reader(profile: ResolutionProfile, reader: TextReader) -> Callable[[np.ndarray], ResultScreen | None]:
+    """배틀로얄 결과 화면을 먼저 찾고, 없으면 코발트 승패 화면을 본다 - 어느 모드인지 미리 알 필요 없다.
+
+    스팀 녹화·다시보기 영상의 모든 결과 판독 경로가 이걸 쓴다(스팀 경로만 배틀로얄 판독을 따로 쓰다 코발트 결과를 통째로
+    놓친 적이 있다).
+    """
+    outcome_templates = (
+        load_region_templates(profile.cobalt_outcome_templates) if profile.cobalt_outcome_templates else None
+    )
+
+    def read(frame: np.ndarray) -> ResultScreen | None:
+        result = read_result_screen(frame, profile, reader)
+        if result is not None:
+            return result
+        cobalt = read_cobalt_result_screen(frame, profile, reader, outcome_templates)
+        return to_result_screen(cobalt) if cobalt is not None else None
+
+    return read
+
+
 def find_result_screen(
     session: RecordingSession,
     seg_range: SegmentRange,
@@ -184,7 +205,7 @@ def find_result_screen(
 
     return scan_for_result(
         frames,
-        lambda f: read_result_screen(f, profile, reader),
+        make_result_reader(profile, reader),
         is_ingame=make_is_ingame(profile, day_templates, phase_templates),
     ).result
 
@@ -241,6 +262,6 @@ def find_result_after(
 
     return scan_forward_for_result(
         batches(),
-        lambda f: read_result_screen(f, profile, reader),
+        make_result_reader(profile, reader),
         is_ingame=make_is_ingame(profile, day_templates, phase_templates),
     ).result

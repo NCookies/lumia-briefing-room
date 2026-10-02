@@ -14,8 +14,14 @@ import numpy as np
 
 from lumia_briefing_room.detect.ocr import TextReader
 from lumia_briefing_room.detect.region import load_region_templates
-from lumia_briefing_room.detect.result import ResultScreen, read_result_screen
-from lumia_briefing_room.pipeline.result_scan import EndScreens, get_reader, make_is_ingame, scan_forward_for_result
+from lumia_briefing_room.detect.result import ResultScreen
+from lumia_briefing_room.pipeline.result_scan import (
+    EndScreens,
+    get_reader,
+    make_is_ingame,
+    make_result_reader,
+    scan_forward_for_result,
+)
 from lumia_briefing_room.profiles.models import ResolutionProfile
 from lumia_briefing_room.video.frames import extract_tail_frames, write_merged_segment_file
 from lumia_briefing_room.video.segments import SegmentRange, existing_segment_numbers
@@ -78,7 +84,7 @@ def find_result_in_video(
         extract_tail_frames(
             video_path, tail_sec=tail_sec, fps=fps, ffmpeg_path=ffmpeg_path, ffprobe_path=ffprobe_path, hwaccel=hwaccel
         ),
-        lambda f: read_result_screen(f, profile, reader),
+        make_result_reader(profile, reader),
         is_ingame=make_is_ingame(profile, day_templates, phase_templates),
     )
 

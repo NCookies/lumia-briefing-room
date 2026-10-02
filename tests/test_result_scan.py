@@ -6,9 +6,15 @@ from lumia_briefing_room.detect.day import white_score
 from lumia_briefing_room.detect.phase import V_LO as PHASE_V_LO
 from lumia_briefing_room.detect.region import build_region_template, region_score
 from lumia_briefing_room.detect.result import ResultScreen
+from lumia_briefing_room.detect.cobalt_result import CobaltResultScreen
+from lumia_briefing_room.detect.region import save_region_templates
+from lumia_briefing_room.pipeline import result_scan
 from lumia_briefing_room.pipeline.result_scan import (
     contiguous_segments,
+    find_result_after,
+    find_result_screen,
     make_is_ingame,
+    make_result_reader,
     scan_for_result,
     scan_forward_for_result,
 )
@@ -200,3 +206,71 @@ def test_make_is_ingame_false_without_any_templates():
     profile = ResolutionProfile.for_resolution(1920, 1080)
     is_ingame = make_is_ingame(profile, None, None)
     assert is_ingame(np.full((1080, 1920, 3), 5, np.uint8)) is False
+
+
+def _cobalt_profile(tmp_path):
+    import dataclasses
+
+    path = tmp_path / "cobalt_outcome.npz"
+    save_region_templates({"승리": np.ones((4, 4), np.float32)}, path)
+    return dataclasses.replace(ResolutionProfile.for_resolution(2560, 1440), cobalt_outcome_templates=path)
+
+
+def test_make_result_reader_uses_the_battle_royale_result_first(tmp_path, monkeypatch):
+    cobalt_calls = []
+    monkeypatch.setattr(result_scan, "read_result_screen", lambda f, p, r: RESULT)
+    monkeypatch.setattr(result_scan, "read_cobalt_result_screen", lambda *a: cobalt_calls.append(a))
+
+    read = make_result_reader(_cobalt_profile(tmp_path), object())
+
+    assert read(np.zeros((2, 2, 3), np.uint8)) == RESULT
+    assert cobalt_calls == []
+
+
+def test_make_result_reader_falls_back_to_the_cobalt_outcome_screen(tmp_path, monkeypatch):
+    seen_templates = []
+
+    def read_cobalt(frame, profile, reader, templates):
+        seen_templates.append(set(templates))
+        return CobaltResultScreen(outcome="승리", nickname="나", stats={"tk": 31}, teammates=[])
+
+    monkeypatch.setattr(result_scan, "read_result_screen", lambda f, p, r: None)
+    monkeypatch.setattr(result_scan, "read_cobalt_result_screen", read_cobalt)
+
+    got = make_result_reader(_cobalt_profile(tmp_path), object())(np.zeros((2, 2, 3), np.uint8))
+
+    assert (got.outcome, got.placement, got.total, got.nickname) == ("승리", 1, 2, "나")
+    assert seen_templates == [{"승리"}]
+
+
+def test_make_result_reader_is_none_when_neither_screen_is_found(tmp_path, monkeypatch):
+    monkeypatch.setattr(result_scan, "read_result_screen", lambda f, p, r: None)
+    monkeypatch.setattr(result_scan, "read_cobalt_result_screen", lambda *a: None)
+
+    assert make_result_reader(_cobalt_profile(tmp_path), object())(np.zeros((2, 2, 3), np.uint8)) is None
+
+
+def _steam_scan_fakes(monkeypatch):
+    """스팀 녹화 키프레임 훑기가 공용 판독기(배틀로얄 + 코발트)를 쓰는지 본다 - 코발트 결과가 빠졌던 사고(2026-10-02)."""
+    monkeypatch.setattr(result_scan, "existing_segment_numbers", lambda session, stream, first, last: [5, 6, 7])
+    monkeypatch.setattr(result_scan, "extract_keyframe_frames", lambda session, **kw: frames(9, 9, 9))
+    monkeypatch.setattr(result_scan, "make_result_reader", lambda profile, reader: lambda f: RESULT)
+    monkeypatch.setattr(result_scan, "read_result_screen", lambda *a: None)
+
+
+def test_find_result_screen_reads_with_the_shared_reader(monkeypatch):
+    _steam_scan_fakes(monkeypatch)
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+
+    got = find_result_screen(object(), SegmentRange(1, 7), ffmpeg_path=None, profile=profile, reader=object())
+
+    assert got == RESULT
+
+
+def test_find_result_after_reads_with_the_shared_reader(monkeypatch):
+    _steam_scan_fakes(monkeypatch)
+    profile = ResolutionProfile.for_resolution(2560, 1440)
+
+    got = find_result_after(object(), 4, ffmpeg_path=None, profile=profile, reader=object())
+
+    assert got == RESULT
