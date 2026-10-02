@@ -66,3 +66,42 @@ def update_game(games_dir: Path, key: str, change: Callable[[dict], None]) -> di
         change(data)
         write_game_json(game_dir(games_dir, key), data)
         return data
+
+
+def _probe_duration(video: Path) -> float | None:
+    from lumia_briefing_room.config import discover_ffmpeg
+    from lumia_briefing_room.video.vod import find_ffprobe, probe_video
+
+    try:
+        ffprobe = find_ffprobe(discover_ffmpeg())
+        return probe_video(video, ffprobe_path=ffprobe).duration_sec if ffprobe else None
+    except Exception:
+        return None
+
+
+def relink_restored_full_video(
+    games_dir: Path, key: str, *, probe: Callable[[Path], float | None] = _probe_duration
+) -> bool:
+    """자동 정리로 지운 풀영상을 사용자가 휴지통에서 되살렸으면 `game.json` 을 다시 이어 준다."""
+    video = game_dir(games_dir, key) / FULL_VIDEO
+    try:
+        game = load_game(games_dir, key)
+        if not game.get("fullVideoDeletedAt") or not video.is_file():
+            return False
+        size = video.stat().st_size
+    except (GameNotFound, OSError):
+        return False
+    old = game.get("deletedFullVideo")
+    duration = old.get("durationSec") if isinstance(old, dict) else None
+    if duration is None:
+        duration = probe(video)
+    if duration is None:
+        return False
+
+    def change(data: dict) -> None:
+        data["fullVideo"] = {**(old if isinstance(old, dict) else {"path": FULL_VIDEO}), "sizeBytes": size, "durationSec": duration}
+        data.pop("fullVideoDeletedAt", None)
+        data.pop("deletedFullVideo", None)
+
+    update_game(games_dir, key, change)
+    return True

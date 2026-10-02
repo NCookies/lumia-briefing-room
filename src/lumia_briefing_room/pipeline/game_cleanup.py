@@ -123,6 +123,7 @@ def delete_full_video(folder: Path, *, mode: str) -> None:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return
+    data["deletedFullVideo"] = data.get("fullVideo")
     data["fullVideo"] = None
     data["fullVideoDeletedAt"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     tmp = path.with_suffix(".json.tmp")

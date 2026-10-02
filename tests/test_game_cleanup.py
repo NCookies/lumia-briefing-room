@@ -247,3 +247,36 @@ def test_make_preserver_saves_through_save_and_mark(tmp_path, monkeypatch):
     assert pbd.make_preserver(cfg_, Path("ffmpeg"))(folder) is True
     assert saved == [(folder.name, "c1")]
     assert pbd.make_preserver(cfg_, None)(folder) is False
+
+
+def test_restored_full_video_is_relinked_with_old_duration(tmp_path):
+    from lumia_briefing_room.pipeline.game_files import load_game, relink_restored_full_video
+
+    games = tmp_path / "games"
+    folder = make_game(games, 1, 500)
+    data = json.loads((folder / "game.json").read_text(encoding="utf-8"))
+    data["fullVideo"]["durationSec"] = 321.0
+    (folder / "game.json").write_text(json.dumps(data), encoding="utf-8")
+    gc.delete_full_video(folder, mode="permanent")
+    assert load_game(games, folder.name)["fullVideo"] is None
+
+    (folder / "full.mp4").write_bytes(b"x" * 700)
+    assert relink_restored_full_video(games, folder.name) is True
+    game = load_game(games, folder.name)
+    assert game["fullVideo"]["durationSec"] == 321.0 and game["fullVideo"]["sizeBytes"] == 700
+    assert not game.get("fullVideoDeletedAt")
+
+
+def test_relink_probes_duration_when_no_backup_and_ignores_missing_file(tmp_path):
+    from lumia_briefing_room.pipeline.game_files import load_game, relink_restored_full_video
+
+    games = tmp_path / "games"
+    folder = make_game(games, 1, 500, with_video=False)
+    data = json.loads((folder / "game.json").read_text(encoding="utf-8"))
+    data["fullVideoDeletedAt"] = "2026-10-02T00:41:29Z"
+    (folder / "game.json").write_text(json.dumps(data), encoding="utf-8")
+    assert relink_restored_full_video(games, folder.name, probe=lambda p: 99.0) is False
+
+    (folder / "full.mp4").write_bytes(b"x" * 10)
+    assert relink_restored_full_video(games, folder.name, probe=lambda p: 99.0) is True
+    assert load_game(games, folder.name)["fullVideo"] == {"path": "full.mp4", "sizeBytes": 10, "durationSec": 99.0}

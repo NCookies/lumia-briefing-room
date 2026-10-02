@@ -40,7 +40,7 @@ from lumia_briefing_room.pipeline.game_cleanup import delete_full_video
 from lumia_briefing_room.pipeline.game_records import delete_record, game_key, records_dir_for
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for
 from lumia_briefing_room.pipeline.proxy import proxy_file
-from lumia_briefing_room.pipeline.game_files import GameNotFound, game_dir, has_full_video, list_games, load_game, update_game
+from lumia_briefing_room.pipeline.game_files import GameNotFound, game_dir, has_full_video, list_games, load_game, relink_restored_full_video, update_game
 from lumia_briefing_room.pipeline.game_store import FULL_VIDEO
 from lumia_briefing_room.pipeline.game_backfill import clip_metas
 from lumia_briefing_room.pipeline.game_edit import GameEditError, lock_result, normalize_title, sync_clip_results, validate_result_edit
@@ -225,6 +225,10 @@ def register_game_routes(
             migrate_once()
         if source in ("vod", "all"):
             migrate_vod_once()
+        for d in games_dirs(source):
+            for g in list_games(d):
+                if g.get("fullVideoDeletedAt"):
+                    relink_restored_full_video(d, g["gameKey"])
         listed = [g for d in games_dirs(source) for g in list_games(d)]
         games = sorted(
             (g for g in listed if source == "all" or (g.get("source") or "steam") == source),
@@ -266,6 +270,8 @@ def register_game_routes(
     @app.get("/api/games/{key}")
     def get_game(key: str):
         game = load_or_404(key)
+        if game.get("fullVideoDeletedAt") and relink_restored_full_video(games_dir(key), key):
+            game = load_or_404(key)
         if game.get("source") == "vod":
             can = (
                 not game.get("fullVideoDeletedAt") and not has_full_video(games_dir(key), key)
