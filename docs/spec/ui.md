@@ -4,7 +4,7 @@
 
 ## 1. 스택과 실행 구조
 
-- **React + TypeScript + Vite + Tailwind** → 정적 빌드 → FastAPI 가 서빙(`api/static.py`, 라우트를 먼저 등록하고 `Mount("/")` 를 나중에). 무거운 컴포넌트 라이브러리·상태 관리 라이브러리는 쓰지 않는다.
+- **React + TypeScript + Vite + Tailwind** → 정적 빌드 → FastAPI 가 서빙(`api/static.py`, 라우트를 먼저 등록하고 `Mount("/")` 를 나중에). 캐시 헤더: `assets/`(내용 해시 파일 이름)는 1년 `immutable`, `index.html` 등 나머지는 `no-cache`(매번 재확인, 안 바뀌었으면 304) — 헤더가 없으면 브라우저가 `index.html` 을 수정 시각으로 어림잡아 재사용해 앱을 새로 설치해도 옛 화면이 보였다(2026-10-02 친구 PC 실측). 무거운 컴포넌트 라이브러리·상태 관리 라이브러리는 쓰지 않는다.
 - 셸: 트레이 경로는 **기본 브라우저**(pystray 와 pywebview 가 메인 스레드를 다툰다). `cli.serve` 독립 실행만 pywebview(WebView2) 창을 시도하고 실패하면 브라우저. Electron 은 쓰지 않는다(RAM 150~300MB).
 - 서버는 `127.0.0.1` 에만 바인드. 접속 주소 **`http://lumia-briefingroom.localhost`**(Chromium·Firefox 가 `*.localhost` 를 루프백으로 푼다, hosts 불필요). 포트 후보는 고정 순서 **80 → `ui.port`(8765) → +20** — 포트가 바뀌면 origin 이 바뀌어 localStorage(볼륨·탭·"다시 묻지 않기")가 초기화되기 때문이다. `ui.port=auto`(옛 값)는 8765 와 같다.
 - 설정 API 는 매번 설정 파일을 다시 읽는다(감시가 학습한 닉네임을 메모리 사본이 덮어쓰지 않게).

@@ -64,3 +64,38 @@ def test_find_frontend_dist_default_uses_resource_dir(tmp_path: Path, monkeypatc
     dist.mkdir(parents=True)
     (dist / "index.html").write_text("<html></html>", encoding="utf-8")
     assert find_frontend_dist() == dist
+
+
+def _client_with_dist(tmp_path: Path) -> TestClient:
+    dist = tmp_path / "dist"
+    (dist / "assets").mkdir(parents=True)
+    (dist / "index.html").write_text("<html></html>", encoding="utf-8")
+    (dist / "assets" / "index-AbC123.js").write_text("1", encoding="utf-8")
+    (dist / "favicon.svg").write_text("<svg/>", encoding="utf-8")
+    app = create_app(Config(paths=PathsConfig(clips=tmp_path / "clips", temp=tmp_path / "tmp")))
+    mount_static(app, dist)
+    return TestClient(app)
+
+
+def test_index_html_is_always_revalidated_so_a_new_install_shows_the_new_screen(tmp_path: Path):
+    client = _client_with_dist(tmp_path)
+
+    for path in ("/", "/index.html", "/favicon.svg"):
+        assert client.get(path).headers["cache-control"] == "no-cache", path
+
+
+def test_hashed_assets_are_cached_for_a_year(tmp_path: Path):
+    client = _client_with_dist(tmp_path)
+
+    cache = client.get("/assets/index-AbC123.js").headers["cache-control"]
+
+    assert "max-age=31536000" in cache and "immutable" in cache
+
+
+def test_revalidation_still_answers_304_for_an_unchanged_index(tmp_path: Path):
+    client = _client_with_dist(tmp_path)
+    first = client.get("/")
+
+    again = client.get("/", headers={"If-None-Match": first.headers["etag"]})
+
+    assert again.status_code == 304
