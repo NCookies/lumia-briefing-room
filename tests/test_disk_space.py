@@ -38,6 +38,8 @@ def test_low_message_names_the_free_space_and_the_remedies():
     status = ds.evaluate(free_bytes=int(12.3 * GB), expected_bytes=3 * GB, min_free_gb=20)
     assert "12.3GB" in status.message
     assert "풀영상" in status.message and "저장한 클립" in status.message
+    assert "자동 정리를 켜거나" in status.message
+    assert "한도를 낮추" not in status.message
 
 
 def test_recent_full_video_sizes_come_from_game_json_newest_last(tmp_path):

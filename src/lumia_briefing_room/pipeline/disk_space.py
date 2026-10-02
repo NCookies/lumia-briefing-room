@@ -38,8 +38,8 @@ def evaluate(*, free_bytes: int, expected_bytes: int, min_free_gb: float) -> Dis
     message = None
     if low:
         message = (
-            f"여유 공간이 {free_bytes / GB:.1f}GB 남았습니다. 풀영상 자동 정리 한도를 낮추거나 "
-            "오래된 풀영상, 저장한 클립을 정리해 주세요."
+            f"여유 공간이 {free_bytes / GB:.1f}GB 남았습니다. 풀영상 자동 정리를 켜거나 한도를 확인하고, "
+            "오래된 풀영상과 저장한 클립을 정리해 주세요."
         )
     return DiskStatus(free_bytes, expected_bytes, threshold, low, message)
 
