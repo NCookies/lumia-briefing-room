@@ -125,3 +125,28 @@ def test_select_for_auto_clean_age_reason_takes_priority_over_count():
     selected = select_for_auto_clean(metas, cfg, now=lambda: now)
     assert len(selected) == 1
     assert selected[0]["_reason"] == "age"
+
+
+def test_size_limit_counts_protected_clips_but_never_selects_them():
+    metas = [
+        _meta("pinned", age_days=50, size_mb=600, pinned=True),
+        _meta("old", age_days=30, size_mb=600),
+        _meta("new", age_days=10, size_mb=600),
+    ]
+    cfg = RetentionConfig(auto_clean_enabled=True, max_total_gb=1300 / 1024)
+    selected = select_for_auto_clean(metas, cfg, now=lambda: datetime(2026, 1, 1, tzinfo=UTC))
+    assert [m["_clip_id"] for m in selected] == ["old"]
+
+
+def test_size_limit_exceeded_by_protected_alone_still_never_selects_protected():
+    metas = [_meta("pinned", age_days=50, size_mb=2000, pinned=True), _meta("a", age_days=5, size_mb=100)]
+    cfg = RetentionConfig(auto_clean_enabled=True, max_total_gb=1.0)
+    selected = select_for_auto_clean(metas, cfg, now=lambda: datetime(2026, 1, 1, tzinfo=UTC))
+    assert [m["_clip_id"] for m in selected] == ["a"]
+
+
+def test_count_limit_counts_protected_clips():
+    metas = [_meta("pinned", age_days=50, pinned=True), _meta("a", age_days=30), _meta("b", age_days=10)]
+    cfg = RetentionConfig(auto_clean_enabled=True, max_count=2)
+    selected = select_for_auto_clean(metas, cfg, now=lambda: datetime(2026, 1, 1, tzinfo=UTC))
+    assert [m["_clip_id"] for m in selected] == ["a"]
