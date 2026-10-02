@@ -19,8 +19,10 @@ async function jsonOrThrow<T>(res: Response, action: string): Promise<T> {
   return res.json()
 }
 
-export async function getGames(source: 'steam' | 'vod' | 'all' = 'steam'): Promise<GameSummary[]> {
-  return (await jsonOrThrow<{ games: GameSummary[] }>(await fetch(`${BASE}?source=${source}`), '게임 목록 불러오기')).games
+/** `q` 가 있으면 서버가 맞는 게임만 돌려주고 각 게임에 어디서 찾았는지(`match`)를 붙인다. */
+export async function getGames(source: 'steam' | 'vod' | 'all' = 'steam', q = ''): Promise<GameSummary[]> {
+  const query = q.trim() ? `&q=${encodeURIComponent(q.trim())}` : ''
+  return (await jsonOrThrow<{ games: GameSummary[] }>(await fetch(`${BASE}?source=${source}${query}`), '게임 목록 불러오기')).games
 }
 
 export class GameNotFoundError extends Error {}

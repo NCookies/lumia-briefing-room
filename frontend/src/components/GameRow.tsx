@@ -30,10 +30,12 @@ interface Props {
   job?: { text: string; queued: boolean; onCancel: () => void }
   menu?: GameMenuItem[]
   onRename?: (title: string | null) => void
+  /** 검색 중에 어디서 찾았는지 한 줄(`matchLabel`). */
+  matchText?: string
 }
 
 /** 게임 목록의 게임 한 줄. 스팀 녹화 탭과 영상 파일 탭이 같이 쓴다(시간 칸만 다르다). */
-export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, job, menu, onRename }: Props) {
+export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, job, menu, onRename, matchText }: Props) {
   return (
     <li
       className="flex cursor-pointer items-stretch rounded-lg border border-zinc-700/60 bg-zinc-800/60 transition-colors hover:border-zinc-500 hover:bg-zinc-800"
@@ -175,6 +177,7 @@ export function GameRow({ game: g, time, due, onOpen, onPin, rebuild, job, menu,
           </button>
           {menu && menu.length > 0 && <GameMenu items={menu} />}
         </span>
+        {matchText && <div className="basis-full text-xs text-amber-300/90">🔍 {matchText}</div>}
       </div>
     </li>
   )

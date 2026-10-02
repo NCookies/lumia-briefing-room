@@ -1,3 +1,5 @@
+import type { SearchMatch } from './search.ts'
+
 export interface CandidateUser {
   start?: number
   end?: number
@@ -77,6 +79,8 @@ export interface GameSummary {
   savedClipCount: number
   autoClipCount: number
   unsavedEditCount: number
+  /** 검색 중일 때만: 어디서 찾았는지. */
+  match?: SearchMatch
 }
 
 export interface GameDetail {

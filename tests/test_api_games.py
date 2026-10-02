@@ -334,3 +334,50 @@ def test_clip_source_reports_a_deleted_full_video_and_404_for_unlinked_clips(cli
     (client.tmp / "games" / KEY / "full.mp4").unlink()
     assert client.get(f"/api/games/by-clip/{clip_id}").json()["hasFullVideo"] is False
     assert client.get("/api/games/by-clip/not-a-clip").status_code == 404
+
+
+def _titles(client, q):
+    return client.get("/api/games", params={"q": q}).json()["games"]
+
+
+def test_search_without_a_query_lists_everything_without_match_info(client):
+    (game,) = client.get("/api/games").json()["games"]
+    assert "match" not in game
+    assert len(_titles(client, "")) == 1 and len(_titles(client, "   ")) == 1
+
+
+def test_search_by_game_title_ignores_case_and_spaces(client):
+    client.patch(f"/api/games/{KEY}", json={"title": "첫 우승 Run"})
+    (game,) = _titles(client, "첫우승run")
+    assert game["match"] == {"where": "게임 제목", "text": "첫 우승 Run"}
+    assert _titles(client, "두번째") == []
+
+
+def test_search_by_candidate_title_uses_the_edited_title_and_skips_dismissed(client):
+    client.patch(f"/api/games/{KEY}/candidates/{KEY}_02", json={"title": "마지막 교전"})
+    (game,) = _titles(client, "마지막")
+    assert game["match"] == {"where": "후보", "text": "마지막 교전"}
+    client.patch(f"/api/games/{KEY}/candidates/{KEY}_02", json={"dismissed": True})
+    assert _titles(client, "마지막") == []
+
+
+def test_search_by_saved_clip_memo(client):
+    client.post(f"/api/games/{KEY}/candidates/{KEY}_01/save")
+    client.patch(f"/api/clips/{KEY}_01", json={"memo": "궁극기 타이밍이 좋았다"})
+    (game,) = _titles(client, "타이밍")
+    assert game["match"] == {"where": "메모", "text": "궁극기 타이밍이 좋았다"}
+
+
+def test_search_by_clip_title_that_differs_from_the_candidate(client):
+    client.post(f"/api/games/{KEY}/candidates/{KEY}_01/save")
+    client.patch(f"/api/clips/{KEY}_01", json={"title": "역전극"})
+    (game,) = _titles(client, "역전")
+    assert game["match"] == {"where": "클립", "text": "역전극"}
+
+
+def test_search_by_streamer_and_video_name_for_vod_games(client):
+    path = client.tmp / "games" / KEY / "game.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    path.write_text(json.dumps({**data, "streamer": "홍길동", "vodFile": "D:/방송/Day3 Stream.mp4"}), encoding="utf-8")
+    assert _titles(client, "홍길")[0]["match"] == {"where": "스트리머", "text": "홍길동"}
+    assert _titles(client, "day3stream")[0]["match"] == {"where": "영상 이름", "text": "Day3 Stream.mp4"}

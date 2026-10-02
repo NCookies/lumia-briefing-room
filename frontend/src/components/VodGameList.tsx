@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useConfirm } from '../confirmContext'
 import type { DeleteMode } from '../deleteConfirm'
 import { onlyDueGames } from '../cleanupPreview'
-import { dayAnchorId, dayId } from '../dayFold'
+import { dayAnchorId, dayId, visibleCollapsed } from '../dayFold'
 import type { GameSummary } from '../games'
 import { getGames, setGamePinned } from '../gamesApi'
 import { useGameDelete } from '../useGameDelete'
@@ -14,6 +14,8 @@ import { useListScroll } from '../useListScroll'
 import { gameCountLabel, listLoading, returnedToList } from '../listLoad'
 import type { GameNav } from '../useRoute'
 import { useDayFold } from '../useDayFold'
+import { matchLabel } from '../search'
+import { useSearch } from '../useSearch'
 import {
   cancelAnalysis,
   deleteVod,
@@ -31,7 +33,7 @@ import {
 import { groupVodsByDate } from '../vodDates'
 import { resolvedDeleteSource } from '../vodDeleteSource'
 import { vodAnalyzeConfirmMessage, vodDoneNotice } from '../vodAnalyzeConfirm'
-import { analysisEnded, buildableGameCount, groupGamesByVod, vodDeleteAllMessage, vodGameTime, vodRemoveMessage, vodTotals } from '../vodGames'
+import { analysisEnded, buildableGameCount, groupGamesByVod, vodDeleteAllMessage, vodGameTime, vodRemoveMessage, vodTotals, withGamesOnly } from '../vodGames'
 import { probeProgress, type Vod } from '../vodGrouping'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { DueOnlyToggle } from './DueOnlyToggle'
@@ -39,6 +41,7 @@ import { GameDayHeader } from './GameDayHeader'
 import { GameRow } from './GameRow'
 import { GameViewer } from './GameViewer'
 import { LoadingBar } from './LoadingBar'
+import { SearchBox } from './SearchBox'
 import { StorageUsageBar } from './StorageUsageBar'
 import { VideoFormatHelp } from './VideoFormatHelp'
 import { VodSection } from './VodSection'
@@ -88,20 +91,27 @@ export function VodGameList({
   const shown = useMemo(() => onlyDueGames(games ?? [], cleanup, dueOnly), [games, cleanup, dueOnly])
   const dueCount = useMemo(() => onlyDueGames(games ?? [], cleanup, true).length, [games, cleanup])
 
+  const loadSeq = useRef(0)
+  const queryRef = useRef('')
+  const reloadGames = useCallback(() => {
+    const seq = ++loadSeq.current
+    getGames('vod', queryRef.current)
+      .then((list) => seq === loadSeq.current && setGames(list))
+      .catch((e: Error) => setError(e.message))
+  }, [])
+  const search = useSearch(active, reloadGames)
+  queryRef.current = search.applied
+  const searching = search.searching
+
   const groups = useMemo(() => {
     if (games === null) return []
     const all = groupGamesByVod(vods, shown)
-    return dueOnly ? all.filter((g) => g.games.length > 0) : all
-  }, [vods, games, shown, dueOnly])
+    return dueOnly || searching ? withGamesOnly(all) : all
+  }, [vods, games, shown, dueOnly, searching])
   const dateGroups = useMemo(() => groupVodsByDate(groups, 'desc'), [groups])
   const days = useMemo(() => dateGroups.map((d) => d.day), [dateGroups])
   const fold = useDayFold('vod', days)
-
-  const reloadGames = useCallback(() => {
-    getGames('vod')
-      .then(setGames)
-      .catch((e: Error) => setError(e.message))
-  }, [])
+  const collapsedDays = visibleCollapsed(fold.collapsed, searching)
 
   const reloadVods = useCallback(() => {
     listVods()
@@ -332,14 +342,15 @@ export function VodGameList({
   const allGames = games ?? []
   const total = vodTotals(allGames)
   const loading = listLoading({ vodsLoaded, gamesLoaded: games !== null, failed: error !== null })
-  const empty = !loading && games !== null && groups.length === 0 && !dueOnly
+  const empty = !loading && games !== null && groups.length === 0 && !dueOnly && !searching
 
   return (
     <div className="flex flex-1 flex-col gap-2 p-4">
       <div className="flex flex-wrap items-baseline gap-3 text-sm text-zinc-300">
-        <span>{gameCountLabel({ loaded: games !== null, total: total.games, shown: shown.length, dueOnly })}</span>
-        {games !== null && <StorageUsageBar totals={storage} tabBytes={total.bytes} />}
-        {games !== null && !(storage && storage.autoCleanEnabled && storage.limitGb) && (
+        <span>{gameCountLabel({ loaded: games !== null, total: total.games, shown: shown.length, dueOnly, searching })}</span>
+        <SearchBox value={search.query} onChange={search.setQuery} label="게임 검색" placeholder="게임·후보·메모·영상·스트리머 검색" />
+        {games !== null && !searching && <StorageUsageBar totals={storage} tabBytes={total.bytes} />}
+        {games !== null && !searching && !(storage && storage.autoCleanEnabled && storage.limitGb) && (
           <span className="text-xs text-zinc-500">풀영상 {formatBytes(total.bytes)}</span>
         )}
         {days.length > 0 && (
@@ -347,7 +358,7 @@ export function VodGameList({
             <button
               type="button"
               className="rounded-md border border-zinc-600/70 px-2 py-0.5 text-xs transition hover:bg-zinc-700 disabled:opacity-40"
-              disabled={fold.collapsed.size === 0}
+              disabled={searching || fold.collapsed.size === 0}
               onClick={fold.expandAll}
             >
               날짜 모두 펼치기
@@ -355,7 +366,7 @@ export function VodGameList({
             <button
               type="button"
               className="rounded-md border border-zinc-600/70 px-2 py-0.5 text-xs transition hover:bg-zinc-700 disabled:opacity-40"
-              disabled={fold.allCollapsed}
+              disabled={searching || fold.allCollapsed}
               onClick={fold.collapseAll}
             >
               날짜 모두 접기
@@ -387,7 +398,8 @@ export function VodGameList({
       {actionError && <p className="text-sm text-rose-400">{actionError}</p>}
       {notice && <p className="text-sm text-emerald-400">{notice}</p>}
 
-      {dueOnly && groups.length === 0 && <p className="text-sm text-zinc-500">삭제 예정인 게임이 없습니다.</p>}
+      {searching && games !== null && groups.length === 0 && <p className="text-sm text-zinc-500">검색에 맞는 게임이 없습니다.</p>}
+      {dueOnly && !searching && groups.length === 0 && <p className="text-sm text-zinc-500">삭제 예정인 게임이 없습니다.</p>}
 
       {empty && (
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-center text-zinc-400">
@@ -416,10 +428,10 @@ export function VodGameList({
               clipCount={dateGroup.vods.reduce((n, vg) => n + vodTotals(vg.games).clips, 0)}
               clipBytes={dateGroup.vods.reduce((n, vg) => n + vodTotals(vg.games).bytes, 0)}
               bytesLabel="풀영상 "
-              collapsed={fold.collapsed.has(dayId(dateGroup.day))}
+              collapsed={collapsedDays.has(dayId(dateGroup.day))}
               onToggle={() => fold.toggle(dateGroup.day)}
             />
-            {!fold.collapsed.has(dayId(dateGroup.day)) &&
+            {!collapsedDays.has(dayId(dateGroup.day)) &&
               dateGroup.vods.map((vg) => {
                 const totals = vodTotals(vg.games)
                 const buildable = buildableGameCount(vg.games)
@@ -430,7 +442,7 @@ export function VodGameList({
                     name={vg.name}
                     vod={vod}
                     job={job?.id === vg.vodId ? job : null}
-                    expanded={!collapsedVods.has(vg.vodId)}
+                    expanded={searching || !collapsedVods.has(vg.vodId)}
                     gameCount={totals.games}
                     clipCount={totals.clips}
                     visibleGameCount={vg.games.length}
@@ -464,6 +476,7 @@ export function VodGameList({
                           key={g.key}
                           game={g}
                           time={vodGameTime(g)}
+                          matchText={matchLabel(g.match)}
                           menu={gameDelete.menuFor(g.key, g, [gameEdit.menuItem(g.key, g)])}
                           onRename={(title) => void gameEdit.saveTitle(g.key, title)}
                           due={cleanup[g.key]}

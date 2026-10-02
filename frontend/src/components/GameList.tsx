@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { dayAnchorId, dayId } from '../dayFold'
+import { dayAnchorId, dayId, visibleCollapsed } from '../dayFold'
 import { groupByDay } from '../gameDays'
 import type { GameSummary } from '../games'
 import { getGames, setGamePinned } from '../gamesApi'
 import { onlyDueGames } from '../cleanupPreview'
 import { formatAgo } from '../grouping'
+import { gameCountLabel } from '../listLoad'
+import { matchLabel } from '../search'
+import { useSearch } from '../useSearch'
 import { formatBytes } from '../retention'
 import { useCleanupPreview } from '../useCleanupPreview'
 import { useStorageUsage } from '../useStorageUsage'
@@ -22,6 +25,7 @@ import { DueOnlyToggle } from './DueOnlyToggle'
 import { GameDayHeader } from './GameDayHeader'
 import { GameRow } from './GameRow'
 import { GameViewer } from './GameViewer'
+import { SearchBox } from './SearchBox'
 import { StorageUsageBar } from './StorageUsageBar'
 
 function formatShort(iso: string | null): string {
@@ -71,11 +75,17 @@ export function GameList({
   const dayList = useMemo(() => dayGroups.map((d) => d.day), [dayGroups])
   const fold = useDayFold('steam', dayList)
 
+  const loadSeq = useRef(0)
+  const queryRef = useRef('')
   const load = useCallback(() => {
-    getGames()
-      .then(setGames)
+    const seq = ++loadSeq.current
+    getGames('steam', queryRef.current)
+      .then((list) => seq === loadSeq.current && setGames(list))
       .catch((e: Error) => setError(e.message))
   }, [])
+  const search = useSearch(active, load)
+  queryRef.current = search.applied
+  const collapsedDays = visibleCollapsed(fold.collapsed, search.searching)
   const [viewerTick, setViewerTick] = useState(0)
   const jobs = useGameJobs(
     useCallback(() => {
@@ -154,9 +164,10 @@ export function GameList({
   return (
     <div className="flex flex-1 flex-col gap-2 p-4">
       <div className="flex items-baseline gap-3 text-sm text-zinc-300">
-        <span>게임 {dueOnly ? `${shown.length} / ${games.length}` : games.length}개</span>
-        <StorageUsageBar totals={storage} tabBytes={total} />
-        {!(storage && storage.autoCleanEnabled && storage.limitGb) && (
+        <span>{gameCountLabel({ loaded: true, total: games.length, shown: shown.length, dueOnly, searching: search.searching })}</span>
+        <SearchBox value={search.query} onChange={search.setQuery} label="게임 검색" placeholder="게임·후보·클립·메모 검색" />
+        {!search.searching && <StorageUsageBar totals={storage} tabBytes={total} />}
+        {!search.searching && !(storage && storage.autoCleanEnabled && storage.limitGb) && (
           <span className="text-xs text-zinc-500">풀영상 {formatBytes(total)}</span>
         )}
         {games.length > 0 && (
@@ -164,7 +175,7 @@ export function GameList({
             <button
               type="button"
               className="rounded-md border border-zinc-600/70 px-2 py-0.5 text-xs transition hover:bg-zinc-700 disabled:opacity-40"
-              disabled={fold.collapsed.size === 0}
+              disabled={search.searching || fold.collapsed.size === 0}
               onClick={fold.expandAll}
             >
               날짜 모두 펼치기
@@ -172,7 +183,7 @@ export function GameList({
             <button
               type="button"
               className="rounded-md border border-zinc-600/70 px-2 py-0.5 text-xs transition hover:bg-zinc-700 disabled:opacity-40"
-              disabled={fold.allCollapsed}
+              disabled={search.searching || fold.allCollapsed}
               onClick={fold.collapseAll}
             >
               날짜 모두 접기
@@ -190,7 +201,8 @@ export function GameList({
         </button>
       </div>
       {dueOnly && shown.length === 0 && <p className="text-sm text-zinc-500">삭제 예정인 게임이 없습니다.</p>}
-      {games.length === 0 && (
+      {games.length === 0 && search.searching && <p className="text-sm text-zinc-500">검색에 맞는 게임이 없습니다.</p>}
+      {games.length === 0 && !search.searching && (
         <p className="text-sm text-zinc-500">
           아직 처리한 게임이 없습니다. 게임을 한 판 마치면 전체 영상과 교전 후보가 여기에 쌓입니다.
         </p>
@@ -207,10 +219,10 @@ export function GameList({
             clipCount={dayGroup.games.reduce((n, g) => n + g.savedClipCount, 0)}
             clipBytes={dayGroup.games.reduce((n, g) => n + (g.fullVideoSizeBytes ?? 0), 0)}
             bytesLabel="풀영상 "
-            collapsed={fold.collapsed.has(dayId(dayGroup.day))}
+            collapsed={collapsedDays.has(dayId(dayGroup.day))}
             onToggle={() => fold.toggle(dayGroup.day)}
           />
-          {!fold.collapsed.has(dayId(dayGroup.day)) && (
+          {!collapsedDays.has(dayId(dayGroup.day)) && (
           <ul className="flex flex-col gap-2">
             {dayGroup.games.map((g) => (
               <GameRow
@@ -218,6 +230,7 @@ export function GameList({
                 game={g}
                 time={{ main: formatShort(g.matchStartUtc), sub: g.matchStartUtc ? formatAgo(g.matchStartUtc) : '' }}
                 due={cleanup[g.key]}
+                matchText={matchLabel(g.match)}
                 menu={gameDelete.menuFor(g.key, g, [gameEdit.menuItem(g.key, g), reanalyzeItem(g.key)])}
                 onRename={(title) => void gameEdit.saveTitle(g.key, title)}
                 onOpen={() => {

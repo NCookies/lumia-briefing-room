@@ -27,6 +27,11 @@ export function groupGamesByVod(vods: Vod[], games: GameSummary[]): VodGameGroup
     .sort((a, b) => a.name.localeCompare(b.name, 'ko', { sensitivity: 'base' }))
 }
 
+/** 검색·삭제 예정 보기처럼 게임 행만 보고 싶을 때 게임이 없는 영상 묶음을 뺀다. */
+export function withGamesOnly(groups: VodGameGroup[]): VodGameGroup[] {
+  return groups.filter((g) => g.games.length > 0)
+}
+
 /** 풀영상이 없어 "풀영상 만들기"가 필요한 옛 게임 수. 자동 정리로 지운 풀영상은 다시 만들지 않는다. */
 export function buildableGameCount(games: Pick<GameSummary, 'legacy' | 'hasFullVideo' | 'fullVideoDeletedAt'>[]): number {
   return games.filter((g) => g.legacy && !g.hasFullVideo && !g.fullVideoDeletedAt).length

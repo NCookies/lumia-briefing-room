@@ -28,3 +28,9 @@ test('only coming back from an open game to the list triggers a quiet refresh', 
   assert.equal(returnedToList('a', 'b'), false)
   assert.equal(returnedToList('a', 'a'), false)
 })
+
+test('검색 중에는 전체 개수 대신 검색 결과 개수를 보인다', () => {
+  assert.equal(gameCountLabel({ loaded: true, total: 12, shown: 3, dueOnly: false, searching: true }), '검색 결과 3개')
+  assert.equal(gameCountLabel({ loaded: true, total: 0, shown: 0, dueOnly: false, searching: true }), '검색 결과 0개')
+  assert.equal(gameCountLabel({ loaded: false, total: 0, shown: 0, dueOnly: false, searching: true }), '게임 불러오는 중…')
+})

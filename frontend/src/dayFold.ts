@@ -44,6 +44,11 @@ export function toggleDay(collapsed: Set<string>, day: string | null): Set<strin
   return next
 }
 
+/** 검색 결과가 있는 날짜는 접혀 있어도 펼쳐 보인다(저장된 접힘 상태는 바뀌지 않는다). */
+export function visibleCollapsed(collapsed: Set<string>, searching: boolean): Set<string> {
+  return searching ? new Set() : collapsed
+}
+
 export function collapseAll(days: (string | null)[]): Set<string> {
   return new Set(days.map(dayId))
 }

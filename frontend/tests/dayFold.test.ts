@@ -10,6 +10,7 @@ import {
   saveCollapsed,
   shortcutDays,
   toggleDay,
+  visibleCollapsed,
 } from '../src/dayFold.ts'
 
 function memoryStorage(initial: Record<string, string> = {}) {
@@ -88,4 +89,11 @@ test('shortcuts follow the list order, use short dates and keep the unknown day 
 test('anchor ids differ between tabs so both lists can stay mounted', () => {
   assert.notEqual(dayAnchorId('steam', '2026-09-30'), dayAnchorId('vod', '2026-09-30'))
   assert.equal(dayAnchorId('vod', null), 'day-vod-unknown')
+})
+
+test('검색 중에는 접어 둔 날짜도 펼쳐 보이고, 저장된 접힘은 그대로 둔다', () => {
+  const collapsed = new Set(['2026-09-30'])
+  assert.deepEqual([...visibleCollapsed(collapsed, true)], [])
+  assert.equal(visibleCollapsed(collapsed, false), collapsed)
+  assert.deepEqual([...collapsed], ['2026-09-30'])
 })

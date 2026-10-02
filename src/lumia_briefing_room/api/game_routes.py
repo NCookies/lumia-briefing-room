@@ -21,6 +21,7 @@ from pydantic import BaseModel
 
 from lumia_briefing_room import activity
 from lumia_briefing_room.api.clips import find_clip, find_clips
+from lumia_briefing_room.api.search import first_match
 from lumia_briefing_room.pipeline.recording_stop import error_of_record, stopped_of_record
 from lumia_briefing_room.pipeline import categories as cats
 from lumia_briefing_room.pipeline import deleted_games
@@ -133,6 +134,21 @@ def _summary(game: dict, games_dir: Path, *, can_rebuild_full: bool = False) -> 
     }
 
 
+def game_match(game: dict, needle: str) -> dict | None:
+    """게임이 검색어에 맞는 첫 칸. 순서 = 게임 제목, 후보(고친 제목 우선, 지운 후보 제외), 클립 제목(후보 제목과 다를 때), 클립 메모, 영상 이름, 스트리머."""
+    fields: list[tuple[str, str | None]] = [("게임 제목", game.get("title"))]
+    cands = [c for c in gcand.all_candidates(game) if not (c.get("user") or {}).get("dismissed")]
+    fields += [("후보", gcand.effective_title(c)) for c in cands]
+    for cand in cands:
+        user = cand.get("user") or {}
+        if user.get("savedTitle") and user["savedTitle"] != gcand.effective_title(cand):
+            fields.append(("클립", user["savedTitle"]))
+    fields += [("메모", (c.get("user") or {}).get("savedMemo")) for c in cands]
+    fields.append(("영상 이름", Path(game["vodFile"]).name if game.get("vodFile") else None))
+    fields.append(("스트리머", game.get("streamer")))
+    return first_match(needle, fields)
+
+
 def register_game_routes(
     app: FastAPI, *, lock, current_config: Callable[[], Config]
 ) -> None:
@@ -200,8 +216,10 @@ def register_game_routes(
         return float(video.get("durationSec") or 0.0)
 
     @app.get("/api/games")
-    def get_games(source: str = "steam"):
-        """`source`: steam(기본) / vod(영상 파일 탭) / all. 두 탭의 게임은 같은 폴더에 있지만 목록은 따로 본다."""
+    def get_games(source: str = "steam", q: str = ""):
+        """`source`: steam(기본) / vod(영상 파일 탭) / all. 두 탭의 게임은 같은 폴더에 있지만 목록은 따로 본다.
+
+        `q` 가 있으면 맞는 게임만 남기고 각 게임에 어디서 찾았는지(`match`)를 붙인다(검색 대상은 `game_match`)."""
         if source not in ("steam", "vod", "all"):
             raise HTTPException(400, "source 는 steam, vod, all 중 하나여야 합니다")
         if source in ("steam", "all"):
@@ -223,7 +241,14 @@ def register_game_routes(
             )
 
         self_saved_categories(games)
-        return {"games": [_summary(g, games_dir(g["gameKey"]), can_rebuild_full=rebuildable(g)) for g in games]}
+        found = {g["gameKey"]: game_match(g, q) for g in games} if q.strip() else None
+        if found is not None:
+            games = [g for g in games if found[g["gameKey"]] is not None]
+        return {"games": [
+            {**_summary(g, games_dir(g["gameKey"]), can_rebuild_full=rebuildable(g)),
+             **({"match": found[g["gameKey"]]} if found is not None else {})}
+            for g in games
+        ]}
 
     @app.get("/api/games/by-clip/{clip_id}")
     def get_clip_source(clip_id: str):
@@ -291,6 +316,8 @@ def register_game_routes(
                 extra["archived"] = cats.is_user_archived(cfg, clip.video)
                 if isinstance(clip.meta.get("memo"), str) and clip.meta["memo"]:
                     extra["savedMemo"] = clip.meta["memo"]
+                if isinstance(clip.meta.get("title"), str):
+                    extra["savedTitle"] = clip.meta["title"]
                 if extra:
                     cand["user"] = {**user, **extra}
 

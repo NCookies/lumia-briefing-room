@@ -10,6 +10,7 @@ import {
   vodDeleteAllMessage,
   vodRemoveMessage,
   vodTotals,
+  withGamesOnly,
 } from '../src/vodGames.ts'
 
 const vod = (id: string, name: string, extra: object = {}) => ({ id, name, videoDate: null, games: [], ...extra }) as never
@@ -112,4 +113,9 @@ test('목록에서 삭제 확인 문구는 보관한 클립이 클립 탭에 남
   assert.match(text, /보관한 클립 4개는 클립 탭에 남습니다/)
   assert.match(text, /되돌릴 수 없습니다/)
   assert.doesNotMatch(vodRemoveMessage('방송', 0), /클립 탭에 남습니다/)
+})
+
+test('검색 결과에는 맞는 게임이 있는 영상 묶음만 남긴다', () => {
+  const groups = groupGamesByVod([vod('a', 'a.mp4'), vod('b', 'b.mp4')], [game('b', 1)])
+  assert.deepEqual(withGamesOnly(groups).map((g) => g.vodId), ['b'])
 })

@@ -3,8 +3,9 @@ export function listLoading(o: { vodsLoaded: boolean; gamesLoaded: boolean; fail
   return !o.failed && !(o.vodsLoaded && o.gamesLoaded)
 }
 
-export function gameCountLabel(o: { loaded: boolean; total: number; shown: number; dueOnly: boolean }): string {
+export function gameCountLabel(o: { loaded: boolean; total: number; shown: number; dueOnly: boolean; searching?: boolean }): string {
   if (!o.loaded) return '게임 불러오는 중…'
+  if (o.searching) return `검색 결과 ${o.shown}개`
   return o.dueOnly ? `게임 ${o.shown} / ${o.total}개` : `게임 ${o.total}개`
 }
 
