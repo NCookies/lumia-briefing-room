@@ -24,9 +24,10 @@ def test_L01_date_headers_split_the_games_and_the_toolbar_order_is_fixed(go, pag
     for key in (KEY_BR, KEY_BR2, KEY_OLD, KEY_COBALT):
         expect(row(page, key)).to_have_count(1)
     toolbar = page.locator("body").inner_text()
-    order = ["날짜 모두 펼치기", "날짜 모두 접기", "삭제 예정만 보기", "과거 녹화 분석", "게임 4개", "이 탭"]
+    order = ["날짜 모두 펼치기", "날짜 모두 접기", "삭제 예정만 보기", "과거 녹화 분석", "게임 4개", "풀영상 1.0 MB"]
     positions = [toolbar.index(t) for t in order]
     assert positions == sorted(positions), f"도구 줄 순서가 다르다: {order}"
+    assert "이 탭" not in toolbar, "자동 정리가 꺼져 있으면(기본) 용량 막대는 숨긴다"
     expect(game_search(page)).to_be_visible()
     shot("list")
 
@@ -106,3 +107,30 @@ def test_L08_pin_button_explains_itself(go, page):
     go("/")
     pin = row(page, KEY_BR).get_by_role("button", name="고정")
     expect(pin).to_have_attribute("title", re.compile("자동 정리에서 제외"))
+
+
+def test_L09_empty_steam_tab_shows_a_centered_message(world, launch, page, shot):
+    server = launch()
+    page.goto(server.url)
+    notice = page.get_by_test_id("steam-empty")
+    expect(notice).to_be_visible()
+    expect(notice).to_contain_text("아직 처리한 게임이 없습니다")
+    box = notice.bounding_box()
+    viewport = page.viewport_size
+    center_x = box["x"] + box["width"] / 2
+    assert abs(center_x - viewport["width"] / 2) < viewport["width"] * 0.1, f"가운데에 있어야 한다: x={center_x}"
+    assert box["y"] > 120, "도구 줄 아래여야 한다"
+    shot("steam_empty")
+
+
+def test_L10_usage_bar_shows_after_the_toolbar_buttons_when_auto_cleanup_is_on(world, launch, page, shot):
+    world.seed_default_games()
+    server = launch(extra_config={"retention": {"autoCleanEnabled": True, "maxTotalGb": 40}})
+    page.goto(server.url)
+    expect(page.get_by_text(re.compile("이 탭 .* 전체"))).to_be_visible()
+    toolbar = page.locator("body").inner_text()
+    order = ["삭제 예정만 보기", "과거 녹화 분석", "게임 4개", "이 탭"]
+    positions = [toolbar.index(t) for t in order]
+    assert positions == sorted(positions), f"도구 줄 순서가 다르다: {order}"
+    assert "/ 40 GB" in toolbar
+    shot("usage_bar")

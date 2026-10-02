@@ -6,7 +6,7 @@
 
 ## 0. 진행 상태 (세션이 끊겨도 여기부터 이어간다)
 
-- [ ] R1 — 검증 묶음 실행기 `tools/release_check.py` (§3.1) — 화면 E2E 기반(`e2e/` pytest-playwright 러너·서버·시드·스크린샷 보고서)과 시나리오 47개는 만들었다([DEVELOPMENT.md "화면 E2E"](DEVELOPMENT.md), [e2e-scenarios.md](e2e-scenarios.md)). 남은 것: 실행기, 시드 시나리오(§3.2 의 `edge`), 시나리오 확대
+- [ ] R1 — 검증 묶음 실행기 `tools/release_check.py` (§3.1) — 화면 E2E 기반(`e2e/` pytest-playwright 러너·서버·시드·스크린샷 보고서)과 시나리오 49개는 만들었다([DEVELOPMENT.md "화면 E2E"](DEVELOPMENT.md), [e2e-scenarios.md](e2e-scenarios.md)). 남은 것: 실행기, 시드 시나리오(§3.2 의 `edge`), 시나리오 확대
 - [ ] R2 — 테스트 전용 가짜 환경(디스크 여유·물리 디스크·스팀 녹화 상태·폴더 선택 창·실패 주입) + 그걸 쓰는 화면 시나리오 (§3.4)
 - [ ] R3 — 파이프라인 E2E: 합성 녹화 + 가짜 검출기로 분석 → 풀영상·클립·game.json 끝까지 (§3.5)
 - [ ] R4 — 실녹화 골든 셋(개발 PC 전용): 검출·판독 결과를 기대값과 비교 (§3.6)

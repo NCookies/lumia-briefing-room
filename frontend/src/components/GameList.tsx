@@ -25,6 +25,7 @@ import { DueOnlyToggle } from './DueOnlyToggle'
 import { GameDayHeader } from './GameDayHeader'
 import { GameRow } from './GameRow'
 import { GameViewer } from './GameViewer'
+import { LoadingBar } from './LoadingBar'
 import { SearchBox } from './SearchBox'
 import { StorageUsageBar } from './StorageUsageBar'
 
@@ -161,7 +162,13 @@ export function GameList({
     )
   }
 
-  if (!games) return <p className="p-4 text-sm text-zinc-400">{error ?? '불러오는 중…'}</p>
+  if (!games) {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 px-4 text-center" data-testid="steam-loading">
+        {error ? <p className="text-sm text-rose-300">{error}</p> : <LoadingBar label="게임 목록을 불러오는 중입니다…" />}
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-2 p-4">
@@ -202,12 +209,15 @@ export function GameList({
         )}
         <div className="ml-auto"><SearchBox value={search.query} onChange={search.setQuery} label="게임 검색" placeholder="게임·후보·클립·메모 검색" /></div>
       </div>
-      {dueOnly && shown.length === 0 && <p className="text-sm text-zinc-500">삭제 예정인 게임이 없습니다.</p>}
-      {games.length === 0 && search.searching && <p className="text-sm text-zinc-500">검색에 맞는 게임이 없습니다.</p>}
+      {dueOnly && shown.length === 0 && <p className="py-10 text-center text-sm text-zinc-500">삭제 예정인 게임이 없습니다.</p>}
+      {games.length === 0 && search.searching && <p className="py-10 text-center text-sm text-zinc-500">검색에 맞는 게임이 없습니다.</p>}
       {games.length === 0 && !search.searching && (
-        <p className="text-sm text-zinc-500">
-          아직 처리한 게임이 없습니다. 게임을 한 판 마치면 전체 영상과 교전 후보가 여기에 쌓입니다.
-        </p>
+        <div className="flex min-h-[50vh] flex-col items-center justify-center gap-2 px-4 text-center" data-testid="steam-empty">
+          <p className="text-base text-zinc-300">아직 처리한 게임이 없습니다</p>
+          <p className="max-w-md text-sm leading-relaxed text-zinc-500">
+            게임을 한 판 마치면 전체 영상과 교전 후보가 여기에 쌓입니다. 이미 녹화해 둔 게임은 위쪽 "과거 녹화 분석"으로 가져올 수 있습니다.
+          </p>
+        </div>
       )}
       {dayGroups.map((dayGroup) => (
         <section

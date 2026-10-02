@@ -46,7 +46,7 @@ $env:LUMIA_FFMPEG = "C:\path\to\ffmpeg.exe"   # PowerShell
 
 브라우저(Playwright Chromium)로 앱을 실제로 눌러 보는 테스트. 눌러 보면 아는 것(화면에 뜨는가·문구·메뉴·확인 창·단축키·뒤로 가기·삭제/보관 흐름)을
 사람 대신 확인한다. 시나리오 목록은 [e2e-scenarios.md](e2e-scenarios.md), 계획은 [plan-release-automation.md](plan-release-automation.md).
-기본 `pytest` 에는 **안 돌아간다**(느리다 - 47개에 약 2분 30초).
+기본 `pytest` 에는 **안 돌아간다**(느리다 - 49개에 약 2분 40초).
 
 ```bash
 pip install -e ".[dev]"                  # pytest-playwright 포함
