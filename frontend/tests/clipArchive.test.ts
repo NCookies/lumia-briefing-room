@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { cardHeadline, filterClips, sortedForCategory } from '../src/clipArchive.ts'
+import { cardHeadline, flattenGroups, searchResultLabel, sortedForCategory, sortedGroups } from '../src/clipArchive.ts'
 
 const clip = (over: Record<string, unknown> = {}) => ({
   id: 'a',
@@ -19,13 +19,20 @@ test('카드 머리글은 순위와 일반/랭크, 결과를 모르면 결과 �
   assert.equal(cardHeadline(clip({ matchResult: { outcome: '승리' }, gameMode: 'cobalt' })), '승리')
 })
 
-test('검색은 제목·파일 이름·메모를 대소문자 없이 거른다', () => {
-  const list = [clip({ id: '1', title: '아야 궁극기' }), clip({ id: '2', title: '사냥', fileName: 'Hunt.mp4' })]
-  assert.deepEqual(filterClips(list, '궁극').map((c) => c.id), ['1'])
-  assert.deepEqual(filterClips(list, 'hunt').map((c) => c.id), ['2'])
-  assert.deepEqual(filterClips(list, '  ').map((c) => c.id), ['1', '2'])
-  const withMemo = [clip({ id: '3', memo: '팀원과 합이 좋았다' }), clip({ id: '4', memo: null })]
-  assert.deepEqual(filterClips(withMemo, '합이').map((c) => c.id), ['3'])
+test('검색 결과는 카테고리 묶음마다 게임 시각 최신순이고, 묶음 순서는 서버가 준 그대로', () => {
+  const groups = [
+    { name: '보관함', clips: [clip({ id: 'old', matchStartUtc: '2026-09-28T00:00:00Z' }), clip({ id: 'new', matchStartUtc: '2026-09-30T00:00:00Z' })] },
+    { name: '자동 보관', clips: [clip({ id: 'x' })] },
+  ]
+  const sorted = sortedGroups(groups)
+  assert.deepEqual(sorted.map((g) => g.name), ['보관함', '자동 보관'])
+  assert.deepEqual(sorted[0].clips.map((c) => c.id), ['new', 'old'])
+  assert.deepEqual(flattenGroups(sorted).map((c) => c.id), ['new', 'old', 'x'])
+})
+
+test('검색 결과 개수 문구', () => {
+  assert.equal(searchResultLabel([]), '검색 결과 0개')
+  assert.equal(searchResultLabel([{ name: 'a', clips: [clip(), clip()] }, { name: 'b', clips: [clip()] }]), '검색 결과 3개 · 카테고리 2곳')
 })
 
 test('클립은 게임 시각 최신순, 시각이 없으면 뒤로', () => {

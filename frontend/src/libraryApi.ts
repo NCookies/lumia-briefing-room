@@ -1,3 +1,4 @@
+import type { SearchMatch } from './search'
 import type { Clip } from './types'
 
 const BASE = '/api/library'
@@ -46,6 +47,20 @@ export async function getLibrary(path: string): Promise<LibraryListing> {
     '클립 폴더 불러오기',
   )
   return { ...listing, clips: listing.clips.map((c) => ({ ...c, userLabel: c.userLabel ?? null })) }
+}
+
+export interface SearchedClip extends LibraryClip {
+  match: SearchMatch
+}
+
+export interface LibrarySearch {
+  enabled: boolean
+  categories: { name: string; clips: SearchedClip[] }[]
+}
+
+/** 모든 카테고리에서 클립 제목·메모·게임 제목을 찾아 카테고리별로 묶어 받는다. */
+export async function searchLibrary(q: string): Promise<LibrarySearch> {
+  return jsonOrThrow<LibrarySearch>(await fetch(`${BASE}/search?q=${encodeURIComponent(q)}`), '클립 검색')
 }
 
 export async function createFolder(path: string, name: string): Promise<string> {

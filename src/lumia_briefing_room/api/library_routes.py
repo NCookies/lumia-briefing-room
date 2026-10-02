@@ -17,9 +17,13 @@ from fastapi import FastAPI, HTTPException
 from lumia_briefing_room.api.clip_index import norm as _norm, summaries_by_video as _summaries_by_video
 from lumia_briefing_room.api.clips import ClipSummary
 from lumia_briefing_room.api.export import export_video
+from lumia_briefing_room.api.search import first_match, matches
 from lumia_briefing_room.config import Config, resolve_paths, uses_legacy_layout
+from lumia_briefing_room.pipeline import categories as cats
+from lumia_briefing_room.pipeline import game_candidates as gcand
 from lumia_briefing_room.pipeline.cleanup_registry import registry as cleanup_preview_registry
 from lumia_briefing_room.pipeline.delete_helper import PERMANENT, delete_clip, permanently_delete, send_to_recycle_bin
+from lumia_briefing_room.pipeline.game_files import list_games
 from lumia_briefing_room.pipeline.game_records import records_dir_for
 from lumia_briefing_room.pipeline.label_archive import archive_dir_for
 from lumia_briefing_room.pipeline.library_fs import LibraryError, LibraryRoots
@@ -87,6 +91,54 @@ def register_library_routes(
             "folders": folders,
             "clips": clips,
         }
+
+    def game_titles_by_clip() -> dict[str, str]:
+        """클립 ID → 그 클립을 만든 게임의 제목(고친 제목이 있는 게임만)."""
+        resolved = resolve_paths(current_config().paths)
+        found: dict[str, str] = {}
+        for directory in dict.fromkeys((resolved.games_steam, resolved.games_vod)):
+            for game in list_games(directory):
+                if not game.get("title"):
+                    continue
+                for cand in gcand.all_candidates(game):
+                    clip_id = (cand.get("user") or {}).get("savedClipId")
+                    if clip_id:
+                        found[clip_id] = game["title"]
+        return found
+
+    @app.get("/api/library/search")
+    @guarded
+    def search_library(q: str = ""):
+        """모든 카테고리에서 클립 제목·메모·게임 제목이 검색어에 맞는 클립을 카테고리별로 묶어 돌려준다(카테고리 순서 그대로, 맞는 클립이 없는 카테고리는 뺀다).
+
+        각 클립에 처음 맞은 칸 `match: {where, text}` 가 붙는다. 앱 밖 영상은 파일 이름(= 제목)으로만 찾고, 맞은 것만 길이·썸네일을 조사한다."""
+        cfg = current_config()
+        if not cats.enabled(cfg):
+            return {"enabled": False, "categories": []}
+        if not q.strip():
+            return {"enabled": True, "categories": []}
+        lib = _roots(cfg)
+        with lock:
+            by_category = {name: lib.list_folder(name)[1] for name in cats.category_names(cfg) if (cats.clips_root(cfg) / name).is_dir()}
+            known = summaries_by_video(cfg, set())
+            unknown_hits = {_norm(v) for videos in by_category.values() for v in videos if _norm(v) not in known and matches(v.stem, q)}
+            mapping = {**known, **(summaries_by_video(cfg, unknown_hits) if unknown_hits else {})}
+            titles = game_titles_by_clip()
+            groups = []
+            for name, videos in by_category.items():
+                clips = []
+                for video in videos:
+                    clip = mapping.get(_norm(video))
+                    if clip is None:
+                        continue
+                    match = first_match(q, [
+                        ("제목", clip.meta.get("title")), ("메모", clip.meta.get("memo")), ("게임 제목", titles.get(clip.id)),
+                    ])
+                    if match is not None:
+                        clips.append({**serialize(clip), "relPath": lib.rel_of(video), "fileName": video.name, "match": match})
+                if clips:
+                    groups.append({"name": name, "clips": clips})
+        return {"enabled": True, "categories": groups}
 
     @app.post("/api/library/folders", status_code=201)
     @guarded

@@ -176,3 +176,56 @@ def test_legacy_layout_has_a_virtual_top(tmp_path, monkeypatch):
     assert [x["fileName"] for x in listing(c, "스팀 녹화")["clips"]] == ["x.mp4"]
     assert c.post("/api/library/folders", json={"path": "", "name": "새"}).status_code == 400
     assert c.post("/api/library/delete", json={"items": ["스팀 녹화"]}).status_code == 400
+
+
+def add_game(client, key, title, clip_ids):
+    folder = client.resolved.games_steam / key
+    folder.mkdir(parents=True, exist_ok=True)
+    cands = [{"id": f"{key}_{i}", "start": 0, "end": 10, "title": "후보", "user": {"savedClipId": cid}} for i, cid in enumerate(clip_ids)]
+    game = {"gameKey": key, "source": "steam", "title": title, "candidates": cands, "userCandidates": []}
+    (folder / "game.json").write_text(json.dumps(game), encoding="utf-8")
+
+
+def search(client, q):
+    resp = client.get("/api/library/search", params={"q": q})
+    assert resp.status_code == 200, resp.text
+    return resp.json()
+
+
+def test_search_spans_every_category_grouped_in_category_order(client):
+    add_clip(client, "a", folder="자동 보관", title="마지막 교전")
+    add_clip(client, "b", folder="보관함", title="마지막 우승")
+    add_clip(client, "c", folder="내 모음", title="무관")
+    result = search(client, "마지막")
+    assert result["enabled"] is True
+    assert [g["name"] for g in result["categories"]] == ["보관함", "자동 보관"]
+    assert [c["id"] for c in result["categories"][0]["clips"]] == ["b"]
+    assert result["categories"][0]["clips"][0]["match"] == {"where": "제목", "text": "마지막 우승"}
+    assert result["categories"][0]["clips"][0]["relPath"] == "보관함/b.mp4"
+
+
+def test_search_ignores_case_and_whitespace_and_looks_at_memo_and_game_title(client):
+    add_clip(client, "a", folder="보관함", title="Final Fight")
+    add_clip(client, "b", folder="보관함", title="다른", memo="궁극기 타이밍이 좋았다")
+    add_clip(client, "c", folder="보관함", title="또 다른")
+    add_game(client, "20260930_002400", "첫 우승 Run", ["c"])
+    assert [c["id"] for c in search(client, "FINALfight")["categories"][0]["clips"]] == ["a"]
+    (memo,) = search(client, "타이밍")["categories"][0]["clips"]
+    assert memo["id"] == "b" and memo["match"] == {"where": "메모", "text": "궁극기 타이밍이 좋았다"}
+    (game,) = search(client, "첫우승")["categories"][0]["clips"]
+    assert game["id"] == "c" and game["match"] == {"where": "게임 제목", "text": "첫 우승 Run"}
+
+
+def test_search_matches_the_title_of_clips_made_outside_the_app_by_file_name(client):
+    base = client.resolved.clips_root / "보관함"
+    base.mkdir(parents=True)
+    (base / "OBS 녹화.mp4").write_bytes(b"obs" * 100)
+    (clip,) = search(client, "obs")["categories"][0]["clips"]
+    assert clip["unknownVideo"] is True
+
+
+def test_empty_query_and_old_layout_return_nothing_to_show(client, tmp_path, monkeypatch):
+    add_clip(client, "a", folder="보관함")
+    assert search(client, "  ")["categories"] == []
+    legacy = make_client(tmp_path / "legacy", monkeypatch, new_layout=False)
+    assert search(legacy, "제목") == {"enabled": False, "categories": []}

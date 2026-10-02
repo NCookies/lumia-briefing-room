@@ -1,18 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { patchClip, splitClip, thumbnailUrl, trimClip } from '../api'
-import { cardHeadline, filterClips, formatWhen, sortedForCategory } from '../clipArchive'
+import { cardHeadline, flattenGroups, formatWhen, searchResultLabel, sortedForCategory, sortedGroups } from '../clipArchive'
 import { idAfterRemoval } from '../clipViewer'
 import { createCategory, getCategories, moveClipsToCategory, type Category } from '../categoriesApi'
 import type { DeleteMode } from '../deleteConfirm'
 import { getExportDefault, pickFolder } from '../exportApi'
-import { deleteEntries, exportEntries, getLibrary, renameEntry, revealEntry, type LibraryClip } from '../libraryApi'
+import { deleteEntries, exportEntries, getLibrary, renameEntry, revealEntry, searchLibrary, type LibraryClip, type SearchedClip } from '../libraryApi'
 import { formatBytes } from '../retention'
+import { isSearching, matchLabel } from '../search'
+import { useSearch } from '../useSearch'
 import { ArchivePopup } from './ArchivePopup'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
 import { ExportDialog } from './ExportDialog'
 import { ClipViewer } from './ClipViewer'
 import { PortraitRow } from './PortraitRow'
 import { PromptDialog } from './PromptDialog'
+import { SearchBox } from './SearchBox'
 
 interface Props {
   active: boolean
@@ -46,7 +49,7 @@ export function ClipArchive({ active, category, onCategoryChange, clipId, onClip
   const [enabled, setEnabled] = useState(true)
   const [categories, setCategories] = useState<Category[] | null>(null)
   const [clips, setClips] = useState<LibraryClip[]>([])
-  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<{ name: string; clips: SearchedClip[] }[]>([])
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
@@ -82,15 +85,32 @@ export function ClipArchive({ active, category, onCategoryChange, clipId, onClip
         setClips(listing.clips)
         setLoadedFor(current)
         setError(null)
-        setSelected((prev) => new Set([...prev].filter((k) => listing.clips.some((c) => c.relPath === k))))
       })
       .catch((e: Error) => setError(e.message))
   }, [current])
 
+  const appliedRef = useRef('')
+  const searchSeq = useRef(0)
+  const loadSearch = useCallback(() => {
+    const q = appliedRef.current
+    const seq = ++searchSeq.current
+    if (!q) return setResults([])
+    searchLibrary(q)
+      .then((found) => {
+        if (seq !== searchSeq.current) return
+        setResults(found.categories)
+      })
+      .catch((e: Error) => setError(e.message))
+  }, [])
+  const search = useSearch(active, loadSearch)
+  appliedRef.current = search.applied
+  const searching = search.searching && isSearching(search.query)
+
   const reload = useCallback(() => {
     void loadCategories()
     loadClips()
-  }, [loadCategories, loadClips])
+    loadSearch()
+  }, [loadCategories, loadClips, loadSearch])
 
   useEffect(() => {
     if (active) void loadCategories()
@@ -100,13 +120,22 @@ export function ClipArchive({ active, category, onCategoryChange, clipId, onClip
     if (active) loadClips()
   }, [active, loadClips, refreshTick])
 
-  const shown = useMemo(() => filterClips(sortedForCategory(clips), query), [clips, query])
+  useEffect(() => {
+    if (active) loadSearch()
+  }, [active, loadSearch, refreshTick])
+
+  const groups = useMemo(() => sortedGroups(results), [results])
+  const shown = useMemo(() => (searching ? flattenGroups(groups) : sortedForCategory(clips)), [searching, groups, clips])
   const playing = clipId && loadedFor === current ? (clips.find((c) => c.id === clipId) ?? null) : null
   const viewerClips = useMemo(() => sortedForCategory(clips), [clips])
 
   useEffect(() => {
     if (active && clipId && loadedFor === current && !clips.some((c) => c.id === clipId)) onClipChange(current, null, true)
   }, [active, clipId, loadedFor, current, clips, onClipChange])
+  useEffect(() => {
+    const present = new Set(shown.map((c) => c.relPath))
+    setSelected((prev) => (prev.size === 0 ? prev : new Set([...prev].filter((k) => present.has(k)))))
+  }, [shown])
   const selectedClips = shown.filter((c) => selected.has(c.relPath))
 
   const run = async (action: () => Promise<unknown>, done?: string) => {
@@ -161,6 +190,34 @@ export function ClipArchive({ active, category, onCategoryChange, clipId, onClip
     else setDeleteRequest({ label: `"${clip.title}" 클립을 삭제합니다.`, items: [clip.relPath], after: next })
   }
 
+  const card = (c: LibraryClip & { match?: SearchedClip['match'] }, inCategory: string | null) => (
+    <div key={c.relPath} className={`flex flex-col overflow-hidden rounded-md border bg-zinc-800/60 ${selected.has(c.relPath) ? 'border-sky-500' : 'border-zinc-700'}`}>
+      <div className="relative aspect-video cursor-pointer bg-zinc-900" onClick={() => (selectMode ? setSelected((s) => { const n = new Set(s); if (n.has(c.relPath)) n.delete(c.relPath); else n.add(c.relPath); return n }) : onClipChange(inCategory, c.id))}>
+        <img src={thumbnailUrl(c.id)} alt="" className="h-full w-full object-cover" loading="lazy" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
+        {selectMode && <input type="checkbox" className="absolute left-2 top-2" aria-label={`${c.title} 선택`} checked={selected.has(c.relPath)} readOnly />}
+        {c.durationSec > 0 && <span className="absolute bottom-1 right-1 rounded-md bg-black/70 px-1.5 text-xs text-zinc-100">{formatDuration(c.durationSec)}</span>}
+        {c.unknownVideo && <span className="absolute right-1 top-1 rounded-md bg-zinc-700/90 px-1.5 text-xs text-zinc-200">앱 밖 영상</span>}
+      </div>
+      <div className="flex flex-col gap-1 px-2 py-2">
+        {c.unknownVideo ? (
+          <div className="truncate text-sm" title={c.title}>{c.title}</div>
+        ) : (
+          <>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-base font-bold">{cardHeadline(c)}</span>
+              <span className="text-xs text-zinc-500">{formatWhen(c.matchStartUtc)}</span>
+            </div>
+            <PortraitRow clip={c} />
+            <div className="truncate text-xs text-zinc-400" title={c.title}>{c.title}</div>
+            {c.memo && <div className="truncate text-xs text-amber-300/80" title={c.memo}>📝 메모 있음</div>}
+          </>
+        )}
+        {c.match && <div className="truncate text-xs text-amber-300/90" title={c.match.text}>🔍 {matchLabel(c.match)}</div>}
+        {c.sizeBytes ? <div className="text-xs text-zinc-600">{formatBytes(c.sizeBytes)}</div> : null}
+      </div>
+    </div>
+  )
+
   return (
     <>
     {playing && current && (
@@ -206,10 +263,10 @@ export function ClipArchive({ active, category, onCategoryChange, clipId, onClip
           <div
             key={c.name}
             className={`group flex items-center gap-2 rounded-md border px-2 py-1.5 ${
-              current === c.name ? 'border-sky-500 bg-zinc-800' : 'border-transparent transition hover:bg-zinc-800/70'
+              current === c.name && !searching ? 'border-sky-500 bg-zinc-800' : 'border-transparent transition hover:bg-zinc-800/70'
             } ${c.auto ? 'opacity-60' : ''}`}
           >
-            <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => { onCategoryChange(c.name); leaveSelectMode() }}>
+            <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => { search.setQuery(''); onCategoryChange(c.name); leaveSelectMode() }}>
               <span className="h-8 w-12 shrink-0 overflow-hidden rounded-md bg-zinc-900">
                 {c.thumbnailClipId && <img className="h-full w-full object-cover" src={thumbnailUrl(c.thumbnailClipId)} alt="" loading="lazy" />}
               </span>
@@ -242,15 +299,8 @@ export function ClipArchive({ active, category, onCategoryChange, clipId, onClip
 
       <section className="flex min-w-0 flex-1 flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-base font-semibold">{current ?? ''}</h2>
-          <input
-            type="search"
-            aria-label="클립 검색"
-            placeholder="제목·메모 검색"
-            className="w-48 rounded-md border border-zinc-600/70 bg-zinc-900 px-2 py-1 text-sm outline-none focus:border-sky-500"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+          <h2 className="text-base font-semibold">{searching ? searchResultLabel(groups) : (current ?? '')}</h2>
+          <SearchBox value={search.query} onChange={search.setQuery} label="클립 검색" placeholder="모든 카테고리에서 제목·메모·게임 검색" />
           <span className="ml-auto flex items-center gap-2">
             <button type="button" className={`rounded-md border px-3 py-1 text-sm ${selectMode ? 'border-sky-500 bg-sky-500/20' : 'border-zinc-600/70 transition hover:bg-zinc-700'}`} onClick={() => (selectMode ? leaveSelectMode() : setSelectMode(true))}>
               선택
@@ -292,40 +342,24 @@ export function ClipArchive({ active, category, onCategoryChange, clipId, onClip
 
         {categories && shown.length === 0 && (
           <p className="py-12 text-center text-sm text-zinc-500">
-            {clips.length === 0
-              ? '이 카테고리에는 보관한 클립이 없습니다. 게임의 풀영상 화면에서 후보의 "보관"을 눌러 보관하세요.'
-              : '검색에 맞는 클립이 없습니다.'}
+            {searching
+              ? '검색에 맞는 클립이 없습니다.'
+              : '이 카테고리에는 보관한 클립이 없습니다. 게임의 풀영상 화면에서 후보의 "보관"을 눌러 보관하세요.'}
           </p>
         )}
 
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3">
-          {shown.map((c) => (
-            <div key={c.relPath} className={`flex flex-col overflow-hidden rounded-md border bg-zinc-800/60 ${selected.has(c.relPath) ? 'border-sky-500' : 'border-zinc-700'}`}>
-              <div className="relative aspect-video cursor-pointer bg-zinc-900" onClick={() => (selectMode ? setSelected((s) => { const n = new Set(s); if (n.has(c.relPath)) n.delete(c.relPath); else n.add(c.relPath); return n }) : onClipChange(current, c.id))}>
-                <img src={thumbnailUrl(c.id)} alt="" className="h-full w-full object-cover" loading="lazy" onError={(e) => (e.currentTarget.style.visibility = 'hidden')} />
-                {selectMode && <input type="checkbox" className="absolute left-2 top-2" aria-label={`${c.title} 선택`} checked={selected.has(c.relPath)} readOnly />}
-                {c.durationSec > 0 && <span className="absolute bottom-1 right-1 rounded-md bg-black/70 px-1.5 text-xs text-zinc-100">{formatDuration(c.durationSec)}</span>}
-                {c.unknownVideo && <span className="absolute right-1 top-1 rounded-md bg-zinc-700/90 px-1.5 text-xs text-zinc-200">앱 밖 영상</span>}
-              </div>
-              <div className="flex flex-col gap-1 px-2 py-2">
-                {c.unknownVideo ? (
-                  <div className="truncate text-sm" title={c.title}>{c.title}</div>
-                ) : (
-                  <>
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-base font-bold">{cardHeadline(c)}</span>
-                      <span className="text-xs text-zinc-500">{formatWhen(c.matchStartUtc)}</span>
-                    </div>
-                    <PortraitRow clip={c} />
-                    <div className="truncate text-xs text-zinc-400" title={c.title}>{c.title}</div>
-                    {c.memo && <div className="truncate text-xs text-amber-300/80" title={c.memo}>📝 메모 있음</div>}
-                  </>
-                )}
-                {c.sizeBytes ? <div className="text-xs text-zinc-600">{formatBytes(c.sizeBytes)}</div> : null}
-              </div>
+        {searching ? (
+          groups.map((g) => (
+            <div key={g.name} className="flex flex-col gap-2">
+              <h3 className="text-sm font-semibold text-zinc-300">
+                {g.name} <span className="text-xs font-normal text-zinc-500">{g.clips.length}개</span>
+              </h3>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3">{g.clips.map((c) => card(c, g.name))}</div>
             </div>
-          ))}
-        </div>
+          ))
+        ) : (
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3">{shown.map((c) => card(c, current))}</div>
+        )}
       </section>
     </div>
 

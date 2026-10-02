@@ -20,14 +20,26 @@ export function cardHeadline(clip: CardClip): string {
   return type ? `${head} · ${type}` : head
 }
 
-export function filterClips<T extends CardClip>(clips: T[], query: string): T[] {
-  const q = query.trim().toLowerCase()
-  if (!q) return clips
-  return clips.filter((c) => `${c.title}\n${c.fileName ?? ''}\n${c.memo ?? ''}`.toLowerCase().includes(q))
-}
-
 export function sortedForCategory<T extends CardClip>(clips: T[]): T[] {
   return [...clips].sort((a, b) => (b.matchStartUtc ?? '').localeCompare(a.matchStartUtc ?? ''))
+}
+
+export interface CategoryGroup<T> {
+  name: string
+  clips: T[]
+}
+
+export function sortedGroups<T extends CardClip>(groups: CategoryGroup<T>[]): CategoryGroup<T>[] {
+  return groups.map((g) => ({ ...g, clips: sortedForCategory(g.clips) }))
+}
+
+export function flattenGroups<T>(groups: CategoryGroup<T>[]): T[] {
+  return groups.flatMap((g) => g.clips)
+}
+
+export function searchResultLabel<T>(groups: CategoryGroup<T>[]): string {
+  const count = flattenGroups(groups).length
+  return groups.length > 1 ? `검색 결과 ${count}개 · 카테고리 ${groups.length}곳` : `검색 결과 ${count}개`
 }
 
 export function formatWhen(iso: string | undefined): string {
