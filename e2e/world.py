@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from lumia_briefing_room.consent import CONSENT_VERSION  # noqa: E402
+from lumia_briefing_room.pipeline.vod_store import save_index, vod_id  # noqa: E402
 
 KEY_BR = "20260930_002400"
 KEY_BR2 = "20260930_013000"
@@ -92,8 +93,22 @@ class World:
     def steam_games(self) -> Path:
         return self.root / "full_video" / "steam_replay"
 
+    @property
+    def vod_videos(self) -> Path:
+        return self.home / "vods"
+
+    @property
+    def vod_games(self) -> Path:
+        return self.root / "full_video" / "vod"
+
+    @property
+    def library_vod(self) -> Path:
+        return self.home / "Local" / "LumiaBriefingRoom" / "library" / "vod"
+
     def write_config(self, *, consented: bool = True, extra: dict | None = None) -> None:
         cfg: dict = {"paths": {"root": str(self.root)}}
+        if self.vod_videos.exists():
+            cfg["vod"] = {"sources": [str(self.vod_videos)]}
         if consented:
             cfg["consent"] = {"version": CONSENT_VERSION}
         for key, value in (extra or {}).items():
@@ -122,6 +137,38 @@ class World:
                       candidates=[candidate(f"{KEY_OLD}_01", 4, 12, certain=True)])
         self.add_game(KEY_COBALT, mode="cobalt", placement=None,
                       candidates=[candidate(f"{KEY_COBALT}_01", 2, 10, certain=True)])
+
+
+    def add_vod(self, name: str, *, streamer: str = "하이용가리", games: int = 2, tail: int = 0,
+                original: bool = True, date_epoch: float = 1790000000.0, placements=(3, 1)) -> str:
+        """영상 파일 하나(분석 끝남)와 그 게임 `games`개. 영상 id 가 겹치지 않게 `tail` 바이트를 붙여 다르게 만든다.
+        `original=False` 면 원본 영상을 지운 상태(풀영상·클립만 남은 영상)."""
+        self.vod_videos.mkdir(parents=True, exist_ok=True)
+        video = self.vod_videos / f"{name}.mp4"
+        shutil.copyfile(self.sample_video, video)
+        with open(video, "ab") as f:
+            f.write(b"x" * tail)
+        vid = vod_id(video)
+        os.utime(video, (date_epoch, date_epoch))
+        index_games = []
+        for i in range(1, games + 1):
+            key = f"vod_{vid}_g{i:02d}"
+            folder = self.vod_games / key
+            folder.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(self.sample_video, folder / "full.mp4")
+            data = game_json(key, placement=placements[(i - 1) % len(placements)], candidates=[
+                candidate(f"{key}_{i:03d}1", 3, 9, certain=True, title=f"{name} 교전 {i}")])
+            data.update({"source": "vod", "vodId": vid, "vodFile": str(video), "streamer": streamer, "vodGameIndex": i,
+                         "vodStartSec": 100.0 * i, "vodEndSec": 100.0 * i + 24, "spanStartSec": 100.0 * i,
+                         "spanEndSec": 100.0 * i + 24, "matchStartUtc": None, "matchEndUtc": None})
+            data["fullVideo"]["sizeBytes"] = (folder / "full.mp4").stat().st_size
+            (folder / "game.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+            index_games.append({"index": i, "gameKey": key, "startSec": 100.0 * i, "endSec": 100.0 * i + 24, "clipIds": []})
+        save_index(self.library_vod, {"id": vid, "path": str(video), "status": "done", "width": 1920, "height": 1080,
+                                      "durationSec": 400.0, "games": index_games, "clips": [], "streamer": streamer})
+        if not original:
+            video.unlink()
+        return vid
 
 
 def free_port() -> int:
