@@ -254,7 +254,7 @@ class EncodeConfig:
 @dataclass
 class RetentionConfig:
     delete_mode: str = "permanent"
-    auto_clean_enabled: bool = True
+    auto_clean_enabled: bool = False
     max_age_days: int | None = None
     max_total_gb: float | None = 40.0
     max_count: int | None = None

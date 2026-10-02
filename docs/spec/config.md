@@ -76,7 +76,7 @@
 
 | 키 | 기본값 | 설명 |
 |---|---|---|
-| `retention.autoCleanEnabled` | `true` | 대상은 풀영상. 저장한 클립은 대상이 아니다 |
+| `retention.autoCleanEnabled` | `false` | 대상은 풀영상. 저장한 클립은 대상이 아니다. 켤 때 확인 창이 뜬다 |
 | `retention.maxAgeDays` / `retention.maxTotalGb` / `retention.maxCount` | `null` / `40` / `null` | 기준별, `null` = 미적용 |
 | `retention.deleteMode` | `permanent` | 자동 정리 전용(`recycle`/`permanent`) |
 | `retention.protectPinned` | `true` | `game.json` 의 `pinned` |

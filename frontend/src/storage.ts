@@ -43,7 +43,7 @@ export function structureLines(root: string, fullVideos: string | null): Structu
     },
     {
       path: fullVideos || joinPath(root, 'full_video'),
-      note: '게임 전체 영상. 앱이 관리하며 용량 한도(기본 40GB)를 넘으면 오래된 것부터 자동으로 지워집니다.',
+      note: '게임 전체 영상. 자동 정리(기본 꺼짐)를 켜면 용량 한도(권장 40GB)를 넘을 때 오래된 것부터 자동으로 지워집니다.',
     },
   ]
 }

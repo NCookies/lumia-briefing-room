@@ -26,6 +26,8 @@ def test_default_config_matches_spec_defaults():
     assert not hasattr(cfg.clip, "max_duration_sec")
     assert cfg.encode.proxy.enabled is False
     assert cfg.encode.thumbnail.enabled is True
+    assert cfg.retention.auto_clean_enabled is False
+    assert cfg.retention.max_total_gb == 40.0
     assert cfg.retention.delete_mode == "permanent"
     assert cfg.retention.protect_tags == []
     assert cfg.ui.auto_start is True

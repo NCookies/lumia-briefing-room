@@ -210,7 +210,7 @@ export function FirstRunScreen({ onDone }: { onDone: (backfillStarted: boolean) 
               {diskTone(info.disk) === 'warn' && ` (권장 ${info.disk.recommendedGb[0]}GB 미만)`}
             </p>
             <p className="mt-1 text-xs text-zinc-400">
-              게임 전체 영상을 저장하기 때문입니다. 오래된 영상은 옵션의 자동 정리 한도(기본 40GB)로 지울 수 있습니다.
+              게임 전체 영상을 저장하기 때문입니다. 자동 정리는 기본적으로 꺼져 있으니, 오래된 영상은 직접 지우거나 옵션에서 자동 정리 한도(권장 40GB)를 켜세요.
             </p>
           </div>
           <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-600/70 bg-zinc-900/60 p-3 text-sm">
