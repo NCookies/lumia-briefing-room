@@ -166,11 +166,6 @@ export function GameList({
   return (
     <div className="flex flex-1 flex-col gap-2 p-4">
       <div className="flex items-center gap-3 text-base text-zinc-200">
-        <span>{gameCountLabel({ loaded: true, total: games.length, shown: shown.length, dueOnly, searching: search.searching })}</span>
-        <StorageUsageBar totals={storage} tabBytes={fullBytes} />
-        {!(storage && storage.autoCleanEnabled && storage.limitGb) && (
-          <span className="text-sm text-zinc-400">풀영상 {formatBytes(fullBytes)}</span>
-        )}
         {games.length > 0 && (
           <>
             <button
@@ -200,6 +195,11 @@ export function GameList({
         >
           {backfillLabel}
         </button>
+        <span>{gameCountLabel({ loaded: true, total: games.length, shown: shown.length, dueOnly, searching: search.searching })}</span>
+        <StorageUsageBar totals={storage} tabBytes={storage ? storage.steamBytes : fullBytes} />
+        {!(storage && storage.autoCleanEnabled && storage.limitGb) && (
+          <span className="text-sm text-zinc-400">풀영상 {formatBytes(fullBytes)}</span>
+        )}
         <div className="ml-auto"><SearchBox value={search.query} onChange={search.setQuery} label="게임 검색" placeholder="게임·후보·클립·메모 검색" /></div>
       </div>
       {dueOnly && shown.length === 0 && <p className="text-sm text-zinc-500">삭제 예정인 게임이 없습니다.</p>}

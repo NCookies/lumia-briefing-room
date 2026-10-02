@@ -356,11 +356,6 @@ export function VodGameList({
   return (
     <div className="flex flex-1 flex-col gap-2 p-4">
       <div className="flex flex-wrap items-center gap-3 text-base text-zinc-200">
-        <span>{gameCountLabel({ loaded: games !== null, total: total.games, shown: shown.length, dueOnly, searching })}</span>
-        {games !== null && <StorageUsageBar totals={storage} tabBytes={fullBytes} />}
-        {games !== null && !(storage && storage.autoCleanEnabled && storage.limitGb) && (
-          <span className="text-sm text-zinc-400">풀영상 {formatBytes(fullBytes)}</span>
-        )}
         {days.length > 0 && (
           <>
             <button
@@ -391,6 +386,11 @@ export function VodGameList({
         >
           {refreshing ? '읽는 중…' : '새로고침'}
         </button>
+        <span>{gameCountLabel({ loaded: games !== null, total: total.games, shown: shown.length, dueOnly, searching })}</span>
+        <StorageUsageBar totals={storage} tabBytes={storage ? storage.vodBytes : fullBytes} />
+        {games !== null && !(storage && storage.autoCleanEnabled && storage.limitGb) && (
+          <span className="text-sm text-zinc-400">풀영상 {formatBytes(fullBytes)}</span>
+        )}
         <div className="ml-auto"><SearchBox value={search.query} onChange={search.setQuery} label="게임 검색" placeholder="게임·후보·메모·영상 검색" /></div>
       </div>
 
