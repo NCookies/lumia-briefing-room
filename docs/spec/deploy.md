@@ -1,6 +1,6 @@
 # 배포·업데이트·데이터 전송·수신 서버
 
-> 목표: 파이썬·node·ffmpeg 가 없는 PC 에서 설치 파일 하나로 동작, 공개 배포는 GitHub Releases(`NCookies/lumia-briefing-room`, 공개 저장소). 빌드·릴리스 절차는 [DEVELOPMENT.md](../DEVELOPMENT.md), 릴리스 전 실측은 [release-checklist.md](../release-checklist.md), 개인정보 안내는 [privacy.md](../privacy.md), 친구 배포 안내는 [friend-guide.md](../friend-guide.md).
+> 목표: 파이썬·node·ffmpeg 가 없는 PC 에서 설치 파일 하나로 동작, 공개 배포는 GitHub Releases(`NCookies/lumia-briefing-room`, 공개 저장소). 빌드·릴리스 절차는 [DEVELOPMENT.md](../DEVELOPMENT.md), 릴리스 전 실측은 [release-checklist.md](../release-checklist.md), 개인정보 안내는 [privacy.md](../privacy.md).
 
 ## 1. 원칙
 
@@ -33,7 +33,7 @@
 - pystray(LGPL v3)는 `tools/pyi_hooks/hook-pystray.py` 로 `_internal/pystray/*.py` 로 풀어 교체 가능하게 한다.
 - `--selftest`: 번들 리소스·OCR·ffmpeg·프록시 인코더 등 점검.
 - 설치기(`installer/lumia.iss`): 사용자 영역(`%LOCALAPPDATA%\Programs\LumiaBriefingRoom`, 관리자 권한 없음), 설치 직후 `--open-ui` 로 앱을 띄우고 마침 화면에 안내, 트레이 알림. 제거 시 자동 시작 값 삭제·실행 중 앱 종료·설정 삭제 여부 질문(무인 제거는 묻지 않음)·**클립 폴더는 남김**. `THIRD_PARTY_NOTICES` 동봉. 조용한 설치일 때 진행 창을 최상위로 올린다(`ShowProgressOnTop`). `/RELAUNCH=1` 이면 설치 뒤 앱을 `--start-server` 로 다시 띄운다.
-- 코드 서명 없음 → SmartScreen 경고(안내로 대응). Windows Defender 가 `Wacatac.C!ml`(머신러닝 추정)로 격리한 사례가 있어 README·friend-guide 에 허용 방법을 적었다.
+- 코드 서명 없음 → SmartScreen 경고(안내로 대응). Windows Defender 가 `Wacatac.C!ml`(머신러닝 추정)로 격리한 사례가 있어 README 에 허용 방법을 적었다.
 
 ### 함정 (빌드본에서만 드러나는 것)
 
