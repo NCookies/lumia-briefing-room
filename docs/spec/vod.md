@@ -56,7 +56,7 @@
 6. **클립 컷**(`clip.saveMode` = `auto` 일 때만, 기본): `ffmpeg -ss/-to -i <vod> -c copy`, 썸네일, 메타데이터. 새 클립은 스테이징 폴더에 만들고 성공해야 기존을 지운다(풀영상도 클립도 못 만들면 기존 보존). `manual` 에서 다시 분석하면 사용자가 저장한 옛 클립은 지우지 않고 같은 ID 후보에 저장됨으로 잇는다. 게임 폴더는 스테이징 없이 게임 단위로 바로 쓰고(취소·실패 시 이번에 새로 만든 폴더만 지움), 다시 만들어지지 않은 옛 게임 폴더는 지우며 `pinned` 는 잇는다.
 
 - **다시 분석** 메뉴: "캐시 재사용(빠름)"(`rebuild` — 클립만 다시) / "처음부터 다시(느림)"(`force`). 옛 `ANALYSIS_VERSION` 캐시는 자동으로 처음부터 판독한다. 라벨은 3초 이상 겹치는 새 클립으로 이관(스팀과 같은 규칙). **다시 분석 때 클립**: `clip.saveMode=auto` 에서는 이 영상의 기존 클립 중 **사용자가 보관한 것(`자동 보관` 카테고리가 아닌 곳)은 두고**(같은 ID 후보에 저장됨으로 이음) `자동 보관` 클립만 지우고 새로 만든다(라벨은 지운 것에서만 옮김, `test_auto_mode_rebuild_keeps_user_archived_clips…`). `manual` 이면 저장한 클립 전부 그대로. 카테고리가 없는 옛 경로 모드는 구분할 수 없어 **전부 남기고** 같은 ID 후보에 잇는다(새 클립을 또 만들지 않는다). 판정은 `categories.is_user_archived`([pipeline.md §9](pipeline.md)). **원본 영상 파일이 없으면**(`sourceDeleted` 등) 저장한 게임 풀영상(`games\vod_…\full.mp4`)에서 후보·결과·초상화를 다시 찾고 자동 저장 클립을 다시 뽑는다(`POST /api/vods/{vid}/analyze` 가 알아서 고르고, 영상 항목에 `canReanalyzeFromFullVideos`, 작업에 `fromFullVideos`·`clipsMade`·`clipsFailed`). 원본도 저장한 풀영상도 없으면 404.
-- 삭제는 세 단위다. 원본 영상 파일은 어느 경우에도 건드리지 않는다(V7 선택 삭제 제외).
+- 삭제는 세 단위다. 원본 영상 파일은 어느 경우에도 건드리지 않는다(사용자가 고른 원본 삭제 `vod.deleteSourceAfter` 제외).
   - 아래 세 삭제는 **`자동 보관` 클립만 지우고 사용자가 보관한 클립(옛 경로 모드는 전부)은 클립 탭에 남긴다**([pipeline.md §9](pipeline.md)) - 응답에 `keptClips`, 확인 창(`vodDeleteAllMessage`·`vodRemoveMessage`)에 지워질 자동 보관 클립 수와 남는 수를 적는다.
   - **전체 삭제**(`DELETE /api/vods/{vid}/clips`): 자동 보관 클립을 지우고 색인을 `games=[]·clips=[]·status="new"` 로 되돌린다(판독 캐시는 남겨 재분석이 빠름). 클립 0개짜리 게임 행이 남아 "다시 만들 수 없다"던 문제의 해결.
   - **게임 삭제**(`DELETE /api/vods/{vid}/games/{index}`): 클립 0개 게임도 지운다.
