@@ -3,10 +3,9 @@
 사용자용 안내(설치·사용법)는 저장소 루트의 [README.md](../README.md) 에 있다. 이 문서는 소스에서 실행·빌드·테스트하는 개발자용이다. 설계 문서는 이 폴더에 있다.
 
 - [docs/SPEC.md](SPEC.md) — 확정·구현된 설계. 목적·원칙과 문서 지도, 세부는 [docs/spec/](spec/) 의 영역별 파일
-- [docs/plan.md](plan.md) — 남은 작업·확인 필요·우선순위 / [docs/plan-fullvideo.md](plan-fullvideo.md) — 진행 중인 풀영상 전환, [docs/plan-release-automation.md](plan-release-automation.md) — 진행 중인 릴리스 검증 자동화
+- [docs/plan.md](plan.md) — 남은 작업·확인 필요·우선순위(계획 문서는 이것 하나)
 - [docs/research.md](research.md) — 0단계 조사 결과(실측)
 - [docs/release-checklist.md](release-checklist.md) — 릴리스 전 사람이 확인할 것
-- [docs/friend-guide.md](friend-guide.md) — **친구에게 설치기와 같이 주는 안내문**(설치·확인 항목·진단 파일 보내는 법)
 
 ## 개발 환경
 
@@ -45,7 +44,7 @@ $env:LUMIA_FFMPEG = "C:\path\to\ffmpeg.exe"   # PowerShell
 ## 화면 E2E
 
 브라우저(Playwright Chromium)로 앱을 실제로 눌러 보는 테스트. 눌러 보면 아는 것(화면에 뜨는가·문구·메뉴·확인 창·단축키·뒤로 가기·삭제/보관 흐름)을
-사람 대신 확인한다. 시나리오 목록은 [e2e-scenarios.md](e2e-scenarios.md), 계획은 [plan-release-automation.md](plan-release-automation.md).
+사람 대신 확인한다. 시나리오 목록은 [e2e-scenarios.md](e2e-scenarios.md), 남은 자동화 계획은 [plan.md §3](plan.md).
 기본 `pytest` 에는 **안 돌아간다**(느리다 - 49개에 약 2분 40초).
 
 ```bash
@@ -347,7 +346,7 @@ python tools/build_installer.py          # → dist\LumiaBriefingRoom-<버전>-s
 - 실행 중이면 설치기가 닫아 달라고 알린다(`AppMutex` 가 앱의 중복 실행 방지 뮤텍스와 같은 이름이다).
 - `THIRD_PARTY_NOTICES.md` 가 설치 폴더에 같이 들어간다. ffmpeg LGPL 고지와 소스 링크가 여기 있다.
 - **코드 서명을 하지 않으므로 SmartScreen 경고가 뜬다.** 사용자에게 "추가 정보 → 실행" 을 안내한다
-  ([docs/friend-guide.md](friend-guide.md)).
+  ([README.md](../README.md) "설치와 사용"·"Windows Defender가 탐지할 때").
 
 ### 12. 라벨·오류 로그 전송 (동의 기반, D10)
 
@@ -397,6 +396,20 @@ $env:LUMIA_UPDATE_DOWNLOAD_PREFIX = "http://127.0.0.1:8770/download/"
 체크리스트"를 먼저 확인한다.** `- [ ]` 로 남은 항목이 있으면 태그를 만들거나 푸시하지
 않는다(CLAUDE.md "릴리스 체크리스트 관리" 참고) — CHANGELOG 절 누락은 CI 가 걸러 주지만,
 실측 미확인은 사람(또는 세션)이 직접 걸러야 한다.
+
+실측 체크리스트에는 아래 기준에 걸리는 것만 둔다(나머지는 pytest·화면 E2E 로 쓴다). ① 실제 게임·스팀이 돌아야만
+재현된다 ② 체감·주관이다("뜨는가"는 테스트, "보기 좋은가"는 사람) ③ 실사용자 데이터·깨끗한 PC·다른 해상도가 필요하다.
+
+| # | 언제 | 무엇 |
+|---|---|---|
+| H1 | 매 릴리스 | 실게임 연속 2~3판(연습 모드 1회 포함) — 스팀 녹화 안 끊김(`streaming_log.txt`), 판마다 풀영상·클립·결과·초상화, 연습 모드 제외, 분석 중 게임 프레임 체감 |
+| H2 | 매 릴리스 | 지난 릴리스 실데이터(백업본)로 새 버전 첫 실행 — 게임·클립(제목·메모·고정·썸네일)이 그대로인지 |
+| H3 | 매 릴리스 | 실제 크기(4~5GB) 풀영상의 탐색 반응·손잡이 끌기·휠 확대·영상 크기·전체화면 |
+| H4 | 매 릴리스 | `pytest e2e -m e2e` 스크린샷 모음(`build/e2e-report/index.html`)을 훑어 어색한 것만 표시 |
+| C1 | 코발트 검출·판독을 고친 릴리스 | 코발트 실게임 1판 — 승패·Phase·사망 분리 |
+| C2 | 빌드·설치기·ffmpeg·재생 프록시를 고친 릴리스 | §15 Windows 샌드박스 확인 |
+| C3 | 앱 안 업데이트를 고친 릴리스 | §16 앱 안 업데이트 수동 확인 |
+| C4 | 검출 ROI·해상도 처리를 고친 릴리스 | 지금까지 안 본 해상도 녹화 1개(있을 때만) |
 
 ```bash
 # 1) src/lumia_briefing_room/__init__.py 의 __version__ 을 올리고, CHANGELOG.md 에 그 버전 절을 쓴다 → 커밋·푸시

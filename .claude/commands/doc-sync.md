@@ -3,7 +3,7 @@ description: plan 의 항목을 코드와 대조해 끝난 것은 spec 으로 �
 argument-hint: "[detection|pipeline|vod|ui|deploy|config|all]"
 ---
 
-`docs/plan.md`(와 진행 중 작업 문서 `docs/plan-<주제>.md`)를 실제 코드와 대조해 문서를 동기화해라. 영역: `$ARGUMENTS`(비었으면 all).
+`docs/plan.md` 를 실제 코드와 대조해 문서를 동기화해라. 영역: `$ARGUMENTS`(비었으면 all).
 
 규칙은 CLAUDE.md "spec 과 plan 의 역할을 섞지 않는다" 그대로다: spec = 확정·구현된 것만, plan = 남은 작업만.
 
@@ -19,7 +19,7 @@ argument-hint: "[detection|pipeline|vod|ui|deploy|config|all]"
    - 일부: plan 항목을 남은 부분만으로 고쳐 쓴다.
    - 더 이상 의미 없음(기한 지남 등): 이유를 커밋 메시지에 적고 지운다.
    - spec 과 코드가 다르면 코드를 기준으로 spec 을 고친다. 코드가 틀린 것 같으면 고치지 말고 plan 에 올린 뒤 사용자에게 알린다.
-   - 우선순위가 바뀌면 plan §1 표도 고친다. 진행 중 작업 문서가 다 끝나면 그 파일을 지운다.
+   - 우선순위가 바뀌면 plan §1 표도 고친다. 큰 작업 절이 다 끝나면 그 절을 지운다.
 6. **검증·커밋**: `python -m pytest tests/test_check_docs.py -q` 통과 후, 영역 단위로 커밋한다(한국어, 무엇을 옮기고 지웠는지와 코드 대조로 발견한 것).
 
 ## 하지 않는 것

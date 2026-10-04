@@ -63,7 +63,7 @@
 
 ## 다음에 만들 시나리오 (우선순위 순)
 
-시드가 더 필요한 것은 [plan-release-automation.md §3.2](plan-release-automation.md) 의 `edge` 세트를 먼저 만든다(`vod`·`legacy` 세트는 `world.add_vod`·`add_legacy_*` 로 만들었다).
+시드가 더 필요한 것은 [plan.md §3](plan.md) R1 의 `edge` 세트를 먼저 만든다(`vod`·`legacy` 세트는 `world.add_vod`·`add_legacy_*` 로 만들었다).
 
 1. **옵션**: 클립 보관 방식 기본값 `자동 보관`, 저장 폴더 화면(옮기기·되돌리기·같은 디스크 경고 — 가짜 환경 필요), 자동 정리 화면 문구, `?` 도움말 말풍선이 잘리지 않는지.
 2. **자동 정리**: 한도를 낮춰 `삭제 예정` 배지·`삭제 예정만 보기`·확인 창, 고정 게임은 안 잡힘.
