@@ -61,6 +61,7 @@ class Label(_Allowlist):
     region: str | None = Field(default=None, max_length=64)
     gameDay: int | None = None
     dayNight: str | None = Field(default=None, max_length=16)
+    cobaltPhase: int | None = None
     phaseIndex: int | None = None
     reviveCost: str | None = Field(default=None, max_length=16)
 
