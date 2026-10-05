@@ -35,7 +35,7 @@
 - 볼륨·음소거는 localStorage(영상마다 `<video>` 가 새로 만들어진다).
 - 영상/썸네일 URL 에 `?v=길이` 를 붙여 자르기 뒤 캐시를 깬다.
 - 창이 넘치면 잘리지 않고 스크롤(`playerLayout.ts` 가 라벨 컨트롤 높이를 반영).
-- **재생 폴백**: 시작 시 `canPlayType`(`hvc1`·`hev1` 둘 다) + 첫 재생 `videoWidth === 0`/오류면 HEVC 불가로 보고 클립별 **H.264 프록시**로 자동 전환(`POST/GET /api/clips/{id}/proxy`, 진행률 표시). 프록시 모드면 현재 클립이 준비되면 다음 클립 1개를 미리 만든다(`?prefetch=1`, 서버 `PriorityGate` 는 직접 요청을 먼저, 실행 중 작업은 끊지 않음, `encode.proxy.prefetch`). 대기 화면에 선택적 코덱 설치 안내(유료 스토어 링크, 무료 제조사판은 검색 안내, 자동 설치 안 함). 프론트가 판별 결과를 `POST /api/client-capabilities` 로 알린다(환경 정보용).
+- **재생 폴백**: 시작 시 `canPlayType`(`hvc1`·`hev1` 둘 다) + 첫 재생 `videoWidth === 0`/오류면 HEVC 불가로 보고 클립별 **H.264 프록시**로 자동 전환(`POST/GET /api/clips/{id}/proxy`, 진행률 표시). 프록시 모드면 현재 클립이 준비되면 다음 클립 1개를 미리 만든다(`?prefetch=1`, 서버 `PriorityGate` 는 직접 요청을 먼저, 실행 중 작업은 끊지 않음, `encode.proxy.prefetch`). 대기 화면에 선택적 코덱 설치 안내(유료 스토어 링크, 무료 제조사판은 검색 안내, 자동 설치 안 함). 프론트가 판별 결과(브라우저 종류, Main/Main10 판정, 하드웨어 디코딩 여부, WebGL 렌더러 포함)를 `POST /api/client-capabilities` 로 알린다(환경 정보용, [game.md §8](game.md)).
 - **라벨링**: `교전`/`그 외` 버튼, 키 `1`/`2`/`0`(해제). 라벨을 붙여도 **다음 클립으로 자동 이동하지 않는다**(메모를 쓰려면 머물러야 한다). 메모(`labelNote`, 500자, 텍스트만, 라벨 해제 시 함께 지움) — 라벨링을 켜면 라벨 전에도 보이되 비활성. `(?)` 도움말(무엇을 보내고 안 보내는지). **라벨링 UI 는 어떤 모드에서도 숨긴다**(`showLabelingUi` 가 늘 거짓 — 처음엔 개발 모드만 보이게 했다가 당장 쓸모가 없어 개발 모드도 껐다. 라벨 재설계 전까지, plan §3). 전송은 UI 와 무관하게 `telemetry.sendLabels` 가 정해 이미 붙인 라벨은 그대로 보낸다. 이 절의 `PlayerModal` 은 옛 카드 뷰만 쓴다 — 클립 탭은 `ClipViewer`.
 
 ### 자르기·분할 (`pipeline/trim.py`, `TrimPanel`)

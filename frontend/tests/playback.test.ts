@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { initialMode, needsProxy, prefetchTarget, proxyProgressText } from '../src/playback.ts'
+import {
+  describeBrowser,
+  fullVideoFailureDetail,
+  formatHevcProbe,
+  initialMode,
+  needsProxy,
+  prefetchTarget,
+  proxyProgressText,
+} from '../src/playback.ts'
 
 test('starts native unless the browser cannot play HEVC or a failure was remembered', () => {
   assert.equal(initialMode('probably', null), 'native')
@@ -44,4 +52,30 @@ test('an interrupted or blocked play() is not a playback failure, anything else 
   assert.equal(isPlaybackFailure({ name: 'NotSupportedError' }), true)
   assert.equal(isPlaybackFailure(new Error('boom')), true)
   assert.equal(isPlaybackFailure(undefined), true)
+})
+
+test('names the browser by its own brand, not by Chromium or the GREASE brand', () => {
+  const brands = [
+    { brand: 'Not.A/Brand', version: '99' },
+    { brand: 'Chromium', version: '141' },
+    { brand: 'NAVER Whale', version: '4' },
+  ]
+  assert.equal(describeBrowser(brands, ''), 'NAVER Whale 4')
+  assert.equal(describeBrowser([{ brand: 'Chromium', version: '141' }], ''), 'Chromium 141')
+  assert.equal(describeBrowser(undefined, 'Mozilla/5.0 (Windows NT 10.0; rv:130.0) Gecko/20100101 Firefox/130.0'), 'Firefox 130')
+  assert.equal(describeBrowser(undefined, 'Mozilla/5.0 AppleWebKit/537.36 Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0'), 'Edge 141')
+  assert.equal(describeBrowser(undefined, 'weird'), 'unknown')
+})
+
+test('summarises the HEVC probe so Main and Main10 and hardware support can be told apart', () => {
+  const ok = { supported: true, smooth: true, powerEfficient: true }
+  assert.equal(formatHevcProbe('probably', 'maybe', ok), 'main=probably main10=maybe mc=supported,smooth,efficient')
+  assert.equal(formatHevcProbe('', '', { supported: false, smooth: false, powerEfficient: false }), 'main=no main10=no mc=unsupported')
+  assert.equal(formatHevcProbe('probably', '', { supported: true, smooth: false, powerEfficient: false }), 'main=probably main10=no mc=supported')
+  assert.equal(formatHevcProbe('', '', null), 'main=no main10=no mc=n/a')
+})
+
+test('describes a full-video failure including the silent black screen', () => {
+  assert.equal(fullVideoFailureDetail({ videoWidth: 0, errorCode: null }, 'Chrome 141'), 'videoWidth=0 error=none browser=Chrome 141')
+  assert.equal(fullVideoFailureDetail({ videoWidth: 0, errorCode: 4 }, 'Edge 141'), 'videoWidth=0 error=4 browser=Edge 141')
 })

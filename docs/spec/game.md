@@ -183,4 +183,6 @@ Player.log 는 로컬 시각 → UTC 로 바꿔 쓴다
 
 - HEVC 는 특허 때문에 Windows·브라우저에 기본 내장되지 않는다. 개발 PC 는 OEM 무료판 `Microsoft.HEVCVideoExtension`(단수, 스토어에서 재설치 불가 — 지우지 말 것)이 있어 WebView2/Edge/Chrome 에서 재생된다.
 - Playwright 번들 Chromium 은 HEVC 를 못 그린다(화면 검정, `videoWidth 0`). 확인은 설치된 Edge/Chrome 으로 한다.
+- 실제 스팀 녹화는 **Main10**(`hev1.2.4.L123.B0`)이다(앞의 "Main" 은 프로파일 이름이 아니라 코덱 문자열 `hev1.<프로파일>.…` 의 `2` = Main10). 브라우저가 Main 은 되고 Main10 은 안 되는 경우가 있어, 앱은 시작 때 `canPlayType`(Main·Main10 따로)과 `MediaCapabilities.decodingInfo`(Main10 2560x1440 60fps → 지원·부드러움·저전력=하드웨어)를 재서 환경 정보(`hevcProbe`)에 싣는다.
+- **오류 없이 검게 나오는 경우**(`loadedmetadata` 때 `videoWidth === 0`)가 있다. 풀영상 화면은 이 경우와 `error` 이벤트를 안내 문구로 보여 주고, `POST /api/client-events/playback-failure` 로 알려 오류 기록(`lumia_briefing_room.playback`)에 남긴다(같은 내용은 앱을 켠 동안 한 번만). 풀영상은 클립과 달리 프록시 폴백이 없다.
 - 디코더는 재배포할 수 없다 → 재생 불가 PC 는 H.264 프록시로 폴백([ui.md](ui.md), [deploy.md](deploy.md)).

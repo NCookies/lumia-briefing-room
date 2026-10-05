@@ -67,25 +67,67 @@ def _cpu_model() -> str | None:
     return (platform.processor() or "")[:128] or None
 
 
-def _gpu_name() -> str | None:
+def _gpu_adapters() -> list[tuple[str, str | None]]:
     if sys.platform != "win32":
-        return None
-    try:
-        import winreg
+        return []
+    import winreg
 
-        base = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
-        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, base) as root:
-            for index in range(16):
-                try:
-                    with winreg.OpenKey(root, f"{index:04d}") as sub:
-                        name = winreg.QueryValueEx(sub, "DriverDesc")[0]
-                        if name and "Basic" not in str(name):
-                            return str(name)[:128]
-                except OSError:
-                    continue
-    except Exception:
-        pass
-    return None
+    adapters: list[tuple[str, str | None]] = []
+    base = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, base) as root:
+        for index in range(16):
+            try:
+                with winreg.OpenKey(root, f"{index:04d}") as sub:
+                    name = str(winreg.QueryValueEx(sub, "DriverDesc")[0])
+                    try:
+                        version = str(winreg.QueryValueEx(sub, "DriverVersion")[0])
+                    except OSError:
+                        version = None
+                    adapters.append((name, version))
+            except OSError:
+                continue
+    return adapters
+
+
+def _format_gpus(adapters) -> str | None:
+    parts = [f"{name} {version}" if version else name for name, version in adapters if name and "Basic" not in name]
+    return " / ".join(parts)[:256] or None
+
+
+def _gpu_name() -> str | None:
+    return _format_gpus(_gpu_adapters())
+
+
+def _appx_package_names() -> list[str]:
+    if sys.platform != "win32":
+        return []
+    import winreg
+
+    key_path = r"Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\Repository\Packages"
+    names: list[str] = []
+    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+        index = 0
+        while True:
+            try:
+                names.append(winreg.EnumKey(key, index))
+            except OSError:
+                break
+            index += 1
+    return names
+
+
+def _format_hevc_extensions(names) -> str:
+    found = set()
+    for full in names:
+        base, _, rest = full.partition("_")
+        if "HEVC" in base.upper():
+            found.add((base.removeprefix("Microsoft."), rest.split("_")[0]))
+    return " / ".join(f"{base} {version}" for base, version in sorted(found))[:128] or "none"
+
+
+def _hevc_extension() -> str | None:
+    names = _appx_package_names()
+    return _format_hevc_extensions(names) if names else None
 
 
 def _memory_mb() -> int | None:
@@ -177,6 +219,7 @@ def collect_environment(cfg: Config) -> dict:
         "cpuModel": _safe(_cpu_model),
         "cpuCores": os.cpu_count() or None,
         "gpuName": _safe(_gpu_name),
+        "hevcExtension": _safe(_hevc_extension),
         "memoryMb": _safe(_memory_mb),
         "ffmpegBuild": _safe(_ffmpeg_build),
         "steamBufferMinutes": _safe(_buffer_minutes, cfg, root),

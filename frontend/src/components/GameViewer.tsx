@@ -18,7 +18,8 @@ import { EMPTY_HISTORY, pushEdit, redoStep, remapId, undoStep, type Edit } from 
 import { applyMark, candidateAtTime, newRangeAround, rangeModified, zoomBy, zoomView, type View } from '../playerBar'
 import { loadVolume, saveVolume, stepVolume, type VolumeState } from '../volume'
 import { isLegacyWithoutVideo } from '../legacyGame'
-import { isPlaybackFailure } from '../playback'
+import { currentBrowserName, fullVideoFailureDetail, isPlaybackFailure, needsProxy } from '../playback'
+import { reportFullVideoFailure } from '../telemetryApi'
 import { gameHeading } from '../gameEdit'
 import { LegacyGamePanel } from './LegacyGamePanel'
 import { ViewerBar, ViewerScroll } from './ViewerBar'
@@ -588,6 +589,10 @@ export function GameViewer({
               onEnded={() => setPlaying(false)}
               onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
               onLoadedMetadata={(e) => {
+                if (needsProxy({ errored: false, videoWidth: e.currentTarget.videoWidth })) {
+                  setVideoError(true)
+                  reportFullVideoFailure(fullVideoFailureDetail({ videoWidth: 0, errorCode: null }, currentBrowserName()))
+                }
                 e.currentTarget.volume = vol.volume
                 e.currentTarget.muted = vol.muted
                 const first = pendingCand.current ? cands.find((c) => c.id === pendingCand.current) : null
@@ -602,13 +607,19 @@ export function GameViewer({
                   void e.currentTarget.play().catch((err: unknown) => setVideoError(isPlaybackFailure(err)))
                 }
               }}
-              onError={() => setVideoError(true)}
+              onError={(e) => {
+                setVideoError(true)
+                reportFullVideoFailure(
+                  fullVideoFailureDetail({ videoWidth: e.currentTarget.videoWidth, errorCode: e.currentTarget.error?.code ?? null }, currentBrowserName()),
+                )
+              }}
             />
             {volumeToast !== null && <VolumeToast percent={volumeToast} />}
             {helpOpen && <ShortcutPanel onClose={() => setHelpOpen(false)} />}
             {videoError && (
               <p className="text-sm text-amber-300">
-                이 브라우저에서 풀영상을 재생하지 못했습니다. 스팀 녹화(HEVC)라면 설치된 Edge/Chrome 에서 열거나 HEVC 확장을 설치해 주세요.
+                이 브라우저에서 풀영상을 재생하지 못했습니다(화면이 검게 나오는 것도 같은 원인입니다). 스팀 녹화(HEVC)는 그래픽 가속이 켜진 Edge/Chrome 에서만 보일 수 있으니,
+                이 주소를 Edge/Chrome 에 붙여 넣어 열어 보세요. 그래도 안 되면 옵션 → 정보·진단의 &quot;진단 정보 보내기&quot;로 환경 정보를 보내 주세요.
               </p>
             )}
 

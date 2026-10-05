@@ -109,3 +109,27 @@ def test_environment_never_raises_when_probes_fail(monkeypatch, tmp_path):
 
 def test_a_bare_host_in_the_server_address_becomes_https(monkeypatch):
     assert load_endpoint(cfg(), environ={"LUMIA_RECEIVER_URL": "r.example.com/", "LUMIA_RECEIVER_TOKEN": "t"}).url == "https://r.example.com"
+
+
+# ── GPU·HEVC 확장 (재생 문제 진단용) ─────────────────────────────────
+
+
+def test_all_gpus_are_listed_with_driver_versions_and_basic_adapters_are_skipped():
+    gpus = [("Intel(R) UHD Graphics 770", "31.0.101.4502"), ("NVIDIA GeForce RTX 4070", "32.0.15.6094"),
+            ("Microsoft Basic Display Adapter", None), ("Unknown", None)]
+    assert environment._format_gpus(gpus) == "Intel(R) UHD Graphics 770 31.0.101.4502 / NVIDIA GeForce RTX 4070 32.0.15.6094 / Unknown"
+    assert environment._format_gpus([("Microsoft Basic Display Adapter", None)]) is None
+    assert len(environment._format_gpus([("G" * 200, "1.0"), ("H" * 200, "1.0")])) == 256
+
+
+def test_hevc_extensions_are_read_from_installed_package_names():
+    names = [
+        "Microsoft.HEVCVideoExtension_2.2.9.0_x64__8wekyb3d8bbwe",
+        "Microsoft.HEVCVideoExtension_2.2.9.0_neutral_split.language-ko_8wekyb3d8bbwe",
+        "Microsoft.WindowsCalculator_11.2.0.0_x64__8wekyb3d8bbwe",
+    ]
+    assert environment._format_hevc_extensions(names) == "HEVCVideoExtension 2.2.9.0"
+    assert environment._format_hevc_extensions(names + ["Microsoft.HEVCVideoExtensions_1.0.5.0_x64__8wekyb3d8bbwe"]) == (
+        "HEVCVideoExtension 2.2.9.0 / HEVCVideoExtensions 1.0.5.0"
+    )
+    assert environment._format_hevc_extensions(["Microsoft.WindowsCalculator_11.2.0.0_x64__8wekyb3d8bbwe"]) == "none"

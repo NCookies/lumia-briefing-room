@@ -139,3 +139,12 @@ def test_V08_delete_key_asks_before_removing_a_saved_clip(go, page, world, serve
     page.get_by_role("dialog").get_by_role("button", name="삭제").click()
     expect(page.get_by_test_id("viewer-candidates")).to_contain_text("후보 2개", timeout=15000)
     assert len(list((world.root / "clips" / "보관함").glob("*.mp4"))) == 0
+
+
+def test_V09_a_full_video_the_browser_cannot_draw_shows_a_notice_and_is_reported(go, page):
+    page.route("**/api/games/*/video*", lambda route: route.fulfill(status=200, content_type="video/mp4", body=b"not a video"))
+    with page.expect_request("**/api/client-events/playback-failure") as reported:
+        open_game(page, go)
+        expect(page.get_by_text("이 브라우저에서 풀영상을 재생하지 못했습니다")).to_be_visible(timeout=15000)
+    assert '"kind":"fullvideo"' in reported.value.post_data
+    assert "videoWidth=0" in reported.value.post_data

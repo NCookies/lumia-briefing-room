@@ -1,4 +1,4 @@
-"""앱이 돌면서 스스로 재는 값(프록시 인코더·생성 시간, 분석 시간 비율, 하드웨어 디코딩 사용, HEVC 재생 가능 여부).
+"""앱이 돌면서 스스로 재는 값(프록시 인코더·생성 시간, 분석 시간 비율, 하드웨어 디코딩 사용, HEVC 재생 가능 여부, 브라우저 종류·코덱 판정·GPU).
 
 환경 정보(`Environment`)에 실려 "어떤 PC 에서 게임 중 부하가 큰가", "HEVC 없는 PC 에서 프록시가 얼마나 걸리는가"를 볼 수 있게 한다.
 최근 WINDOW 개의 평균만 남기고, 기록하는 일은 어떤 실패도 밖으로 내지 않는다(측정이 앱을 멈추면 안 된다).
@@ -11,6 +11,7 @@ import logging
 import math
 import os
 import threading
+from datetime import datetime, timezone
 from pathlib import Path
 
 from lumia_briefing_room import paths
@@ -19,6 +20,7 @@ from lumia_briefing_room.config import _default_local_appdata
 log = logging.getLogger("lumia_briefing_room.telemetry.runtime_stats")
 
 WINDOW = 20
+BROWSER_FIELDS = {"browser": 64, "hevcProbe": 160, "browserGpu": 128}
 _LOCK = threading.RLock()
 
 
@@ -87,6 +89,16 @@ class RuntimeStats:
             data["hevcPlayable"] = bool(playable)
             self._save(data)
 
+    def record_browser(self, info: dict) -> None:
+        values = {k: v[:limit] for k, limit in BROWSER_FIELDS.items() if isinstance(v := info.get(k), str) and v}
+        if not values:
+            return
+        with _LOCK:
+            data = self._load()
+            data.update(values)
+            data["hevcProbedAt"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            self._save(data)
+
     def snapshot(self) -> dict:
         with _LOCK:
             data = self._load()
@@ -101,6 +113,9 @@ class RuntimeStats:
             out["analysisTimeRatio"] = round(ratio, 3)
         for key in ("hwaccel", "hevcPlayable"):
             if isinstance(data.get(key), bool):
+                out[key] = data[key]
+        for key in (*BROWSER_FIELDS, "hevcProbedAt"):
+            if isinstance(data.get(key), str):
                 out[key] = data[key]
         return out
 
@@ -121,6 +136,13 @@ def record_analysis(process_sec, game_sec, hwaccel) -> None:
         get_runtime_stats().record_analysis(process_sec=process_sec, game_sec=game_sec, hwaccel=hwaccel)
     except Exception:
         log.debug("분석 통계를 기록하지 못했다", exc_info=True)
+
+
+def record_browser(info: dict) -> None:
+    try:
+        get_runtime_stats().record_browser(info)
+    except Exception:
+        log.debug("브라우저 재생 환경을 기록하지 못했다", exc_info=True)
 
 
 def record_hevc(playable) -> None:

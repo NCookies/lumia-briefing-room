@@ -23,7 +23,7 @@ import { getFirstRun } from './onboardingApi'
 import { isBackfillActive, progressPercent, type BackfillStatus } from './backfill'
 import { getBackfillStatus } from './backfillApi'
 import { getLegacyTrashCount } from './legacyTrashApi'
-import { browserCanPlayHevc } from './playback'
+import { probePlayback } from './playback'
 import { reportClientCapabilities } from './telemetryApi'
 import type { Route, TabId } from './route'
 import { useRoute, type GameNav } from './useRoute'
@@ -71,7 +71,9 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    reportClientCapabilities({ hevcPlayable: browserCanPlayHevc() !== '' }).catch(() => {})
+    probePlayback()
+      .then(reportClientCapabilities)
+      .catch(() => {})
   }, [])
 
   useEffect(() => {

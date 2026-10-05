@@ -34,7 +34,20 @@ export const sendDiagnostics = async (): Promise<DiagnosticsResult> =>
 export const getPrivacyText = async (): Promise<string> =>
   (await jsonOrThrow<{ markdown: string }>(await fetch(`${BASE}/privacy`), '개인정보 처리 안내 불러오기')).markdown
 
-export const reportClientCapabilities = async (capabilities: { hevcPlayable: boolean }): Promise<void> => {
+export const reportFullVideoFailure = (detail: string): void => {
+  fetch(`${BASE}/client-events/playback-failure`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind: 'fullvideo', detail }),
+  }).catch(() => {})
+}
+
+export const reportClientCapabilities = async (capabilities: {
+  hevcPlayable: boolean
+  browser?: string
+  hevcProbe?: string
+  browserGpu?: string
+}): Promise<void> => {
   await jsonOrThrow(
     await fetch(`${BASE}/client-capabilities`, {
       method: 'POST',

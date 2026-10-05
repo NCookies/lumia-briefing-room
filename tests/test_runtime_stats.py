@@ -175,3 +175,52 @@ def test_client_capabilities_endpoint_stores_hevc_support(tmp_path, monkeypatch)
     assert stats.snapshot()["hevcPlayable"] is False
     assert client.post("/api/client-capabilities", json={"hevcPlayable": "maybe"}).status_code == 400
     assert client.post("/api/client-capabilities", json={}).status_code == 400
+
+
+# ── 브라우저가 알려 주는 재생 환경(브라우저·코덱 판정·GPU) ──────────
+
+
+def test_browser_info_is_recorded_with_the_probe_time_and_reported_in_the_snapshot(tmp_path):
+    stats = RuntimeStats(tmp_path / "s.json")
+    stats.record_browser({"browser": "Chrome 141", "hevcProbe": "main=probably main10=no mc=unsupported", "browserGpu": "ANGLE (Intel, UHD 770)"})
+    snap = stats.snapshot()
+    assert snap["browser"] == "Chrome 141" and snap["browserGpu"] == "ANGLE (Intel, UHD 770)"
+    assert snap["hevcProbe"] == "main=probably main10=no mc=unsupported"
+    assert snap["hevcProbedAt"].endswith("Z")
+
+
+def test_browser_info_ignores_non_strings_and_truncates_long_values(tmp_path):
+    stats = RuntimeStats(tmp_path / "s.json")
+    stats.record_browser({"browser": 5, "hevcProbe": "x" * 500, "browserGpu": None, "unknown": "y"})
+    snap = stats.snapshot()
+    assert "browser" not in snap and "browserGpu" not in snap and "unknown" not in snap
+    assert len(snap["hevcProbe"]) == 160
+
+
+def test_client_capabilities_endpoint_accepts_the_browser_info(tmp_path, monkeypatch):
+    stats = RuntimeStats(tmp_path / "s.json")
+    monkeypatch.setattr(rs, "get_runtime_stats", lambda: stats)
+    app = create_app(Config(paths=PathsConfig(clips=tmp_path / "clips", temp=tmp_path / "t")), config_path=tmp_path / "config.json")
+    client = TestClient(app)
+    body = {"hevcPlayable": False, "browser": "Edge 141", "hevcProbe": "main=no", "browserGpu": "ANGLE (NVIDIA)"}
+    assert client.post("/api/client-capabilities", json=body).status_code == 200
+    snap = stats.snapshot()
+    assert snap["hevcPlayable"] is False and snap["browser"] == "Edge 141" and snap["browserGpu"] == "ANGLE (NVIDIA)"
+    assert client.post("/api/client-capabilities", json={"hevcPlayable": True, "browser": ["x"]}).status_code == 400
+
+
+def test_playback_failure_is_logged_as_an_error_once_per_distinct_report(tmp_path, caplog):
+    from lumia_briefing_room.api import telemetry_routes
+
+    telemetry_routes._reported_playback.clear()
+    app = create_app(Config(paths=PathsConfig(clips=tmp_path / "clips", temp=tmp_path / "t")), config_path=tmp_path / "config.json")
+    client = TestClient(app)
+    body = {"kind": "fullvideo", "detail": "videoWidth=0 error=none browser=Chrome 141"}
+    with caplog.at_level("ERROR", logger="lumia_briefing_room.playback"):
+        assert client.post("/api/client-events/playback-failure", json=body).status_code == 200
+        assert client.post("/api/client-events/playback-failure", json=body).status_code == 200
+        assert client.post("/api/client-events/playback-failure", json={"kind": "fullvideo", "detail": "videoWidth=0 error=4"}).status_code == 200
+    records = [r for r in caplog.records if r.name == "lumia_briefing_room.playback"]
+    assert len(records) == 2 and "videoWidth=0" in records[0].getMessage() and "풀영상" in records[0].getMessage()
+    assert client.post("/api/client-events/playback-failure", json={"kind": "other", "detail": "x"}).status_code == 400
+    assert client.post("/api/client-events/playback-failure", json={"kind": "fullvideo"}).status_code == 400

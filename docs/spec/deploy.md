@@ -71,7 +71,7 @@
 | `payload.py` | 메타데이터 → 계약 `Label`(변환·길이 정리·키 해시·표시용 ID) |
 | `collect.py` | 스팀·VOD 클립과 `.labels/` 보관소에서 라벨 수집 |
 | `outbox.py`·`scrub.py` | ERROR 이상 로그를 구조화 핸들러로 outbox(`outbox\errors.jsonl`, 20MB)에, 개인정보 제거·오류 지문 |
-| `environment.py`·`runtime_stats.py` | 환경 정보, 판독 실패 통계, 프록시 인코더·시간, 분석 시간 비율, hwaccel, HEVC 재생 여부 |
+| `environment.py`·`runtime_stats.py` | 환경 정보, 판독 실패 통계, 프록시 인코더·시간, 분석 시간 비율, hwaccel, HEVC 재생 여부, 브라우저·코덱 판정·WebGL 렌더러, 전체 GPU·드라이버 버전, 설치된 HEVC 확장 |
 | `client.py`·`sender.py` | 전송·재시도 분류, 하루 1회·백오프·동의/모드 게이트·미리보기·삭제 요청 |
 | `endpoint.py`·`state.py` | 서버 주소·토큰(설정 → 환경변수 → 번들), 진행 상태 |
 

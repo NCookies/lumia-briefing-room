@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -12,6 +13,11 @@ from fastapi import FastAPI, HTTPException
 from lumia_briefing_room import paths
 from lumia_briefing_room.telemetry import runtime_stats
 from lumia_briefing_room.telemetry.sender import TelemetrySender
+
+
+playback_log = logging.getLogger("lumia_briefing_room.playback")
+_reported_playback: set[tuple[str, str]] = set()
+_PLAYBACK_KINDS = {"fullvideo": "풀영상"}
 
 
 def privacy_path() -> Path:
@@ -77,5 +83,21 @@ def register_telemetry_routes(app: FastAPI) -> None:
         playable = body.get("hevcPlayable")
         if not isinstance(playable, bool):
             raise HTTPException(400, "hevcPlayable 은 true/false 여야 합니다")
+        info = {k: body[k] for k in runtime_stats.BROWSER_FIELDS if k in body}
+        if any(not isinstance(v, str) for v in info.values()):
+            raise HTTPException(400, "browser·hevcProbe·browserGpu 는 문자열이어야 합니다")
         runtime_stats.record_hevc(playable)
+        runtime_stats.record_browser(info)
+        return {"ok": True}
+
+    @app.post("/api/client-events/playback-failure")
+    def post_playback_failure(body: dict):
+        """브라우저가 영상을 못 그렸다는 보고(오류 없이 검게 나오는 경우 포함)를 오류 기록에 남긴다. 같은 내용은 앱을 켠 동안 한 번만."""
+        kind, detail = body.get("kind"), body.get("detail")
+        if kind not in _PLAYBACK_KINDS or not isinstance(detail, str) or not detail:
+            raise HTTPException(400, "kind(fullvideo)와 detail 이 필요합니다")
+        key = (kind, detail[:300])
+        if key not in _reported_playback:
+            _reported_playback.add(key)
+            playback_log.error("브라우저가 %s 을 재생하지 못했다: %s", _PLAYBACK_KINDS[kind], key[1])
         return {"ok": True}
