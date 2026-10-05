@@ -87,7 +87,12 @@ class Environment(_Allowlist):
     codec: str | None = Field(default=None, max_length=32)
     cpuModel: str | None = Field(default=None, max_length=128)
     cpuCores: int | None = Field(default=None, ge=1)
-    gpuName: str | None = Field(default=None, max_length=128)
+    gpuName: str | None = Field(default=None, max_length=256)
+    hevcExtension: str | None = Field(default=None, max_length=128)
+    browser: str | None = Field(default=None, max_length=64)
+    browserGpu: str | None = Field(default=None, max_length=128)
+    hevcProbe: str | None = Field(default=None, max_length=160)
+    hevcProbedAt: str | None = Field(default=None, max_length=40)
     memoryMb: int | None = Field(default=None, ge=1)
     hwaccel: bool | None = None
     hevcPlayable: bool | None = None

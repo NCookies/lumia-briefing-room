@@ -332,7 +332,42 @@
             "string",
             "null"
           ],
+          "maxLength": 256
+        },
+        "hevcExtension": {
+          "type": [
+            "string",
+            "null"
+          ],
           "maxLength": 128
+        },
+        "browser": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "browserGpu": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "hevcProbe": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 160
+        },
+        "hevcProbedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 40
         },
         "memoryMb": {
           "type": [
